@@ -1,0 +1,8 @@
+# Godot 4+ specific ignores
+.godot/
+
+# Exported builds (regenerate via Project > Export)
+build/
+
+# Local tool config, not meant to be shared
+.claude/
