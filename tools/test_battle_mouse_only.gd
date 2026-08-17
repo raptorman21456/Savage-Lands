@@ -23,6 +23,10 @@ func _init() -> void:
 	var goblin = goblin_script.new()
 	main.add_child(goblin)
 	goblin.global_position = main.player.global_position + Vector2(30, 0)
+	# This test isn't about the first-ever-battle tutorial -- mark it
+	# completed first so trigger_battle doesn't force a solo squad/pinned
+	# tile/gated menu on top of what's actually being tested here.
+	load("res://scripts/SaveData.gd").mark_tutorial_completed()
 	main.trigger_battle(goblin)
 	await process_frame
 

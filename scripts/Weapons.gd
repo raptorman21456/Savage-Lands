@@ -184,6 +184,20 @@ const HAND_PICKS := {
 
 const UPGRADABLE_TYPES := [SPEAR, GREATSWORD, HAMMER, BATTLE_AXE, DAGGER, BOW, KNUCKLE_GLOVES, HAND_PICKS]
 
+# Inverse of make_variant()'s id construction: a purchased/offered weapon's
+# id is always "<base_id>_<tier>_<material>" (or "<base_id>_mythic"), except
+# Club, which has no variants and IS its own base id already (make_variant
+# is never called on it). Returns {} only for something that matches no
+# known base -- shouldn't happen for anything actually sold in the shop.
+static func get_base_type(weapon: Dictionary) -> Dictionary:
+	var id: String = weapon.get("id", "")
+	if id == "club":
+		return CLUB
+	for base in UPGRADABLE_TYPES:
+		if id.begins_with("%s_" % base.id):
+			return base
+	return {}
+
 # Quality tiers rolled for each upgradeable weapon whenever the shop opens.
 # weight is out of 100 total across all tiers. rank orders them worst-to-best
 # so a shop roll can be restricted to "at least as good as what you own."

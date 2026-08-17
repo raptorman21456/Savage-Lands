@@ -623,6 +623,12 @@ var prev_reroll_key := false
 var prev_c_key := false
 
 var in_battle := false
+# First-ever-battle interactive tutorial. Gated device-wide via
+# SaveData.gd:is_tutorial_completed_ever (not per-save-slot). tutorial_step:
+# 0=Move, 1=Fight, 2=Defend. Set once in trigger_battle, left untouched by
+# _setup_battle_grid's per-battle reset block.
+var tutorial_active := false
+var tutorial_step := 0
 var battle_terrain := {}
 var battle_units := []
 # Battle-time representation of the player's recruited party (party_members +
@@ -1123,6 +1129,7 @@ func _build_hud() -> void:
 	hud.arrow_sell_pressed.connect(_on_arrow_sell_pressed)
 	hud.game_over_return_pressed.connect(_on_game_over_return_pressed)
 	hud.enemy_target_selected.connect(_on_enemy_target_selected)
+	hud.tutorial_skip_pressed.connect(_on_tutorial_skip_pressed)
 	hud.update_health(player.health, player.max_health)
 	hud.update_coins(player.coins)
 	hud.update_items(player.healing_items)
@@ -1350,6 +1357,9 @@ func _on_player_died() -> void:
 	if in_battle:
 		in_battle = false
 		hud.hide_battle()
+	# Bypasses _end_battle() entirely, so the tutorial's own gating/hint
+	# state needs its own defensive reset here too.
+	tutorial_active = false
 	if choosing_stat:
 		# A level-up triggered by the same killing blow that finished off
 		# the player (both can fire synchronously in the same attack-
@@ -1531,6 +1541,12 @@ func _refresh_enchant_display() -> void:
 
 func _on_enchant_apply_pressed(rune_id: String) -> void:
 	var applied: bool = player.try_apply_enchantment(rune_id)
+	if applied:
+		# weapon_enchantments is keyed by weapon, not rune, so it carries no
+		# per-run "first time" signal -- the lifetime seen-flag inside
+		# _maybe_announce_unlock is the only source of truth here.
+		var rune: Dictionary = EnchantmentsScript.get_rune(rune_id)
+		_maybe_announce_unlock("rune:%s" % rune_id, rune.name, rune.description)
 	play_sfx("purchase" if applied else "error")
 	_refresh_shop_display()
 
@@ -1553,7 +1569,13 @@ func _on_shop_lock_pressed(index: int) -> void:
 	_refresh_shop_display()
 
 func _on_arrow_buy_pressed(kind: String) -> void:
+	# All 3 kinds are pre-keyed at 0 from run start (Player.gd:owned_arrows),
+	# so "first time obtaining" is owned_arrows[kind] == 0, not a .has() check.
+	var is_first_arrow: bool = player.owned_arrows.get(kind, 0) == 0
 	var bought: bool = player.try_buy_arrow(kind)
+	if bought and is_first_arrow:
+		var info: Dictionary = WeaponsScript.ARROW_TYPES[kind]
+		_maybe_announce_unlock("arrow:%s" % kind, info.name, info.description)
 	play_sfx("purchase" if bought else "error")
 	_refresh_shop_display()
 
@@ -1561,6 +1583,14 @@ func _on_arrow_sell_pressed(kind: String) -> void:
 	var sold: bool = player.try_sell_arrow(kind)
 	play_sfx("purchase" if sold else "error")
 	_refresh_shop_display()
+
+# Shared "first time you ever obtain X" trigger for weapons/shields/arrows/
+# runes (skill tree nodes get their own copy in TitleScreen.gd, which has no
+# access to this HUD instance). title/description are always the item's own
+# EXISTING name/description text -- no new copy is authored here.
+func _maybe_announce_unlock(key: String, title: String, description: String) -> void:
+	if SaveDataScript.try_mark_unlock_seen(key):
+		hud.show_unlock_popup(title, description)
 
 func _on_player_xp_changed(current: int, needed: int) -> void:
 	hud.update_xp(current, needed)
@@ -1710,11 +1740,19 @@ func _on_shop_buy_pressed(index: int) -> void:
 		"armor":
 			bought = player.try_buy_armor(item)
 		"shield":
+			var is_new_shield: bool = not player.owned_shields.has(item.id)
 			bought = player.try_buy_shield(item)
+			if bought and is_new_shield:
+				_maybe_announce_unlock("shield:%s" % item.id.trim_prefix("shield_"), item.name, item.description)
 		"potion":
 			bought = player.try_buy_potion(item)
 		_:
+			var is_new_weapon: bool = not player.owned_weapons.has(item.id)
 			bought = player.try_buy_weapon(item)
+			if bought and is_new_weapon:
+				var base_type: Dictionary = WeaponsScript.get_base_type(item)
+				if not base_type.is_empty():
+					_maybe_announce_unlock("weapon:%s" % base_type.id, base_type.name, base_type.description)
 	play_sfx("purchase" if bought else "error")
 	_refresh_shop_display()
 
@@ -1871,7 +1909,12 @@ func _resolve_event_choice(id: String, accepted: bool) -> void:
 func trigger_battle(initial_enemy) -> void:
 	if in_battle or game_over or shop_open or choosing_stat:
 		return
-	var squad := _gather_squad(initial_enemy)
+	tutorial_active = not SaveDataScript.is_tutorial_completed_ever()
+	tutorial_step = 0
+	# A forced solo squad for the very first battle ever -- _gather_squad's
+	# proximity gathering could otherwise turn a brand-new player's first
+	# fight into a 2v1, which the tutorial's scripted hints don't account for.
+	var squad := [initial_enemy] if tutorial_active else _gather_squad(initial_enemy)
 	in_battle = true
 	get_tree().paused = true
 	_setup_battle_grid(squad)
@@ -2061,6 +2104,16 @@ func _setup_battle_grid(squad: Array) -> void:
 			"armored": traits.get("armored", false),
 			"disarmed_tile": Vector2i(-1, -1),
 		})
+
+	# Tutorial: pin the lone enemy onto the player's row, just past melee
+	# range, instead of its normal random row -- otherwise the gap could
+	# exceed a single Move's range and stall the scripted Move->Fight hint
+	# sequence. Only ever runs when trigger_battle forced a solo squad.
+	if tutorial_active and battle_units.size() == 1:
+		var tut_tile := Vector2i(mini(battle_player_tile.x + PLAYER_BASE_MOVE_RANGE + 1, BATTLE_GRID_W - 1), battle_player_tile.y)
+		used_tiles.erase(battle_units[0].tile)
+		battle_units[0].tile = tut_tile
+		used_tiles[tut_tile] = true
 
 	_place_ally_units(used_tiles)
 
@@ -2655,6 +2708,9 @@ func _handle_battle(_delta: float) -> void:
 func _on_battle_main_action(action: String) -> void:
 	if battle_turn != "player":
 		return
+	if tutorial_active and not _tutorial_action_allowed(action):
+		hud.battle_log("Follow the tutorial hint above.")
+		return
 	match action:
 		"move":
 			if battle_player_moves_left <= 0:
@@ -2696,6 +2752,9 @@ func _on_battle_main_action(action: String) -> void:
 
 func _on_battle_fight_action(action: String) -> void:
 	if battle_turn != "player":
+		return
+	if tutorial_active and tutorial_step == 1 and action != "attack" and action != "back":
+		hud.battle_log("Try a regular Attack.")
 		return
 	match action:
 		"attack":
@@ -2744,6 +2803,8 @@ func _on_battle_move_action(action: String) -> void:
 		return
 	match action:
 		"confirm":
+			if tutorial_active and tutorial_step == 0:
+				_advance_tutorial_hint()
 			battle_menu_state = "main"
 			battle_move_trail = []
 			_focus_battle_main_menu()
@@ -2762,7 +2823,10 @@ func _on_battle_move_action(action: String) -> void:
 # arrow-key navigation has somewhere to start from without needing a prior
 # mouse click.
 func _focus_battle_main_menu() -> void:
-	hud.battle_main_buttons["move"].grab_focus()
+	if tutorial_active:
+		hud.battle_main_buttons[["move", "fight", "defend"][tutorial_step]].grab_focus()
+	else:
+		hud.battle_main_buttons["move"].grab_focus()
 
 func _focus_battle_fight_menu() -> void:
 	hud.battle_fight_buttons["attack"].grab_focus()
@@ -3204,6 +3268,9 @@ func _battle_perform_attack(action: Dictionary) -> void:
 			player.regen_stamina(cost)
 		return
 
+	if tutorial_active and tutorial_step == 1 and action.get("is_regular_attack", false):
+		_advance_tutorial_hint()
+
 	# Snapshotted once, not re-read live from player.current_weapon on every
 	# _apply_single_hit call -- see that function's comment for why (a break
 	# roll partway through a multi-hit action must not change the stats
@@ -3573,6 +3640,8 @@ func _battle_player_defend() -> void:
 	# Resilience (repurposed): heal a flat amount every time you Defend.
 	if player.meta_block_heal_amount > 0:
 		player.heal(player.meta_block_heal_amount)
+	if tutorial_active and tutorial_step == 2:
+		_complete_tutorial()
 	_end_player_turn()
 
 # Taunt: mechanically identical to Defend (same reduction, same stamina
@@ -4682,3 +4751,57 @@ func _refresh_battle_display() -> void:
 	for u in battle_units:
 		u["spotted_you"] = u.get("aware_of_player", false)
 	hud.update_battle_grid(BATTLE_GRID_W, BATTLE_GRID_H, battle_terrain, battle_player_tile, battle_units, player.health, player.max_health, player.level, battle_turn, _effective_target_index(), battle_player_moves_left, player.stamina, player.max_stamina, player.current_weapon, battle_menu_state, player.healing_items, battle_move_trail, battle_allies, player.has_guardian_skill, battle_skill_cooldown, player.disarmed_tile != Vector2i(-1, -1), player.owned_arrows, battle_awaiting_evasion, can_mine, player.equipped_shield.get("name", ""), player.shield_block_chance(), player.berserk_turns_remaining, player.stealth_turns_remaining, STEALTH_STAMINA_COST)
+	if tutorial_active and battle_turn == "player":
+		hud.show_battle_hint(_tutorial_hint_text(), _tutorial_hint_target_button())
+	else:
+		hud.hide_battle_hint()
+
+# --- First-ever-battle tutorial (see trigger_battle/_setup_battle_grid for
+# the trigger + enemy-tile pinning that make this sequence always
+# completable). tutorial_step: 0=Move, 1=Fight, 2=Defend. ---------------
+
+func _tutorial_action_allowed(action: String) -> bool:
+	match tutorial_step:
+		0:
+			return action == "move"
+		1:
+			return action == "move" or action == "fight"
+		2:
+			return action == "defend"
+	return true
+
+func _tutorial_hint_text() -> String:
+	match tutorial_step:
+		0:
+			return "Press Move, then tap a highlighted tile and Confirm to reposition."
+		1:
+			if battle_menu_state == "fight":
+				return "Choose Attack to strike the enemy."
+			return "Open Fight to attack the enemy."
+		2:
+			return "Choose Defend to brace for the enemy's turn."
+	return ""
+
+func _tutorial_hint_target_button() -> Control:
+	match tutorial_step:
+		0:
+			return hud.battle_main_buttons["move"]
+		1:
+			if battle_menu_state == "fight":
+				return hud.battle_fight_buttons["attack"]
+			return hud.battle_main_buttons["fight"]
+		2:
+			return hud.battle_main_buttons["defend"]
+	return null
+
+func _advance_tutorial_hint() -> void:
+	tutorial_step += 1
+
+func _complete_tutorial() -> void:
+	tutorial_active = false
+	SaveDataScript.mark_tutorial_completed()
+
+func _on_tutorial_skip_pressed() -> void:
+	if tutorial_active:
+		_complete_tutorial()
+		hud.battle_log("Tutorial skipped.")

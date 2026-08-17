@@ -386,6 +386,33 @@ static func mark_game_completed() -> void:
 	data.game_completed_ever = true
 	save_lifetime_data(data)
 
+static func is_tutorial_completed_ever() -> bool:
+	return load_lifetime_data().get("tutorial_completed_ever", false)
+
+static func mark_tutorial_completed() -> void:
+	var data := load_lifetime_data()
+	data.tutorial_completed_ever = true
+	save_lifetime_data(data)
+
+static func is_unlock_seen(key: String) -> bool:
+	return load_lifetime_data().get("seen_unlocks", {}).get(key, false)
+
+static func mark_unlock_seen(key: String) -> void:
+	var data := load_lifetime_data()
+	if not data.has("seen_unlocks"):
+		data.seen_unlocks = {}
+	data.seen_unlocks[key] = true
+	save_lifetime_data(data)
+
+# Atomic check-and-mark -- true only the first time `key` is ever seen,
+# false on every later call (any run, any slot, forever). Callers use this
+# directly instead of pairing the two functions above themselves.
+static func try_mark_unlock_seen(key: String) -> bool:
+	if is_unlock_seen(key):
+		return false
+	mark_unlock_seen(key)
+	return true
+
 # Run-end aggregates, updated on EVERY run-end (death or victory alike) --
 # unlike game_completed_ever, these don't gate anything, they're purely for
 # the title screen's Stats display. world_reached_index is only used here to

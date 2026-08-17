@@ -219,8 +219,19 @@ signal arrow_buy_pressed(kind: String)
 signal arrow_sell_pressed(kind: String)
 signal game_over_return_pressed
 signal enemy_target_selected(index: int)
+signal tutorial_skip_pressed
 
 var battle_panel: ColorRect
+var battle_hint_panel: Panel
+var battle_hint_label: Label
+var battle_tutorial_skip_button: Button
+# "First time you obtained X" card -- a direct child of HUD itself (not
+# nested in battle_panel/shop_window), so it stays on top and visible
+# regardless of which sub-panel is currently active. See _build_unlock_popup.
+var unlock_popup_panel: Panel
+var unlock_popup_name_label: Label
+var unlock_popup_desc_label: Label
+var unlock_popup_dismiss_button: Button
 var battle_tile_rects := {}
 var battle_tile_icons := {}
 var battle_tile_markers := {}
@@ -751,6 +762,46 @@ func _ready() -> void:
 	game_over_panel.add_child(game_over_return_button)
 
 	_build_battle_ui()
+	_build_unlock_popup()
+
+# "First time you obtained X" card, shared across skills/weapons/shields/
+# arrows/runes (see Main.gd:_maybe_announce_unlock). Added last -- and
+# directly to HUD itself rather than nested in any sub-panel -- so it's
+# always the topmost sibling Control no matter which other panel (shop,
+# battle, pause) is currently showing. Non-blocking: mouse_filter=IGNORE on
+# the backdrop, no pause/focus-grab, just an informational overlay.
+func _build_unlock_popup() -> void:
+	unlock_popup_panel = Panel.new()
+	unlock_popup_panel.size = Vector2(280, 100)
+	unlock_popup_panel.position = Vector2(get_viewport().get_visible_rect().size.x - 300, 20)
+	unlock_popup_panel.visible = false
+	unlock_popup_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	unlock_popup_panel.add_theme_stylebox_override("panel", _make_stylebox(PANEL_BG, PANEL_BORDER, 3, 0, 10))
+	add_child(unlock_popup_panel)
+
+	unlock_popup_name_label = Label.new()
+	unlock_popup_name_label.position = Vector2(10, 8)
+	unlock_popup_name_label.size = Vector2(260, 22)
+	unlock_popup_name_label.add_theme_font_size_override("font_size", 16)
+	unlock_popup_name_label.add_theme_color_override("font_color", Color(1.0, 0.9, 0.2))
+	unlock_popup_panel.add_child(unlock_popup_name_label)
+
+	unlock_popup_desc_label = Label.new()
+	unlock_popup_desc_label.position = Vector2(10, 32)
+	unlock_popup_desc_label.size = Vector2(260, 50)
+	unlock_popup_desc_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+	unlock_popup_desc_label.add_theme_font_size_override("font_size", 13)
+	unlock_popup_desc_label.add_theme_color_override("font_color", Color(1.0, 0.95, 0.8))
+	unlock_popup_panel.add_child(unlock_popup_desc_label)
+
+	unlock_popup_dismiss_button = Button.new()
+	unlock_popup_dismiss_button.text = "X"
+	unlock_popup_dismiss_button.position = Vector2(250, 6)
+	unlock_popup_dismiss_button.size = Vector2(22, 20)
+	unlock_popup_dismiss_button.pressed.connect(hide_unlock_popup)
+	_add_hover_color(unlock_popup_dismiss_button)
+	_style_standard_button(unlock_popup_dismiss_button, 4)
+	unlock_popup_panel.add_child(unlock_popup_dismiss_button)
 
 # The Cliff/Ledge/Water art is drawn facing "down" (dir/push_dir ==
 # Vector2i(0, 1)) at 0 rotation -- every other cardinal direction rotates
@@ -1138,6 +1189,34 @@ func _build_battle_ui() -> void:
 		_style_standard_button(button)
 		battle_arrow_submenu_box.add_child(button)
 		battle_arrow_buttons[action[1]] = button
+
+	# First-ever-battle tutorial hint bubble + its Skip control -- see
+	# Main.gd's tutorial_active/tutorial_step for the sequencing logic that
+	# drives show_battle_hint/hide_battle_hint below. Both live as children
+	# of battle_panel so they fade in/out with it for free.
+	battle_hint_panel = Panel.new()
+	battle_hint_panel.size = Vector2(220, 50)
+	battle_hint_panel.visible = false
+	battle_hint_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	battle_hint_panel.add_theme_stylebox_override("panel", _make_stylebox(PANEL_BG, Color(1.0, 0.9, 0.2, 1.0), 2, 0, 8))
+	battle_panel.add_child(battle_hint_panel)
+
+	battle_hint_label = Label.new()
+	battle_hint_label.position = Vector2(8, 6)
+	battle_hint_label.size = Vector2(204, 38)
+	battle_hint_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+	battle_hint_label.add_theme_font_size_override("font_size", 14)
+	battle_hint_label.add_theme_color_override("font_color", Color(1.0, 0.95, 0.8))
+	battle_hint_panel.add_child(battle_hint_label)
+
+	battle_tutorial_skip_button = Button.new()
+	battle_tutorial_skip_button.text = "Skip Tutorial"
+	battle_tutorial_skip_button.visible = false
+	battle_tutorial_skip_button.position = Vector2(get_viewport().get_visible_rect().size.x - 160, 20)
+	battle_tutorial_skip_button.pressed.connect(func(): tutorial_skip_pressed.emit())
+	_add_hover_color(battle_tutorial_skip_button)
+	_style_standard_button(battle_tutorial_skip_button)
+	battle_panel.add_child(battle_tutorial_skip_button)
 
 # Wires up the shared hover/focus behavior every clickable menu button uses
 # across the whole HUD: a yellow highlight and a description shown in
@@ -2118,3 +2197,36 @@ func battle_log(msg: String) -> void:
 
 func hide_battle() -> void:
 	battle_panel.visible = false
+
+# Positioned fresh every call (not cached) -- called from Main.gd's
+# _refresh_battle_display, which already recomputes the rest of the battle
+# HUD every frame during the player's turn, so this stays correct with no
+# extra layout-timing handling needed.
+func show_battle_hint(text: String, target_button: Control) -> void:
+	battle_hint_label.text = text
+	battle_hint_panel.visible = true
+	battle_tutorial_skip_button.visible = true
+	if target_button == null:
+		return
+	var anchor: Vector2 = target_button.global_position - battle_panel.global_position
+	var desired := anchor + Vector2(target_button.size.x / 2.0 - battle_hint_panel.size.x / 2.0, -battle_hint_panel.size.y - 10)
+	var bounds: Vector2 = get_viewport().get_visible_rect().size
+	desired.x = clampf(desired.x, 10, bounds.x - battle_hint_panel.size.x - 10)
+	desired.y = clampf(desired.y, 10, bounds.y - battle_hint_panel.size.y - 10)
+	battle_hint_panel.position = desired
+
+func hide_battle_hint() -> void:
+	battle_hint_panel.visible = false
+	battle_tutorial_skip_button.visible = false
+
+# Simultaneous unlocks: deliberately non-queued -- a second call while one
+# is already showing just overwrites the text and stays visible. All five
+# acquisition points are one-at-a-time player clicks, so this is a rare
+# edge case and not worth a queue for a purely informational card.
+func show_unlock_popup(title: String, description: String) -> void:
+	unlock_popup_name_label.text = title
+	unlock_popup_desc_label.text = description
+	unlock_popup_panel.visible = true
+
+func hide_unlock_popup() -> void:
+	unlock_popup_panel.visible = false

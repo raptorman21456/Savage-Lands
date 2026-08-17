@@ -80,6 +80,14 @@ var quit_button: Button
 var upgrades_button: Button
 var stats_button: Button
 var description_label: Label
+# "First time you obtained X" card for skill tree nodes -- see HUD.gd's
+# unlock_popup_panel for the in-run twin of this (weapons/shields/arrows/
+# runes). Independent implementation: this screen has no access to that
+# HUD instance, and they're otherwise unrelated scripts/scenes.
+var unlock_popup_panel: Panel
+var unlock_popup_name_label: Label
+var unlock_popup_desc_label: Label
+var unlock_popup_dismiss_button: Button
 var main_menu_box: VBoxContainer
 
 var upgrades_box: VBoxContainer
@@ -561,6 +569,40 @@ func _ready() -> void:
 	_refresh_select_save_display()
 	slot_buttons[1].grab_focus()
 
+	# Added last -- directly to self, not nested in any screen box -- so it
+	# renders above whichever screen (upgrades_box etc.) is currently visible.
+	unlock_popup_panel = Panel.new()
+	unlock_popup_panel.size = Vector2(280, 100)
+	unlock_popup_panel.position = Vector2(get_viewport().get_visible_rect().size.x - 300, 20)
+	unlock_popup_panel.visible = false
+	unlock_popup_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	unlock_popup_panel.add_theme_stylebox_override("panel", _make_node_stylebox(Color(0.09, 0.08, 0.12, 0.97), Color(0.62, 0.48, 0.2, 1.0)))
+	add_child(unlock_popup_panel)
+
+	unlock_popup_name_label = Label.new()
+	unlock_popup_name_label.position = Vector2(10, 8)
+	unlock_popup_name_label.size = Vector2(260, 22)
+	unlock_popup_name_label.add_theme_font_size_override("font_size", 16)
+	unlock_popup_name_label.add_theme_color_override("font_color", Color(1.0, 0.9, 0.2))
+	unlock_popup_panel.add_child(unlock_popup_name_label)
+
+	unlock_popup_desc_label = Label.new()
+	unlock_popup_desc_label.position = Vector2(10, 32)
+	unlock_popup_desc_label.size = Vector2(260, 50)
+	unlock_popup_desc_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+	unlock_popup_desc_label.add_theme_font_size_override("font_size", 13)
+	unlock_popup_desc_label.add_theme_color_override("font_color", Color(0.85, 0.85, 0.6))
+	unlock_popup_panel.add_child(unlock_popup_desc_label)
+
+	unlock_popup_dismiss_button = Button.new()
+	unlock_popup_dismiss_button.text = "X"
+	unlock_popup_dismiss_button.position = Vector2(250, 6)
+	unlock_popup_dismiss_button.size = Vector2(22, 20)
+	unlock_popup_dismiss_button.pressed.connect(hide_unlock_popup)
+	_setup_hover_button(unlock_popup_dismiss_button, "Dismiss.")
+	_style_skill_node_button(unlock_popup_dismiss_button)
+	unlock_popup_panel.add_child(unlock_popup_dismiss_button)
+
 # Flat rectangular panel, no rounded corners or anti-aliasing -- matches the
 # crisp-edged StyleBoxFlat card look established for the shop (HUD.gd).
 func _make_node_stylebox(bg: Color, border: Color) -> StyleBoxFlat:
@@ -611,6 +653,20 @@ func _style_name_edit(line_edit: LineEdit) -> void:
 	line_edit.add_theme_color_override("font_selected_color", Color(0.09, 0.08, 0.12))
 	line_edit.add_theme_color_override("selection_color", Color(1.0, 0.9, 0.2, 0.55))
 	line_edit.add_theme_color_override("caret_color", Color(1.0, 0.9, 0.2))
+
+# Deliberately non-queued, same as HUD.gd's twin -- a second call while one
+# is already showing just overwrites the text and stays visible.
+func show_unlock_popup(title: String, description: String) -> void:
+	unlock_popup_name_label.text = title
+	unlock_popup_desc_label.text = description
+	unlock_popup_panel.visible = true
+
+func hide_unlock_popup() -> void:
+	unlock_popup_panel.visible = false
+
+func _maybe_announce_unlock(key: String, title: String, description: String) -> void:
+	if SaveDataScript.try_mark_unlock_seen(key):
+		show_unlock_popup(title, description)
 
 # Same yellow-highlight-plus-description hover/focus pattern used everywhere
 # else in the game's UI (shop, level-up, battle menus).
@@ -874,9 +930,13 @@ func _on_slot_action_cancel_pressed() -> void:
 	_show_select_save_screen()
 
 func _on_buy_upgrade_pressed(id: String) -> void:
+	var is_first_purchase: bool = save_data.get("upgrades", {}).get(id, 0) == 0
 	if SaveDataScript.try_buy_upgrade(save_data, id):
 		SaveDataScript.save_data(save_data)
 		_refresh_upgrades_display()
+		if is_first_purchase:
+			var def: Dictionary = SaveDataScript.UPGRADES[id]
+			_maybe_announce_unlock("skill:%s" % id, def.name, def.description)
 
 func _refresh_upgrades_display() -> void:
 	var essence: int = save_data.get("essence", 0)
