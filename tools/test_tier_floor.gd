@@ -1,6 +1,9 @@
 extends SceneTree
 
 func _init() -> void:
+	# Fixed seed: every random roll below repeats run to run, so a changed result
+	# is a real change, not luck.
+	seed(20260926)
 	var weapons = load("res://scripts/Weapons.gd")
 
 	# Rolling with min_rank=1 should never produce the bottom tier (Broken).

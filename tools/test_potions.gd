@@ -17,6 +17,9 @@ func _make_goblin(main, tile: Vector2i, hp: int = 999999) -> Dictionary:
 	}
 
 func _init() -> void:
+	# Fixed seed: every random roll below repeats run to run, so a changed result
+	# is a real change, not luck.
+	seed(20260926)
 	var potions_script = load("res://scripts/Potions.gd")
 	var main_scene = load("res://Main.tscn")
 	var main = main_scene.instantiate()

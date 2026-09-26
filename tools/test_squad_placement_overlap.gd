@@ -7,6 +7,9 @@ extends SceneTree
 # _setup_battle_grid directly, the same real path _gather_squad feeds into,
 # across many trials with a maximal 4-unit squad including a Brute.
 func _init() -> void:
+	# Fixed seed: every random roll below repeats run to run, so a changed result
+	# is a real change, not luck.
+	seed(20260926)
 	var main_scene = load("res://Main.tscn")
 	var main = main_scene.instantiate()
 	root.add_child(main)

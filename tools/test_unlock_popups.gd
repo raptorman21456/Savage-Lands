@@ -6,6 +6,9 @@ extends SceneTree
 # exactly once ever, non-blocking, no queue.
 
 func _init() -> void:
+	# Fixed seed: every random roll below repeats run to run, so a changed result
+	# is a real change, not luck.
+	seed(20260926)
 	var save_data_script = load("res://scripts/SaveData.gd")
 	var weapons_script = load("res://scripts/Weapons.gd")
 	var lifetime_path: String = save_data_script._resolve_lifetime_path()

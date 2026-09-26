@@ -18,6 +18,9 @@ func _press_key(keycode: int, pressed: bool) -> void:
 # Move mode (whose buttons deliberately can't hold focus, so they need
 # explicit key handling rather than the native ui_accept route).
 func _init() -> void:
+	# Fixed seed: every random roll below repeats run to run, so a changed result
+	# is a real change, not luck.
+	seed(20260926)
 	var title_scene = load("res://TitleScreen.tscn")
 	var title = title_scene.instantiate()
 	root.add_child(title)

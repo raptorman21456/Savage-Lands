@@ -5,6 +5,9 @@ extends SceneTree
 # this into the main title-screen test would make it unclear whether the
 # script's own quit() or the button's quit() ended the process.
 func _init() -> void:
+	# Fixed seed: every random roll below repeats run to run, so a changed result
+	# is a real change, not luck.
+	seed(20260926)
 	var title_scene = load("res://TitleScreen.tscn")
 	var title = title_scene.instantiate()
 	root.add_child(title)

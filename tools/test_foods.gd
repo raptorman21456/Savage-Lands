@@ -5,6 +5,9 @@ extends SceneTree
 # Also the Flea Market's Baker, which sells the other half of the catalog.
 
 func _init() -> void:
+	# Fixed seed: every random roll below repeats run to run, so a changed result
+	# is a real change, not luck.
+	seed(20260926)
 	var main = load("res://Main.tscn").instantiate()
 	root.add_child(main)
 	await physics_frame

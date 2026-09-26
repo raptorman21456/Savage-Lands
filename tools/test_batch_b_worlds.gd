@@ -42,6 +42,9 @@ func _check_world(main, wave_mini: int, wave_boss: int, world_name: String, mini
 		e.set_physics_process(false)
 
 func _init() -> void:
+	# Fixed seed: every random roll below repeats run to run, so a changed result
+	# is a real change, not luck.
+	seed(20260926)
 	var main_scene = load("res://Main.tscn")
 	var main = main_scene.instantiate()
 	root.add_child(main)

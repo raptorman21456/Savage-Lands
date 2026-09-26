@@ -6,6 +6,9 @@ extends SceneTree
 # everywhere.
 
 func _init() -> void:
+	# Fixed seed: every random roll below repeats run to run, so a changed result
+	# is a real change, not luck.
+	seed(20260926)
 	var main_scene = load("res://Main.tscn")
 	var main = main_scene.instantiate()
 	root.add_child(main)

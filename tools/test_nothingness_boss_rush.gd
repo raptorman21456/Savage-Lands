@@ -6,6 +6,9 @@ extends SceneTree
 # and the Worldwalker skill-tree capstone it unlocks lifetime-wide.
 
 func _init() -> void:
+	# Fixed seed: every random roll below repeats run to run, so a changed result
+	# is a real change, not luck.
+	seed(20260926)
 	# Explicit reset -- the lifetime file is a single shared scratch path
 	# across every test run (same convention test_skill_tree.gd's save_data
 	# reset already uses for the numbered slots), so a PREVIOUS test run
