@@ -301,7 +301,8 @@ var meta_worldwalker := false
 # _on_wolf_died) -- a single extra slot that doesn't count against
 # max_party_slots (empty dict = no wolf).
 var party_members: Array = []
-var max_party_slots := 2
+const BASE_PARTY_SLOTS := 2
+var max_party_slots := BASE_PARTY_SLOTS
 var party_wolf: Dictionary = {}
 
 # Battle-scoped weapon-special state, reset at the start of every battle
@@ -349,6 +350,19 @@ var berserk_turns_remaining := 0
 # ally or wanders. The player's own next attack breaks stealth immediately
 # for a guaranteed crit (Main.gd:_apply_single_hit's stealth_forced_crit).
 var stealth_turns_remaining := 0
+# Bloodmoon Fang (talisman): kill-driven Bloodlust stacks, owned here but
+# driven entirely by Main.gd (_apply_single_hit's kill block increments it,
+# _setup_battle_grid/the crash-debuff reset it to 0). bloodmoon_debuffed is
+# the -50%-all-combat-stats crash from 3 quiet turns -- read directly in
+# Main.gd's damage formula and armor_damage_reduction() below.
+const BLOODMOON_PCT_PER_STACK := 0.075
+const BLOODMOON_MAX_STACKS := 5
+var bloodmoon_stacks := 0
+var bloodmoon_debuffed := false
+# Weapon Whisperer (talisman): up to 3 learned special ids (any weapon type)
+# that override current_weapon's own specials -- see _apply_talisman_to_weapon
+# and DojoPanel.gd's toggle UI.
+var weapon_whisperer_specials: Array = []
 
 var health := max_health
 var facing := Vector2.DOWN
@@ -406,23 +420,22 @@ func _ready() -> void:
 	_equip_weapon(current_weapon)
 
 # Applies every permanent, Essence-bought upgrade from past runs -- this is
-# what makes a roguelike run start stronger than the last one, instead of
-# every death resetting progress to zero. Recomputes derived stats directly
-# rather than going through _recalc_stats(), since that emits signals Main.gd
-# forwards straight to `hud` -- and this runs during _ready(), before Main
-# has built the HUD those signals would be delivered to.
+# what makes a run start stronger than the last one, instead of every death
+# resetting progress to zero. Recomputes derived stats directly rather than
+# going through _recalc_stats(), since that emits signals Main.gd forwards
+# straight to `hud` -- and this runs during _ready(), before Main has built
+# the HUD those signals would be delivered to.
+#
+# Split in two on purpose: everything continuously READ (the meta_* values and
+# ownership flags) lives in _refresh_meta_passives, which is safe to re-run at
+# any time -- a Church purchase mid-run calls it again. What stays here are the
+# ONE-SHOT starting grants (coins, potions, allies, full heal), which must only
+# ever happen once per run.
 func _apply_meta_upgrades() -> void:
 	var bonuses: Dictionary = SaveDataScript.get_applied_bonuses()
 	difficulty_mult = SaveDataScript.get_difficulty_mult(SaveDataScript.load_data().get("difficulty", ""))
-	# Might/Swiftness/Vitality/Presence no longer touch starting stats at
-	# all -- they're stored here and applied per level-up instead, in
-	# apply_bonus_stat().
-	meta_levelup_bonus_strength = int(bonuses.get("strength", 0))
-	meta_levelup_bonus_agility = int(bonuses.get("agility", 0))
-	meta_levelup_bonus_vigor = int(bonuses.get("vigor", 0))
-	meta_levelup_bonus_intimidation = int(bonuses.get("intimidation", 0))
+	_refresh_meta_passives(bonuses)
 	coins += bonuses.get("coins", 0)
-	meta_worldwalker = bonuses.get("worldwalker", 0) > 0
 	max_health = int(round(stat_vigor * (1.0 + WORLDWALKER_HP_BONUS_PCT))) if meta_worldwalker else stat_vigor
 	health = max_health
 	attack_damage = int(round(stat_strength * (1.0 + WORLDWALKER_DAMAGE_BONUS_PCT))) if meta_worldwalker else stat_strength
@@ -431,6 +444,45 @@ func _apply_meta_upgrades() -> void:
 	max_stamina = MAX_STAMINA + int(bonuses.get("stamina", 0))
 	_base_max_stamina = max_stamina
 	stamina = max_stamina
+	# Not add_healing_item() -- that emits items_changed, which Main.gd
+	# forwards to `hud`, and this runs before Main has built the HUD (same
+	# reason everything else above avoids its signal-emitting setter too).
+	for i in int(bonuses.get("potions", 0)):
+		potion_queue.append("potion_health")
+	healing_items = potion_queue.size()
+
+	# Skill tree capstones -- one-time unlocks for fully investing in a wing
+	# (see SaveData.gd:UPGRADES). Each is now a whole new mechanic rather than a
+	# flat stat, so the ally-granting ones just seed the party here.
+	if bonuses.get("battle_hardened", 0) > 0:
+		party_members.append({"name": "Blade Ally", "dmg_mult": 0.75})
+	# Beastmaster (repurposed): guarantees a Traitor Wolf from the start of
+	# the run instead of a bonus recruit-chance -- Main.gd reads party_wolf
+	# being non-empty at run start to seed wolf_waves_remaining.
+	if bonuses.get("beastmaster", 0) > 0:
+		party_wolf = {"name": "Traitor Wolf", "dmg_mult": 0.6}
+	# Appraisal is a plain stacking stat node (extra starting coins), applied
+	# the same way its tier-1 counterpart is.
+	coins += int(bonuses.get("appraisal", 0))
+	# Second Wind is a plain stacking stat node too (extra healing items),
+	# applied after the base amount above so it adds on top rather than
+	# being overwritten by it.
+	for i in int(bonuses.get("second_wind", 0)):
+		potion_queue.append("potion_health")
+	healing_items = potion_queue.size()
+
+# Every continuously-read effect of the owned upgrades, as plain assignments --
+# idempotent, so calling it again after a purchase just brings the player up to
+# date. bonuses is SaveData.get_applied_bonuses() (stat_bonus * level per id).
+func _refresh_meta_passives(bonuses: Dictionary) -> void:
+	# Might/Swiftness/Vitality/Presence no longer touch starting stats at
+	# all -- they're stored here and applied per level-up instead, in
+	# apply_bonus_stat().
+	meta_levelup_bonus_strength = int(bonuses.get("strength", 0))
+	meta_levelup_bonus_agility = int(bonuses.get("agility", 0))
+	meta_levelup_bonus_vigor = int(bonuses.get("vigor", 0))
+	meta_levelup_bonus_intimidation = int(bonuses.get("intimidation", 0))
+	meta_worldwalker = bonuses.get("worldwalker", 0) > 0
 	luck_bonus = bonuses.get("luck", 0.0)
 	# Resilience/Reflexes/Dexterity themselves stay at 0 until unlocked (see
 	# _level_up) -- resilience_reduction/meta_dodge_chance/meta_crit_chance
@@ -442,59 +494,31 @@ func _apply_meta_upgrades() -> void:
 	meta_double_hit_chance = bonuses.get("berserker_edge", 0.0)
 	meta_lifesteal_pct = bonuses.get("vampiric_grit", 0.0)
 	meta_free_specials = bonuses.get("silver_tongue", 0) > 0
-	# Not add_healing_item() -- that emits items_changed, which Main.gd
-	# forwards to `hud`, and this runs before Main has built the HUD (same
-	# reason everything else above avoids its signal-emitting setter too).
-	for i in int(bonuses.get("potions", 0)):
-		potion_queue.append("potion_health")
-	healing_items = potion_queue.size()
-
-	# Skill tree capstones -- one-time unlocks for fully investing in a wing
-	# (see SaveData.gd:UPGRADES). Each is now a whole new
-	# mechanic rather than a flat stat, so this just sets the flag Main.gd/
-	# HUD.gd read; stat_bonus in SaveData.gd is vestigial for these, kept
-	# nonzero purely so `bonuses.get(id, 0) > 0` still detects ownership.
-	if bonuses.get("battle_hardened", 0) > 0:
-		party_members.append({"name": "Blade Ally", "dmg_mult": 0.75})
 	has_merchant_prince = bonuses.get("golden_touch", 0) > 0
 	has_guardian_skill = bonuses.get("undying", 0) > 0
 	# Pack Leader -- a further Warrior-wing unlock past Blade Ally itself, so
 	# a fully-invested run can field 2 recruited allies, not just 1. Warlord
 	# (deeper still) pushes it one further, to 4.
-	if bonuses.get("pack_leader", 0) > 0:
-		max_party_slots = 3
 	if bonuses.get("warlord", 0) > 0:
 		max_party_slots = 4
-
+	elif bonuses.get("pack_leader", 0) > 0:
+		max_party_slots = 3
+	else:
+		max_party_slots = BASE_PARTY_SLOTS
 	# Adrenaline (repurposed): extra damage DEALT below 30% HP, read in
 	# Main.gd:_apply_single_hit -- no longer a damage-reduction node.
 	meta_low_hp_damage_bonus_pct = bonuses.get("adrenaline", 0.0)
 	meta_bonus_coin_pct = bonuses.get("haggling", 0.0)
 	meta_healing_bonus_pct = bonuses.get("herbalism", 0.0)
 	meta_bonus_levelup_stat = bonuses.get("prodigy", 0) > 0
-	# Beastmaster (repurposed): guarantees a Traitor Wolf from the start of
-	# the run instead of a bonus recruit-chance -- Main.gd reads party_wolf
-	# being non-empty at run start to seed wolf_waves_remaining.
-	if bonuses.get("beastmaster", 0) > 0:
-		party_wolf = {"name": "Traitor Wolf", "dmg_mult": 0.6}
 	meta_wolf_bonus_waves = int(bonuses.get("pack_bond", 0))
 	meta_warband_bonus = bonuses.get("warband", 0.0)
 	meta_battle_medic = bonuses.get("battle_medic", 0) > 0
 	meta_war_chest_reduction = bonuses.get("war_chest", 0.0)
 	meta_war_profiteer_coins = int(bonuses.get("war_profiteer", 0))
-	# Appraisal is a plain stacking stat node (extra starting coins), applied
-	# the same way its tier-1 counterpart is.
-	coins += int(bonuses.get("appraisal", 0))
 	# Investor (repurposed): extra weapon slots rolled into every shop
 	# offering, read in Main.gd:_roll_shop_offering.
 	meta_investor_bonus_slots = int(bonuses.get("investor", 0))
-	# Second Wind is a plain stacking stat node too (extra healing items),
-	# applied after the base amount above so it adds on top rather than
-	# being overwritten by it.
-	for i in int(bonuses.get("second_wind", 0)):
-		potion_queue.append("potion_health")
-	healing_items = potion_queue.size()
-
 	# Block Master / Vigilant Defense (renamed) / Last Stand -- all read
 	# directly by Main.gd's damage-reduction/Defend pipeline.
 	meta_block_negate_chance = bonuses.get("block_master", 0.0)
@@ -515,6 +539,41 @@ func _apply_meta_upgrades() -> void:
 	meta_field_surgeon_discount_pct = bonuses.get("field_surgeon", 0.0)
 	meta_windfall_chance = bonuses.get("windfall", 0.0)
 	meta_reroll_discount_pct = bonuses.get("black_market", 0.0)
+
+# One newly bought skill level (the Church, Main.gd:apply_meta_purchase),
+# applied to the run already in progress. The slot file must already hold the
+# purchase (SaveData.get_applied_bonuses reads it). Re-runs the idempotent
+# refresh, then hands out only what THIS level grants of the one-shot kind --
+# never _apply_meta_upgrades again, which would re-add coins/potions/allies and
+# reset health.
+func apply_meta_purchase(id: String) -> void:
+	var bonuses: Dictionary = SaveDataScript.get_applied_bonuses()
+	_refresh_meta_passives(bonuses)
+	var per_level: float = float(SaveDataScript.UPGRADES.get(id, {}).get("stat_bonus", 0))
+	match id:
+		"coins", "appraisal":
+			coins += int(per_level)
+			coins_changed.emit(coins)
+		"stamina":
+			_base_max_stamina = MAX_STAMINA + int(bonuses.get("stamina", 0))
+			var old_max_stamina := max_stamina
+			max_stamina = _base_max_stamina + int(talisman_bonus("max_stamina"))
+			stamina = clampi(stamina + (max_stamina - old_max_stamina), 0, max_stamina)
+			stamina_changed.emit(stamina, max_stamina)
+		"potions", "second_wind":
+			add_potion("potion_health")
+		"battle_hardened":
+			if not party_members.any(func(m): return m.get("name", "") == "Blade Ally"):
+				party_members.append({"name": "Blade Ally", "dmg_mult": 0.75})
+		"beastmaster":
+			if party_wolf.is_empty():
+				party_wolf = {"name": "Traitor Wolf", "dmg_mult": 0.6}
+	# Worldwalker's +HP/+damage and the unlock-derived stats live in
+	# _recalc_stats; the weapon's baked passives (double-hit, lifesteal, free
+	# specials) only refresh on a re-equip.
+	_recalc_stats()
+	if not current_weapon_base.is_empty():
+		_equip_weapon(current_weapon_base)
 
 func _physics_process(delta: float) -> void:
 	if cooldown_timer > 0.0:
@@ -728,17 +787,31 @@ func _apply_upgrade_to_weapon(weapon: Dictionary) -> Dictionary:
 func _apply_talisman_to_weapon(weapon: Dictionary) -> Dictionary:
 	var discount: float = talisman_bonus("special_stamina_discount")
 	var flat_reduction: int = int(talisman_bonus("special_stamina_flat_reduction"))
+	var pct_increase: float = talisman_bonus("special_stamina_pct_increase")
 	var break_cut: float = talisman_bonus("break_reduction")
-	if discount <= 0.0 and flat_reduction <= 0 and break_cut <= 0.0:
+	var whisperer_active: bool = talisman_bonus("weapon_whisperer") > 0.0 and not weapon_whisperer_specials.is_empty()
+	if discount <= 0.0 and flat_reduction <= 0 and pct_increase <= 0.0 and break_cut <= 0.0 and not whisperer_active:
 		return weapon
 	var w: Dictionary = weapon.duplicate(true)
-	if discount > 0.0 or flat_reduction > 0:
+	# Weapon Whisperer (talisman): swaps in up to 3 learned specials (any
+	# weapon type) in place of this weapon's own, by slot index. A weapon
+	# with fewer slots than chosen specials (or none at all, like the Bow)
+	# just ignores the extras.
+	if whisperer_active:
+		var slots: Array = w.get("specials", [])
+		for i in mini(weapon_whisperer_specials.size(), slots.size()):
+			var found: Dictionary = DojoScript.locate_special(weapon_whisperer_specials[i])
+			if not found.is_empty():
+				slots[i] = found.special.duplicate(true)
+	if discount > 0.0 or flat_reduction > 0 or pct_increase > 0.0:
 		for special in w.get("specials", []):
 			if special.stamina_cost > 0:
 				var cost: int = special.stamina_cost
 				if discount > 0.0:
 					cost = int(round(cost * (1.0 - discount)))
 				cost -= flat_reduction
+				if pct_increase > 0.0:
+					cost = int(round(cost * (1.0 + pct_increase)))
 				special.stamina_cost = maxi(1, cost)
 	if break_cut > 0.0 and w.get("break_chance", 0.0) > 0.0:
 		w.break_chance *= maxf(0.0, 1.0 - break_cut)
@@ -754,6 +827,20 @@ func _stamp_learned_specials(weapon: Dictionary) -> void:
 
 func knows_special(special_id: String) -> bool:
 	return learned_specials.has(special_id)
+
+# Weapon Whisperer (talisman): toggles a learned special in/out of the
+# player's custom 3-move loadout. Silently no-ops past 3 already chosen
+# (DojoPanel only offers this on already-learned moves, so it's always a
+# valid id). Re-equips so the change is live on the very next fight.
+func toggle_whisperer_special(special_id: String) -> void:
+	if weapon_whisperer_specials.has(special_id):
+		weapon_whisperer_specials.erase(special_id)
+	elif weapon_whisperer_specials.size() < 3:
+		weapon_whisperer_specials.append(special_id)
+	else:
+		return
+	if not current_weapon_base.is_empty():
+		_equip_weapon(current_weapon_base)
 
 # Dojo lesson: pay the slot's price to learn a special. Only for weapon types
 # you currently hold at least one variant of. Refreshes the equipped weapon so
@@ -1033,7 +1120,15 @@ func try_buy_armor(armor: Dictionary) -> bool:
 # "damage_reduction" directly goes through here now (Main.gd's incoming-damage
 # sum, the Inventory's armour card) so clothes count everywhere at once.
 func armor_damage_reduction() -> float:
-	return armor_tier_damage_reduction() + clothing_damage_reduction() + talisman_bonus("damage_reduction") + coin_scaled_defense_bonus()
+	var total: float = armor_tier_damage_reduction() + clothing_damage_reduction() + talisman_bonus("damage_reduction") + coin_scaled_defense_bonus()
+	# Ironclad Ward (talisman): your whole defense multiplied by 2.5x, the
+	# trade for never being able to Move (Main.gd:_on_battle_main_action).
+	# Bloodmoon Fang's crash-debuff instead halves it, on top of that.
+	if talisman_bonus("ironclad_ward") > 0.0:
+		total *= 2.5
+	if bloodmoon_debuffed:
+		total *= 0.5
+	return total
 
 # Gilded Scarab (talisman): raw attack/defense scaled by the player's current
 # coin balance, read live rather than stamped at equip/level-up like other
@@ -1309,7 +1404,9 @@ func add_healing_item(count: int = 1) -> void:
 # "effect" ("" / "cleanse" / "guaranteed_crit") is Main.gd's cue for what
 # else to do -- see _battle_player_item.
 func use_healing_item() -> Dictionary:
-	if potion_queue.is_empty():
+	# Vampire's Pact (talisman): potions/food no longer do anything -- checked
+	# before touching the queue at all, so nothing is wasted.
+	if potion_queue.is_empty() or talisman_bonus("disable_healing_items") > 0.0:
 		return {}
 	return _consume_potion(potion_queue.pop_front())
 
@@ -1318,6 +1415,8 @@ func use_healing_item() -> Dictionary:
 # lets you drink any held potion directly, not just "the next one in line"
 # (see InventoryPanel.gd). Returns {} if none of that type are held.
 func use_specific_potion(potion_id: String) -> Dictionary:
+	if talisman_bonus("disable_healing_items") > 0.0:
+		return {}
 	var idx: int = potion_queue.find(potion_id)
 	if idx == -1:
 		return {}
@@ -1493,10 +1592,23 @@ func _recalc_stats() -> void:
 	# Talismans (max HP, move speed) are folded in here, not applied once and
 	# forgotten, so every level-up's recalculation keeps them.
 	max_health += int(talisman_bonus("max_hp"))
+	# Glass Cannon Charm (talisman): a multiplicative +/-% on top of the flat
+	# bonus above.
+	var max_hp_pct: float = talisman_bonus("max_hp_pct")
+	if max_hp_pct != 0.0:
+		max_health = max(1, int(round(max_health * (1.0 + max_hp_pct))))
 	health += max_health - old_max
 	health = clampi(health, 0, max_health)
+	# Last Stand Idol (talisman): overrides everything above -- always
+	# exactly 1 HP, regardless of Vigor, armor, or any other max-HP source.
+	if talisman_bonus("lock_hp_to_one") > 0.0:
+		max_health = 1
+		health = min(health, 1)
 	attack_damage = int(round(stat_strength * (1.0 + WORLDWALKER_DAMAGE_BONUS_PCT))) if meta_worldwalker else stat_strength
-	move_speed = stat_agility * (1.0 + talisman_bonus("move_speed_pct"))
+	# Bloodmoon Fang (talisman): battle-transient Bloodlust stacks add to move
+	# speed the same way a talisman's own move_speed_pct would (Main.gd drives
+	# bloodmoon_stacks directly -- see _apply_single_hit/_on_enemy_died).
+	move_speed = stat_agility * (1.0 + talisman_bonus("move_speed_pct") + bloodmoon_stacks * BLOODMOON_PCT_PER_STACK)
 	attack_cooldown_max = max(MIN_ATTACK_COOLDOWN, BASE_ATTACK_COOLDOWN - COOLDOWN_REDUCTION_PER_AGILITY * (stat_agility - AGILITY_START))
 	resilience_reduction = min(RESILIENCE_REDUCTION_CAP, stat_resilience * RESILIENCE_PCT_PER_POINT)
 	meta_dodge_chance = min(REFLEXES_DODGE_CAP, stat_reflexes * REFLEXES_PCT_PER_POINT)

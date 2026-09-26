@@ -3,7 +3,7 @@ class_name SaveData
 
 # Persistent meta-progression: Essence earned on death (based on waves
 # cleared that run) banks permanently and buys permanent starting-stat
-# upgrades from the title screen, applied to every future run. This is what
+# upgrades at the Church in town, applied to every future run. This is what
 # makes death matter instead of just resetting everything to zero.
 const ESSENCE_PER_WAVE_CLEARED := 8
 
@@ -306,9 +306,11 @@ static func copy_slot(from: int, to: int) -> void:
 	fw.store_string(text)
 	fw.close()
 
-# Permadeath: dying wipes the slot's file entirely -- essence, upgrades,
-# best_wave, difficulty, all of it. slot_exists(n) reads false again
-# afterward, so the title screen offers it as [New Game] once more.
+# Removes the slot's file entirely -- essence, upgrades, best_wave, difficulty,
+# all of it -- so slot_exists(n) reads false and the title screen offers it as
+# [New Game] again. Dying no longer does this (a death only ends the run, the
+# slot's Essence and upgrades persist); it's now just the player's own "Clear"
+# choice on the Select Save screen.
 static func delete_slot(n: int) -> void:
 	var path := _resolve_save_path(n)
 	if FileAccess.file_exists(path):
@@ -346,9 +348,9 @@ static func save_settings(data: Dictionary) -> void:
 
 # Lifetime progress (World Progression feature's Nothingness boss rush) --
 # a third, device-level file alongside the 3 numbered save slots and
-# settings.json, deliberately never touched by delete_slot. Permadeath wipes
-# a slot's essence/upgrades/best_wave every time, but "have you ever beaten
-# the game" needs to survive that -- see Main.gd's Nothingness completion
+# settings.json, deliberately never touched by delete_slot. A slot can be
+# cleared or copied over, but "have you ever beaten the game" needs to survive
+# that on any slot -- see Main.gd's Nothingness completion
 # handling and the Worldwalker skill node below, which is gated on
 # game_completed_ever rather than a normal prereq.
 static func _resolve_lifetime_path() -> String:

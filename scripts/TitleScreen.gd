@@ -3,99 +3,35 @@ class_name TitleScreen
 
 const SaveDataScript := preload("res://scripts/SaveData.gd")
 const BeastiaryPanelScript := preload("res://scripts/BeastiaryPanel.gd")
+const TitleBackdropScript := preload("res://scripts/TitleBackdrop.gd")
+const PixelLogoScript := preload("res://scripts/PixelLogo.gd")
+const PixelUIScript := preload("res://scripts/PixelUI.gd")
 
-# A real tree: hand-placed (col, row) positions for every node (see
-# SaveData.gd:UPGRADES) so branch/converge/split connector lines read
-# cleanly. Each wing (Warrior/Merchant/Survivor) gets 3 sub-columns (branch
-# A / trunk / branch B) with a blank gap column between wings, so a wing's
-# own connectors never cross a neighboring wing's nodes. The 3 cross-wing
-# convergence nodes sit below the main rows, pulled toward whichever
-# position keeps both of their connector lines clear of a third wing's
-# nodes -- the part most likely to need a visual tweak after a look.
-const SKILL_TREE_LAYOUT := {
-	# Warrior wing (cols 0-2)
-	"strength": Vector2i(1, 0),
-	"agility": Vector2i(1, 1),
-	"vigor": Vector2i(0, 2),
-	"reflexes_unlock": Vector2i(2, 2),
-	"dexterity_unlock": Vector2i(2, 1),
-	"berserker_edge": Vector2i(0, 3),
-	"adrenaline": Vector2i(2, 3),
-	"battle_hardened": Vector2i(1, 4),
-	"pack_leader": Vector2i(1, 5),
-	"prodigy": Vector2i(0, 6),
-	"warlord": Vector2i(1, 6),
-	"beastmaster": Vector2i(2, 6),
-	# Warrior wing, deeper still (row 7+)
-	"pack_bond": Vector2i(2, 7),
-	"riposte": Vector2i(0, 7),
-	"momentum": Vector2i(1, 7),
-	"hardened": Vector2i(1, 8),
-	"rage": Vector2i(2, 8),
-	# Merchant wing (cols 4-6)
-	"coins": Vector2i(5, 0),
-	"intimidation": Vector2i(5, 1),
-	"luck": Vector2i(4, 2),
-	"haggling": Vector2i(6, 2),
-	"silver_tongue": Vector2i(4, 3),
-	"appraisal": Vector2i(6, 3),
-	"golden_touch": Vector2i(5, 4),
-	"investor": Vector2i(5, 5),
-	# Merchant wing, new col 7 (mirrors the col-3 gap on the Warrior side)
-	"fletcher": Vector2i(7, 1),
-	"field_surgeon": Vector2i(7, 2),
-	"windfall": Vector2i(7, 3),
-	"black_market": Vector2i(4, 4),
-	# Survivor wing (cols 8-10)
-	"stamina": Vector2i(9, 0),
-	"resilience_unlock": Vector2i(9, 1),
-	"potions": Vector2i(8, 2),
-	"herbalism": Vector2i(10, 2),
-	"vampiric_grit": Vector2i(8, 3),
-	"vigilant_defense": Vector2i(10, 3),
-	"undying": Vector2i(9, 4),
-	"second_wind": Vector2i(9, 5),
-	# Survivor wing, new col 11
-	"second_breath": Vector2i(11, 0),
-	"block_master": Vector2i(11, 1),
-	"last_stand": Vector2i(11, 2),
-	"shield_mastery": Vector2i(10, 1),
-	"unbreakable_guard": Vector2i(9, 2),
-	"favour": Vector2i(9, 7),
-	# Cross-wing convergence
-	"warband": Vector2i(3, 4),
-	"war_chest": Vector2i(7, 6),
-	"battle_medic": Vector2i(4, 7),
-	"war_profiteer": Vector2i(3, 5),
-	# Deliberately isolated below the whole tree, no prereqs/connector lines
-	# -- a post-game reward rather than part of any one wing's progression.
-	"worldwalker": Vector2i(5, 9),
-}
-const SKILL_NODE_W := 120.0
-const SKILL_NODE_H := 56.0
-const SKILL_COL_W := 140.0
-const SKILL_ROW_H := 80.0
+const GAME_TITLE := "SAVAGE LANDS"
+const GAME_SUBTITLE := "A tiny pixel-art action RPG"
+# The logo's width as a fraction of the window in the full title layout / the
+# compact one used while the wider stats screen is open.
+const LOGO_WIDTH_FRACTION := 0.56
+const LOGO_COMPACT_WIDTH_FRACTION := 0.26
 
 var play_button: Button
 var quit_button: Button
-var upgrades_button: Button
 var stats_button: Button
 var description_label: Label
-# "First time you obtained X" card for skill tree nodes -- see HUD.gd's
-# unlock_popup_panel for the in-run twin of this (weapons/shields/arrows/
-# runes). Independent implementation: this screen has no access to that
-# HUD instance, and they're otherwise unrelated scripts/scenes.
-var unlock_popup_panel: Panel
-var unlock_popup_name_label: Label
-var unlock_popup_desc_label: Label
-var unlock_popup_dismiss_button: Button
 var main_menu_box: VBoxContainer
 var beastiary_panel: BeastiaryPanelScript
 
-var upgrades_box: VBoxContainer
-var upgrades_header_label: Label
-var upgrade_buttons := {}
-var barbarian_deco: TextureRect
+# The living scene behind everything (sunset, ridges, the barbarian's campfire),
+# the pixel-font logo pinned above the menu, and the framed panel the menu
+# screens sit in. logo_compact shrinks the logo and dims the scene while a
+# screen too big to share the window with a full logo (the stats screen) is up.
+var backdrop: TitleBackdropScript
+var logo: PixelLogoScript
+var subtitle_label: Label
+var logo_block: VBoxContainer
+var menu_margin: MarginContainer
+var menu_panel: PanelContainer
+var logo_compact := false
 
 # Lifetime stats (SaveData.gd:record_lifetime_run_stats) -- a simple
 # read-only recap, not tied to any one save slot. One multi-line label,
@@ -104,7 +40,7 @@ var barbarian_deco: TextureRect
 var stats_box: VBoxContainer
 var stats_label: Label
 
-# Shown first, before Play/Upgrades/Quit: 3 independent save slots, each
+# Shown first, before Play/Quit: 3 independent save slots, each
 # locking in a difficulty (SaveData.gd:DIFFICULTIES) the moment it's created.
 # Picking an empty slot detours through difficulty_box; picking a filled one
 # goes straight to the main menu.
@@ -160,56 +96,54 @@ func _ready() -> void:
 	_bind_extra_select_key()
 	save_data = SaveDataScript.load_data()
 
-	var gradient := Gradient.new()
-	gradient.set_color(0, Color(0.1, 0.06, 0.18, 1.0))
-	gradient.set_color(1, Color(0.02, 0.02, 0.04, 1.0))
-	var gradient_texture := GradientTexture2D.new()
-	gradient_texture.gradient = gradient
-	gradient_texture.fill_from = Vector2(0, 0)
-	gradient_texture.fill_to = Vector2(0, 1)
+	# The scene behind everything: banded sunset, parallax ridges, the
+	# barbarian's campfire and its drifting embers (TitleBackdrop.gd).
+	backdrop = TitleBackdropScript.new()
+	add_child(backdrop)
 
-	var background := TextureRect.new()
-	background.texture = gradient_texture
-	background.stretch_mode = TextureRect.STRETCH_SCALE
-	background.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(background)
-
-	barbarian_deco = TextureRect.new()
-	barbarian_deco.texture = load("res://assets/barbarian.png")
-	barbarian_deco.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	barbarian_deco.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	barbarian_deco.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	barbarian_deco.position = Vector2(-260, -220)
-	barbarian_deco.size = Vector2(160, 160)
-	barbarian_deco.modulate = Color(1, 1, 1, 0.9)
-	add_child(barbarian_deco)
+	# The menu sits in a framed panel centered in whatever room the logo
+	# leaves below it (menu_margin's top margin tracks the logo's height).
+	menu_margin = MarginContainer.new()
+	menu_margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(menu_margin)
 
 	var center := CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(center)
+	menu_margin.add_child(center)
+
+	menu_panel = PanelContainer.new()
+	menu_panel.add_theme_stylebox_override("panel", PixelUIScript.panel_style())
+	center.add_child(menu_panel)
 
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 18)
 	column.alignment = BoxContainer.ALIGNMENT_CENTER
-	center.add_child(column)
+	menu_panel.add_child(column)
 
-	var title_label := Label.new()
-	title_label.text = "PIXEL QUEST"
-	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title_label.add_theme_font_size_override("font_size", 56)
-	title_label.add_theme_color_override("font_color", Color(1, 0.9, 0.3))
-	column.add_child(title_label)
+	# The logo block is added after the menu so it draws over it; it's pinned
+	# to the top and never takes part in the menu's centering.
+	logo_block = VBoxContainer.new()
+	logo_block.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	logo_block.offset_top = 26
+	logo_block.add_theme_constant_override("separation", 8)
+	logo_block.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(logo_block)
 
-	var subtitle_label := Label.new()
-	subtitle_label.text = "A tiny pixel-art action RPG"
+	logo = PixelLogoScript.new()
+	logo.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	logo_block.add_child(logo)
+
+	subtitle_label = Label.new()
+	subtitle_label.text = GAME_SUBTITLE
 	subtitle_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	subtitle_label.add_theme_font_size_override("font_size", 16)
-	subtitle_label.add_theme_color_override("font_color", Color(0.75, 0.75, 0.75))
-	column.add_child(subtitle_label)
+	subtitle_label.add_theme_color_override("font_color", Color(0.95, 0.82, 0.62))
+	subtitle_label.add_theme_color_override("font_outline_color", Color(0.05, 0.02, 0.08, 0.95))
+	subtitle_label.add_theme_constant_override("outline_size", 5)
+	subtitle_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	logo_block.add_child(subtitle_label)
 
-	var spacer := Control.new()
-	spacer.custom_minimum_size = Vector2(0, 20)
-	column.add_child(spacer)
+	resized.connect(_update_logo_layout)
+	_update_logo_layout()
 
 	main_menu_box = VBoxContainer.new()
 	main_menu_box.add_theme_constant_override("separation", 18)
@@ -226,14 +160,6 @@ func _ready() -> void:
 	_setup_hover_button(play_button, "Begin your adventure.")
 	_style_skill_node_button(play_button)
 	main_menu_box.add_child(play_button)
-
-	upgrades_button = Button.new()
-	upgrades_button.text = "Upgrades"
-	upgrades_button.custom_minimum_size = Vector2(180, 44)
-	upgrades_button.pressed.connect(_on_upgrades_pressed)
-	_setup_hover_button(upgrades_button, "Spend Essence earned from past runs on permanent bonuses.")
-	_style_skill_node_button(upgrades_button)
-	main_menu_box.add_child(upgrades_button)
 
 	switch_save_button = Button.new()
 	switch_save_button.text = "Switch Save"
@@ -490,64 +416,6 @@ func _ready() -> void:
 	description_label.add_theme_color_override("font_color", Color(0.85, 0.85, 0.6))
 	column.add_child(description_label)
 
-	upgrades_box = VBoxContainer.new()
-	upgrades_box.add_theme_constant_override("separation", 10)
-	upgrades_box.alignment = BoxContainer.ALIGNMENT_CENTER
-	upgrades_box.visible = false
-	column.add_child(upgrades_box)
-
-	upgrades_header_label = Label.new()
-	upgrades_header_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	upgrades_header_label.add_theme_font_size_override("font_size", 18)
-	upgrades_header_label.add_theme_color_override("font_color", Color(1, 0.9, 0.3))
-	upgrades_box.add_child(upgrades_header_label)
-
-	# A real tree: nodes positioned absolutely from SKILL_TREE_LAYOUT (a
-	# Container can't express branching/converging lines), with thin rotated
-	# ColorRects as connectors -- the same absolute-position-plus-drawn-line
-	# technique HUD.gd's battle grid already uses for arbitrary node layout.
-	# Both scroll directions are needed now (11 columns wide, 8 rows tall).
-	var upgrades_scroll := ScrollContainer.new()
-	upgrades_scroll.custom_minimum_size = Vector2(900, 480)
-	upgrades_box.add_child(upgrades_scroll)
-
-	var max_col := 0
-	var max_row := 0
-	for coord in SKILL_TREE_LAYOUT.values():
-		max_col = max(max_col, coord.x)
-		max_row = max(max_row, coord.y)
-
-	var tree_area := Control.new()
-	tree_area.custom_minimum_size = Vector2((max_col + 1) * SKILL_COL_W, (max_row + 1) * SKILL_ROW_H)
-	upgrades_scroll.add_child(tree_area)
-
-	# Connectors are added before the node buttons, so each button visually
-	# draws over (and clips) the line ends beneath it -- reads as edge-to-
-	# edge rather than center-to-center.
-	for id in SaveDataScript.UPGRADE_IDS:
-		for prereq in SaveDataScript.UPGRADES[id].get("prereqs", []):
-			_draw_connector(tree_area, _skill_node_center(prereq.id), _skill_node_center(id))
-
-	for id in SaveDataScript.UPGRADE_IDS:
-		var def: Dictionary = SaveDataScript.UPGRADES[id]
-		var button := Button.new()
-		var node_center: Vector2 = _skill_node_center(id)
-		button.position = node_center - Vector2(SKILL_NODE_W, SKILL_NODE_H) / 2.0
-		button.size = Vector2(SKILL_NODE_W, SKILL_NODE_H)
-		button.pressed.connect(_on_buy_upgrade_pressed.bind(id))
-		_setup_hover_button(button, def.description)
-		_style_skill_node_button(button)
-		tree_area.add_child(button)
-		upgrade_buttons[id] = button
-
-	var upgrades_back_button := Button.new()
-	upgrades_back_button.text = "Back"
-	upgrades_back_button.custom_minimum_size = Vector2(180, 40)
-	upgrades_back_button.pressed.connect(_on_upgrades_back_pressed)
-	_setup_hover_button(upgrades_back_button, "Return to the main menu.")
-	_style_skill_node_button(upgrades_back_button)
-	upgrades_box.add_child(upgrades_back_button)
-
 	stats_box = VBoxContainer.new()
 	stats_box.add_theme_constant_override("separation", 10)
 	stats_box.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -575,46 +443,50 @@ func _ready() -> void:
 	_style_skill_node_button(stats_back_button)
 	stats_box.add_child(stats_back_button)
 
-	# barbarian_deco overlaps select_save_box/difficulty_box the same way it
-	# overlaps the upgrades tree -- hidden whenever the main menu isn't the
-	# visible screen.
-	barbarian_deco.visible = false
 	_refresh_select_save_display()
 	slot_buttons[1].grab_focus()
 
-	# Added last -- directly to self, not nested in any screen box -- so it
-	# renders above whichever screen (upgrades_box etc.) is currently visible.
-	unlock_popup_panel = Panel.new()
-	unlock_popup_panel.size = Vector2(280, 100)
-	unlock_popup_panel.position = Vector2(get_viewport().get_visible_rect().size.x - 300, 20)
-	unlock_popup_panel.visible = false
-	unlock_popup_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	unlock_popup_panel.add_theme_stylebox_override("panel", _make_node_stylebox(Color(0.09, 0.08, 0.12, 0.97), Color(0.62, 0.48, 0.2, 1.0)))
-	add_child(unlock_popup_panel)
+	# Re-run now that every screen exists (the first call, above, ran before
+	# the stats screen was built).
+	_update_logo_layout()
 
-	unlock_popup_name_label = Label.new()
-	unlock_popup_name_label.position = Vector2(10, 8)
-	unlock_popup_name_label.size = Vector2(260, 22)
-	unlock_popup_name_label.add_theme_font_size_override("font_size", 16)
-	unlock_popup_name_label.add_theme_color_override("font_color", Color(1.0, 0.9, 0.2))
-	unlock_popup_panel.add_child(unlock_popup_name_label)
+	# Entrance: the logo fades up first, then the menu panel behind it.
+	logo_block.modulate.a = 0.0
+	menu_margin.modulate.a = 0.0
+	var intro := create_tween().set_parallel(true)
+	intro.tween_property(logo_block, "modulate:a", 1.0, 1.0)
+	intro.tween_property(menu_margin, "modulate:a", 1.0, 0.7).set_delay(0.45)
 
-	unlock_popup_desc_label = Label.new()
-	unlock_popup_desc_label.position = Vector2(10, 32)
-	unlock_popup_desc_label.size = Vector2(260, 50)
-	unlock_popup_desc_label.autowrap_mode = TextServer.AUTOWRAP_WORD
-	unlock_popup_desc_label.add_theme_font_size_override("font_size", 13)
-	unlock_popup_desc_label.add_theme_color_override("font_color", Color(0.85, 0.85, 0.6))
-	unlock_popup_panel.add_child(unlock_popup_desc_label)
+# Sizes the pixel logo to the window (bigger pixels on a bigger window, capped
+# so it never dominates) and reserves exactly its height above the menu. The
+# compact form (smaller logo, no subtitle) is for screens too big to share the
+# window with a full logo -- the stats screen.
+func _update_logo_layout() -> void:
+	if logo == null or size.x < 32.0:
+		return
+	var fraction: float = LOGO_COMPACT_WIDTH_FRACTION if logo_compact else LOGO_WIDTH_FRACTION
+	var cols_estimate := 69.0
+	var pixel: int = clampi(int(size.x * fraction / cols_estimate), 2, 10)
+	logo.set_logo(GAME_TITLE, pixel)
+	subtitle_label.visible = not logo_compact
+	var block_height: float = logo.custom_minimum_size.y + (0.0 if logo_compact else 32.0)
+	var top_margin: float = 26.0 + block_height + 8.0
+	menu_margin.add_theme_constant_override("margin_top", int(top_margin))
 
-	unlock_popup_dismiss_button = Button.new()
-	unlock_popup_dismiss_button.text = "X"
-	unlock_popup_dismiss_button.position = Vector2(250, 6)
-	unlock_popup_dismiss_button.size = Vector2(22, 20)
-	unlock_popup_dismiss_button.pressed.connect(hide_unlock_popup)
-	_setup_hover_button(unlock_popup_dismiss_button, "Dismiss.")
-	_style_skill_node_button(unlock_popup_dismiss_button)
-	unlock_popup_panel.add_child(unlock_popup_dismiss_button)
+func _set_logo_compact(compact: bool) -> void:
+	if compact == logo_compact:
+		return
+	logo_compact = compact
+	_update_logo_layout()
+
+# The scene dims behind the wide screens so it never fights the text on top of
+# it, and the logo shrinks to make room for them.
+func _process(_delta: float) -> void:
+	if backdrop == null:
+		return
+	var heavy: bool = stats_box.visible
+	_set_logo_compact(heavy)
+	backdrop.dim_target = 0.6 if heavy else (0.35 if beastiary_panel.visible else 0.0)
 
 # Flat rectangular panel, no rounded corners or anti-aliasing -- matches the
 # crisp-edged StyleBoxFlat card look established for the shop (HUD.gd).
@@ -627,34 +499,11 @@ func _make_node_stylebox(bg: Color, border: Color) -> StyleBoxFlat:
 	sb.set_content_margin_all(8)
 	return sb
 
-func _skill_node_center(id: String) -> Vector2:
-	var coord: Vector2i = SKILL_TREE_LAYOUT[id]
-	return Vector2(coord.x * SKILL_COL_W, coord.y * SKILL_ROW_H) + Vector2(SKILL_NODE_W, SKILL_NODE_H) / 2.0
-
-# A thin rotated ColorRect between two node centers -- branch, converge, and
-# split edges all render the same way, just a line segment between two
-# points. Added as a child of `parent` before any node buttons are (see the
-# call site in _ready()), so buttons drawn afterward clip the line ends
-# beneath them.
-func _draw_connector(parent: Control, from: Vector2, to: Vector2) -> void:
-	var connector := ColorRect.new()
-	connector.color = Color(0.55, 0.42, 0.18, 0.9)
-	var diff := to - from
-	connector.position = from
-	connector.size = Vector2(diff.length(), 3)
-	connector.rotation = diff.angle()
-	connector.pivot_offset = Vector2(0, 1.5)
-	parent.add_child(connector)
-
 func _style_skill_node_button(button: Button) -> void:
-	# Same bronze (0.62, 0.48, 0.2) HUD.gd's PANEL_BORDER/_style_standard_
-	# button use, so the title screen and every in-game menu share one
-	# border color instead of two near-but-not-quite-matching bronzes.
-	button.add_theme_stylebox_override("normal", _make_node_stylebox(Color(0.13, 0.12, 0.16, 0.92), Color(0.62, 0.48, 0.2, 1.0)))
-	button.add_theme_stylebox_override("hover", _make_node_stylebox(Color(0.22, 0.19, 0.1, 0.96), Color(1.0, 0.9, 0.2, 1.0)))
-	button.add_theme_stylebox_override("pressed", _make_node_stylebox(Color(0.18, 0.15, 0.06, 0.96), Color(1.0, 0.9, 0.2, 1.0)))
-	button.add_theme_stylebox_override("disabled", _make_node_stylebox(Color(0.08, 0.08, 0.09, 0.6), Color(0.25, 0.25, 0.25, 0.6)))
-	button.add_theme_stylebox_override("focus", _make_node_stylebox(Color(0, 0, 0, 0), Color(1.0, 0.9, 0.2, 1.0)))
+	# The shared pixel-art skin (PixelUI.gd): beveled bronze frame, rivets and a
+	# banded fill, with gold hover/focus states -- the same bronze the in-game
+	# menus use, so the title screen and the rest of the game still match.
+	PixelUIScript.skin_button(button)
 
 # Bronze/yellow-accent chrome for the save-name text fields, matching every
 # other bordered control on this screen instead of Godot's stock LineEdit box.
@@ -667,23 +516,9 @@ func _style_name_edit(line_edit: LineEdit) -> void:
 	line_edit.add_theme_color_override("selection_color", Color(1.0, 0.9, 0.2, 0.55))
 	line_edit.add_theme_color_override("caret_color", Color(1.0, 0.9, 0.2))
 
-# Deliberately non-queued, same as HUD.gd's twin -- a second call while one
-# is already showing just overwrites the text and stays visible.
-func show_unlock_popup(title: String, description: String) -> void:
-	unlock_popup_name_label.text = title
-	unlock_popup_desc_label.text = description
-	unlock_popup_panel.visible = true
-
-func hide_unlock_popup() -> void:
-	unlock_popup_panel.visible = false
-
-func _maybe_announce_unlock(key: String, title: String, description: String) -> void:
-	if SaveDataScript.try_mark_unlock_seen(key):
-		show_unlock_popup(title, description)
-
 # Same yellow-highlight-plus-description hover/focus pattern used everywhere
 # else in the game's UI (shop, level-up, battle menus).
-func _setup_hover_button(button: Button, description: String) -> void:
+func _setup_hover_button(button: Button, description: String, animate: bool = true) -> void:
 	button.focus_mode = Control.FOCUS_ALL
 	button.add_theme_color_override("font_hover_color", Color(1.0, 0.9, 0.2))
 	button.add_theme_color_override("font_focus_color", Color(1.0, 0.9, 0.2))
@@ -692,6 +527,24 @@ func _setup_hover_button(button: Button, description: String) -> void:
 	button.mouse_exited.connect(func(): description_label.text = "")
 	button.focus_entered.connect(func(): description_label.text = button.get_meta("description", ""))
 	button.focus_exited.connect(func(): description_label.text = "")
+	if animate:
+		# A quick swell on hover/focus, so the menu feels alive under the
+		# cursor instead of just changing color. Scaling doesn't disturb the
+		# container layout, only how the button draws.
+		button.resized.connect(func(): button.pivot_offset = button.size / 2.0)
+		button.mouse_entered.connect(_swell_button.bind(button, 1.06))
+		button.focus_entered.connect(_swell_button.bind(button, 1.06))
+		button.mouse_exited.connect(_swell_button.bind(button, 1.0))
+		button.focus_exited.connect(_swell_button.bind(button, 1.0))
+
+func _swell_button(button: Button, target_scale: float) -> void:
+	if button.has_meta("swell_tween"):
+		var old: Tween = button.get_meta("swell_tween")
+		if old != null and old.is_valid():
+			old.kill()
+	var tween := button.create_tween()
+	tween.tween_property(button, "scale", Vector2(target_scale, target_scale), 0.09).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	button.set_meta("swell_tween", tween)
 
 # Registers Z as an extra key for Godot's built-in "ui_accept" action --
 # once bound, it activates whatever Control has keyboard focus everywhere
@@ -714,38 +567,14 @@ func _on_play_pressed() -> void:
 func _on_quit_pressed() -> void:
 	get_tree().quit()
 
-func _on_upgrades_pressed() -> void:
-	select_save_box.visible = false
-	difficulty_box.visible = false
-	main_menu_box.visible = false
-	upgrades_box.visible = true
-	stats_box.visible = false
-	slot_action_box.visible = false
-	copy_target_box.visible = false
-	slot_options_box.visible = false
-	# The tree is now much wider than the old 3-column layout and scrolls
-	# into the corner where this decoration sits -- hidden while it's open
-	# so it doesn't overlap real nodes/text.
-	barbarian_deco.visible = false
-	_refresh_upgrades_display()
-	upgrade_buttons[SaveDataScript.UPGRADE_IDS[0]].grab_focus()
-
-func _on_upgrades_back_pressed() -> void:
-	upgrades_box.visible = false
-	main_menu_box.visible = true
-	barbarian_deco.visible = true
-	play_button.grab_focus()
-
 func _on_stats_pressed() -> void:
 	select_save_box.visible = false
 	difficulty_box.visible = false
 	main_menu_box.visible = false
-	upgrades_box.visible = false
 	stats_box.visible = true
 	slot_action_box.visible = false
 	copy_target_box.visible = false
 	slot_options_box.visible = false
-	barbarian_deco.visible = false
 	_refresh_stats_display()
 
 func _on_stats_back_pressed() -> void:
@@ -787,12 +616,10 @@ func _show_select_save_screen() -> void:
 	select_save_box.visible = true
 	difficulty_box.visible = false
 	main_menu_box.visible = false
-	upgrades_box.visible = false
 	stats_box.visible = false
 	slot_action_box.visible = false
 	copy_target_box.visible = false
 	slot_options_box.visible = false
-	barbarian_deco.visible = false
 	_refresh_select_save_display()
 	slot_buttons[1].grab_focus()
 
@@ -800,12 +627,10 @@ func _show_main_menu() -> void:
 	select_save_box.visible = false
 	difficulty_box.visible = false
 	main_menu_box.visible = true
-	upgrades_box.visible = false
 	stats_box.visible = false
 	slot_action_box.visible = false
 	copy_target_box.visible = false
 	slot_options_box.visible = false
-	barbarian_deco.visible = true
 	play_button.grab_focus()
 
 # Opens the small Rename/Copy/Clear/Back menu for slot n (the "..." button
@@ -941,32 +766,3 @@ func _on_slot_action_confirm_pressed() -> void:
 
 func _on_slot_action_cancel_pressed() -> void:
 	_show_select_save_screen()
-
-func _on_buy_upgrade_pressed(id: String) -> void:
-	var is_first_purchase: bool = save_data.get("upgrades", {}).get(id, 0) == 0
-	if SaveDataScript.try_buy_upgrade(save_data, id):
-		SaveDataScript.save_data(save_data)
-		_refresh_upgrades_display()
-		if is_first_purchase:
-			var def: Dictionary = SaveDataScript.UPGRADES[id]
-			_maybe_announce_unlock("skill:%s" % id, def.name, def.description)
-
-func _refresh_upgrades_display() -> void:
-	var essence: int = save_data.get("essence", 0)
-	upgrades_header_label.text = "Essence: %d" % essence
-	var owned: Dictionary = save_data.get("upgrades", {})
-	for id in SaveDataScript.UPGRADE_IDS:
-		var def: Dictionary = SaveDataScript.UPGRADES[id]
-		var level: int = owned.get(id, 0)
-		var max_level: int = def.get("max_level", 999999)
-		var button: Button = upgrade_buttons[id]
-		if level >= max_level:
-			button.text = "%s\n[Mastered]" % def.name
-			button.disabled = true
-		elif not SaveDataScript.is_upgrade_unlocked(save_data, id):
-			button.text = "%s\n[Locked]" % def.name
-			button.disabled = true
-		else:
-			var cost: int = SaveDataScript.get_upgrade_cost(id, level)
-			button.text = "%s Lv.%d\n%d Essence" % [def.name, level, cost]
-			button.disabled = essence < cost

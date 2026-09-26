@@ -18,6 +18,11 @@ const KNOWN_KEYS := [
 	"luck", "coin_pct", "shop_discount", "coin_drop_chance", "attack_per_coin", "defense_per_coin", "xp_pct",
 	"move_speed_pct", "reveal_all_locations", "gambling_luck", "phoenix", "fishing_luck",
 	"arrow_unlimited", "arrow_price_pct",
+	# --- Wildcard ---
+	"max_hp_pct", "lifesteal_pct", "disable_healing_items", "momentum_chain",
+	"whirlwind_double_melee", "weapon_whisperer", "special_stamina_pct_increase",
+	"chaos_shard", "lock_hp_to_one", "oneshot_regular_enemies", "bloodmoon_fang",
+	"ironclad_ward", "wildfire_core",
 ]
 # Talismans.gd's doc comment also lists "special_stamina_discount",
 # "break_reduction", "max_hp", "max_stamina", "dodge_chance", "block_heal",
@@ -608,6 +613,221 @@ func _init() -> void:
 	print("no talisman: reveal_all_locations reads 0: %.2f (expected 0.00)" % [player.talisman_bonus("reveal_all_locations")])
 	_wear(player, ["pathfinders_compass"])
 	print("Pathfinder's Compass: reveal_all_locations is active: %.2f (expected 1.00)" % [player.talisman_bonus("reveal_all_locations")])
+	_reset(player)
+
+	# --- Wildcard talismans: extreme, build-defining trade-offs -------------------------------------------------
+	player.stat_vigor = 100
+	_reset(player)
+	var base_max_hp: int = player.max_health
+	_wear(player, ["glass_cannon_charm"])
+	print("Glass Cannon Charm: -50%% max HP: %d (expected %d), +75%% damage_pct: %.2f (expected 0.75)" % [
+		player.max_health, int(round(base_max_hp * 0.5)), player.talisman_bonus("damage_pct")
+	])
+	_reset(player)
+
+	# Vampire's Pact: 25% lifesteal on landed hits; potions/food disabled.
+	main.in_battle = true
+	main.battle_terrain.clear()
+	main.battle_allies = []
+	main.battle_player_tile = Vector2i(2, 2)
+	main.battle_turn = "player"
+	player.current_weapon = weapons.CLUB
+	_wear(player, ["vampires_pact"])
+	player.max_health = 100
+	player.health = 50
+	var pact_target := {"ref": null, "tile": Vector2i(3, 2), "hp": 999, "max_hp": 999, "move_range": 2, "damage": 0, "name": "Goblin"}
+	main.battle_units = [pact_target]
+	main._apply_single_hit(0, 1.0, "", weapons.CLUB, "You", Vector2i(-1, -1), 20, false)
+	print("Vampire's Pact: heals 25%% of damage dealt: health=%d (expected %d)" % [player.health, 55])
+	player.add_potion("potion_health")
+	var pact_result: Dictionary = player.use_healing_item()
+	print("...and potions/food no longer work at all: %s (expected true, empty result)" % [pact_result.is_empty()])
+	main.in_battle = false
+	_reset(player)
+
+	# Momentum Chain: +8%/stack uncapped while unhit; taking a hit resets the
+	# chain and costs a turn.
+	main.in_battle = true
+	main.battle_player_tile = Vector2i(2, 2)
+	main.battle_momentum_chain_stacks = 0
+	main.battle_player_turns_to_skip = 0
+	main.battle_player_defending = false
+	main.player_bleeding = false
+	player.berserk_turns_remaining = 0
+	player.equipped_shield = {}
+	_wear(player, ["momentum_chain"])
+	var chain_target := {"ref": null, "tile": Vector2i(3, 2), "hp": 999999, "max_hp": 999999, "move_range": 2, "damage": 0, "name": "Goblin"}
+	main.battle_units = [chain_target]
+	var chain_before1: int = chain_target.hp
+	main._apply_single_hit(0, 1.0, "", weapons.CLUB, "You", Vector2i(-1, -1), 10, false)
+	var chain_dealt1: int = chain_before1 - chain_target.hp
+	var chain_before2: int = chain_target.hp
+	main._apply_single_hit(0, 1.0, "", weapons.CLUB, "You", Vector2i(-1, -1), 10, false)
+	var chain_dealt2: int = chain_before2 - chain_target.hp
+	print("Momentum Chain: each unhit hit lands harder than the last: %d then %d (expected 10 then %d)" % [chain_dealt1, chain_dealt2, int(round(10 * 1.08))])
+	main._enemy_apply_damage({"ref": null, "tile": Vector2i(5, 6)}, Vector2i(2, 2), 5, {})
+	print("...but taking a hit resets the chain and costs a turn: stacks=%d (expected 0), turns_to_skip=%d (expected 1)" % [main.battle_momentum_chain_stacks, main.battle_player_turns_to_skip])
+	main.battle_player_turns_to_skip = 0
+	main.in_battle = false
+	_reset(player)
+
+	# Whirlwind Charm: melee regular Attacks land twice, all damage cut to 40%.
+	# current_weapon is set AFTER _wear -- _wear's _on_talismans_changed calls
+	# _equip_weapon(current_weapon_base) internally, which would otherwise
+	# silently re-equip whatever weapon was owned before this block (Deep
+	# Lung Charm's Spear) and clobber a CLUB set beforehand.
+	main.in_battle = true
+	main.battle_target_index = 0
+	player.stat_strength = 10
+	player.attack_damage = 10
+	player.temp_damage_bonus_pct = 0.0
+	player.stamina = player.MAX_STAMINA
+	_wear(player, ["whirlwind_charm"])
+	player.current_weapon = weapons.CLUB
+	var whirl_target := _make_goblin(main, Vector2i(3, 2))
+	main.battle_units = [whirl_target]
+	main._battle_player_fight()
+	print("Whirlwind Charm: a melee Attack lands twice at 40%% damage each: dealt=%d (expected %d)" % [999 - whirl_target.hp, 2 * int(round(10 * 0.4))])
+	var spear_weapon: Dictionary = weapons.SPEAR.duplicate(true)
+	player.current_weapon = spear_weapon
+	var whirl_spear_target := _make_goblin(main, Vector2i(3, 2))
+	main.battle_units = [whirl_spear_target]
+	main._battle_player_fight()
+	print("...but a long-range weapon (Spear) doesn't double-hit: dealt=%d (expected %d)" % [999 - whirl_spear_target.hp, int(round(int(round(10 * 0.55)) * 0.4))])
+	main.in_battle = false
+	_reset(player)
+
+	# Weapon Whisperer: pick any 3 learned specials (any weapon type) as your
+	# loadout; specials cost 50% more stamina.
+	player.learned_specials.clear()
+	player.owned_weapons["club"] = true
+	player.owned_weapons["spear_fine_steel"] = true
+	player.try_learn_special("spear_piercing_thrust")
+	player.coins += 1000
+	_wear(player, ["weapon_whisperer"])
+	player.weapon_whisperer_specials = []
+	player.toggle_whisperer_special("spear_piercing_thrust")
+	player.try_buy_weapon(weapons.CLUB)
+	print("Weapon Whisperer: a learned Spear move replaces the Club's own special: %s (expected spear_piercing_thrust)" % [player.current_weapon.specials[0].id])
+	print("...at +50%% stamina cost: %d (expected %d)" % [player.current_weapon.specials[0].stamina_cost, int(round(33 * 1.5))])
+	player.weapon_whisperer_specials = []
+	_reset(player)
+
+	# Chaos Shard: every hit's damage rerolled to 50%-160% of normal.
+	main.in_battle = true
+	player.current_weapon = weapons.CLUB
+	_wear(player, ["chaos_shard"])
+	var chaos_target := {"ref": null, "tile": Vector2i(3, 2), "hp": 999999, "max_hp": 999999, "move_range": 2, "damage": 0, "name": "Goblin"}
+	main.battle_units = [chaos_target]
+	var chaos_min := 99999
+	var chaos_max := 0
+	for i in 200:
+		var chaos_before: int = chaos_target.hp
+		main._apply_single_hit(0, 1.0, "", weapons.CLUB, "You", Vector2i(-1, -1), 100, false)
+		var chaos_dealt: int = chaos_before - chaos_target.hp
+		chaos_min = mini(chaos_min, chaos_dealt)
+		chaos_max = maxi(chaos_max, chaos_dealt)
+	print("Chaos Shard: damage varies between 50%% and 160%% of normal over 200 trials: min=%d max=%d (expected roughly 50-60 and 150-160)" % [chaos_min, chaos_max])
+	main.in_battle = false
+	_reset(player)
+
+	# Last Stand Idol: oneshots regular enemies (bosses excluded); HP locked
+	# to 1 no matter what.
+	player.stat_vigor = 500
+	_reset(player)
+	_wear(player, ["last_stand_idol"])
+	print("Last Stand Idol: HP is locked to 1 regardless of Vigor: max_health=%d health=%d (expected 1 1)" % [player.max_health, player.health])
+	main.in_battle = true
+	player.current_weapon = weapons.CLUB
+	var idol_target := {"ref": null, "tile": Vector2i(3, 2), "hp": 999999, "max_hp": 999999, "move_range": 2, "damage": 0, "name": "Goblin"}
+	main.battle_units = [idol_target]
+	main._apply_single_hit(0, 1.0, "", weapons.CLUB, "You", Vector2i(-1, -1), 1, false)
+	print("...and any hit instantly kills a regular enemy: hp=%d (expected <= 0)" % [idol_target.hp])
+	player.berserk_turns_remaining = 0
+	var idol_boss := {"ref": null, "tile": Vector2i(3, 2), "hp": 999999, "max_hp": 999999, "move_range": 2, "damage": 0, "name": "Boss"}
+	main.battle_units = [idol_boss]
+	main._apply_single_hit(0, 1.0, "", weapons.CLUB, "You", Vector2i(-1, -1), 1, false)
+	print("...but a boss-tier enemy just takes the normal hit: dealt=%d (expected 1)" % [999999 - idol_boss.hp])
+	main.in_battle = false
+	_reset(player)
+	player.stat_vigor = 100
+	player._recalc_stats()
+
+	# Bloodmoon Fang: kills stack +7.5% damage/+7.5% move speed each; 3 quiet
+	# turns crash it to -50% all combat stats.
+	main.in_battle = true
+	main.battle_player_tile = Vector2i(2, 2)
+	player.current_weapon = weapons.CLUB
+	player.stat_strength = 10
+	player.attack_damage = 10
+	player.stat_agility = 100
+	player.bloodmoon_stacks = 0
+	player.bloodmoon_debuffed = false
+	main.battle_bloodmoon_quiet_turns = 0
+	main.battle_had_combat_action_this_cycle = false
+	_wear(player, ["bloodmoon_fang"])
+	var bm_kill_target := {"ref": null, "tile": Vector2i(3, 2), "hp": 1, "max_hp": 1, "move_range": 2, "damage": 0, "name": "Goblin"}
+	main.battle_units = [bm_kill_target]
+	main._apply_single_hit(0, 1.0, "", weapons.CLUB, "You", Vector2i(-1, -1), 999, false)
+	player.berserk_turns_remaining = 0
+	print("Bloodmoon Fang: a kill stacks Bloodlust: stacks=%d (expected 1), move_speed reflects it: %.1f (expected %.1f)" % [
+		player.bloodmoon_stacks, player.move_speed, 100.0 * (1.0 + 0.075)
+	])
+	var bm_target := {"ref": null, "tile": Vector2i(3, 2), "hp": 999999, "max_hp": 999999, "move_range": 2, "damage": 0, "name": "Goblin"}
+	main.battle_units = [bm_target]
+	main._apply_single_hit(0, 1.0, "", weapons.CLUB, "You", Vector2i(-1, -1), 10, false)
+	print("...and the damage bonus lands in a real hit: dealt=%d (expected %d)" % [999999 - bm_target.hp, int(round(10 * 1.075))])
+	main.battle_had_combat_action_this_cycle = false
+	main._advance_bloodmoon_quiet_turn()
+	main.battle_had_combat_action_this_cycle = false
+	main._advance_bloodmoon_quiet_turn()
+	main.battle_had_combat_action_this_cycle = false
+	main._advance_bloodmoon_quiet_turn()
+	print("...3 quiet turns crash it: debuffed=%s (expected true), stacks=%d (expected 0)" % [player.bloodmoon_debuffed, player.bloodmoon_stacks])
+	main.in_battle = false
+	_reset(player)
+	player.bloodmoon_stacks = 0
+	player.bloodmoon_debuffed = false
+	player.stat_agility = 5
+	player._recalc_stats()
+
+	# Ironclad Ward: Move is disabled entirely; defense x2.5.
+	main.in_battle = true
+	main.battle_turn = "player"
+	main.battle_menu_state = "main"
+	main.battle_player_moves_left = 5
+	_wear(player, ["ironclad_ward"])
+	main._on_battle_main_action("move")
+	print("Ironclad Ward: Move is refused entirely: menu_state=%s (expected main, not move)" % [main.battle_menu_state])
+	player.equipped_armor = load("res://scripts/Armor.gd").TIERS[1]
+	player.equipped_clothing = {"head": "", "body": "", "feet": ""}
+	var base_dr: float = player.armor_tier_damage_reduction()
+	print("...and defense is multiplied by 2.5x: %.3f (expected %.3f)" % [player.armor_damage_reduction(), base_dr * 2.5])
+	main.in_battle = false
+	_reset(player)
+
+	# Wildfire Core: a burning kill explodes, damaging and igniting everything
+	# nearby -- allies and the player included.
+	main.in_battle = true
+	main.battle_terrain.clear()
+	main.battle_player_tile = Vector2i(2, 2)
+	main.player_burning = false
+	_wear(player, ["wildfire_core"])
+	player.max_health = 500
+	player.health = 500
+	var wf_ally := {"tile": Vector2i(3, 3), "hp": 500, "max_hp": 500, "name": "Ally", "dmg_mult": 1.0, "move_range": 2, "attack_range": 1}
+	main.battle_allies = [wf_ally]
+	var wf_bystander := _make_goblin(main, Vector2i(3, 3), 999)
+	var wf_target := {"ref": null, "tile": Vector2i(3, 2), "hp": 1, "max_hp": 400, "move_range": 2, "damage": 0, "name": "Goblin", "burning": true}
+	main.battle_units = [wf_target, wf_bystander]
+	main._apply_single_hit(0, 1.0, "", weapons.CLUB, "You", Vector2i(-1, -1), 999, false)
+	var expected_blast: int = int(round(400 * 0.25))
+	print("Wildfire Core: a burning kill explodes onto everything nearby: player_health=%d (expected %d), ally_hp=%d (expected %d), bystander_hp=%d (expected %d), bystander_burning=%s (expected true), player_burning=%s (expected true)" % [
+		player.health, 500 - expected_blast, wf_ally.hp, 500 - expected_blast, wf_bystander.hp, 999 - expected_blast, wf_bystander.burning, main.player_burning
+	])
+	main.in_battle = false
+	main.battle_allies = []
+	main.player_burning = false
 	_reset(player)
 
 	# --- The Seer ----------------------------------------------------------------------------------------------

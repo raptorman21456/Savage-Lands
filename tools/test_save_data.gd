@@ -55,11 +55,9 @@ func _init() -> void:
 		player.stat_strength, bonuses.strength, 1 + bonuses.strength, player.attack_damage
 	])
 
-	# --- Permadeath: dying computes essence for the waves cleared (shown on
-	# the game-over screen for the player's benefit) but then wipes the
-	# whole slot instead of banking it -- there is no save left to bank it
-	# to. Shows the game-over panel instead of the old bare "press R"
-	# message. ---
+	# --- Death: computes essence for the waves cleared, banks it into the slot
+	# (see below) and shows the game-over panel instead of the old bare
+	# "press R" message. ---
 	main.wave = 4
 	var expected_earned: int = (main.wave - 1) * save_data_script.ESSENCE_PER_WAVE_CLEARED
 	player.health = 1
@@ -77,25 +75,14 @@ func _init() -> void:
 	print("the game-over screen reports what this run would have earned: %s (expected true, contains 'earned %d Essence')" % [
 		reports_earned, expected_earned
 	])
-	print("permadeath wipes the whole slot -- essence, upgrades, everything: slot_exists=%s (expected false)" % [
-		save_data_script.slot_exists(save_data_script.active_slot)
+	# Dying ends the run, not the save: the essence is banked and the upgrades
+	# bought with it stay (a run's own weapons/armour/allies/gold are never
+	# serialized, so they're gone regardless).
+	var after_death: Dictionary = save_data_script.load_data()
+	print("dying keeps the slot and banks the essence: slot_exists=%s (expected true), essence=%d (expected %d)" % [
+		save_data_script.slot_exists(save_data_script.active_slot), after_death.essence, (100 - cost_lvl0) + expected_earned
 	])
-
-	# --- The title screen's Upgrades panel buys and persists an upgrade. ---
-	save_data_script.save_data({"essence": 50, "upgrades": {}, "best_wave": 0})
-	var title_scene = load("res://TitleScreen.tscn")
-	var title = title_scene.instantiate()
-	root.add_child(title)
-	await process_frame
-	await process_frame
-	title._on_upgrades_pressed()
-	var cost: int = save_data_script.get_upgrade_cost("strength", 0)
-	title._on_buy_upgrade_pressed("strength")
-	print("title screen upgrades panel buys an upgrade: essence_left=%d (expected %d), button_text=%s" % [
-		title.save_data.essence, 50 - cost, title.upgrade_buttons["strength"].text
-	])
-	var reloaded2: Dictionary = save_data_script.load_data()
-	print("the purchase persists to disk: strength_level=%d (expected 1)" % [reloaded2.upgrades.get("strength", 0)])
+	print("...and the upgrades bought with it survive: strength_level=%d (expected 1)" % [after_death.upgrades.get("strength", 0)])
 
 	# Reset the scratch save so later tests in a full-suite run always see a
 	# clean slate, regardless of run order.

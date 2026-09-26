@@ -58,6 +58,7 @@ const FleaMarketPanelScript := preload("res://scripts/FleaMarketPanel.gd")
 const BlacksmithPanelScript := preload("res://scripts/BlacksmithPanel.gd")
 const DojoPanelScript := preload("res://scripts/DojoPanel.gd")
 const SeerPanelScript := preload("res://scripts/SeerPanel.gd")
+const ChurchPanelScript := preload("res://scripts/ChurchPanel.gd")
 const WishingWellPanelScript := preload("res://scripts/WishingWellPanel.gd")
 const HorseRacePanelScript := preload("res://scripts/HorseRacePanel.gd")
 const FishingPanelScript := preload("res://scripts/FishingPanel.gd")
@@ -166,6 +167,9 @@ const TOWN_LAYOUT := {
 	"healer": {"name": "Inn", "pos": Vector2(1230, 330), "size": Vector2(120, 144), "door": Vector2(90, 60)},
 	"seer": {"name": "Seer", "pos": Vector2(1450, 330), "size": Vector2(120, 144), "door": Vector2(90, 60)},
 	"dojo": {"name": "Dojo", "pos": Vector2(1670, 330), "size": Vector2(120, 144), "door": Vector2(90, 60)},
+	# The Church, in the strip of open ground between the north wall and the
+	# seer's row -- where Essence is spent on permanent upgrades.
+	"church": {"name": "Church", "pos": Vector2(1450, 140), "size": Vector2(120, 144), "door": Vector2(90, 60)},
 	# South-west
 	"flea_market": {"name": "Flea Market", "pos": Vector2(250, 838), "size": Vector2(348, 96), "door": Vector2(340, 50)},
 	"quest_board": {"name": "Quest Board", "pos": Vector2(540, 841), "size": Vector2(84, 102), "door": Vector2(84, 50)},
@@ -185,7 +189,7 @@ const TOWN_LAYOUT := {
 const TOWN_OUTSKIRTS_KINDS := ["horse_racing", "fishing"]
 # The subset of TOWN_LAYOUT that _build_town actually places, in the order the
 # Map tab numbers them.
-const TOWN_BUILT_KINDS := ["shop", "healer", "enchanter", "beastiary", "quest_board", "tavern", "butcher", "flea_market", "blacksmith", "dojo", "seer", "wishing_well"]
+const TOWN_BUILT_KINDS := ["shop", "healer", "enchanter", "beastiary", "quest_board", "tavern", "butcher", "flea_market", "blacksmith", "dojo", "seer", "wishing_well", "church"]
 # Venues too big for the walled plaza sit just outside its east and west gates
 # (which is what the bigger world is for). Only the reserved footprints live
 # here for now -- decorations and enemy spawns already steer clear of them
@@ -322,6 +326,16 @@ const BONE_DREAD_CHANCE_BY_TYPE := {
 	"spear": 0.03, "hand_picks": 0.03, "dagger": 0.03, "knuckle_gloves": 0.03,
 	"bow": 0.05, "greatsword": 0.08, "hammer": 0.09, "battle_axe": 0.10,
 }
+
+# Wildcard talismans -- extreme, build-defining trade-offs (Talismans.gd's
+# "--- Wildcard ---" section). Each constant here belongs to exactly one of
+# them; search the talisman's name in Main.gd/Player.gd for every read site.
+const MOMENTUM_CHAIN_PCT_PER_STACK := 0.08
+const CHAOS_SHARD_MIN_MULT := 0.5
+const CHAOS_SHARD_MAX_MULT := 1.6
+const BLOODMOON_QUIET_TURNS_LIMIT := 3
+const WILDFIRE_EXPLOSION_RADIUS := 1
+const WILDFIRE_EXPLOSION_MAX_HP_PCT := 0.25
 
 # Reserved terrain types -- fully implemented (movement/damage/status
 # mechanics in _resolve_battle_step/_apply_terrain_tick/_apply_knockback,
@@ -1000,6 +1014,16 @@ var battle_feared_unreachable := false
 # Momentum: how many enemies the player has defeated THIS battle, reset in
 # _setup_battle_grid -- read in _apply_single_hit as a damage-mult stack.
 var battle_momentum_stacks := 0
+# Momentum Chain (talisman): a DIFFERENT stack from the one above -- hits
+# landed in a row without the player taking damage, reset (and briefly stuns
+# the player) the instant they're hit. See _apply_single_hit/_enemy_apply_damage.
+var battle_momentum_chain_stacks := 0
+# Bloodmoon Fang (talisman): ticks up once per full turn cycle with no damage
+# dealt or taken by anyone (_advance_bloodmoon_quiet_turn), reset by any of
+# it; hitting BLOODMOON_QUIET_TURNS_LIMIT crashes the buff (Player.bloodmoon_
+# debuffed) and wipes Player.bloodmoon_stacks.
+var battle_bloodmoon_quiet_turns := 0
+var battle_had_combat_action_this_cycle := false
 # Whetstone Pendant (talisman): whichever hit lands first THIS battle --
 # player's or an ally's -- gets a damage bonus. Reset in _setup_battle_grid,
 # consumed in _apply_single_hit (which is only ever called for damage dealt TO
@@ -1319,6 +1343,7 @@ func _build_town() -> void:
 	_place_building(town_building_positions.blacksmith, preload("res://assets/building_blacksmith.png"), "blacksmith")
 	_place_building(town_building_positions.dojo, preload("res://assets/building_dojo.png"), "dojo")
 	_place_building(town_building_positions.seer, preload("res://assets/building_seer.png"), "seer")
+	_place_building(town_building_positions.church, preload("res://assets/building_church.png"), "church")
 	_place_building(town_building_positions.wishing_well, preload("res://assets/wishing_well.png"), "wishing_well")
 	_build_race_track()
 	_build_fishing_hole()
@@ -1941,7 +1966,7 @@ func _spawn_nothingness_fight(fight_index: int) -> void:
 # The rush's 6th fight has just been cleared. First time ever (checked
 # against the lifetime file, not this slot -- see SaveData.gd), this is the
 # game's only win condition: banks essence same as a death would, but framed
-# as a win, then resets the run the same permadeath way. Every later
+# as a win, and ends the run the same way (the slot itself is kept). Every later
 # clearing (this slot or any other, after the lifetime flag is set) instead
 # drops straight into an endless post-game reusing Voidlands' own content --
 # see _spawn_wave's comment for how that actually works.
@@ -1958,7 +1983,6 @@ func _complete_nothingness_rush() -> void:
 		var essence_earned: int = SaveDataScript.record_run_result(wave - 1)
 		var total_essence: int = SaveDataScript.load_data().get("essence", 0)
 		SaveDataScript.record_lifetime_run_stats(stats.kills_by_name, stats.world_reached, 10, stats.bosses_defeated)
-		SaveDataScript.delete_slot(SaveDataScript.active_slot)
 		game_over = true
 		get_tree().paused = true
 		hud.show_victory(essence_earned, total_essence, stats)
@@ -1985,6 +2009,7 @@ func _build_hud() -> void:
 	_register_town_panel("blacksmith", BlacksmithPanelScript.new())
 	_register_town_panel("dojo", DojoPanelScript.new())
 	_register_town_panel("seer", SeerPanelScript.new())
+	_register_town_panel("church", ChurchPanelScript.new())
 	_register_town_panel("wishing_well", WishingWellPanelScript.new())
 	_register_town_panel("horse_racing", HorseRacePanelScript.new())
 	_register_town_panel("fishing", FishingPanelScript.new())
@@ -2259,16 +2284,14 @@ func _on_player_died() -> void:
 		choosing_stat = false
 		hud.hide_levelup_choice()
 	get_tree().paused = true
-	# Permadeath: waves cleared before dying still compute an Essence total
-	# (shown below for the player's benefit -- what this run would have
-	# banked), but record_run_result's write is immediately undone by
-	# delete_slot -- death wipes the whole slot, not just the run. The
-	# title screen offers it as [New Game] again afterward.
+	# Dying ends the RUN, not the save: the weapons, armour, allies and gold
+	# you carried are gone (a run is never serialized, so the next Play starts
+	# clean), but the Essence this run banks and every upgrade bought with it
+	# in the Church stay in the slot for the next attempt.
 	var essence_earned: int = SaveDataScript.record_run_result(wave - 1)
 	var total_essence: int = SaveDataScript.load_data().get("essence", 0)
 	var stats: Dictionary = _run_stats_summary()
 	SaveDataScript.record_lifetime_run_stats(stats.kills_by_name, stats.world_reached, current_world_index, stats.bosses_defeated)
-	SaveDataScript.delete_slot(SaveDataScript.active_slot)
 	hud.show_game_over(essence_earned, total_essence, stats)
 
 func _on_game_over_return_pressed() -> void:
@@ -2436,6 +2459,16 @@ func _try_open_panel(kind: String) -> void:
 		panel.open()
 	else:
 		panel.open(player)
+
+# The Church (ChurchPanel.gd) just bought one level of skill `id` and saved it
+# to the slot: bring the run in progress up to date. Player handles its own
+# state; the one piece of Main-owned run state a purchase can touch is how
+# long a freshly granted Beastmaster wolf stays.
+func apply_meta_purchase(id: String) -> void:
+	var had_wolf: bool = not player.party_wolf.is_empty()
+	player.apply_meta_purchase(id)
+	if id == "beastmaster" and not had_wolf:
+		wolf_waves_remaining = WOLF_BASE_STAY_WAVES + player.meta_wolf_bonus_waves
 
 func _any_town_panel_open() -> bool:
 	for panel in town_panels.values():
@@ -2774,8 +2807,8 @@ func _on_arrow_sell_pressed(kind: String) -> void:
 	_refresh_shop_display()
 
 # Shared "first time you ever obtain X" trigger for weapons/shields/arrows/
-# runes (skill tree nodes get their own copy in TitleScreen.gd, which has no
-# access to this HUD instance). title/description are always the item's own
+# runes (skill-tree nodes do not announce: the Church shows their text itself).
+# title/description are always the item's own
 # EXISTING name/description text -- no new copy is authored here.
 func _maybe_announce_unlock(key: String, title: String, description: String) -> void:
 	if SaveDataScript.try_mark_unlock_seen(key):
@@ -3291,6 +3324,11 @@ func _setup_battle_grid(squad: Array) -> void:
 	battle_skill_cooldown = 0
 	battle_player_turns_to_skip = 0
 	battle_momentum_stacks = 0
+	battle_momentum_chain_stacks = 0
+	battle_bloodmoon_quiet_turns = 0
+	battle_had_combat_action_this_cycle = false
+	player.bloodmoon_stacks = 0
+	player.bloodmoon_debuffed = false
 	battle_first_attack_used = false
 	battle_free_abilities_used = 0
 	player.disarmed_tile = Vector2i(-1, -1)
@@ -4026,6 +4064,9 @@ func _on_battle_main_action(action: String) -> void:
 		return
 	match action:
 		"move":
+			if player.talisman_bonus("ironclad_ward") > 0.0:
+				hud.battle_log("Ironclad Ward roots you to the spot.")
+				return
 			if battle_player_moves_left <= 0:
 				hud.battle_log("No moves left this turn.")
 				return
@@ -4462,6 +4503,23 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 	# reset in _setup_battle_grid, incremented in _on_enemy_died).
 	if player.meta_momentum_pct_per_kill > 0.0 and battle_momentum_stacks > 0:
 		dmg = int(round(dmg * (1.0 + player.meta_momentum_pct_per_kill * battle_momentum_stacks)))
+	# Momentum Chain (talisman): +8% damage per hit landed without taking one
+	# first, uncapped -- battle_momentum_chain_stacks resets to 0 (and stuns
+	# the player) the instant a hit lands on them, see _enemy_apply_damage.
+	if attacker_label == "You" and player.talisman_bonus("momentum_chain") > 0.0 and battle_momentum_chain_stacks > 0:
+		dmg = int(round(dmg * (1.0 + MOMENTUM_CHAIN_PCT_PER_STACK * battle_momentum_chain_stacks)))
+	# Bloodmoon Fang (talisman): Bloodlust stacks (Player.bloodmoon_stacks,
+	# incremented on a kill below) add flat damage on top of everything else.
+	if attacker_label == "You" and player.bloodmoon_stacks > 0:
+		dmg = int(round(dmg * (1.0 + player.BLOODMOON_PCT_PER_STACK * player.bloodmoon_stacks)))
+	# Bloodmoon Fang's crash: 3 quiet turns (see _advance_bloodmoon_quiet_turn)
+	# halves everything, including the damage you deal.
+	if attacker_label == "You" and player.bloodmoon_debuffed:
+		dmg = int(round(dmg * 0.5))
+	# Chaos Shard (talisman): every hit's damage is rerolled to somewhere
+	# between 50% and 160% of normal, replacing consistency with variance.
+	if attacker_label == "You" and player.talisman_bonus("chaos_shard") > 0.0:
+		dmg = int(round(dmg * randf_range(CHAOS_SHARD_MIN_MULT, CHAOS_SHARD_MAX_MULT)))
 	# Rage/Berserk: gated on attacker_label the same way every other
 	# player-only bonus here is, so an ally's own attack (funneling through
 	# this same function) never picks up the player's own berserk state.
@@ -4560,11 +4618,27 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 		if randf() < volatile_chance:
 			dmg = int(round(dmg * OBSIDIAN_VOLATILE_DAMAGE_MULT))
 			volatile_shard_triggered = true
+	# Last Stand Idol (talisman): every one of the player's hits instantly
+	# kills a non-boss enemy outright.
+	if attacker_label == "You" and player.talisman_bonus("oneshot_regular_enemies") > 0.0 and not ENEMY_TRAITS.get(u.name, {}).get("is_boss_tier", false):
+		dmg = u.hp
 	# Getting hit obviously reveals you -- an unaware target is always
 	# spotted by whatever just landed on it, player or ally alike.
 	u["aware_of_player"] = true
 	u.hp -= dmg
 	run_damage_dealt += dmg
+	# Bloodmoon Fang (talisman): ANY landed hit -- player's or an ally's --
+	# keeps the combat-action clock alive (_advance_bloodmoon_quiet_turn).
+	battle_had_combat_action_this_cycle = true
+	if attacker_label == "You":
+		# Vampire's Pact (talisman): heals back a cut of damage just dealt.
+		var lifesteal_pct: float = player.talisman_bonus("lifesteal_pct")
+		if lifesteal_pct > 0.0 and dmg > 0:
+			player.heal(max(1, int(round(dmg * lifesteal_pct))))
+		# Momentum Chain (talisman): consecutive hits landed without taking
+		# damage first.
+		if player.talisman_bonus("momentum_chain") > 0.0:
+			battle_momentum_chain_stacks += 1
 	play_sfx("hit")
 	if is_crit:
 		hud.battle_log("Critical hit!")
@@ -4719,6 +4793,14 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 				gilded_bonus = int(round(gilded_bonus * STONE_AMULET_MATERIAL_BOOST_MULT))
 			player.add_coins(gilded_bonus)
 			hud.battle_log("Your golden blade leaves a coin behind!")
+		# Bloodmoon Fang (talisman): a kill stacks Bloodlust, up to
+		# BLOODMOON_MAX_STACKS.
+		if attacker_label == "You" and player.talisman_bonus("bloodmoon_fang") > 0.0:
+			player.bloodmoon_stacks = mini(player.BLOODMOON_MAX_STACKS, player.bloodmoon_stacks + 1)
+			player._recalc_stats()
+		# Wildfire Core (talisman): a burning kill explodes outward.
+		if player.talisman_bonus("wildfire_core") > 0.0 and u.get("burning", false):
+			_trigger_wildfire_explosion(u.tile, u.max_hp)
 		if is_instance_valid(u.ref):
 			u.ref.take_damage(9999)
 		battle_units.remove_at(idx)
@@ -4908,19 +4990,22 @@ func _battle_perform_attack(action: Dictionary) -> void:
 		# below actually fire this time -- so every hit from a kit that CAN
 		# flurry uses the smaller multi-hit burn chance, not just the ones
 		# after the first.
+		var whirlwind_melee: bool = action.get("is_regular_attack", false) and player.talisman_bonus("whirlwind_double_melee") > 0.0 and not weapon.get("long_range", false)
 		var multihit_capable: bool = effect == "double_hit" or effect == "piercing_thrust" \
 			or (action.get("is_regular_attack", false) and weapon.get("double_strike", false)) \
 			or weapon.get("passive_double_hit_chance", 0.0) > 0.0 \
 			or (effect == "" and player.pichaku_active) \
-			or weapon.get("passive_cleave_pct", 0.0) > 0.0
+			or weapon.get("passive_cleave_pct", 0.0) > 0.0 \
+			or whirlwind_melee
 		_apply_single_hit(idx, dmg_mult, effect, weapon, "You", Vector2i(-1, -1), -1, multihit_capable)
 		if effect == "double_hit" and still_primary_target.call():
 			_apply_single_hit(idx, dmg_mult, effect, weapon, "You", Vector2i(-1, -1), -1, multihit_capable)
 		# Knuckle Gloves' innate double_strike (plain Attack only, not
-		# specials -- those already carry their own explicit effect) and any
-		# weapon's passive_double_hit_chance (Nightwhisper/Thunderclap).
+		# specials -- those already carry their own explicit effect), any
+		# weapon's passive_double_hit_chance (Nightwhisper/Thunderclap), and
+		# Whirlwind Charm's talisman-driven double hit on any melee weapon.
 		if action.get("is_regular_attack", false) and still_primary_target.call():
-			if weapon.get("double_strike", false):
+			if weapon.get("double_strike", false) or whirlwind_melee:
 				_apply_single_hit(idx, dmg_mult, effect, weapon, "You", Vector2i(-1, -1), -1, multihit_capable)
 		if still_primary_target.call():
 			var double_hit_chance: float = weapon.get("passive_double_hit_chance", 0.0)
@@ -5159,7 +5244,45 @@ func _resolve_bomb_arrow(center_tile: Vector2i) -> void:
 		_spawn_battle_damage_number(battle_player_tile, ARROW_BOMB_FLAT_DMG)
 		_shake_battle(6.0, 0.2)
 
+# Wildfire Core (talisman): a burning kill explodes outward, scorching and
+# igniting everything within WILDFIRE_EXPLOSION_RADIUS -- other enemies,
+# allies, and the player alike. Allies have no burn mechanic of their own
+# (see battle_allies' shape), so they take the blast damage without igniting.
+# Dealt directly rather than through _apply_single_hit, so the explosion
+# itself never re-triggers Last Stand Idol/Momentum Chain/etc.
+func _trigger_wildfire_explosion(center_tile: Vector2i, source_max_hp: int) -> void:
+	var blast_dmg: int = max(1, int(round(source_max_hp * WILDFIRE_EXPLOSION_MAX_HP_PCT)))
+	hud.battle_log("The blaze erupts outward!")
+	if _in_blast_radius(battle_player_tile, center_tile, WILDFIRE_EXPLOSION_RADIUS):
+		player.take_battle_damage(blast_dmg)
+		player_burning = true
+		_spawn_battle_damage_number(battle_player_tile, blast_dmg)
+		hud.battle_log("You're caught in the blast for %d damage and catch fire!" % blast_dmg)
+	for a in battle_allies:
+		if a.hp > 0 and _in_blast_radius(a.tile, center_tile, WILDFIRE_EXPLOSION_RADIUS):
+			a.hp -= blast_dmg
+			_spawn_battle_damage_number(a.tile, blast_dmg)
+			hud.battle_log("Your %s is caught in the blast!" % a.name)
+	for i in range(battle_units.size() - 1, -1, -1):
+		var other: Dictionary = battle_units[i]
+		if other.tile == center_tile or not _in_blast_radius(other.tile, center_tile, WILDFIRE_EXPLOSION_RADIUS):
+			continue
+		other.hp -= blast_dmg
+		other.burning = true
+		_spawn_battle_damage_number(other.tile, blast_dmg, other.get("size", 1))
+		hud.battle_log("The %s is caught in the blast and catches fire!" % other.name)
+		if other.hp <= 0:
+			hud.battle_log("The %s falls!" % other.name)
+			if is_instance_valid(other.ref):
+				other.ref.take_damage(9999)
+			battle_units.remove_at(i)
+			if battle_target_index >= battle_units.size():
+				battle_target_index = 0
+
 func _battle_player_item() -> void:
+	if player.talisman_bonus("disable_healing_items") > 0.0:
+		hud.battle_log("Your pact forbids healing -- lifesteal is all you have.")
+		return
 	var result: Dictionary = player.use_healing_item()
 	if result.is_empty():
 		hud.battle_log("No items to use!")
@@ -5251,6 +5374,7 @@ func _battle_player_skill() -> void:
 func _end_player_turn() -> void:
 	if battle_skill_cooldown > 0:
 		battle_skill_cooldown -= 1
+	_advance_bloodmoon_quiet_turn()
 	# Water pushes whoever's standing on it at the end of a turn -- enemies
 	# already got this (see _process_enemy_turn), the player didn't. Heavy
 	# Shield's passive makes the player immune to this specifically. Turtle
@@ -5266,6 +5390,26 @@ func _end_player_turn() -> void:
 			battle_player_tile = _apply_water_push(battle_player_tile)
 	_apply_terrain_tick(battle_player_tile)
 	_start_ally_turn()
+
+# Bloodmoon Fang (talisman): once per player turn, checks whether anyone --
+# player, ally, or enemy -- landed a hit this cycle
+# (battle_had_combat_action_this_cycle, set by _apply_single_hit/
+# _enemy_apply_damage). BLOODMOON_QUIET_TURNS_LIMIT quiet turns in a row
+# crashes the buff for the rest of the battle (only _setup_battle_grid clears
+# bloodmoon_debuffed again).
+func _advance_bloodmoon_quiet_turn() -> void:
+	if player.talisman_bonus("bloodmoon_fang") <= 0.0:
+		return
+	if battle_had_combat_action_this_cycle:
+		battle_bloodmoon_quiet_turns = 0
+	else:
+		battle_bloodmoon_quiet_turns += 1
+		if battle_bloodmoon_quiet_turns >= BLOODMOON_QUIET_TURNS_LIMIT and not player.bloodmoon_debuffed:
+			player.bloodmoon_debuffed = true
+			player.bloodmoon_stacks = 0
+			player._recalc_stats()
+			hud.battle_log("Bloodmoon Fang crashes -- your stats are halved!")
+	battle_had_combat_action_this_cycle = false
 
 # Turtle Shell (talisman): the water wants to carry the player off this tile
 # at the end of their turn -- ask first instead of just doing it. True = go
@@ -5654,6 +5798,13 @@ func _enemy_apply_damage(u: Dictionary, target_tile: Vector2i, raw_dmg: int, tra
 		var dmg: int = _apply_incoming_reductions(raw_dmg, traits)
 		player.take_battle_damage(dmg)
 		run_damage_taken += dmg
+		battle_had_combat_action_this_cycle = true
+		# Momentum Chain (talisman): taking a hit breaks the chain and costs
+		# the player their next turn.
+		if dmg > 0 and player.talisman_bonus("momentum_chain") > 0.0 and battle_momentum_chain_stacks > 0:
+			battle_momentum_chain_stacks = 0
+			battle_player_turns_to_skip += 1
+			hud.battle_log("The chain breaks -- you're staggered!")
 		_spawn_battle_attack_lunge(u.tile, target_tile, ATTACK_LUNGE_ENEMY_COLOR, traits.get("attack_range", 1) > 1)
 		_spawn_battle_damage_number(target_tile, dmg)
 		_flash_battle_tile(target_tile)
@@ -5694,6 +5845,7 @@ func _enemy_apply_damage(u: Dictionary, target_tile: Vector2i, raw_dmg: int, tra
 			dmg = int(round(dmg * (1.0 - ally_dr)))
 		target_ally.hp -= dmg
 		target_name = target_ally.name
+		battle_had_combat_action_this_cycle = true
 	else:
 		# Wind Chime (talisman): taunt-confusion (_pick_confused_target_tile)
 		# can point one enemy at another instead of the player or an ally --
@@ -5751,6 +5903,8 @@ func _process_enemy_turn() -> void:
 			_spawn_battle_damage_number(u.tile, burn_dmg, u.get("size", 1))
 			hud.battle_log("The %s burns for %d damage!" % [u.name, burn_dmg])
 			if u.hp <= 0:
+				if player.talisman_bonus("wildfire_core") > 0.0:
+					_trigger_wildfire_explosion(u.tile, u.max_hp)
 				continue
 
 		# Poison Bog's lingering DOT (reserved terrain) -- same "ticks

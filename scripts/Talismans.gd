@@ -105,6 +105,40 @@ class_name Talismans
 #   gambling_luck           +x better odds at the Wishing Well and the races
 #   phoenix                 1 = once per run, survive a killing blow at 1 HP
 #   fishing_luck            +x bigger bite window and rarer catches at the pond
+#
+# --- Wildcard keys (Player.gd/Main.gd, search the key name for the read site) ---
+#   max_hp_pct              +x% (or -x%) to max HP, multiplicative, applied
+#                           after the flat max_hp bonus above (_recalc_stats)
+#   lifesteal_pct           +x% of damage dealt healed back, on any of the
+#                           player's own landed hits
+#   disable_healing_items   1 = potions/food no longer have any effect
+#                           (use_healing_item/use_specific_potion)
+#   momentum_chain          1 = each hit landed without taking damage first
+#                           adds +8% damage, uncapped; taking a hit resets it
+#                           and costs a turn (battle_momentum_chain_stacks)
+#   whirlwind_double_melee  1 = every melee (non-long_range) regular Attack
+#                           lands twice (_battle_perform_attack)
+#   weapon_whisperer        1 = current_weapon's specials are overridden by
+#                           Player.weapon_whisperer_specials, any 3 learned
+#                           moves regardless of weapon type (see
+#                           _apply_talisman_to_weapon, DojoPanel.gd)
+#   special_stamina_pct_increase  +x% stamina cost on every special (stamped
+#                           at equip, the inverse of special_stamina_discount)
+#   chaos_shard             1 = every landed hit's damage is rerolled to a
+#                           random 50%-160% of normal
+#   lock_hp_to_one          1 = max HP (and current HP) forced to 1, overriding
+#                           every other max-HP source (_recalc_stats)
+#   oneshot_regular_enemies 1 = every landed hit instantly kills a non-boss
+#                           enemy outright
+#   bloodmoon_fang          1 = kills stack Bloodlust (Player.bloodmoon_stacks,
+#                           +7.5% damage/+7.5% move speed each); 3 turns with
+#                           no damage dealt or taken by anyone crashes it
+#                           (Player.bloodmoon_debuffed, -50% to combat stats)
+#   ironclad_ward           1 = Move is disabled in battle; defense
+#                           (armor_damage_reduction) is multiplied by 2.5
+#   wildfire_core           1 = a burning enemy's death explodes, damaging
+#                           and igniting everything nearby (_trigger_wildfire_
+#                           explosion)
 
 # The player levels at which the 2nd, 3rd and 4th slots open (the 1st is
 # always available).
@@ -196,6 +230,37 @@ static var ITEMS := [
 		"effects": {"fishing_luck": 0.25}, "description": "A wider bite window and rarer catches at the fishing hole."},
 	{"id": "phoenix_ash", "name": "Phoenix Ash", "rarity": "epic", "price": 140,
 		"effects": {"phoenix": 1}, "description": "Once per run, survive a killing blow with 1 HP."},
+	# --- Wildcard: extreme, build-defining trade-offs -------------------------------
+	{"id": "glass_cannon_charm", "name": "Glass Cannon Charm", "rarity": "epic", "price": 150,
+		"effects": {"max_hp_pct": -0.5, "damage_pct": 0.75},
+		"description": "-50% max HP, but +75% damage on everything you deal."},
+	{"id": "vampires_pact", "name": "Vampire's Pact", "rarity": "epic", "price": 150,
+		"effects": {"lifesteal_pct": 0.25, "disable_healing_items": 1},
+		"description": "Heal 25% of all damage you deal -- but potions and food no longer work on you at all."},
+	{"id": "momentum_chain", "name": "Momentum Chain", "rarity": "epic", "price": 140,
+		"effects": {"momentum_chain": 1},
+		"description": "Each hit you land without taking damage first adds +8% damage, uncapped -- but the instant you're hit, the chain breaks and stuns you."},
+	{"id": "whirlwind_charm", "name": "Whirlwind Charm", "rarity": "epic", "price": 130,
+		"effects": {"whirlwind_double_melee": 1, "damage_pct": -0.6},
+		"description": "Every melee attack strikes twice, but all damage (from any source) is cut to 40%."},
+	{"id": "weapon_whisperer", "name": "Weapon Whisperer", "rarity": "epic", "price": 160,
+		"effects": {"weapon_whisperer": 1, "special_stamina_pct_increase": 0.5},
+		"description": "Pick any 3 specials you've learned at the Dojo (from any weapon) as your loadout, regardless of what you're holding -- but every special costs 50% more stamina."},
+	{"id": "chaos_shard", "name": "Chaos Shard", "rarity": "rare", "price": 100,
+		"effects": {"chaos_shard": 1},
+		"description": "Every hit deals somewhere between 50% and 160% of its normal damage, rerolled each time."},
+	{"id": "last_stand_idol", "name": "Last Stand Idol", "rarity": "epic", "price": 180,
+		"effects": {"lock_hp_to_one": 1, "oneshot_regular_enemies": 1},
+		"description": "Every attack instantly kills a regular enemy (bosses unaffected) -- but your HP is permanently locked at 1, no matter what else you wear."},
+	{"id": "bloodmoon_fang", "name": "Bloodmoon Fang", "rarity": "epic", "price": 140,
+		"effects": {"bloodmoon_fang": 1},
+		"description": "Every kill stacks Bloodlust: +7.5% damage and +7.5% move speed per stack. But 3 turns with nothing landing a hit -- yours, an ally's, or an enemy's -- crashes it, halving all your stats."},
+	{"id": "ironclad_ward", "name": "Ironclad Ward", "rarity": "epic", "price": 130,
+		"effects": {"ironclad_ward": 1},
+		"description": "You can no longer Move in battle at all, but your defense is multiplied by 250%."},
+	{"id": "wildfire_core", "name": "Wildfire Core", "rarity": "epic", "price": 130,
+		"effects": {"wildfire_core": 1},
+		"description": "A burning enemy that dies explodes, scorching everything nearby -- allies and you included -- for a share of its max HP, and setting it all alight too."},
 ]
 
 static func get_talisman(id: String) -> Dictionary:

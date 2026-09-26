@@ -1,9 +1,9 @@
 extends SceneTree
 
 # Covers the "first time you obtained X" popup system: device-wide seen-set
-# in SaveData.gd, Weapons.gd's base-type derivation, and the 5 acquisition
-# call sites (skill tree in TitleScreen.gd; weapons/shields/arrows/runes in
-# Main.gd), each showing exactly once ever, non-blocking, no queue.
+# in SaveData.gd, Weapons.gd's base-type derivation, and the 4 acquisition
+# call sites (weapons/shields/arrows/runes, all in Main.gd), each showing
+# exactly once ever, non-blocking, no queue.
 
 func _init() -> void:
 	var save_data_script = load("res://scripts/SaveData.gd")
@@ -178,28 +178,6 @@ func _init() -> void:
 	])
 
 	main.queue_free()
-	await process_frame
-
-	# --- Scenario: TitleScreen.gd skill tree ---
-	if FileAccess.file_exists(lifetime_path):
-		DirAccess.remove_absolute(lifetime_path)
-
-	var title_scene = load("res://TitleScreen.tscn")
-	var title = title_scene.instantiate()
-	root.add_child(title)
-	await physics_frame
-	await physics_frame
-
-	title.save_data = {"essence": 100000, "upgrades": {}, "best_wave": 0}
-	title._on_buy_upgrade_pressed("strength")
-	print("first skill-node level (Brawn) shows the popup: visible=%s title=%s key_seen=%s (expected true, %s, true)" % [
-		title.unlock_popup_panel.visible, title.unlock_popup_name_label.text, save_data_script.is_unlock_seen("skill:strength"), save_data_script.UPGRADES["strength"].name
-	])
-	title.hide_unlock_popup()
-	title._on_buy_upgrade_pressed("strength")
-	print("a later level of the same node does not re-trigger: %s (expected false)" % [title.unlock_popup_panel.visible])
-
-	title.queue_free()
 	await process_frame
 
 	if FileAccess.file_exists(lifetime_path):

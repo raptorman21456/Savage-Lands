@@ -40,6 +40,11 @@ func _refresh() -> void:
 	coins_label.text = "Coins: %d" % _player.coins
 	_clear(lessons_box)
 	var current_base_id: String = WeaponsScript.get_base_type(_player.current_weapon_base).get("id", "")
+	# Weapon Whisperer (talisman): once learned, a special can be toggled into
+	# a custom 3-move loadout that overrides current_weapon's own specials,
+	# regardless of weapon type -- see Player.toggle_whisperer_special and
+	# _apply_talisman_to_weapon.
+	var whisperer_active: bool = _player.talisman_bonus("weapon_whisperer") > 0.0
 	for base in DojoScript.owned_bases(_player.owned_weapons):
 		var heading: String = base.name.to_upper()
 		if base.id == current_base_id:
@@ -54,16 +59,28 @@ func _refresh() -> void:
 			var button_text := "Learn"
 			var price_text := "%d c" % cost
 			var disabled: bool = _player.coins < cost
+			var highlight: bool = learned
+			var on_press := _on_learn_pressed.bind(special.id)
 			if learned:
 				button_text = "Learned"
 				price_text = ""
 				disabled = true
+			if whisperer_active and learned:
+				var chosen: bool = _player.weapon_whisperer_specials.has(special.id)
+				button_text = "Whispered" if chosen else "Whisper"
+				disabled = false
+				highlight = chosen
+				on_press = _on_whisper_pressed.bind(special.id)
 			lessons_box.add_child(_make_shop_row(
 				"weapon_%s" % base.get("icon", ""), special.name, description, price_text, button_text, disabled,
-				_on_learn_pressed.bind(special.id), learned
+				on_press, highlight
 			))
 	if lessons_box.get_child_count() == 0:
 		lessons_box.add_child(_make_label("You hold no weapons with moves to teach.", 13, Color(0.7, 0.7, 0.65)))
+
+func _on_whisper_pressed(special_id: String) -> void:
+	_player.toggle_whisperer_special(special_id)
+	_refresh()
 
 # Returns whether the lesson went through (tests drive this directly).
 func learn(special_id: String) -> bool:

@@ -1872,7 +1872,7 @@ func show_game_over(essence_earned: int, total_essence: int, stats: Dictionary =
 # instead of red, and calling out the one-time Worldwalker unlock.
 func show_victory(essence_earned: int, total_essence: int, stats: Dictionary = {}) -> void:
 	game_over_label.add_theme_color_override("font_color", Color(1, 0.85, 0.3))
-	game_over_label.text = "You have conquered the Nothingness!\n\nWorldwalker is now unlocked in the skill tree."
+	game_over_label.text = "You have conquered the Nothingness!\n\nWorldwalker is now unlocked at the Church."
 	_populate_game_over_stats(essence_earned, total_essence, stats)
 	game_over_panel.visible = true
 	game_over_return_button.grab_focus()
@@ -1888,6 +1888,7 @@ func _populate_game_over_stats(essence_earned: int, total_essence: int, stats: D
 
 	var summary_lines := [
 		"This run earned %d Essence. (Total: %d)" % [essence_earned, total_essence],
+		"Spend it at the Church in town.",
 		"Waves cleared: %d" % stats.get("waves_cleared", 0),
 		"World reached: %s" % stats.get("world_reached", "Plains"),
 		"Bosses/minibosses defeated: %d" % stats.get("bosses_defeated", 0),

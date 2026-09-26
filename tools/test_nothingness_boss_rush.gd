@@ -102,7 +102,7 @@ func _init() -> void:
 	print("...and pins current_world_index to Voidlands for good: index=%d name=%s rush_complete=%s (expected 9, Voidlands, true)" % [
 		main.current_world_index, main.WORLDS[main.current_world_index].name, main.nothingness_rush_complete
 	])
-	print("...the save slot was wiped, same as a death (best_wave/essence gone): %s (expected true, empty dict)" % [save_data_script.load_data().get("upgrades", {}).is_empty()])
+	print("...the save slot is kept, same as a death (its essence banked): slot_exists=%s (expected true)" % [save_data_script.slot_exists(save_data_script.active_slot)])
 	paused = false
 
 	# --- Worldwalker: locked before, unlocked (and purchasable) after ---

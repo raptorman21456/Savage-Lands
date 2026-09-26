@@ -2567,6 +2567,97 @@ func make_building_dojo() -> Image:
 	set_px(img, 20, 28, banner)
 	return img
 
+# The Church: a grey stone chapel whose central bell tower rises into a slate
+# spire topped with a gold cross, over a stained-glass window and an arched
+# oak door, with narrow arched windows and buttresses down the nave. Unlike the
+# other venues it doesn't start from _make_building_base -- the steeple needs
+# its own silhouette -- but it keeps their 40x48 footprint.
+func make_building_church() -> Image:
+	var img := Image.create(40, 48, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+	var stone := Color(0.72, 0.7, 0.67, 1.0)
+	var stone_dk := Color(0.52, 0.5, 0.5, 1.0)
+	var stone_lt := Color(0.86, 0.84, 0.8, 1.0)
+	var roof := Color(0.27, 0.31, 0.44, 1.0)
+	var roof_dk := Color(0.18, 0.21, 0.32, 1.0)
+	var roof_lt := Color(0.38, 0.43, 0.58, 1.0)
+	var wood := Color(0.36, 0.22, 0.11, 1.0)
+	var wood_dk := Color(0.2, 0.12, 0.06, 1.0)
+	var gold := Color(0.97, 0.82, 0.3, 1.0)
+	var gold_dk := Color(0.75, 0.55, 0.15, 1.0)
+	var glass_blue := Color(0.28, 0.48, 0.86, 1.0)
+	var glass_red := Color(0.82, 0.24, 0.26, 1.0)
+	var glass_gold := Color(0.97, 0.86, 0.34, 1.0)
+	var dark := Color(0.1, 0.08, 0.14, 1.0)
+
+	# Nave: the long low hall either side of the tower, with a slate roof and
+	# a shadowed eave, buttressed at both ends.
+	fill_rect(img, 3, 29, 36, 46, stone)
+	fill_rect(img, 3, 29, 36, 30, stone_dk)
+	fill_rect(img, 3, 44, 36, 46, stone_dk)
+	fill_rect(img, 3, 29, 4, 46, stone_dk)
+	fill_rect(img, 35, 29, 36, 46, stone_dk)
+	fill_rect(img, 1, 26, 38, 29, roof)
+	fill_rect(img, 3, 23, 36, 26, roof)
+	fill_rect(img, 1, 28, 38, 29, roof_dk)
+	fill_rect(img, 3, 23, 36, 23, roof_lt)
+
+	# Narrow arched windows down each side of the nave.
+	for wx in [7, 29]:
+		fill_rect(img, wx, 32, wx + 3, 39, glass_blue)
+		fill_rect(img, wx + 1, 31, wx + 2, 31, glass_blue)
+		fill_rect(img, wx + 1, 33, wx + 2, 38, glass_gold)
+		fill_rect(img, wx + 1, 35, wx + 2, 35, glass_red)
+		fill_rect(img, wx - 1, 31, wx - 1, 40, stone_dk)
+		fill_rect(img, wx + 4, 31, wx + 4, 40, stone_dk)
+		fill_rect(img, wx - 1, 40, wx + 4, 40, stone_dk)
+
+	# The bell tower, over everything.
+	fill_rect(img, 14, 11, 25, 30, stone)
+	fill_rect(img, 24, 11, 25, 30, stone_dk)
+	fill_rect(img, 14, 11, 14, 30, stone_lt)
+	fill_rect(img, 14, 20, 25, 20, stone_dk)
+	# Belfry: an arched opening with the bell hanging in it.
+	fill_rect(img, 17, 14, 22, 19, dark)
+	fill_rect(img, 18, 13, 21, 13, dark)
+	fill_rect(img, 19, 15, 20, 18, gold)
+	set_px(img, 19, 18, gold_dk)
+	set_px(img, 20, 18, gold_dk)
+
+	# Slate spire rising to a gold cross.
+	fill_rect(img, 13, 9, 26, 10, roof)
+	fill_rect(img, 15, 7, 24, 8, roof)
+	fill_rect(img, 17, 5, 22, 6, roof)
+	fill_rect(img, 18, 4, 21, 4, roof)
+	fill_rect(img, 13, 10, 26, 10, roof_dk)
+	fill_rect(img, 15, 8, 15, 8, roof_lt)
+	fill_rect(img, 17, 6, 17, 6, roof_lt)
+	fill_rect(img, 19, 0, 20, 3, gold)
+	fill_rect(img, 18, 1, 21, 1, gold)
+	set_px(img, 20, 3, gold_dk)
+
+	# Stained-glass window above the door: a blue arch with a gold cross and
+	# a red heart.
+	fill_rect(img, 16, 22, 23, 21, stone_dk)
+	fill_rect(img, 17, 22, 22, 30, glass_blue)
+	fill_rect(img, 18, 21, 21, 21, glass_blue)
+	fill_rect(img, 19, 22, 20, 29, glass_gold)
+	fill_rect(img, 18, 25, 21, 26, glass_gold)
+	fill_rect(img, 19, 25, 20, 26, glass_red)
+	fill_rect(img, 16, 22, 16, 31, stone_dk)
+	fill_rect(img, 23, 22, 23, 31, stone_dk)
+
+	# Arched oak double door, with a step in front.
+	fill_rect(img, 16, 34, 23, 46, wood_dk)
+	fill_rect(img, 17, 33, 22, 33, wood_dk)
+	fill_rect(img, 17, 35, 22, 46, wood)
+	fill_rect(img, 19, 35, 20, 46, wood_dk)
+	set_px(img, 18, 41, gold)
+	set_px(img, 21, 41, gold)
+	fill_rect(img, 14, 46, 25, 47, stone_dk)
+	fill_rect(img, 12, 47, 27, 47, stone_lt)
+	return img
+
 # The Seer: a cottage under a deep-teal roof, a crystal ball glowing above the
 # door, and a few stars scattered over the roof.
 func make_building_seer() -> Image:
@@ -2945,6 +3036,14 @@ func _init() -> void:
 	if not dir.dir_exists("assets"):
 		dir.make_dir("assets")
 
+	# `-- --only-church` regenerates just the Church sprite, so a new venue's art
+	# can be added without rewriting every other asset in assets/.
+	if "--only-church" in OS.get_cmdline_user_args():
+		make_building_church().save_png("res://assets/building_church.png")
+		print("church sprite generated")
+		quit()
+		return
+
 	var barbarian := make_barbarian()
 	barbarian.save_png("res://assets/barbarian.png")
 
@@ -3095,6 +3194,7 @@ func _init() -> void:
 	make_building_blacksmith().save_png("res://assets/building_blacksmith.png")
 	make_building_dojo().save_png("res://assets/building_dojo.png")
 	make_building_seer().save_png("res://assets/building_seer.png")
+	make_building_church().save_png("res://assets/building_church.png")
 	make_wishing_well().save_png("res://assets/wishing_well.png")
 	make_icon_horse().save_png("res://assets/horse.png")
 	make_ground_track().save_png("res://assets/ground_track.png")

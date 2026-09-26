@@ -128,7 +128,7 @@ func _init() -> void:
 	main.quest_board_panel.close()
 
 	# The newer venues all go through the town_panels registry.
-	for kind in ["butcher", "flea_market", "blacksmith", "dojo", "seer", "wishing_well", "horse_racing", "fishing"]:
+	for kind in ["butcher", "flea_market", "blacksmith", "dojo", "seer", "wishing_well", "horse_racing", "fishing", "church"]:
 		main._try_open_panel(kind)
 		print("the %s door opens its panel: visible=%s (expected true)" % [kind, main.town_panels[kind].visible])
 		main.town_panels[kind].close()
