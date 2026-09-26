@@ -4,7 +4,9 @@ extends TownPanel
 # to live on the title screen; it now sits in town as a starfield constellation
 # (see AscensionView.gd) -- a hub at the centre, three wings fanning out from it
 # (Warrior / Merchant / Survivor), a few cross-wing nodes between them, and the
-# post-game Worldwalker floating far off on its own.
+# post-game Worldwalker floating far off on its own. A skill only appears once you
+# own one of its prerequisites (see is_revealed), so a new save shows three roots
+# and the tree grows as you spend.
 #
 # The panel owns the game rules (what a node is called, what state it's in, what
 # a purchase does); AscensionView only draws and reports clicks. Essence and
@@ -77,6 +79,12 @@ var tooltip_cost_label: Label
 
 var _data := {}
 var _hover_id := ""
+# False until the panel has shown once since opening, so what is already
+# unlocked appears at once and only later reveals (after a purchase) fade in.
+var _animate_reveals := false
+# True while the panel is giving a node its opening keyboard focus, which is a
+# starting point for the arrow keys, not a request to show that node's tooltip.
+var _quiet_focus := false
 
 func _panel_title() -> String:
 	return "THE CHURCH"
@@ -112,7 +120,7 @@ func _build_content(outer: VBoxContainer) -> void:
 	var spacer := Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(spacer)
-	hint_label = _make_label("Drag to look around  |  Click a glowing node to spend Essence  |  Boons work at once", 13, COLOR_DIM)
+	hint_label = _make_label("Drag to look around  |  Click a glowing node to spend Essence  |  Buying reveals new paths", 13, COLOR_DIM)
 	hint_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 	hint_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	header.add_child(hint_label)
@@ -185,6 +193,25 @@ func state_for(id: String) -> String:
 		return "available" if can_afford(id) else "unaffordable"
 	return "upgradable" if can_afford(id) else "owned"
 
+# Whether the node is on show. Owned skills always are; otherwise a skill stays
+# hidden until you own at least one of its prerequisites (the roots, having
+# none, are there from the start). Worldwalker has no prerequisite but is gated
+# on beating the game, so it stays hidden until then rather than teasing.
+func is_revealed(id: String) -> bool:
+	if level_of(id) > 0:
+		return true
+	var def: Dictionary = SaveDataScript.UPGRADES[id]
+	var flag: String = def.get("requires_lifetime_flag", "")
+	if flag != "" and not SaveDataScript.load_lifetime_data().get(flag, false):
+		return false
+	var prereqs: Array = def.get("prereqs", [])
+	if prereqs.is_empty():
+		return true
+	for prereq in prereqs:
+		if level_of(prereq.id) > 0:
+			return true
+	return false
+
 func _badge_for(id: String) -> String:
 	var level := level_of(id)
 	if level <= 0 or max_level_of(id) == 1:
@@ -198,6 +225,8 @@ func _refresh() -> void:
 	essence_label.text = "%d Essence" % int(_data.get("essence", 0))
 	for id in SaveDataScript.UPGRADE_IDS:
 		view.set_state(id, state_for(id), _badge_for(id))
+		view.set_revealed(id, is_revealed(id), _animate_reveals)
+	_animate_reveals = true
 	_update_tooltip()
 
 func _on_opened() -> void:
@@ -210,9 +239,13 @@ func _on_opened() -> void:
 		if state == "available" or state == "upgradable":
 			first = id
 			break
+	_quiet_focus = true
 	view.button_for(first).grab_focus()
+	_quiet_focus = false
+	view.clear_hover()
 
 func _on_closing() -> void:
+	_animate_reveals = false
 	_hover_id = ""
 	tooltip.visible = false
 
@@ -267,6 +300,8 @@ func _build_tooltip() -> void:
 	box.add_child(tooltip_cost_label)
 
 func _on_node_hover_changed(id: String) -> void:
+	if _quiet_focus:
+		return
 	_hover_id = id
 	_update_tooltip()
 

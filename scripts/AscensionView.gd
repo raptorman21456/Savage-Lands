@@ -12,6 +12,8 @@ extends Control
 # Node definition: {id, parents: Array of ids, wing: String, icon: Texture2D,
 #                   isolated (optional): true for a node with no prerequisites
 #                   that should sit apart from every wing (post-game unlocks)}
+# Nodes can also be hidden until the caller decides they are relevant
+# (set_revealed).
 # States: "locked", "unaffordable", "available", "owned", "upgradable" (owned and
 # the next level is affordable), "mastered".
 
@@ -50,6 +52,10 @@ var _icons := {}
 var _badges := {}
 var _positions := {}
 var _states := {}
+# Hidden nodes (see set_revealed) keep their layout slot but are not drawn,
+# clickable or focusable; _reveal_alpha fades a newly revealed one in.
+var _revealed := {}
+var _reveal_alpha := {}
 var _stars: Array = []
 var _time := 0.0
 var _dragging := false
@@ -187,18 +193,60 @@ func build(defs: Array, hub_icon: Texture2D) -> void:
 	_badges.clear()
 	_defs.clear()
 	_states.clear()
+	_revealed.clear()
+	_reveal_alpha.clear()
 	hub_texture = hub_icon
 	for d in defs:
 		_defs[d.id] = d
 	_positions = compute_layout(defs)
-	_extent = 400.0
-	for p in _positions.values():
-		_extent = maxf(_extent, p.length() + NODE_RADIUS + 60.0)
+	for d in defs:
+		_revealed[d.id] = true
+		_reveal_alpha[d.id] = 1.0
+	_recompute_extent()
 	for d in defs:
 		_make_node(d)
 		_states[d.id] = "locked"
 		_apply_state(d.id)
 	_apply_offset()
+
+# --- Reveal -----------------------------------------------------------------
+
+# Hides or shows a node. A hidden node keeps its slot in the layout (so the map
+# never reshuffles as it fills in) but is invisible, unclickable and skipped by
+# keyboard focus, and so are the lines into it. animate fades a node in when it
+# goes from hidden to shown; without it, it simply appears.
+func set_revealed(id: String, revealed: bool, animate: bool = false) -> void:
+	if not _buttons.has(id):
+		return
+	var was: bool = _revealed.get(id, true)
+	_revealed[id] = revealed
+	var button: Button = _buttons[id]
+	if revealed:
+		button.visible = true
+		if not was:
+			_reveal_alpha[id] = 0.0 if animate else 1.0
+	else:
+		button.visible = false
+		_reveal_alpha[id] = 0.0
+		if _hover_id == id:
+			_set_hover("")
+	button.modulate.a = _reveal_alpha.get(id, 1.0)
+	_recompute_extent()
+
+func is_revealed(id: String) -> bool:
+	return _revealed.get(id, true)
+
+# How far you can pan: only as far as the nodes currently on show, so a hidden
+# far-off node (Worldwalker) doesn't leave a huge empty scroll area.
+func _recompute_extent() -> void:
+	_extent = 400.0
+	for id in _positions:
+		if _revealed.get(id, true):
+			_extent = maxf(_extent, _positions[id].length() + NODE_RADIUS + 60.0)
+
+# Alpha of an edge: as visible as its less-visible end.
+func _edge_alpha(parent_id: String, child_id: String) -> float:
+	return minf(_reveal_alpha.get(parent_id, 1.0), _reveal_alpha.get(child_id, 1.0))
 
 func _make_node(d: Dictionary) -> void:
 	var id: String = d.id
@@ -312,6 +360,11 @@ func _apply_state(id: String) -> void:
 
 # --- Hover / focus / panning ---------------------------------------------------
 
+# Forgets the current hover without announcing it, so the next real hover of the
+# same node still reports (see ChurchPanel._on_opened).
+func clear_hover() -> void:
+	_hover_id = ""
+
 func _set_hover(id: String) -> void:
 	if id == _hover_id:
 		return
@@ -386,6 +439,10 @@ func _process(delta: float) -> void:
 	if not is_visible_in_tree():
 		return
 	_time += delta
+	for id in _reveal_alpha:
+		if _revealed.get(id, true) and _reveal_alpha[id] < 1.0:
+			_reveal_alpha[id] = minf(1.0, _reveal_alpha[id] + delta * 2.0)
+			_buttons[id].modulate.a = _reveal_alpha[id]
 	queue_redraw()
 	world.queue_redraw()
 
@@ -441,18 +498,22 @@ func _draw_world() -> void:
 		world.draw_texture_rect(hub_texture, Rect2(-24.0, -24.0, 48.0, 48.0), false)
 
 	for id in _defs:
+		if not _revealed.get(id, true):
+			continue
 		var d: Dictionary = _defs[id]
 		var to: Vector2 = _positions[id]
 		var roots: bool = d.parents.is_empty() and not d.get("isolated", false)
 		if roots:
 			var c: Color = tint_of(id)
-			world.draw_line(Vector2.ZERO, to, Color(c.r, c.g, c.b, 0.3), 3.0)
+			world.draw_line(Vector2.ZERO, to, Color(c.r, c.g, c.b, 0.3 * _reveal_alpha.get(id, 1.0)), 3.0)
 		for parent_id in d.parents:
-			if _positions.has(parent_id):
-				world.draw_line(_positions[parent_id], to, _edge_color(parent_id, id), 4.0)
+			if _positions.has(parent_id) and _revealed.get(parent_id, true):
+				var edge: Color = _edge_color(parent_id, id)
+				edge.a *= _edge_alpha(parent_id, id)
+				world.draw_line(_positions[parent_id], to, edge, 4.0)
 	# A slow pulse around every node you can buy right now.
 	var pulse: float = fmod(_time * 0.9, 1.0)
 	for id in _states:
-		if _states[id] == "available" or _states[id] == "upgradable":
+		if _revealed.get(id, true) and (_states[id] == "available" or _states[id] == "upgradable"):
 			var c: Color = GOLD if _states[id] == "upgradable" else tint_of(id)
 			world.draw_arc(_positions[id], NODE_RADIUS + 5.0 + pulse * 9.0, 0.0, TAU, 40, Color(c.r, c.g, c.b, (1.0 - pulse) * 0.7), 3.0)

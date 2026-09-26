@@ -67,9 +67,19 @@ func _init() -> void:
 	await process_frame
 	await process_frame
 	print("the church door opens its panel and pauses the game: visible=%s paused=%s (expected true, true)" % [panel.visible, main.get_tree().paused])
+	print("opening focuses a starting node for the keyboard without popping its tooltip: focused=%s tooltip=%s (expected true, false)" % [
+		panel.view.button_for("strength").has_focus(), panel.tooltip.visible
+	])
 	print("a broke player sees 0 Essence: '%s' (expected '0 Essence')" % [panel.essence_label.text])
 	print("root skill with no Essence is unaffordable, deeper ones locked: strength=%s agility=%s worldwalker=%s (expected unaffordable, locked, locked)" % [
 		panel.state_for("strength"), panel.state_for("agility"), panel.state_for("worldwalker")
+	])
+	# --- Reveal: a fresh save shows only the three roots ---
+	var shown: Array = panel.view.node_ids().filter(func(id): return panel.view.is_revealed(id))
+	shown.sort()
+	print("a fresh save shows only the three wing roots: %s (expected [coins, stamina, strength])" % [shown])
+	print("...the rest are really hidden, not just dimmed: agility_visible=%s worldwalker_visible=%s strength_visible=%s (expected false, false, true)" % [
+		panel.view.button_for("agility").visible, panel.view.button_for("worldwalker").visible, panel.view.button_for("strength").visible
 	])
 
 	# --- Buying: persisted, and felt by the run in progress ---
@@ -92,6 +102,10 @@ func _init() -> void:
 		panel.state_for("strength"), panel.state_for("agility")
 	])
 	print("multi-level skills badge their level: '%s' (expected '1')" % [panel._badge_for("strength")])
+	print("owning a skill reveals the next one, but not the one after: agility=%s vigor=%s (expected true, false)" % [
+		panel.view.is_revealed("agility"), panel.view.is_revealed("vigor")
+	])
+	print("...and the newly revealed node is really on screen: %s (expected true)" % [panel.view.button_for("agility").visible])
 	save_data_script.save_data({"essence": 5, "upgrades": {"strength": 1}, "best_wave": 0})
 	panel._refresh()
 	print("owned but the next level is out of reach reads owned: %s (expected owned)" % [panel.state_for("strength")])
@@ -136,11 +150,14 @@ func _init() -> void:
 	panel._refresh()
 	panel._on_node_pressed("worldwalker")
 	print("Worldwalker is locked until the game has been beaten: state=%s level=%d (expected locked, 0)" % [panel.state_for("worldwalker"), panel.level_of("worldwalker")])
-	panel._on_node_hover_changed("worldwalker")
-	print("...its tooltip says why: '%s' (expected to start 'Requires: Beat the Nothingness')" % [panel.tooltip_cost_label.text])
+	print("...and stays hidden rather than teasing: revealed=%s visible=%s (expected false, false)" % [
+		panel.view.is_revealed("worldwalker"), panel.view.button_for("worldwalker").visible
+	])
 	save_data_script.mark_game_completed()
 	panel._refresh()
-	print("...and opens up once it has: %s (expected available)" % [panel.state_for("worldwalker")])
+	print("...it appears and opens up once it has: revealed=%s state=%s (expected true, available)" % [
+		panel.view.is_revealed("worldwalker"), panel.state_for("worldwalker")
+	])
 	panel._on_node_pressed("worldwalker")
 	print("...then buys and applies: level=%d (expected 1), meta_worldwalker=%s (expected true)" % [panel.level_of("worldwalker"), player.meta_worldwalker])
 
@@ -152,11 +169,22 @@ func _init() -> void:
 		panel.tooltip.visible, panel.tooltip_name_label.text, save_data_script.UPGRADES.strength.name
 	])
 	print("...with the cost in red when you can't afford it: '%s'" % [panel.tooltip_cost_label.text])
-	panel._on_node_hover_changed("agility")
-	print("a locked node lists its missing prerequisite: '%s' (expected 'Requires: %s')" % [
-		panel.tooltip_cost_label.text, save_data_script.UPGRADES.strength.name
+	# A convergence node shows as soon as ONE of its parents is owned, and its
+	# tooltip names the parent still missing.
+	save_data_script.save_data({"essence": 0, "upgrades": {"battle_hardened": 1}, "best_wave": 0})
+	panel._refresh()
+	print("a node with two parents appears once one is owned: warband=%s (expected true); one whose parents are both unowned stays hidden: field_surgeon=%s (expected false)" % [
+		panel.view.is_revealed("warband"), panel.view.is_revealed("field_surgeon")
 	])
-	var rect: Rect2 = panel.view.node_rect_in_view("agility")
+	panel._on_node_hover_changed("warband")
+	print("a revealed-but-locked node lists its missing prerequisite: '%s' (expected 'Requires: %s')" % [
+		panel.tooltip_cost_label.text, save_data_script.UPGRADES.golden_touch.name
+	])
+	panel._on_node_hover_changed("strength")
+	# The tooltip settles its size over a frame or two, like it does in play.
+	await process_frame
+	await process_frame
+	var rect: Rect2 = panel.view.node_rect_in_view("strength")
 	print("the tooltip stays inside the view: %s (expected true)" % [Rect2(Vector2.ZERO, panel.view.size).encloses(Rect2(panel.tooltip.position, panel.tooltip.size))])
 	print("...and never covers the node it describes: %s (expected false)" % [Rect2(panel.tooltip.position, panel.tooltip.size).intersects(rect)])
 	panel._on_node_hover_changed("")
