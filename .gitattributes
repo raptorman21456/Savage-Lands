@@ -1,0 +1,16 @@
+# Keep every text file LF (Godot reads it fine and the code here is authored
+# that way), regardless of a contributor's core.autocrlf setting -- this stops
+# the "LF will be replaced by CRLF" warnings on Windows.
+* text=auto eol=lf
+
+# Never touch binary assets.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.wav binary
+*.ogg binary
+*.mp3 binary
+*.ttf binary
+*.otf binary
+*.ico binary
