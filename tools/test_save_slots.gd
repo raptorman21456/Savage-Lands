@@ -1,6 +1,9 @@
 extends SceneTree
 
 func _init() -> void:
+	# Fixed seed: every random roll below repeats run to run, so a changed result
+	# is a real change, not luck.
+	seed(20260926)
 	var save_data_script = load("res://scripts/SaveData.gd")
 
 	# Clean slate for slots 1-3 + settings before starting. Slots 4/9 are
@@ -128,9 +131,14 @@ func _init() -> void:
 		])
 
 		main.wave = 3
-		var earned: int = save_data_script.record_run_result(main.wave - 1)
-		var expected_earned: int = int(round((main.wave - 1) * save_data_script.ESSENCE_PER_WAVE_CLEARED * entry.mult))
-		print("%s: essence earned for %d waves cleared = %d (expected %d)" % [entry.name, main.wave - 1, earned, expected_earned])
+		# Essence is earned per enemy now: 6 ordinary kills and one boss.
+		for i in 6:
+			main._on_enemy_died(0, "Goblin")
+		main._on_enemy_died(0, "Demogorgon")
+		var raw_essence: int = 6 * save_data_script.ESSENCE_PER_KILL + save_data_script.ESSENCE_PER_BOSS_KILL
+		var earned: int = save_data_script.record_run_result(main.run_essence, main.wave - 1)
+		var expected_earned: int = int(round(raw_essence * entry.mult))
+		print("%s: essence earned for 6 kills + 1 boss (%d raw) = %d (expected %d)" % [entry.name, raw_essence, earned, expected_earned])
 
 		main.queue_free()
 		await physics_frame

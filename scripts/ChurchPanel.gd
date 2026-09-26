@@ -63,11 +63,15 @@ const NODE_ICONS := {
 }
 
 const TOOLTIP_WIDTH := 330.0
+# Shift+click on a node buys up to this many levels at once.
+const SHIFT_BUY_LEVELS := 5
+const WING_NAMES := {"warrior": "WARRIOR", "merchant": "MERCHANT", "survivor": "SURVIVOR"}
 const COLOR_GOOD := Color(0.55, 0.95, 0.55)
 const COLOR_BAD := Color(1.0, 0.5, 0.45)
 const COLOR_DIM := Color(0.68, 0.68, 0.72)
 
 var essence_label: Label
+var progress_label: Label
 var hint_label: Label
 var recenter_button: Button
 var view: Control
@@ -76,6 +80,7 @@ var tooltip_name_label: Label
 var tooltip_level_label: Label
 var tooltip_desc_label: Label
 var tooltip_cost_label: Label
+var tooltip_hint_label: Label
 
 var _data := {}
 var _hover_id := ""
@@ -117,10 +122,14 @@ func _build_content(outer: VBoxContainer) -> void:
 	essence_label.add_theme_color_override("font_outline_color", PixelUIScript.OUTLINE)
 	essence_label.add_theme_constant_override("outline_size", 5)
 	header.add_child(essence_label)
+	progress_label = _make_label("", 15, COLOR_DIM)
+	progress_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	progress_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	header.add_child(progress_label)
 	var spacer := Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(spacer)
-	hint_label = _make_label("Drag to look around  |  Click a glowing node to spend Essence  |  Buying reveals new paths", 13, COLOR_DIM)
+	hint_label = _make_label("Drag to pan  |  Click to buy  |  Shift+click: up to %d levels" % SHIFT_BUY_LEVELS, 13, COLOR_DIM)
 	hint_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 	hint_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	header.add_child(hint_label)
@@ -136,6 +145,7 @@ func _build_content(outer: VBoxContainer) -> void:
 	view.custom_minimum_size = Vector2(0, 260)
 	outer.add_child(view)
 	view.build(_node_defs(), load("res://assets/runic_shard.png"))
+	view.set_wing_labels(WING_NAMES)
 	view.node_pressed.connect(_on_node_pressed)
 	view.node_hover_changed.connect(_on_node_hover_changed)
 	_build_tooltip()
@@ -212,6 +222,14 @@ func is_revealed(id: String) -> bool:
 			return true
 	return false
 
+# How many different skills you own at least one level of.
+func learned_count() -> int:
+	var count := 0
+	for id in SaveDataScript.UPGRADE_IDS:
+		if level_of(id) > 0:
+			count += 1
+	return count
+
 func _badge_for(id: String) -> String:
 	var level := level_of(id)
 	if level <= 0 or max_level_of(id) == 1:
@@ -227,6 +245,7 @@ func _refresh() -> void:
 		view.set_state(id, state_for(id), _badge_for(id))
 		view.set_revealed(id, is_revealed(id), _animate_reveals)
 	_animate_reveals = true
+	progress_label.text = "%d / %d skills" % [learned_count(), SaveDataScript.UPGRADE_IDS.size()]
 	_update_tooltip()
 
 func _on_opened() -> void:
@@ -251,20 +270,34 @@ func _on_closing() -> void:
 
 # --- Buying ------------------------------------------------------------------
 
+# A click buys one level; Shift+click buys up to SHIFT_BUY_LEVELS in a row (as
+# many as you can afford), which is what a many-level skill like Brawn needs.
 func _on_node_pressed(id: String) -> void:
-	var state := state_for(id)
-	if state != "available" and state != "upgradable":
+	var count: int = SHIFT_BUY_LEVELS if Input.is_key_pressed(KEY_SHIFT) else 1
+	if buy_levels(id, count) == 0:
 		_play_sfx("error")
-		return
-	if not SaveDataScript.try_buy_upgrade(_data, id):
-		_play_sfx("error")
-		return
-	SaveDataScript.save_data(_data)
-	_play_sfx("purchase")
+
+# Buys up to `count` levels of a skill, one at a time, stopping at the first
+# level that isn't available or affordable. Each level is saved and then applied
+# to the run in progress (their one-shot grants -- coins, potions, allies -- come
+# per level). Returns how many levels were actually bought.
+func buy_levels(id: String, count: int) -> int:
+	var bought := 0
 	var main := get_parent()
-	if main != null and main.has_method("apply_meta_purchase"):
-		main.apply_meta_purchase(id)
-	_refresh()
+	for i in count:
+		var state := state_for(id)
+		if state != "available" and state != "upgradable":
+			break
+		if not SaveDataScript.try_buy_upgrade(_data, id):
+			break
+		SaveDataScript.save_data(_data)
+		bought += 1
+		if main != null and main.has_method("apply_meta_purchase"):
+			main.apply_meta_purchase(id)
+	if bought > 0:
+		_play_sfx("purchase")
+		_refresh()
+	return bought
 
 # --- Tooltip -----------------------------------------------------------------
 
@@ -298,6 +331,8 @@ func _build_tooltip() -> void:
 	box.add_child(tooltip_desc_label)
 	tooltip_cost_label = _make_label("", 15, COLOR_GOOD)
 	box.add_child(tooltip_cost_label)
+	tooltip_hint_label = _make_label("", 12, COLOR_DIM)
+	box.add_child(tooltip_hint_label)
 
 func _on_node_hover_changed(id: String) -> void:
 	if _quiet_focus:
@@ -333,6 +368,10 @@ func _update_tooltip() -> void:
 			else:
 				tooltip_cost_label.text = "Cost: %d Essence" % cost
 				tooltip_cost_label.add_theme_color_override("font_color", COLOR_GOOD)
+	var levels_left: int = max_level_of(_hover_id) - level_of(_hover_id)
+	var can_stack: bool = (state == "available" or state == "upgradable") and levels_left >= 2
+	tooltip_hint_label.text = "Shift+click: buy up to %d levels" % mini(SHIFT_BUY_LEVELS, levels_left) if can_stack else ""
+	tooltip_hint_label.visible = can_stack
 	tooltip.reset_size()
 	tooltip.visible = true
 	_reposition_tooltip()

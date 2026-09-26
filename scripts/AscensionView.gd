@@ -56,6 +56,10 @@ var _states := {}
 # clickable or focusable; _reveal_alpha fades a newly revealed one in.
 var _revealed := {}
 var _reveal_alpha := {}
+# Optional names for the wings (see set_wing_labels), drawn on the path from the
+# hub to each wing's root; _wing_roots maps a wing to its root node.
+var _wing_labels := {}
+var _wing_roots := {}
 var _stars: Array = []
 var _time := 0.0
 var _dragging := false
@@ -195,6 +199,7 @@ func build(defs: Array, hub_icon: Texture2D) -> void:
 	_states.clear()
 	_revealed.clear()
 	_reveal_alpha.clear()
+	_wing_roots.clear()
 	hub_texture = hub_icon
 	for d in defs:
 		_defs[d.id] = d
@@ -202,6 +207,8 @@ func build(defs: Array, hub_icon: Texture2D) -> void:
 	for d in defs:
 		_revealed[d.id] = true
 		_reveal_alpha[d.id] = 1.0
+		if d.parents.is_empty() and not d.get("isolated", false) and not _wing_roots.has(d.wing):
+			_wing_roots[d.wing] = d.id
 	_recompute_extent()
 	for d in defs:
 		_make_node(d)
@@ -232,6 +239,11 @@ func set_revealed(id: String, revealed: bool, animate: bool = false) -> void:
 			_set_hover("")
 	button.modulate.a = _reveal_alpha.get(id, 1.0)
 	_recompute_extent()
+
+# Names drawn along the hub-to-root path of each wing ({wing: text}) -- the
+# constellation carries no other text, so this is what tells the three arms apart.
+func set_wing_labels(labels: Dictionary) -> void:
+	_wing_labels = labels
 
 func is_revealed(id: String) -> bool:
 	return _revealed.get(id, true)
@@ -326,30 +338,41 @@ func _apply_state(id: String) -> void:
 	var button: Button = _buttons[id]
 	var tint: Color = tint_of(id)
 	var state: String = _states.get(id, "locked")
+	var grey := Color(0.5, 0.5, 0.56)
 	var fill := Color(0.06, 0.06, 0.1)
 	var ring := Color(0.26, 0.26, 0.32)
 	var icon_color := Color(0.4, 0.4, 0.46, 0.75)
+	var border := 4
 	match state:
 		"unaffordable":
-			fill = tint.darkened(0.78)
-			ring = tint.darkened(0.35)
-			icon_color = Color(0.85, 0.85, 0.85)
+			# Not yet buyable: a little greyed out.
+			fill = tint.darkened(0.8).lerp(Color(0.1, 0.1, 0.13), 0.5)
+			ring = tint.lerp(grey, 0.6).darkened(0.3)
+			icon_color = Color(0.62, 0.62, 0.66)
 		"available":
 			fill = tint.darkened(0.6)
 			ring = tint
 			icon_color = Color(1, 1, 1)
-		"owned", "upgradable":
+		"owned":
+			# Owned, but the next level is out of reach: a little greyed out too,
+			# though it keeps its wing colour so you can tell it is yours.
+			fill = tint.darkened(0.65).lerp(Color(0.1, 0.1, 0.13), 0.3)
+			ring = tint.lerp(grey, 0.4)
+			icon_color = Color(0.8, 0.8, 0.82)
+		"upgradable":
 			fill = tint.darkened(0.55)
-			ring = GOLD
+			ring = tint.lightened(0.12)
 			icon_color = Color(1, 1, 1)
 		"mastered":
-			fill = GOLD.darkened(0.45)
-			ring = Color(1.0, 0.97, 0.75)
+			# Fully maxed out: a thick golden border.
+			fill = tint.darkened(0.5)
+			ring = GOLD
 			icon_color = Color(1, 1, 1)
-	button.add_theme_stylebox_override("normal", _circle_style(fill, ring))
-	button.add_theme_stylebox_override("hover", _circle_style(fill.lightened(0.18), ring.lightened(0.35)))
-	button.add_theme_stylebox_override("pressed", _circle_style(fill.darkened(0.3), ring))
-	button.add_theme_stylebox_override("disabled", _circle_style(fill, ring))
+			border = 6
+	button.add_theme_stylebox_override("normal", _circle_style(fill, ring, border))
+	button.add_theme_stylebox_override("hover", _circle_style(fill.lightened(0.18), ring.lightened(0.35), border))
+	button.add_theme_stylebox_override("pressed", _circle_style(fill.darkened(0.3), ring, border))
+	button.add_theme_stylebox_override("disabled", _circle_style(fill, ring, border))
 	var focus := _circle_style(Color(0, 0, 0, 0), Color(1, 1, 1, 0.95), 3)
 	focus.expand_margin_left = 5
 	focus.expand_margin_right = 5
@@ -511,9 +534,36 @@ func _draw_world() -> void:
 				var edge: Color = _edge_color(parent_id, id)
 				edge.a *= _edge_alpha(parent_id, id)
 				world.draw_line(_positions[parent_id], to, edge, 4.0)
+	# Fully maxed nodes get a faint golden halo on top of their golden border.
+	for id in _states:
+		if _states[id] == "mastered" and _revealed.get(id, true):
+			world.draw_arc(_positions[id], NODE_RADIUS + 5.0, 0.0, TAU, 40, Color(GOLD.r, GOLD.g, GOLD.b, 0.45 * _reveal_alpha.get(id, 1.0)), 3.0)
+	_draw_wing_labels()
 	# A slow pulse around every node you can buy right now.
 	var pulse: float = fmod(_time * 0.9, 1.0)
 	for id in _states:
 		if _revealed.get(id, true) and (_states[id] == "available" or _states[id] == "upgradable"):
 			var c: Color = GOLD if _states[id] == "upgradable" else tint_of(id)
 			world.draw_arc(_positions[id], NODE_RADIUS + 5.0 + pulse * 9.0, 0.0, TAU, 40, Color(c.r, c.g, c.b, (1.0 - pulse) * 0.7), 3.0)
+
+# Each wing's name, centred on the path between the hub and the wing's root, in
+# the wing's colour with a dark outline so it reads over the line beneath it.
+func _draw_wing_labels() -> void:
+	var font: Font = world.get_theme_default_font()
+	if font == null:
+		return
+	var font_size := 13
+	for wing in _wing_labels:
+		if not _wing_roots.has(wing):
+			continue
+		var root_id: String = _wing_roots[wing]
+		if not _revealed.get(root_id, true):
+			continue
+		var to: Vector2 = _positions[root_id]
+		var reach: float = HUB_RADIUS + (to.length() - NODE_RADIUS - HUB_RADIUS) * 0.5
+		var text: String = _wing_labels[wing]
+		var text_size := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size)
+		var at: Vector2 = to.normalized() * reach - Vector2(text_size.x * 0.5, -font_size * 0.35)
+		var tint: Color = WING_TINTS.get(wing, Color(1, 1, 1)).lightened(0.3)
+		world.draw_string_outline(font, at, text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, 5, Color(0.03, 0.02, 0.07, 0.95))
+		world.draw_string(font, at, text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color(tint.r, tint.g, tint.b, 0.95))

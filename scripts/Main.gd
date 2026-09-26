@@ -901,6 +901,10 @@ var run_kills_by_name := {}
 var run_damage_dealt := 0
 var run_damage_taken := 0
 var run_bosses_defeated := 0
+# Essence this run has earned so far, before the slot's difficulty multiplier:
+# SaveData.essence_for_kill() per enemy defeated (bosses and minibosses are worth
+# more). Banked into the slot when the run ends -- see record_run_result.
+var run_essence := 0
 # Random events: event_choosing pauses/shows HUD's event_panel the same way
 # choosing_stat does for the level-up panel. pending_event_weapon is the
 # Traveling Merchant's rolled offer, snapshotted once when the event starts
@@ -1089,7 +1093,9 @@ var battle_shake_strength := 0.0
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	randomize()
+	# No randomize() here: Godot 4 seeds the global RNG randomly at engine start, and
+	# calling it again on every Main instance would also undo the fixed seed the
+	# test scripts set (tools/test_*.gd) to keep their random rolls repeatable.
 	# The Settings autoload isn't resolvable as a bare global identifier at
 	# GDScript compile time for a script loaded this early in a bare
 	# SceneTree's first frame (confirmed empirically) -- a runtime node
@@ -1344,6 +1350,7 @@ func _build_town() -> void:
 	_place_building(town_building_positions.dojo, preload("res://assets/building_dojo.png"), "dojo")
 	_place_building(town_building_positions.seer, preload("res://assets/building_seer.png"), "seer")
 	_place_building(town_building_positions.church, preload("res://assets/building_church.png"), "church")
+	_build_church_marker()
 	_place_building(town_building_positions.wishing_well, preload("res://assets/wishing_well.png"), "wishing_well")
 	_build_race_track()
 	_build_fishing_hole()
@@ -1469,6 +1476,32 @@ func _place_building(pos: Vector2, texture: Texture2D, kind: String) -> void:
 		_:
 			# Every newer venue is just a TownPanel registered under its kind.
 			_make_door_trigger(door_pos, door_size, func(): _try_open_panel(kind))
+
+# A little bobbing Essence shard over the Church's roof whenever there is a
+# skill you could buy right now, so banked Essence doesn't sit forgotten.
+# Rechecked at the start of a run (here) and after every Church purchase
+# (apply_meta_purchase) -- the two moments Essence or the tree can change.
+var church_marker: Sprite2D
+
+func _build_church_marker() -> void:
+	var roof: Vector2 = town_building_positions.church - Vector2(0, preload("res://assets/building_church.png").get_height() * 0.5 * TOWN_BUILDING_SCALE + 30.0)
+	church_marker = Sprite2D.new()
+	church_marker.texture = preload("res://assets/runic_shard.png")
+	church_marker.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	church_marker.scale = Vector2(3, 3)
+	church_marker.position = roof
+	church_marker.z_index = 5
+	church_marker.visible = false
+	add_child(church_marker)
+	var bob := church_marker.create_tween().set_loops()
+	bob.tween_property(church_marker, "position:y", roof.y - 9.0, 0.7).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	bob.tween_property(church_marker, "position:y", roof.y, 0.7).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	refresh_church_marker()
+
+func refresh_church_marker() -> void:
+	if church_marker == null:
+		return
+	church_marker.visible = SaveDataScript.can_buy_any_upgrade(SaveDataScript.load_data())
 
 # The Quest Board is a smaller kiosk object, not a full building -- its own
 # placement helper since it doesn't share _place_building's cottage-sized
@@ -1980,7 +2013,7 @@ func _complete_nothingness_rush() -> void:
 	_apply_world_visuals()
 	if not SaveDataScript.is_game_completed_ever():
 		SaveDataScript.mark_game_completed()
-		var essence_earned: int = SaveDataScript.record_run_result(wave - 1)
+		var essence_earned: int = SaveDataScript.record_run_result(run_essence, wave - 1)
 		var total_essence: int = SaveDataScript.load_data().get("essence", 0)
 		SaveDataScript.record_lifetime_run_stats(stats.kills_by_name, stats.world_reached, 10, stats.bosses_defeated)
 		game_over = true
@@ -2288,7 +2321,7 @@ func _on_player_died() -> void:
 	# you carried are gone (a run is never serialized, so the next Play starts
 	# clean), but the Essence this run banks and every upgrade bought with it
 	# in the Church stay in the slot for the next attempt.
-	var essence_earned: int = SaveDataScript.record_run_result(wave - 1)
+	var essence_earned: int = SaveDataScript.record_run_result(run_essence, wave - 1)
 	var total_essence: int = SaveDataScript.load_data().get("essence", 0)
 	var stats: Dictionary = _run_stats_summary()
 	SaveDataScript.record_lifetime_run_stats(stats.kills_by_name, stats.world_reached, current_world_index, stats.bosses_defeated)
@@ -2306,11 +2339,15 @@ func _on_enemy_died(xp_reward: int, enemy_name: String = "") -> void:
 	# Run-end stats recap: enemy_name is only ever empty for older direct/test
 	# call sites that don't bind it (see the .died.connect callers above) --
 	# a kill from one of those just doesn't show up in the per-name breakdown.
+	var was_boss := false
 	if enemy_name != "":
 		SaveDataScript.mark_creature_seen(enemy_name)
 		run_kills_by_name[enemy_name] = run_kills_by_name.get(enemy_name, 0) + 1
 		if ENEMY_TRAITS.get(enemy_name, {}).get("is_boss_tier", false):
 			run_bosses_defeated += 1
+			was_boss = true
+	# Every enemy that falls (whoever landed the blow) is worth Essence.
+	run_essence += SaveDataScript.essence_for_kill(was_boss)
 	# Momentum: stacks for the rest of THIS battle, reset in
 	# _setup_battle_grid -- only tracked at all when the skill is owned, so
 	# it can't silently accumulate across a run for players without it.
@@ -2469,6 +2506,7 @@ func apply_meta_purchase(id: String) -> void:
 	player.apply_meta_purchase(id)
 	if id == "beastmaster" and not had_wolf:
 		wolf_waves_remaining = WOLF_BASE_STAY_WAVES + player.meta_wolf_bonus_waves
+	refresh_church_marker()
 
 func _any_town_panel_open() -> bool:
 	for panel in town_panels.values():
@@ -3103,8 +3141,7 @@ func _advance_wave_tier() -> void:
 			hud.show_message("Your Traitor Wolf's loyalty fades -- it leaves your pack.")
 	# Hardened: permanent max-HP growth per wave cleared THIS run.
 	if player.meta_hardened_hp_per_wave > 0:
-		player.max_health += player.meta_hardened_hp_per_wave
-		player.heal(player.meta_hardened_hp_per_wave)
+		player.add_hardened_hp(player.meta_hardened_hp_per_wave)
 	# The Nothingness rush is a fixed, curated solo-boss gauntlet -- clear any
 	# stray ambient roamers before each of its fights so it stays a clean
 	# 1-on-1 duel, same as it always was back when every wave force-cleared
@@ -3260,7 +3297,7 @@ func _gear_quality_score() -> int:
 	var score := 0
 	if player.current_weapon.get("tier_name", "") in ["Masterwork", "Legendary", "Mythic"]:
 		score += 1
-	if ArmorScript.TIERS.find(player.equipped_armor) >= 3:
+	if ArmorScript.tier_rank(player.equipped_armor) >= 3:
 		score += 1
 	return score
 

@@ -125,7 +125,7 @@ func take_damage(amount: int) -> void:
 		queue_free()
 
 func _drop_loot() -> void:
-	var coin_count := int(round(randi_range(COIN_MIN, COIN_MAX) * (1.5 if is_elite else 1.0)))
+	var coin_count := PickupScript.roll_coins(COIN_MIN, COIN_MAX, is_elite)
 	if coin_count > 0:
 		var coin := PickupScript.new()
 		coin.kind = "coin"

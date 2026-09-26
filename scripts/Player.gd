@@ -258,6 +258,10 @@ var meta_riposte_chance := 0.0
 var meta_momentum_pct_per_kill := 0.0
 # Hardened: permanent max-HP growth per wave cleared THIS run.
 var meta_hardened_hp_per_wave := 0
+# The max HP Hardened has granted so far THIS run. Folded into _recalc_stats
+# (rather than added straight onto max_health) so a level-up, a talisman change
+# or a Church purchase, all of which recalculate from Vigor, cannot wipe it.
+var hardened_hp_bonus := 0
 # Favour (renamed from Second Chance): a %-chance, on any hit that would
 # drop you to 0 HP, to survive at 1 HP instead -- still only ever once per
 # battle. See take_battle_damage() below; second_chance_used_this_battle is
@@ -1277,7 +1281,7 @@ func shield_evasion_active() -> bool:
 func shield_special_pct() -> float:
 	if equipped_shield.is_empty():
 		return 0.0
-	if current_weapon.get("id", "") == equipped_shield.get("synergy_weapon", ""):
+	if ShieldsScript.base_weapon_id(current_weapon.get("id", "")) == equipped_shield.get("synergy_weapon", ""):
 		return equipped_shield.get("synergy_special_pct", 0.0)
 	return equipped_shield.get("special_pct", 0.0)
 
@@ -1586,12 +1590,18 @@ func apply_bonus_stat(stat_name: String) -> void:
 	awaiting_bonus = false
 	_recalc_stats()
 
+# Hardened: grows the run's permanent max HP (and heals by the same amount, since
+# _recalc_stats carries the difference over to current health).
+func add_hardened_hp(amount: int) -> void:
+	hardened_hp_bonus += amount
+	_recalc_stats()
+
 func _recalc_stats() -> void:
 	var old_max := max_health
 	max_health = int(round(stat_vigor * (1.0 + WORLDWALKER_HP_BONUS_PCT))) if meta_worldwalker else stat_vigor
 	# Talismans (max HP, move speed) are folded in here, not applied once and
 	# forgotten, so every level-up's recalculation keeps them.
-	max_health += int(talisman_bonus("max_hp"))
+	max_health += int(talisman_bonus("max_hp")) + hardened_hp_bonus
 	# Glass Cannon Charm (talisman): a multiplicative +/-% on top of the flat
 	# bonus above.
 	var max_hp_pct: float = talisman_bonus("max_hp_pct")

@@ -7,6 +7,9 @@ extends SceneTree
 # progress), the tooltip, and the Worldwalker lifetime gate.
 
 func _init() -> void:
+	# Fixed seed: every random roll below repeats run to run, so a changed result
+	# is a real change, not luck.
+	seed(20260926)
 	var save_data_script = load("res://scripts/SaveData.gd")
 	var view_script = load("res://scripts/AscensionView.gd")
 	# Clean slate: the slot and lifetime files are shared scratch paths.
@@ -189,6 +192,65 @@ func _init() -> void:
 	print("...and never covers the node it describes: %s (expected false)" % [Rect2(panel.tooltip.position, panel.tooltip.size).intersects(rect)])
 	panel._on_node_hover_changed("")
 	print("moving off a node hides the tooltip: %s (expected false)" % [panel.tooltip.visible])
+
+	# --- Polish: node styling, multi-buy, progress, wing labels, door marker ---
+	save_data_script.save_data({"essence": 400, "upgrades": {"strength": 2, "agility": 1, "reflexes_unlock": 1}, "best_wave": 0})
+	panel._refresh()
+	var mastered_box: StyleBoxFlat = panel.view.button_for("reflexes_unlock").get_theme_stylebox("normal")
+	var upgradable_box: StyleBoxFlat = panel.view.button_for("strength").get_theme_stylebox("normal")
+	print("a maxed-out node gets a thick golden border: state=%s width=%d gold=%s (expected mastered, 6, true)" % [
+		panel.state_for("reflexes_unlock"), mastered_box.border_width_left, mastered_box.border_color == view_script.GOLD
+	])
+	print("...an owned node that isn't maxed does not: width=%d gold=%s (expected 4, false)" % [
+		upgradable_box.border_width_left, upgradable_box.border_color == view_script.GOLD
+	])
+	print("progress line counts the skills you own: '%s' (expected '3 / %d skills')" % [panel.progress_label.text, save_data_script.UPGRADE_IDS.size()])
+	print("wing names are set on the three roots: %s (expected warrior=strength, merchant=coins, survivor=stamina)" % [
+		"warrior=%s, merchant=%s, survivor=%s" % [panel.view._wing_roots.get("warrior"), panel.view._wing_roots.get("merchant"), panel.view._wing_roots.get("survivor")]
+	])
+	panel._on_node_hover_changed("strength")
+	print("a stackable buyable node advertises Shift+click: shown=%s text='%s' (expected true, 'Shift+click: buy up to 5 levels')" % [
+		panel.tooltip_hint_label.visible, panel.tooltip_hint_label.text
+	])
+	panel._on_node_hover_changed("reflexes_unlock")
+	print("...a maxed one does not: shown=%s (expected false)" % [panel.tooltip_hint_label.visible])
+	panel._on_node_hover_changed("")
+
+	save_data_script.save_data({"essence": 5, "upgrades": {"strength": 1}, "best_wave": 0})
+	panel._refresh()
+	var owned_box: StyleBoxFlat = panel.view.button_for("strength").get_theme_stylebox("normal")
+	var greyed_owned: float = panel.view.button_for("strength").get_child(0).modulate.r
+	var greyed_unaffordable: float = panel.view.button_for("coins").get_child(0).modulate.r
+	print("a node you can't buy is a little greyed out: owned=%s icon=%.2f, unaffordable=%s icon=%.2f (expected owned/unaffordable, both < 1.0)" % [
+		panel.state_for("strength"), greyed_owned, panel.state_for("coins"), greyed_unaffordable
+	])
+	print("...but an owned one keeps its wing colour, not gold: gold=%s (expected false)" % [owned_box.border_color == view_script.GOLD])
+
+	save_data_script.save_data({"essence": 1000, "upgrades": {}, "best_wave": 0})
+	panel._refresh()
+	var coins_before_stack: int = player.coins
+	var got: int = panel.buy_levels("coins", 3)
+	var expected_spend: int = save_data_script.get_upgrade_cost("coins", 0) + save_data_script.get_upgrade_cost("coins", 1) + save_data_script.get_upgrade_cost("coins", 2)
+	print("Shift+click style buying takes several levels: bought=%d level=%d essence_left=%d (expected 3, 3, %d)" % [
+		got, panel.level_of("coins"), save_data_script.load_data().essence, 1000 - expected_spend
+	])
+	print("...each level is applied to the run: +%d coins (expected +%d)" % [player.coins - coins_before_stack, 3 * int(save_data_script.UPGRADES.coins.stat_bonus)])
+	save_data_script.save_data({"essence": 30, "upgrades": {"coins": 3}, "best_wave": 0})
+	panel._refresh()
+	print("...it stops when you run out of Essence: bought=%d (expected 1: 28 fits, the next level doesn't)" % [panel.buy_levels("coins", 5)])
+	save_data_script.save_data({"essence": 1000, "upgrades": {"agility": 1, "strength": 1}, "best_wave": 0})
+	panel._refresh()
+	print("...and at a skill's max level: bought=%d (expected 1 for a single-purchase skill asked for 5)" % [panel.buy_levels("reflexes_unlock", 5)])
+
+	save_data_script.save_data({"essence": 0, "upgrades": {}, "best_wave": 0})
+	main.refresh_church_marker()
+	var marker_broke: bool = main.church_marker.visible
+	save_data_script.save_data({"essence": 100, "upgrades": {}, "best_wave": 0})
+	main.refresh_church_marker()
+	print("the Church door shows a marker only when something is buyable: broke=%s afford=%s (expected false, true)" % [marker_broke, main.church_marker.visible])
+	print("can_buy_any_upgrade: 9 essence=%s, 10 essence=%s (expected false, true: Nest Egg is the cheapest root at 10)" % [
+		save_data_script.can_buy_any_upgrade({"essence": 9, "upgrades": {}}), save_data_script.can_buy_any_upgrade({"essence": 10, "upgrades": {}})
+	])
 
 	# --- Closing ---
 	panel.close()

@@ -21,6 +21,9 @@ func _make_goblin(main, tile: Vector2i, hp: int = 999) -> Dictionary:
 	}
 
 func _init() -> void:
+	# Fixed seed: every random roll below repeats run to run, so a changed result
+	# is a real change, not luck.
+	seed(20260926)
 	var save_data_script = load("res://scripts/SaveData.gd")
 	var weapons_script = load("res://scripts/Weapons.gd")
 
@@ -317,15 +320,20 @@ func _init() -> void:
 
 	# --- Hardened: permanent max-HP growth per wave cleared this run. ---
 	player.meta_hardened_hp_per_wave = 4
-	player.max_health = 50
-	player.health = 50
+	player._recalc_stats()
+	var hardened_base_hp: int = player.max_health
+	player.health = player.max_health
 	main.shrine_effect_waves_remaining = 0
 	main.wolf_waves_remaining = 0
 	player.party_wolf = {}
 	main.wave = 1
 	main._advance_wave_tier()
-	print("Hardened permanently grows max HP each wave cleared: max_health=%d health=%d (expected 54, 54)" % [player.max_health, player.health])
+	print("Hardened permanently grows max HP each wave cleared: max_health=%d health=%d (expected %d, %d)" % [player.max_health, player.health, hardened_base_hp + 4, hardened_base_hp + 4])
+	player._recalc_stats()
+	print("...and survives a stat recalculation (a level-up, a Church purchase): max_health=%d (expected %d)" % [player.max_health, hardened_base_hp + 4])
+	player.hardened_hp_bonus = 0
 	player.meta_hardened_hp_per_wave = 0
+	player._recalc_stats()
 
 	# --- Wolf expiry: a recruited wolf's loyalty runs out after
 	# WOLF_BASE_STAY_WAVES (+ Pack Bond) waves cleared, then leaves. ---

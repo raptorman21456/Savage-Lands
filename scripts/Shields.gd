@@ -117,5 +117,15 @@ static var SHIELDS := {
 
 const SHIELD_IDS := ["shield_buckler", "shield_heavy", "shield_bulwark", "shield_phantom", "shield_brawler"]
 
+# Shop weapons carry their tier and material in the id ("spear_fine_steel",
+# "dagger_mythic"); COMPATIBLE_WEAPONS and each shield's synergy_weapon name the
+# BASE type. Returns that base type ("club" is already one), or the id untouched
+# when it is not a one-handed base (a Battle Axe stays "battle_axe_...").
+static func base_weapon_id(weapon_id: String) -> String:
+	for base in COMPATIBLE_WEAPONS:
+		if weapon_id == base or weapon_id.begins_with("%s_" % base):
+			return base
+	return weapon_id
+
 static func is_weapon_compatible(weapon_id: String) -> bool:
-	return weapon_id in COMPATIBLE_WEAPONS
+	return base_weapon_id(weapon_id) in COMPATIBLE_WEAPONS

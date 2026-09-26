@@ -1,6 +1,19 @@
 extends Area2D
 class_name Pickup
 
+# Gold is plentiful: every ordinary enemy's coin range is scaled by this (a
+# Goblin's 1-2 becomes 3-6). Bosses and minibosses, whose ranges start at
+# BOSS_COIN_FLOOR or more, are already big and rare, so they are left as they
+# were. Elites still pay 1.5x on top. Every enemy script's _drop_loot rolls
+# through roll_coins, so this one number tunes the whole economy's income.
+const COIN_DROP_MULT := 3.0
+const BOSS_COIN_FLOOR := 50
+
+static func roll_coins(coin_min: int, coin_max: int, is_elite: bool) -> int:
+	var scale: float = 1.0 if coin_min >= BOSS_COIN_FLOOR else COIN_DROP_MULT
+	var rolled: int = randi_range(int(round(coin_min * scale)), int(round(coin_max * scale)))
+	return int(round(rolled * (1.5 if is_elite else 1.0)))
+
 var kind := "coin"
 var amount := 1
 var sprite: Sprite2D

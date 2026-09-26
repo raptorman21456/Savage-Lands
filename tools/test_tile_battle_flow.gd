@@ -1,6 +1,9 @@
 extends SceneTree
 
 func _init() -> void:
+	# Fixed seed: every random roll below repeats run to run, so a changed result
+	# is a real change, not luck.
+	seed(20260926)
 	var main_scene = load("res://Main.tscn")
 	var main = main_scene.instantiate()
 	root.add_child(main)
@@ -139,6 +142,9 @@ func _init() -> void:
 		"ref": orc, "tile": Vector2i(3, 2), "hp": 999, "max_hp": 999,
 		"move_range": 1, "damage": 4, "name": "Orc", "winding_up": false,
 	}]
+	# Orcs skip the telegraph for a quick jab 40% of the time (ORC_QUICK_JAB_CHANCE),
+	# which would make this check flaky -- so pin the roll to one that telegraphs.
+	seed(1)
 	player.health = player.max_health
 	main._process_enemy_turn()
 	print("orc telegraphs before its first hit: player_health=%d (expected unchanged %d), winding_up=%s (expected true)" % [

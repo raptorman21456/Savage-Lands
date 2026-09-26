@@ -1,11 +1,17 @@
 extends Node
 class_name SaveData
 
-# Persistent meta-progression: Essence earned on death (based on waves
-# cleared that run) banks permanently and buys permanent starting-stat
-# upgrades at the Church in town, applied to every future run. This is what
-# makes death matter instead of just resetting everything to zero.
-const ESSENCE_PER_WAVE_CLEARED := 8
+# Persistent meta-progression: Essence earned during a run (1 per enemy
+# defeated, ESSENCE_PER_BOSS_KILL per boss or miniboss) banks permanently when
+# the run ends and buys permanent upgrades at the Church in town, applied to
+# every future run. This is what makes death matter instead of just resetting
+# everything to zero.
+const ESSENCE_PER_KILL := 1
+const ESSENCE_PER_BOSS_KILL := 10
+
+# What one defeated enemy is worth before the difficulty multiplier.
+static func essence_for_kill(is_boss: bool) -> int:
+	return ESSENCE_PER_BOSS_KILL if is_boss else ESSENCE_PER_KILL
 
 # A real tree: 3 wings (Warrior/Merchant/Survivor), each splitting into two
 # sub-paths partway down that reconverge at that wing's capstone, plus
@@ -476,6 +482,22 @@ static func is_upgrade_unlocked(data: Dictionary, id: String) -> bool:
 			return false
 	return true
 
+# True if at least one skill can be bought right now: not at its max level, its
+# prerequisites (and any lifetime gate) met, and enough Essence for its next
+# level. The Church door's marker (Main.gd:refresh_church_marker) uses this.
+static func can_buy_any_upgrade(data: Dictionary) -> bool:
+	var owned_upgrades: Dictionary = data.get("upgrades", {})
+	var essence: int = data.get("essence", 0)
+	for id in UPGRADE_IDS:
+		var owned: int = owned_upgrades.get(id, 0)
+		if owned >= UPGRADES[id].get("max_level", 999999):
+			continue
+		if essence < get_upgrade_cost(id, owned):
+			continue
+		if is_upgrade_unlocked(data, id):
+			return true
+	return false
+
 # Mutates `data` in place (caller is expected to have gotten it from
 # load_data() and to persist it afterward with save_data()).
 static func try_buy_upgrade(data: Dictionary, id: String) -> bool:
@@ -494,16 +516,18 @@ static func try_buy_upgrade(data: Dictionary, id: String) -> bool:
 	data.upgrades[id] = owned + 1
 	return true
 
-# Banks essence for a finished run and returns the amount earned, for
-# display on the game-over screen. Scaled by the active slot's locked-in
-# difficulty -- harder modes pay out more Essence, same multiplier that
-# makes their enemies tougher (Main.gd:_setup_battle_grid).
-static func record_run_result(waves_cleared: int) -> int:
+# Banks the essence a finished run earned and returns the amount, for display
+# on the game-over screen. raw_essence is what the run tallied up (see
+# Main.gd:run_essence); it is scaled here by the active slot's locked-in
+# difficulty -- harder modes pay out more Essence, same multiplier that makes
+# their enemies tougher (Main.gd:_setup_battle_grid). waves_reached only feeds
+# the slot's best_wave record.
+static func record_run_result(raw_essence: int, waves_reached: int = 0) -> int:
 	var data := load_data()
 	var mult: float = get_difficulty_mult(data.get("difficulty", ""))
-	var earned: int = int(round(max(0, waves_cleared) * ESSENCE_PER_WAVE_CLEARED * mult))
+	var earned: int = int(round(max(0, raw_essence) * mult))
 	data.essence = data.get("essence", 0) + earned
-	data.best_wave = max(data.get("best_wave", 0), waves_cleared)
+	data.best_wave = max(data.get("best_wave", 0), waves_reached)
 	save_data(data)
 	return earned
 

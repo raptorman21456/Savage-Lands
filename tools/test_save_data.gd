@@ -1,6 +1,9 @@
 extends SceneTree
 
 func _init() -> void:
+	# Fixed seed: every random roll below repeats run to run, so a changed result
+	# is a real change, not luck.
+	seed(20260926)
 	var save_data_script = load("res://scripts/SaveData.gd")
 
 	# Start from a clean slate -- every test_*.gd run shares the same
@@ -55,11 +58,15 @@ func _init() -> void:
 		player.stat_strength, bonuses.strength, 1 + bonuses.strength, player.attack_damage
 	])
 
-	# --- Death: computes essence for the waves cleared, banks it into the slot
+	# --- Death: computes essence for the kills made, banks it into the slot
 	# (see below) and shows the game-over panel instead of the old bare
 	# "press R" message. ---
 	main.wave = 4
-	var expected_earned: int = (main.wave - 1) * save_data_script.ESSENCE_PER_WAVE_CLEARED
+	# Essence is earned per enemy: 5 ordinary kills and one boss.
+	for i in 5:
+		main._on_enemy_died(0, "Goblin")
+	main._on_enemy_died(0, "Demogorgon")
+	var expected_earned: int = 5 * save_data_script.ESSENCE_PER_KILL + save_data_script.ESSENCE_PER_BOSS_KILL
 	player.health = 1
 	player.take_battle_damage(1)
 	print("dying shows the game-over panel: game_over=%s panel_visible=%s (expected true, true)" % [

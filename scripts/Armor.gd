@@ -63,3 +63,14 @@ static func get_next_tier(owned_armor: Dictionary) -> Dictionary:
 		if not owned_armor.has(tier.id):
 			return tier
 	return {}
+
+# Position of an armor in TIERS (worst to best), found by id -- the shop hands
+# out tagged COPIES of these entries (Main._tagged adds a "category" key), which
+# never compare equal to the original dictionaries, so TIERS.find(armor) would
+# always come back -1 for anything bought. -1 for an unknown id.
+static func tier_rank(armor: Dictionary) -> int:
+	var id: String = armor.get("id", "")
+	for i in TIERS.size():
+		if TIERS[i].id == id:
+			return i
+	return -1
