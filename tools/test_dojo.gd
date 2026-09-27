@@ -15,6 +15,14 @@ func _make_goblin(main, tile: Vector2i, hp: int = 999) -> Dictionary:
 		"damage": 0, "name": "Goblin", "winding_up": false, "stunned": false,
 	}
 
+func _labels(node: Node) -> Array:
+	var texts := []
+	if node is Label:
+		texts.append(node.text)
+	for child in node.get_children():
+		texts.append_array(_labels(child))
+	return texts
+
 func _init() -> void:
 	# Fixed seed: every random roll below repeats run to run, so a changed result
 	# is a real change, not luck.
@@ -148,6 +156,44 @@ func _init() -> void:
 		print("broke for the third (60): %s (expected false)" % [panel.learn(weapons.CLUB.specials[2].id)])
 		player.owned_weapons[spear_a.id] = true
 		print("owning a Spear adds it to the list: %s (expected [club, spear])" % [dojo.owned_bases(player.owned_weapons).map(func(b): return b.id)])
+
+		# --- The weapon picker: weapons on the left, the selected one's moves on the right ---
+		panel._refresh()
+		print("one entry per weapon type you hold, the one in hand first: %s (expected [club, spear])" % [panel.weapon_buttons.keys()])
+		print("the weapon in hand starts selected: %s (expected club)" % [panel.selected_base_id])
+		var club_texts: Array = _labels(panel.detail_box)
+		print("its header counts what you've learned: %s (expected true)" % [club_texts.any(func(t): return t.begins_with("2 of 3 moves learned"))])
+		print("three move cards, learned ones locked and the third unaffordable (60, have 10): %s disabled=%s (expected [Learned, Learned, Learn], [true, true, true])" % [
+			panel.move_buttons.map(func(b): return b.text), panel.move_buttons.map(func(b): return b.disabled)
+		])
+		panel.select_base("spear")
+		print("picking another weapon shows its own moves: %s (expected spear), buttons %s (expected all Learn, all disabled at 10 coins)" % [
+			panel.selected_base_id, panel.move_buttons.map(func(b): return b.text + ("/off" if b.disabled else "/on"))
+		])
+		player.coins = 20
+		panel._refresh()
+		print("with 20 coins only the 15-coin first lesson is open: %s (expected [Learn/on, Learn/off, Learn/off])" % [
+			panel.move_buttons.map(func(b): return b.text + ("/off" if b.disabled else "/on"))
+		])
+		panel.move_buttons[0].pressed.emit()
+		print("pressing Learn teaches the move and updates the card: known=%s coins=%d text=%s (expected true, 5, Learned)" % [
+			player.knows_special(weapons.SPEAR.specials[0].id), player.coins, panel.move_buttons[0].text
+		])
+		print("...and the weapon's list entry has a lit pip (the entry is rebuilt): %s (expected true)" % [panel.weapon_buttons.has("spear")])
+		var all_text: String = " ".join(_labels(panel.detail_box))
+		print("move descriptions show plain percent signs, not %%%%: %s (expected true)" % [not all_text.contains("%%")])
+
+		player.owned_talismans["weapon_whisperer"] = true
+		player.equip_talisman("weapon_whisperer")
+		panel._refresh()
+		print("with Weapon Whisperer a learned move offers Whisper: %s (expected Whisper)" % [panel.move_buttons[0].text])
+		panel.move_buttons[0].pressed.emit()
+		print("...and toggles to Whispered: %s (expected Whispered)" % [panel.move_buttons[0].text])
+		player.owned_weapons = {}
+		panel._refresh()
+		print("with no weapons the picker is empty and says so: entries=%d moves=%d (expected 0, 0), text=%s" % [
+			panel.weapon_buttons.size(), panel.move_buttons.size(), " ".join(_labels(panel.detail_box)).left(40)
+		])
 		panel.close()
 
 	quit()
