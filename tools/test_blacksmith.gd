@@ -6,6 +6,22 @@ extends SceneTree
 # applied inside _equip_weapon / armor_damage_reduction, so they reach every
 # equip path and the real incoming-damage calculation.
 
+func _labels(node: Node) -> Array:
+	var texts := []
+	if node is Label:
+		texts.append(node.text)
+	for child in node.get_children():
+		texts.append_array(_labels(child))
+	return texts
+
+func _buttons_text(node: Node) -> Array:
+	var texts := []
+	if node is Button:
+		texts.append(node.text)
+	for child in node.get_children():
+		texts.append_array(_buttons_text(child))
+	return texts
+
 func _init() -> void:
 	# Fixed seed: every random roll below repeats run to run, so a changed result
 	# is a real change, not luck.
@@ -157,6 +173,53 @@ func _init() -> void:
 		print("...and armour: ok=%s (expected true), coins=%d (expected 35)" % [panel.upgrade_armor("armor_iron"), player.coins])
 		print("refuses leather (not metal): %s (expected false)" % [panel.upgrade_armor("armor_leather")])
 		print("refuses when broke: %s (expected false)" % [panel.upgrade_armor("armor_iron")])
+
+		# --- The gear picker: your gear on the left, the selected piece's upgrade on the right ---
+		player.owned_weapons = {"club": true, "dagger_worn_wood": true, "spear_fine_steel": true}
+		player.weapon_upgrade_levels = {}
+		player.armor_upgrade_levels = {}
+		player.owned_armor = {"armor_rags": true, "armor_leather": true, "armor_iron": true}
+		player.equipped_armor = armor.TIERS[2]
+		player.attack_damage = 20
+		player.coins = 100
+		player._equip_weapon(weapons.get_owned_variant("spear_fine_steel"))
+		panel.selected_kind = ""
+		panel.selected_id = ""
+		panel._refresh()
+		print("the list has your weapons (in hand first, then best tier) then your armour without the Rags: %s (expected spear, dagger, club, leather, iron)" % [panel.entry_buttons.keys()])
+		print("the weapon in hand starts selected: %s %s (expected weapon spear_fine_steel)" % [panel.selected_kind, panel.selected_id])
+		var spear_variant: Dictionary = weapons.get_owned_variant("spear_fine_steel")
+		var texts: Array = _labels(panel.detail_box)
+		print("the next-upgrade card offers +1 and can be bought: %s, button=%s enabled=%s (expected true, Upgrade, true)" % [
+			texts.has("Upgrade to +1"), panel.upgrade_button.text, not panel.upgrade_button.disabled
+		])
+		print("...showing the damage before and after with a decimal, so a small gain is visible: %.2f -> %.2f (expected the second higher)" % [
+			player.weapon_damage_exact(spear_variant), player.weapon_damage_exact(spear_variant, 1)
+		])
+		print("...and the whole-number preview is just that rounded: %d (expected %d)" % [player.weapon_damage_preview(spear_variant), int(round(player.weapon_damage_exact(spear_variant)))])
+		panel.upgrade_button.pressed.emit()
+		print("pressing Upgrade forges it: level=%d coins=%d (expected 1, 75)" % [player.get_weapon_upgrade_level("spear_fine_steel"), player.coins])
+		print("...and the card moves on to +2: %s (expected true)" % [_labels(panel.detail_box).has("Upgrade to +2")])
+		player.coins = 10
+		panel._refresh()
+		print("too poor for the next level: the button is disabled: %s (expected true)" % [panel.upgrade_button.disabled])
+		player.coins = 500
+		player.weapon_upgrade_levels["dagger_worn_wood"] = 5
+		panel.select("weapon", "dagger_worn_wood")
+		print("a maxed weapon says it is fully forged: %s (expected true)" % [_labels(panel.detail_box).has("Fully forged")])
+		print("...its Upgrade button is gone, and the maxed card has a disabled Maxed button: %s (expected true)" % [_buttons_text(panel.detail_box).has("Maxed")])
+		panel.select("armor", "armor_iron")
+		print("armour shows its damage reduction before and after: %s (expected true)" % [_labels(panel.detail_box).has("30.0%") and _labels(panel.detail_box).has("32.5%")])
+		panel.upgrade_button.pressed.emit()
+		print("upgrading armour through the panel: level=%d (expected 1)" % [player.get_armor_upgrade_level("armor_iron")])
+		panel.select("armor", "armor_leather")
+		print("non-metal armour explains itself and has no Upgrade button: %s, button=%s (expected true, null)" % [
+			_labels(panel.detail_box).any(func(t): return t.begins_with("Not metal -- the smith")), panel.upgrade_button
+		])
+		player.owned_weapons = {}
+		player.owned_armor = {"armor_rags": true}
+		panel._refresh()
+		print("with nothing to work on the picker is empty and says so: entries=%d, text=%s (expected 0)" % [panel.entry_buttons.size(), " ".join(_labels(panel.detail_box)).left(30)])
 		panel.close()
 
 	quit()

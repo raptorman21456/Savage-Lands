@@ -775,9 +775,17 @@ func _apply_enchantment_to_weapon(weapon: Dictionary) -> Dictionary:
 # What one plain hit with this weapon would do at your current Strength -- its
 # tier, material, rune and Blacksmith level included, but not talismans or
 # one-off battle modifiers -- so the Inventory cards can be compared at a glance.
-func weapon_damage_preview(weapon: Dictionary) -> int:
-	var prepared: Dictionary = _apply_upgrade_to_weapon(_apply_enchantment_to_weapon(weapon))
-	return int(round(attack_damage * prepared.get("damage_mult", 1.0)))
+# upgrade_level >= 0 previews the weapon at that Blacksmith level instead of the
+# one it has now (the Blacksmith's before/after).
+func weapon_damage_preview(weapon: Dictionary, upgrade_level: int = -1) -> int:
+	return int(round(weapon_damage_exact(weapon, upgrade_level)))
+
+# The same, unrounded: a small upgrade often does not move the whole number, but
+# the Blacksmith still wants to show that it did something.
+func weapon_damage_exact(weapon: Dictionary, upgrade_level: int = -1) -> float:
+	var prepared: Dictionary = _apply_enchantment_to_weapon(weapon)
+	var level: int = get_weapon_upgrade_level(weapon.get("id", "")) if upgrade_level < 0 else upgrade_level
+	return attack_damage * prepared.get("damage_mult", 1.0) * BlacksmithScript.weapon_damage_factor(level)
 
 func _apply_upgrade_to_weapon(weapon: Dictionary) -> Dictionary:
 	var level: int = weapon_upgrade_levels.get(weapon.get("id", ""), 0)
