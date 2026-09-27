@@ -21,10 +21,17 @@ const WeaponsScript := preload("res://scripts/Weapons.gd")
 const ShieldsScript := preload("res://scripts/Shields.gd")
 const ClothingScript := preload("res://scripts/Clothing.gd")
 const TalismansScript := preload("res://scripts/Talismans.gd")
+const WeaponIconsScript := preload("res://scripts/WeaponIcons.gd")
 
 const TABS := ["Weapons", "Items", "Talismans", "Party", "Map", "Settings"]
 const GRID_COLUMNS := 4
 const CELL_SIZE := Vector2(112, 122)
+# Weapons get bigger cards than everything else on the tab (icon at 2x, tier tag,
+# name, damage), five to a row. Legendary and Mythic cards glow.
+const WEAPON_CELL_SIZE := Vector2(150, 172)
+const WEAPON_COLUMNS := 5
+const GLOW_SIZE := 9
+const GLOW_SIZE_MYTHIC := 12
 const EQUIPPED_COLOR := Color(1.0, 0.85, 0.2)
 const BORDER_COLOR := Color(0.4, 0.4, 0.45)
 
@@ -191,29 +198,33 @@ func _refresh() -> void:
 
 func _build_weapons_tab(container: VBoxContainer) -> void:
 	_add_section_heading(container, "WEAPONS")
+	# Room around the grid for the Legendary/Mythic glow, which spills past a
+	# card's edge and would otherwise be cut off by the scroll area.
+	var weapon_margin := MarginContainer.new()
+	for side in ["left", "right", "top", "bottom"]:
+		weapon_margin.add_theme_constant_override("margin_%s" % side, 10)
+	container.add_child(weapon_margin)
 	var weapon_grid := GridContainer.new()
-	weapon_grid.columns = GRID_COLUMNS
+	weapon_grid.columns = WEAPON_COLUMNS
 	weapon_grid.add_theme_constant_override("h_separation", 10)
-	weapon_grid.add_theme_constant_override("v_separation", 10)
-	container.add_child(weapon_grid)
+	weapon_grid.add_theme_constant_override("v_separation", 12)
+	weapon_margin.add_child(weapon_grid)
 	var current_weapon_id: String = _player.current_weapon_base.get("id", "")
+	# Best tier first, then by name, so the good stuff leads instead of sitting in
+	# the order it happened to be bought.
+	var owned_variants: Array = []
 	for id in _player.owned_weapons:
 		var variant: Dictionary = WeaponsScript.get_owned_variant(id)
-		if variant.is_empty():
-			continue
-		var equipped: bool = id == current_weapon_id
-		var subtitle: String = variant.get("tier_name", "")
-		var rune_id: String = _player.weapon_enchantments.get(id, "")
-		if rune_id != "":
-			subtitle += " (%s)" % EnchantmentsScript.get_rune(rune_id).name
-		var upgrade_level: int = _player.get_weapon_upgrade_level(id)
-		if upgrade_level > 0:
-			subtitle += " +%d" % upgrade_level
-		var cell := _make_grid_cell(
-			"res://assets/weapon_%s.png" % variant.get("icon", ""), variant.name, subtitle, equipped,
-			variant.get("description", ""), func(): _on_weapon_cell_pressed(variant)
-		)
-		weapon_grid.add_child(cell)
+		if not variant.is_empty():
+			owned_variants.append(variant)
+	owned_variants.sort_custom(func(a, b):
+		var rank_a: int = _tier_rank(a)
+		var rank_b: int = _tier_rank(b)
+		if rank_a != rank_b:
+			return rank_a > rank_b
+		return WeaponIconsScript.display_name(a) < WeaponIconsScript.display_name(b))
+	for variant in owned_variants:
+		weapon_grid.add_child(_make_weapon_card(variant, variant.get("id", "") == current_weapon_id))
 
 	_add_section_heading(container, "ARMOR")
 	var armor_row := HBoxContainer.new()
@@ -274,8 +285,166 @@ func _build_weapons_tab(container: VBoxContainer) -> void:
 			)
 			shield_grid.add_child(cell)
 
+# Higher is better; the Club (no tier) sorts last.
+func _tier_rank(variant: Dictionary) -> int:
+	for tier in WeaponsScript.TIERS:
+		if tier.tier_name == variant.get("tier_name", ""):
+			return tier.rank
+	return -1
+
+# A weapon card: tier tag and (if worn) an EQUIPPED marker on top, the icon on a
+# plate tinted with the tier's colour, the name without its tier prefix, damage
+# and any Might requirement underneath. The border is the tier's colour, and
+# Legendary/Mythic add a glow around the card.
+func _make_weapon_card(variant: Dictionary, equipped: bool) -> Button:
+	var id: String = variant.get("id", "")
+	var tier_color: Color = WeaponIconsScript.tier_color(variant)
+	var glowing: bool = WeaponIconsScript.has_glow(variant)
+	var required_might: int = int(variant.get("required_might", 0))
+	var might_locked: bool = required_might > _player.stat_might
+	var upgrade_level: int = _player.get_weapon_upgrade_level(id)
+	var rune_id: String = _player.weapon_enchantments.get(id, "")
+
+	var card := Button.new()
+	card.custom_minimum_size = WEAPON_CELL_SIZE
+	card.tooltip_text = variant.get("description", "")
+	if might_locked:
+		card.tooltip_text += "\n\nNeeds %d Might to wield (you have %d)." % [required_might, _player.stat_might]
+	card.pressed.connect(func(): _on_weapon_cell_pressed(variant))
+	_style_weapon_card(card, tier_color, glowing, equipped)
+	if glowing:
+		# Drawn above its neighbours so the glow isn't painted over by the next card.
+		card.z_index = 1
+
+	var pad := MarginContainer.new()
+	pad.set_anchors_preset(Control.PRESET_FULL_RECT)
+	pad.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for side in ["left", "right"]:
+		pad.add_theme_constant_override("margin_%s" % side, 8)
+	pad.add_theme_constant_override("margin_top", 7)
+	pad.add_theme_constant_override("margin_bottom", 7)
+	card.add_child(pad)
+	var content := VBoxContainer.new()
+	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	content.add_theme_constant_override("separation", 3)
+	pad.add_child(content)
+
+	# Header: tier tag (with any Blacksmith level) left, EQUIPPED right.
+	var header := HBoxContainer.new()
+	header.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	content.add_child(header)
+	var tag_text: String = WeaponIconsScript.tier_label(variant)
+	if upgrade_level > 0:
+		tag_text += " +%d" % upgrade_level
+	var tag := Label.new()
+	tag.text = tag_text
+	tag.add_theme_font_size_override("font_size", 11)
+	tag.add_theme_color_override("font_color", tier_color.lightened(0.25))
+	header.add_child(tag)
+	var header_spacer := Control.new()
+	header_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_child(header_spacer)
+	if equipped:
+		var worn := Label.new()
+		worn.text = "EQUIPPED"
+		worn.add_theme_font_size_override("font_size", 10)
+		worn.add_theme_color_override("font_color", EQUIPPED_COLOR)
+		header.add_child(worn)
+
+	# The icon, at 2x on a plate tinted with the tier's colour.
+	var plate := PanelContainer.new()
+	plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	plate.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	plate.add_theme_stylebox_override("panel", _make_stylebox(tier_color.darkened(0.82), tier_color.darkened(0.45), 1, 6))
+	content.add_child(plate)
+	var icon := TextureRect.new()
+	icon.texture = WeaponIconsScript.texture_for(variant)
+	icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	icon.custom_minimum_size = Vector2(64, 64)
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if might_locked:
+		icon.modulate = Color(0.5, 0.5, 0.55)
+	plate.add_child(icon)
+
+	var name_label := Label.new()
+	name_label.text = WeaponIconsScript.display_name(variant)
+	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+	name_label.max_lines_visible = 2
+	name_label.custom_minimum_size = Vector2(WEAPON_CELL_SIZE.x - 20, 34)
+	name_label.add_theme_font_size_override("font_size", 13)
+	name_label.add_theme_color_override("font_color", EQUIPPED_COLOR if equipped else Color(0.92, 0.92, 0.88))
+	content.add_child(name_label)
+
+	# Damage at your current Strength (tier, material, runes and Blacksmith levels
+	# included), and the Might needed, red while you lack it.
+	var stats := HBoxContainer.new()
+	stats.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	content.add_child(stats)
+	var damage := Label.new()
+	damage.text = "DMG %d" % _player.weapon_damage_preview(variant)
+	damage.add_theme_font_size_override("font_size", 12)
+	damage.add_theme_color_override("font_color", Color(0.9, 0.9, 0.85))
+	stats.add_child(damage)
+	var stats_spacer := Control.new()
+	stats_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	stats.add_child(stats_spacer)
+	if required_might > 0:
+		var might := Label.new()
+		might.text = "MGT %d" % required_might
+		might.add_theme_font_size_override("font_size", 11)
+		might.add_theme_color_override("font_color", Color(1.0, 0.4, 0.4) if might_locked else Color(0.55, 0.6, 0.55))
+		stats.add_child(might)
+
+	# A rune's name under the stats (a blank line otherwise, so every card is the
+	# same height).
+	var rune_label := Label.new()
+	rune_label.text = EnchantmentsScript.get_rune(rune_id).name if rune_id != "" else ""
+	rune_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	rune_label.add_theme_font_size_override("font_size", 10)
+	rune_label.add_theme_color_override("font_color", Color(0.75, 0.6, 1.0))
+	rune_label.custom_minimum_size = Vector2(0, 13)
+	content.add_child(rune_label)
+	return card
+
+func _style_weapon_card(button: Button, tier_color: Color, glowing: bool, equipped: bool) -> void:
+	var bg: Color = Color(0.17, 0.15, 0.08, 0.96) if equipped else Color(0.11, 0.11, 0.13, 0.96)
+	var normal := StyleBoxFlat.new()
+	normal.bg_color = bg
+	normal.border_color = tier_color
+	normal.set_border_width_all(3 if glowing else 2)
+	normal.set_corner_radius_all(7)
+	if glowing:
+		var glow: Color = tier_color
+		glow.a = 0.55
+		normal.shadow_color = glow
+		normal.shadow_size = GLOW_SIZE_MYTHIC if tier_color == WeaponIconsScript.TIER_COLORS["Mythic"] else GLOW_SIZE
+		normal.shadow_offset = Vector2.ZERO
+	button.add_theme_stylebox_override("normal", normal)
+	var hover: StyleBoxFlat = normal.duplicate()
+	hover.border_color = tier_color.lightened(0.35)
+	hover.bg_color = bg.lightened(0.08)
+	button.add_theme_stylebox_override("hover", hover)
+	var pressed: StyleBoxFlat = normal.duplicate()
+	pressed.bg_color = bg.darkened(0.12)
+	button.add_theme_stylebox_override("pressed", pressed)
+	var focus := StyleBoxFlat.new()
+	focus.bg_color = Color(0, 0, 0, 0)
+	focus.border_color = Color(1, 1, 1, 0.9)
+	focus.set_border_width_all(2)
+	focus.set_corner_radius_all(7)
+	focus.set_expand_margin_all(2)
+	button.add_theme_stylebox_override("focus", focus)
+
 func _on_weapon_cell_pressed(variant: Dictionary) -> void:
 	if variant.get("id", "") == _player.current_weapon_base.get("id", ""):
+		return
+	# Same rule as the shop: a weapon needing more Might than you have cannot be wielded.
+	if int(variant.get("required_might", 0)) > _player.stat_might:
+		_play_sfx("error")
 		return
 	_player._equip_weapon(variant)
 	_play_sfx("purchase")

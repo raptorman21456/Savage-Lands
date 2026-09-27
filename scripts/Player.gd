@@ -772,6 +772,13 @@ func _apply_enchantment_to_weapon(weapon: Dictionary) -> Dictionary:
 # nothing that predates upgrades sees any difference. Duplicates first, same
 # reasoning as _apply_meta_passives_to_weapon below: the input may be a shared
 # const or the caller's own base dict, neither of which may be mutated.
+# What one plain hit with this weapon would do at your current Strength -- its
+# tier, material, rune and Blacksmith level included, but not talismans or
+# one-off battle modifiers -- so the Inventory cards can be compared at a glance.
+func weapon_damage_preview(weapon: Dictionary) -> int:
+	var prepared: Dictionary = _apply_upgrade_to_weapon(_apply_enchantment_to_weapon(weapon))
+	return int(round(attack_damage * prepared.get("damage_mult", 1.0)))
+
 func _apply_upgrade_to_weapon(weapon: Dictionary) -> Dictionary:
 	var level: int = weapon_upgrade_levels.get(weapon.get("id", ""), 0)
 	if level <= 0:

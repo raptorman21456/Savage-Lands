@@ -2,6 +2,7 @@ extends CanvasLayer
 class_name HUD
 
 const WeaponsScript := preload("res://scripts/Weapons.gd")
+const WeaponIconsScript := preload("res://scripts/WeaponIcons.gd")
 const PlayerScript := preload("res://scripts/Player.gd")
 
 # Flat cost to lock a rolled (non-Club) weapon offer so a reroll can't take
@@ -2060,7 +2061,7 @@ func show_shop(coins: int, runic_shards: int, offering: Array, prices: Array, cu
 		var button := Button.new()
 		button.custom_minimum_size = Vector2(0, 52)
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		button.icon = load("res://assets/weapon_%s.png" % item.icon if item.category == "weapon" else "res://assets/%s.png" % item.icon)
+		button.icon = WeaponIconsScript.texture_for(item) if item.category == "weapon" else load("res://assets/%s.png" % item.icon)
 		button.expand_icon = true
 		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		button.text = "[%d] %s%s%s" % [i + 1, "🔒 " if is_locked else "", "★ " if is_mythic else "", item.name]

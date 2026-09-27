@@ -37,6 +37,8 @@ func _init() -> void:
 	var armor_script = load("res://scripts/Armor.gd")
 
 	player.owned_weapons["spear_masterwork_steel"] = true
+	# Masterwork needs 8 Might; the Inventory now enforces that on equip, like the shop.
+	player.stat_might = 8
 	player.owned_shields["shield_heavy"] = true
 	player.equipped_shield = shields_script.SHIELDS["shield_heavy"]
 	player.equipped_armor = armor_script.TIERS[2]
