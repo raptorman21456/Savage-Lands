@@ -17,6 +17,7 @@ extends TownPanel
 const AscensionViewScript := preload("res://scripts/AscensionView.gd")
 const SaveDataScript := preload("res://scripts/SaveData.gd")
 const PixelUIScript := preload("res://scripts/PixelUI.gd")
+const TownUIScript := preload("res://scripts/TownUI.gd")
 
 # Which wing each skill belongs to (tints its nodes and picks where its roots
 # fan out from). Every id in SaveData.UPGRADE_IDS must appear exactly once --
@@ -66,9 +67,12 @@ const TOOLTIP_WIDTH := 330.0
 # Shift+click on a node buys up to this many levels at once.
 const SHIFT_BUY_LEVELS := 5
 const WING_NAMES := {"warrior": "WARRIOR", "merchant": "MERCHANT", "survivor": "SURVIVOR"}
-const COLOR_GOOD := Color(0.55, 0.95, 0.55)
-const COLOR_BAD := Color(1.0, 0.5, 0.45)
-const COLOR_DIM := Color(0.68, 0.68, 0.72)
+# Shared with the Dojo/Blacksmith (TownUI.gd) so all three town panels read from the
+# same palette: COLOR_GOOD/BAD/DIM are kept as aliases since test_church.gd and the
+# rest of this file were written against those names.
+const COLOR_GOOD := TownUIScript.GOOD
+const COLOR_BAD := TownUIScript.BAD
+const COLOR_DIM := TownUIScript.DIM
 
 var essence_label: Label
 var progress_label: Label
@@ -95,16 +99,14 @@ func _panel_title() -> String:
 	return "THE CHURCH"
 
 func _window_size() -> Vector2:
+	# Deliberately uncapped, unlike TownUI.picker_window_size's 900x610 -- the
+	# constellation makes good use of extra room that a fixed list-and-cards layout
+	# (Dojo/Blacksmith) wouldn't.
 	var viewport_size := get_viewport().get_visible_rect().size
 	return Vector2(maxf(viewport_size.x - 80.0, 640.0), maxf(viewport_size.y - 60.0, 480.0))
 
 func _build_content(outer: VBoxContainer) -> void:
-	window.add_theme_stylebox_override("panel", PixelUIScript.panel_style(true))
-	title_label.add_theme_font_size_override("font_size", 28)
-	title_label.add_theme_color_override("font_color", Color(1.0, 0.88, 0.4))
-	title_label.add_theme_color_override("font_outline_color", PixelUIScript.OUTLINE)
-	title_label.add_theme_constant_override("outline_size", 6)
-	PixelUIScript.skin_button(close_button)
+	TownUIScript.apply_bronze_frame(self)
 
 	var header := HBoxContainer.new()
 	header.add_theme_constant_override("separation", 10)
