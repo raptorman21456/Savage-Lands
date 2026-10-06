@@ -32,7 +32,7 @@ func _init() -> void:
 		save_data_script.is_upgrade_unlocked(data, "vigor"), save_data_script.is_upgrade_unlocked(data, "reflexes_unlock")
 	])
 
-	# --- Blade Ally is now a CONVERGE point: both branch A (Berserker's
+	# --- Knight is now a CONVERGE point: both branch A (Berserker's
 	# Edge) and branch B (Adrenaline) must be independently satisfied, not
 	# just one of them -- the real "converging paths" this whole redesign
 	# was about. ---
@@ -41,18 +41,18 @@ func _init() -> void:
 	save_data_script.try_buy_upgrade(data, "berserker_edge")
 	save_data_script.try_buy_upgrade(data, "berserker_edge")
 	print("berserker_edge now at level 3: %d (expected 3)" % [data.upgrades.berserker_edge])
-	print("Blade Ally stays locked with ONLY branch A satisfied (branch B/Adrenaline untouched): %s (expected false)" % [
+	print("Knight stays locked with ONLY branch A satisfied (branch B/Adrenaline untouched): %s (expected false)" % [
 		save_data_script.is_upgrade_unlocked(data, "battle_hardened")
 	])
 
 	save_data_script.try_buy_upgrade(data, "reflexes_unlock")
 	save_data_script.try_buy_upgrade(data, "adrenaline")
-	print("Blade Ally still locked with Adrenaline at only level 1 (needs 2): %s (expected false)" % [
+	print("Knight still locked with Adrenaline at only level 1 (needs 2): %s (expected false)" % [
 		save_data_script.is_upgrade_unlocked(data, "battle_hardened")
 	])
 	save_data_script.try_buy_upgrade(data, "adrenaline")
 	print("adrenaline now at level 2: %d (expected 2)" % [data.upgrades.adrenaline])
-	print("Blade Ally unlocks once BOTH branches are satisfied: %s (expected true)" % [
+	print("Knight unlocks once BOTH branches are satisfied: %s (expected true)" % [
 		save_data_script.is_upgrade_unlocked(data, "battle_hardened")
 	])
 
@@ -71,7 +71,7 @@ func _init() -> void:
 	])
 
 	# --- Warband is a CROSS-WING convergence: requires a capstone from TWO
-	# different wings (Blade Ally already owned above, Merchant Prince not
+	# different wings (Knight already owned above, Merchant Prince not
 	# yet) -- locked until both, not just one. ---
 	print("Warband (cross-wing) stays locked with only the Warrior side owned: %s (expected false)" % [
 		save_data_script.is_upgrade_unlocked(data, "warband")
@@ -80,7 +80,7 @@ func _init() -> void:
 		save_data_script.try_buy_upgrade(data, id)
 	save_data_script.try_buy_upgrade(data, "golden_touch")
 	print("Merchant Prince purchased: level=%d (expected 1)" % [data.upgrades.get("golden_touch", 0)])
-	print("Warband unlocks once BOTH Blade Ally and Merchant Prince are owned: %s (expected true)" % [
+	print("Warband unlocks once BOTH Knight and Merchant Prince are owned: %s (expected true)" % [
 		save_data_script.is_upgrade_unlocked(data, "warband")
 	])
 	save_data_script.try_buy_upgrade(data, "warband")
@@ -104,7 +104,7 @@ func _init() -> void:
 	print("Vitality's bonus is instead stored for level-up time: meta_levelup_bonus_vigor=%d (expected %d, 1 level * 2)" % [player.meta_levelup_bonus_vigor, bonuses.vigor])
 
 	# --- the capstone's real effect is a party member, not a stat ---
-	print("owning the Blade Ally capstone adds a party member: %d members (expected 1), name=%s (expected Blade Ally)" % [
+	print("owning the Knight capstone adds a party member: %d members (expected 1), name=%s (expected Knight)" % [
 		player.party_members.size(), player.party_members[0].name if not player.party_members.is_empty() else "none"
 	])
 	print("Berserker's Edge's account-wide passive is live on the equipped weapon: passive_double_hit_chance=%.2f (expected >= %.2f, 3 levels * 0.08)" % [

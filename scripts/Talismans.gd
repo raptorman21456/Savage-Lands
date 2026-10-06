@@ -31,6 +31,9 @@ class_name Talismans
 #                           Traitor Wolf (0.25 = 25% more often, not +25 points)
 #   wolf_recruit_chance_min floor on a fallen Traitor Wolf's chance to join
 #                           your pack (only ever raises it, never lowers it)
+#   wolf_slot               1 = one extra party slot that only a Fickle Wolf can
+#                           fill (Player.wolf_only_slots)
+#   wolf_stay_bonus         extra battles of loyalty for a newly recruited wolf
 #   special_stamina_discount  -x% stamina cost on specials (stamped at equip).
 #                           Reserved: Duelist's Coin used to carry this, no
 #                           current talisman does -- the Player.gd hook
@@ -44,10 +47,18 @@ class_name Talismans
 #   damage_reduction        +x damage reduction (added to armour + clothes).
 #                           Reserved: Stone Amulet used to carry this, no
 #                           current talisman does.
-#   material_passive_boost  1 = amplifies whichever weapon-material passive
-#                           (Weapons.gd:MATERIALS) is active for your current
-#                           weapon -- see the material_id checks in
-#                           Main.gd:_apply_single_hit/_battle_perform_attack
+#   ember_burn              1 = a burn this player inflicts through burn_chance
+#                           uses the Ember Charm formula (5 + attack/5, then
+#                           x0.7 per turn, rounded up) instead of a share of
+#                           the target's max HP (Main.gd:_ignite_with_ember)
+#   double_secondary_chance 1 = every on-hit proc chance is doubled (capped at
+#                           100%) -- Main.gd:_proc, Player.secondary_chance_mult
+#   material_passive_boost  1 = Stone Amulet: doubles whichever weapon material
+#                           the current weapon is forged from -- its dmg/price/
+#                           stamina deviation from 1.0, its break chance and its
+#                           passive -- see Player._apply_talisman_to_weapon and
+#                           the material_id checks in Main.gd:_apply_single_hit
+#                           /_battle_perform_attack
 #   max_hp                  +n max HP (applied in Player._recalc_stats).
 #                           Reserved: Turtle Shell used to carry this, no
 #                           current talisman does.
@@ -68,6 +79,8 @@ class_name Talismans
 #                           enemy attacks whichever combatant (player, ally,
 #                           or another enemy) is nearest to IT
 #   hp_regen_turn           +n HP at the start of each of your battle turns
+#   hp_regen_per_20_max_hp  +n more of the above per 20 max HP you have
+#                           (Player.hp_regen_per_turn)
 #   heal_pct                +x% to all healing from potions and food
 #   heal_on_kill            +n HP whenever an enemy dies
 #   stamina_regen           +n stamina regained per battle turn
@@ -130,15 +143,16 @@ class_name Talismans
 #                           every other max-HP source (_recalc_stats)
 #   oneshot_regular_enemies 1 = every landed hit instantly kills a non-boss
 #                           enemy outright
-#   bloodmoon_fang          1 = kills stack Bloodlust (Player.bloodmoon_stacks,
-#                           +7.5% damage/+7.5% move speed each); 3 turns with
+#   bloodmoon_fang          1 = each hit you land stacks Bloodlust (Player.bloodmoon_stacks,
+#                           +5% damage/+7.5% move speed each); 3 turns with
 #                           no damage dealt or taken by anyone crashes it
 #                           (Player.bloodmoon_debuffed, -50% to combat stats)
-#   ironclad_ward           1 = Move is disabled in battle; defense
+#   ironclad_ward           1 = Move only works on alternating player turns
+#                           (Main.gd:battle_ironclad_move_allowed); defense
 #                           (armor_damage_reduction) is multiplied by 2.5
-#   wildfire_core           1 = a burning enemy's death explodes, damaging
-#                           and igniting everything nearby (_trigger_wildfire_
-#                           explosion)
+#   wildfire_core           1 = a burning enemy's death explodes for 3x its
+#                           fire damage per turn, damaging and igniting
+#                           everything nearby (_trigger_wildfire_explosion)
 
 # The player levels at which the 2nd, 3rd and 4th slots open (the 1st is
 # always available).
@@ -155,36 +169,40 @@ const RARITY_COLORS := {
 static var ITEMS := [
 	# --- Offense ---
 	{"id": "ember_charm", "name": "Ember Charm", "rarity": "common", "price": 70,
-		"effects": {"burn_chance": 0.10, "burn_chance_multihit": 0.02},
-		"description": "10% chance for any attack to set the target on fire (2% per hit on multi-hit moves). No extra damage."},
+		"effects": {"burn_chance": 0.10, "burn_chance_multihit": 0.02, "ember_burn": 1},
+		"description": "10% chance for any attack to set the target on fire (2% per hit on multi-hit moves). The fire deals (5 + your attack / 5) damage, then 70% of that again each turn after, rounded up, until it burns out."},
 	{"id": "wolf_fang", "name": "Wolf Fang", "rarity": "common", "price": 70,
-		"effects": {"traitor_wolf_chance_pct": 0.25, "wolf_recruit_chance_min": 0.30},
-		"description": "Traitor Wolves replace ordinary wolves 25% more often, and are at least 30% likely to join your pack when they fall."},
+		"effects": {"traitor_wolf_chance_pct": 0.25, "wolf_recruit_chance_min": 0.30, "wolf_slot": 1, "wolf_stay_bonus": 5},
+		"description": "Traitor Wolves replace ordinary wolves 25% more often and are at least 30% likely to join when they fall. Adds a party slot only a Fickle Wolf can fill, and wolves stay 5 battles longer."},
 	{"id": "berserkers_knot", "name": "Berserker's Knot", "rarity": "uncommon", "price": 110,
 		"effects": {"low_hp_damage_pct": 1.0, "low_hp_threshold": 0.20},
 		"description": "+100% damage while at or below 20% HP."},
 	{"id": "duelists_coin", "name": "Duelist's Coin", "rarity": "uncommon", "price": 110,
-		"effects": {"damage_pct": -0.15, "crit_chance": 0.05, "crit_damage_mult_bonus": 0.5},
-		"description": "-15% damage on every hit, but critical hits deal 250% damage and are 5% more likely to land."},
+		"effects": {"damage_pct": -0.15, "crit_chance": 0.05, "crit_damage_mult_bonus": 1.0},
+		"description": "-15% damage on every hit, but critical hits deal 300% damage and are 5% more likely to land."},
 	{"id": "whetstone_pendant", "name": "Whetstone Pendant", "rarity": "common", "price": 60,
-		"effects": {"first_attack_damage_pct": 0.33},
-		"description": "Whoever lands the first hit each battle -- you or an ally -- deals 33% more damage with it."},
+		"effects": {"first_attack_damage_pct": 0.50},
+		"description": "Whoever lands the first hit each battle -- you or an ally -- deals 50% more damage with it."},
 	{"id": "fletchers_ring", "name": "Fletcher's Ring", "rarity": "common", "price": 60,
 		"effects": {"arrow_unlimited": 1, "arrow_price_pct": 0.10},
 		"description": "No limit on carried special arrows, but they cost 10% more."},
 	# --- Defense ---
 	{"id": "stone_amulet", "name": "Stone Amulet", "rarity": "uncommon", "price": 120,
 		"effects": {"material_passive_boost": 1},
-			"description": "Strengthens whichever material your current weapon is forged from -- its passive trait hits noticeably harder or more often."},
+		"description": "Doubles what your current weapon's material does -- its damage, price, stamina and break-chance swings from plain steel are all doubled, and so is its passive. Steel itself becomes 1.2x damage at 0.8x price and 0.8x stamina."},
 	{"id": "turtle_shell", "name": "Turtle Shell", "rarity": "common", "price": 70,
 		"effects": {"water_push_prompt": 1},
 		"description": "The current can't sweep you off a water tile without asking first."},
 	{"id": "wind_chime", "name": "Wind Chime", "rarity": "uncommon", "price": 90,
 		"effects": {"taunt_confusion": 1},
-		"description": "Your Taunt enrages the enemy past reason -- instead of converging on you, each one attacks whoever's nearest, even each other."},
+		"description": "Your Taunt enrages the enemy past reason -- instead of converging on you, each one attacks whoever's nearest, even each other, picking randomly on an exact tie."},
+	# NOTE (2026-09-29): the user's latest spec says this should only be
+	# equippable by allies, not the player -- deferred until allies can equip
+	# their own talismans (Step 5 of the party system); worn by the player for
+	# now, same as every other talisman, with the updated 40% number.
 	{"id": "guardian_knot", "name": "Guardian Knot", "rarity": "common", "price": 70,
-		"effects": {"ally_defense_pct": 0.20},
-		"description": "Your allies take 20% less damage."},
+		"effects": {"ally_defense_pct": 0.40},
+		"description": "Your allies take 40% less damage."},
 	{"id": "iron_will_band", "name": "Iron Will Band", "rarity": "rare", "price": 90,
 		"effects": {"survive_lethal": 0.10}, "description": "10% chance to survive a killing blow with 1 HP (once a battle)."},
 	{"id": "cliffwalkers_bead", "name": "Cliffwalker's Bead", "rarity": "common", "price": 50,
@@ -192,25 +210,26 @@ static var ITEMS := [
 		"description": "Cliff falls deal no damage, and you can attack up a ledge or cliff drop with any weapon."},
 	# --- Sustain ---
 	{"id": "moss_charm", "name": "Moss Charm", "rarity": "uncommon", "price": 55,
-		"effects": {"hp_regen_turn": 1}, "description": "Regain 1 HP at the start of each of your battle turns."},
+		"effects": {"hp_regen_turn": 1, "hp_regen_per_20_max_hp": 1},
+		"description": "Regain 1 HP at the start of each of your battle turns, plus 1 more for every 20 max HP you have."},
 	{"id": "healers_knot", "name": "Healer's Knot", "rarity": "common", "price": 35,
 		"effects": {"heal_pct": 0.25}, "description": "Potions and food heal 25% more."},
 	{"id": "bloodstone", "name": "Bloodstone", "rarity": "uncommon", "price": 60,
 		"effects": {"heal_on_kill": 3}, "description": "Heal 3 HP whenever an enemy falls."},
 	{"id": "second_wind_whistle", "name": "Second Wind Whistle", "rarity": "common", "price": 40,
-		"effects": {"stamina_regen": 3}, "description": "Regain 3 extra stamina each battle turn."},
+		"effects": {"stamina_regen": 5}, "description": "Regain 5 extra stamina each battle turn."},
 	{"id": "deep_lung_charm", "name": "Deep Lung Charm", "rarity": "common", "price": 70,
 		"effects": {"special_stamina_flat_reduction": 5},
 		"description": "Every weapon special costs 5 less stamina."},
 	# --- Economy ---
 	{"id": "lucky_clover", "name": "Lucky Clover", "rarity": "uncommon", "price": 110,
-		"effects": {"luck": 0.50},
-		"description": "+0.50 luck: dramatically better weapon tiers in the shop."},
+		"effects": {"double_secondary_chance": 1},
+		"description": "Double chance for secondary effects to occur -- burning, bleeding, stuns, extra strikes, material passives and every other on-hit proc."},
 	{"id": "merchants_coin", "name": "Merchant's Coin", "rarity": "common", "price": 40,
 		"effects": {"coin_pct": 0.10}, "description": "+10% coins from every source."},
 	{"id": "hagglers_tooth", "name": "Haggler's Tooth", "rarity": "uncommon", "price": 65,
 		"effects": {"shop_discount": 0.10}, "description": "-10% off every shop price."},
-	{"id": "gilded_scarab", "name": "Gilded Scarab", "rarity": "common", "price": 70,
+	{"id": "gilded_scarab", "name": "Gilded Scarab", "rarity": "rare", "price": 70,
 		"effects": {"attack_per_coin": 0.125, "defense_per_coin": 0.1},
 		"description": "+0.125 attack power and +0.1 damage reduction for every coin you're currently holding -- the more you hoard, the stronger you get."},
 	{"id": "tax_collectors_seal", "name": "Tax Collector's Seal", "rarity": "rare", "price": 160,
@@ -218,7 +237,7 @@ static var ITEMS := [
 		"description": "20% chance for any landed hit to drop an extra coin (bosses excluded)."},
 	# --- Utility ---
 	{"id": "scholars_quill", "name": "Scholar's Quill", "rarity": "common", "price": 45,
-		"effects": {"xp_pct": 0.15}, "description": "+15% experience gained."},
+		"effects": {"xp_pct": 0.30}, "description": "+30% experience gained."},
 	{"id": "swift_feather", "name": "Swift Feather", "rarity": "common", "price": 60,
 		"effects": {"move_speed_pct": 0.35}, "description": "+35% movement speed in the field."},
 	{"id": "pathfinders_compass", "name": "Pathfinder's Compass", "rarity": "rare", "price": 100,
@@ -244,8 +263,8 @@ static var ITEMS := [
 		"effects": {"whirlwind_double_melee": 1, "damage_pct": -0.6},
 		"description": "Every melee attack strikes twice, but all damage (from any source) is cut to 40%."},
 	{"id": "weapon_whisperer", "name": "Weapon Whisperer", "rarity": "epic", "price": 160,
-		"effects": {"weapon_whisperer": 1, "special_stamina_pct_increase": 0.5},
-		"description": "Pick any 3 specials you've learned at the Dojo (from any weapon) as your loadout, regardless of what you're holding -- but every special costs 50% more stamina."},
+		"effects": {"weapon_whisperer": 1, "special_stamina_pct_increase": 0.3},
+		"description": "Pick any 3 specials you've learned at the Dojo (from any weapon) as your loadout, regardless of what you're holding -- but every special costs 30% more stamina."},
 	{"id": "chaos_shard", "name": "Chaos Shard", "rarity": "rare", "price": 100,
 		"effects": {"chaos_shard": 1},
 		"description": "Every hit deals somewhere between 50% and 160% of its normal damage, rerolled each time."},
@@ -254,13 +273,13 @@ static var ITEMS := [
 		"description": "Every attack instantly kills a regular enemy (bosses unaffected) -- but your HP is permanently locked at 1, no matter what else you wear."},
 	{"id": "bloodmoon_fang", "name": "Bloodmoon Fang", "rarity": "epic", "price": 140,
 		"effects": {"bloodmoon_fang": 1},
-		"description": "Every kill stacks Bloodlust: +7.5% damage and +7.5% move speed per stack. But 3 turns with nothing landing a hit -- yours, an ally's, or an enemy's -- crashes it, halving all your stats."},
+		"description": "Each hit you land on anything stacks Bloodlust: +5% damage and +7.5% move speed per stack. But 3 turns with no hit landed by anyone crashes it, halving all your stats."},
 	{"id": "ironclad_ward", "name": "Ironclad Ward", "rarity": "epic", "price": 130,
 		"effects": {"ironclad_ward": 1},
-		"description": "You can no longer Move in battle at all, but your defense is multiplied by 250%."},
+		"description": "You can only Move on every other turn, but your defense is multiplied by 250%."},
 	{"id": "wildfire_core", "name": "Wildfire Core", "rarity": "epic", "price": 130,
 		"effects": {"wildfire_core": 1},
-		"description": "A burning enemy that dies explodes, scorching everything nearby -- allies and you included -- for a share of its max HP, and setting it all alight too."},
+		"description": "A burning enemy that dies explodes into 3x its fire damage, hurting and igniting everything nearby -- allies and you included."},
 ]
 
 static func get_talisman(id: String) -> Dictionary:

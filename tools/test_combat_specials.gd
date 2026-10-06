@@ -87,17 +87,47 @@ func _init() -> void:
 	])
 	main.battle_terrain.clear()
 
-	# Special: execute (Club's Heavy Swing) does bonus damage below 30% HP.
+	# Special: full_hp_bonus (Club's Heavy Swing, 2026-09-29) deals +50% to a
+	# target still at full HP -- the mirror image of execute -- and nothing extra
+	# once it's been scratched.
 	player.stamina = player.MAX_STAMINA
-	var g_execute = _make_goblin(main, Vector2i(3, 2), 20)
-	g_execute.hp = 5  # 25% of 20 max_hp -- below the 30% threshold
-	main.battle_units = [g_execute]
+	var g_full = _make_goblin(main, Vector2i(3, 2), 400)
+	main.battle_units = [g_full]
 	main._battle_player_special(2)
-	var base_execute_dmg: int = int(round(10 * player.current_weapon.specials[2].dmg_mult))
-	var expected_execute_dmg: int = int(round(base_execute_dmg * 1.5))
-	print("execute special deals bonus damage to a low-HP target: dealt=%d (expected %d)" % [
-		5 - g_execute.hp, expected_execute_dmg
+	var base_full_dmg: int = int(round(10 * player.current_weapon.specials[2].dmg_mult))
+	print("Heavy Swing deals +50%% to a full-HP target: dealt=%d (expected %d)" % [400 - g_full.hp, int(round(base_full_dmg * 1.5))])
+	player.stamina = player.MAX_STAMINA
+	var g_hurt = _make_goblin(main, Vector2i(3, 2), 400)
+	g_hurt.hp = 399
+	main.battle_units = [g_hurt]
+	main._battle_player_special(2)
+	print("...but no bonus once it's wounded: dealt=%d (expected %d)" % [399 - g_hurt.hp, base_full_dmg])
+	# The execute effect itself (no weapon carries it right now) still works:
+	# +50% below 30% HP, driven here through a synthetic action.
+	player.stamina = player.MAX_STAMINA
+	var g_execute = _make_goblin(main, Vector2i(3, 2), 400)
+	g_execute.hp = 100  # 25% of 400 max_hp -- below the 30% threshold (and well above the blow, so the damage isn't capped at what's left)
+	main.battle_units = [g_execute]
+	main._battle_perform_attack({"name": "Test Execute", "stamina_cost": 0, "dmg_mult": player.current_weapon.specials[2].dmg_mult, "effect": "execute"})
+	print("execute effect deals bonus damage to a low-HP target: dealt=%d (expected %d)" % [
+		100 - g_execute.hp, int(round(base_full_dmg * 1.5))
 	])
+
+	# Overkill is capped at what the target has left: a big hit on a nearly-dead
+	# enemy only deals (and only recoils / lifesteals off) its remaining 3 HP.
+	player.stamina = player.MAX_STAMINA
+	player.max_health = 100
+	player.health = 50
+	var overkill_weapon: Dictionary = weapons_script.CLUB.duplicate(true)
+	overkill_weapon["passive_self_damage_pct"] = 0.5
+	overkill_weapon["passive_lifesteal_pct"] = 0.5
+	player.current_weapon = overkill_weapon
+	var g_overkill = _make_goblin(main, Vector2i(3, 2), 400)
+	g_overkill.hp = 3
+	main.battle_units = [g_overkill]
+	main._apply_single_hit(0, 5.0, "", overkill_weapon)
+	print("overkill: damage dealt is capped at the target's remaining HP, so recoil and lifesteal use 3, not the full blow: player_health=%d (expected 50 -2 recoil +2 heal = 50)" % [player.health])
+	player.current_weapon = weapons_script.CLUB
 
 	# Special: self_heal (Club's Second Wind) heals the player.
 	player.stamina = player.MAX_STAMINA
@@ -173,11 +203,12 @@ func _init() -> void:
 	main._apply_single_hit(0, oldest_trick.dmg_mult, oldest_trick.effect, player.current_weapon)
 	print("stun_bypass special always stuns: stunned=%s (expected true)" % [g_stun.stunned])
 
-	# Stamina resets to full when a new battle starts. Done last since
-	# _setup_battle_grid rebuilds the whole grid (player tile, terrain),
-	# which would disrupt the fixed layout the tests above rely on.
+	# Stamina resets to a partial (50%) bar when a new battle starts, not a
+	# full one (2026-09-29 -- keeps specials from being spammable turn one).
+	# Done last since _setup_battle_grid rebuilds the whole grid (player
+	# tile, terrain), which would disrupt the fixed layout the tests above rely on.
 	player.stamina = 3
 	main._setup_battle_grid([])
-	print("stamina resets to full on battle start: %d (expected %d)" % [player.stamina, player.MAX_STAMINA])
+	print("stamina resets to 50%% on battle start: %d (expected %d)" % [player.stamina, int(round(player.MAX_STAMINA * 0.5))])
 
 	quit()

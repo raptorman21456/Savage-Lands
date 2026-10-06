@@ -1,6 +1,6 @@
 extends SceneTree
 
-# 3 new enemies (Fae Hut/Fae, Gnome, Druid) + the squad-size scaling that
+# 2 new enemies (Fae Hut/Fae, Gnome) + the squad-size scaling that
 # now lets a battle grow past the old flat 4-unit tough-tier cap.
 
 func _make_gnome(main, tile: Vector2i, hp: int = 999) -> Dictionary:
@@ -204,53 +204,7 @@ func _init() -> void:
 	main._process_enemy_turn()
 	print("...but a lone gnome (rest of the pack dead) deals only base damage: player_health=%d (expected %d)" % [player.health, 100 - 2])
 
-	# =========================================================
-	# Druid: heals first, buffs second, only fights alone
-	# =========================================================
-	main.battle_terrain.clear()
-	print("Druid's ENEMY_TRAITS: heals_allies=%s buffs_allies=%s (both expected true)" % [
-		main.ENEMY_TRAITS.get("Druid", {}).get("heals_allies", false), main.ENEMY_TRAITS.get("Druid", {}).get("buffs_allies", false)
-	])
-
-	var druid_script = load("res://scripts/Druid.gd")
-	var druid_ref = druid_script.new()
-	main.add_child(druid_ref)
-	druid_ref.died.connect(main._on_enemy_died)
-	main.enemies_alive += 1
-	var druid := {
-		"ref": druid_ref, "tile": Vector2i(1, 1), "hp": 12, "max_hp": 12, "move_range": 2,
-		"damage": 1, "name": "Druid", "winding_up": false, "stunned": false,
-		"attack_range": 1, "concussed_turns": 0, "frozen_turns": 0,
-		"burning": false, "armored": false,
-		"disarmed_tile": Vector2i(-1, -1),
-	}
-	var hurt_goblin := _make_goblin(main, Vector2i(2, 2), 3)
-	hurt_goblin.max_hp = 10
-	var healthy_goblin := _make_goblin(main, Vector2i(2, 3), 10)
-	healthy_goblin.max_hp = 10
-	main.battle_units = [druid, hurt_goblin, healthy_goblin]
-	main._process_enemy_turn()
-	print("Druid heals the worst-hurt ally when one exists, instead of buffing: hurt_hp=%d (expected >3), healthy_buffed=%s (expected false)" % [
-		hurt_goblin.hp, healthy_goblin.get("buffed_dmg_turns", 0) > 0
-	])
-
-	# Nobody's hurt now -- Druid should buff an un-buffed ally instead.
-	hurt_goblin.hp = hurt_goblin.max_hp
-	main._process_enemy_turn()
-	var buffed_count := 0
-	for u in [hurt_goblin, healthy_goblin]:
-		if u.get("buffed_dmg_turns", 0) > 0:
-			buffed_count += 1
-	print("With nobody hurt, Druid buffs an un-buffed ally instead: exactly_one_buffed=%s (expected true)" % [buffed_count == 1])
-
-	# Both allies already buffed -- Druid has nothing left to do but hang back.
-	hurt_goblin.buffed_dmg_turns = main.DRUID_BUFF_TURNS
-	hurt_goblin.buffed_dmg_pct = main.DRUID_BUFF_DMG_PCT
-	healthy_goblin.buffed_dmg_turns = main.DRUID_BUFF_TURNS
-	healthy_goblin.buffed_dmg_pct = main.DRUID_BUFF_DMG_PCT
-	var druid_tile_before: Vector2i = druid.tile
-	main._process_enemy_turn()
-	print("With everyone healed and buffed, Druid just hangs back: tile_unchanged=%s (expected true)" % [druid.tile == druid_tile_before])
+	# (The Druid enemy was removed; the buff-consumption mechanic itself is still covered below.)
 
 	# The buff itself: a buffed unit's next attack is boosted, then consumed.
 	# An isolated Gnome, not a reused Goblin -- Goblin's OWN pack_bonus_mult

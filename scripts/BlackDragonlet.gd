@@ -5,7 +5,7 @@ const PickupScript := preload("res://scripts/Pickup.gd")
 
 signal died(xp_reward: int)
 
-# Swamp's world-ending boss (World Progression feature) -- Owlbear.gd's
+# Swamp's world-ending boss (World Progression feature) -- the original boss's
 # windup template with its own numbers/sprite (see
 # Main.gd:ENEMY_TRAITS["Black Dragonlet"] -- a breath-weapon sweep).
 const SPEED := 44.0

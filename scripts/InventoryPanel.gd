@@ -302,6 +302,8 @@ func _make_weapon_card(variant: Dictionary, equipped: bool) -> Button:
 	var glowing: bool = WeaponIconsScript.has_glow(variant)
 	var required_might: int = int(variant.get("required_might", 0))
 	var might_locked: bool = required_might > _player.stat_might
+	var required_intimidation: int = int(variant.get("required_intimidation", 0))
+	var intimidation_locked: bool = required_intimidation > _player.stat_intimidation
 	var upgrade_level: int = _player.get_weapon_upgrade_level(id)
 	var rune_id: String = _player.weapon_enchantments.get(id, "")
 
@@ -310,6 +312,8 @@ func _make_weapon_card(variant: Dictionary, equipped: bool) -> Button:
 	card.tooltip_text = variant.get("description", "")
 	if might_locked:
 		card.tooltip_text += "\n\nNeeds %d Might to wield (you have %d)." % [required_might, _player.stat_might]
+	if intimidation_locked:
+		card.tooltip_text += "\n\nNeeds %d Intimidation to wield (you have %d)." % [required_intimidation, _player.stat_intimidation]
 	card.pressed.connect(func(): _on_weapon_cell_pressed(variant))
 	_style_weapon_card(card, tier_color, glowing, equipped)
 	if glowing:
@@ -398,6 +402,12 @@ func _make_weapon_card(variant: Dictionary, equipped: bool) -> Button:
 		might.add_theme_font_size_override("font_size", 11)
 		might.add_theme_color_override("font_color", Color(1.0, 0.4, 0.4) if might_locked else Color(0.55, 0.6, 0.55))
 		stats.add_child(might)
+	if required_intimidation > 0:
+		var intimidation := Label.new()
+		intimidation.text = "INT %d" % required_intimidation
+		intimidation.add_theme_font_size_override("font_size", 11)
+		intimidation.add_theme_color_override("font_color", Color(1.0, 0.4, 0.4) if intimidation_locked else Color(0.55, 0.6, 0.55))
+		stats.add_child(intimidation)
 
 	# A rune's name under the stats (a blank line otherwise, so every card is the
 	# same height).
@@ -442,8 +452,12 @@ func _style_weapon_card(button: Button, tier_color: Color, glowing: bool, equipp
 func _on_weapon_cell_pressed(variant: Dictionary) -> void:
 	if variant.get("id", "") == _player.current_weapon_base.get("id", ""):
 		return
-	# Same rule as the shop: a weapon needing more Might than you have cannot be wielded.
+	# Same rule as the shop: a weapon needing more Might/Intimidation than you
+	# have cannot be wielded.
 	if int(variant.get("required_might", 0)) > _player.stat_might:
+		_play_sfx("error")
+		return
+	if int(variant.get("required_intimidation", 0)) > _player.stat_intimidation:
 		_play_sfx("error")
 		return
 	_player._equip_weapon(variant)
@@ -572,7 +586,7 @@ func _on_potion_cell_pressed(potion_id: String) -> void:
 
 func _build_party_tab(container: VBoxContainer) -> void:
 	_add_section_heading(container, "PARTY")
-	if _player.party_wolf.is_empty() and _player.party_members.is_empty():
+	if _player.party.is_empty() and _player.party_members.is_empty():
 		_add_plain_label(container, "No party members recruited yet.")
 		return
 	var grid := GridContainer.new()
@@ -580,11 +594,14 @@ func _build_party_tab(container: VBoxContainer) -> void:
 	grid.add_theme_constant_override("h_separation", 10)
 	grid.add_theme_constant_override("v_separation", 10)
 	container.add_child(grid)
-	if not _player.party_wolf.is_empty():
+	for member in _player.party:
+		var subtitle := "Lv %d   %d HP" % [member.level, member.max_hp()]
+		if member.is_wolf():
+			subtitle = "%d battles left" % member.battles_left
 		grid.add_child(_make_grid_cell(
-			"res://assets/enemy_wolf.png", _player.party_wolf.get("name", "Traitor Wolf"),
-			"%d%% dmg" % int(_player.party_wolf.get("dmg_mult", 1.0) * 100), false,
-			"A defected enemy, fighting at your side. Follows you in the field.", Callable()
+			"res://assets/%s.png" % ("enemy_wolf" if member.is_wolf() else "blade_ally"), member.name,
+			subtitle, false,
+			"A recruited companion, fighting at your side. Follows you in the field.", Callable()
 		))
 	for member in _player.party_members:
 		grid.add_child(_make_grid_cell(

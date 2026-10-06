@@ -46,8 +46,8 @@ func _init() -> void:
 	player.add_potion("potion_health")
 	player.add_potion("potion_attack")
 	player.owned_arrows["flame"] = 3
-	player.party_wolf = {"name": "Traitor Wolf", "dmg_mult": 0.6}
-	player.party_members.append({"name": "Blade Ally", "dmg_mult": 0.75})
+	player.recruit("wolf")
+	player.party_members.append({"name": "Knight", "dmg_mult": 0.75})
 
 	var panel = main.inventory_panel
 	var was_paused_initially: bool = main.get_tree().paused
@@ -106,7 +106,7 @@ func _init() -> void:
 	panel._select_tab("Party")
 	var party_text := _collect_labels(panel.tab_containers.Party)
 	print("party roster shows the wolf and the recruited ally: %s (expected true)" % [
-		party_text.contains("Traitor Wolf") and party_text.contains("Blade Ally")
+		party_text.contains("Fickle Wolf") and party_text.contains("Knight")
 	])
 
 	# --- Map tab: the schematic draws without erroring (see _on_map_draw). ---

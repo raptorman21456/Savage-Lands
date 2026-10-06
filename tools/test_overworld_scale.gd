@@ -52,16 +52,16 @@ func _init() -> void:
 	goblin.queue_free()
 
 	# Followers: wolf matches an overworld Wolf enemy's on-screen size, the
-	# Blade Ally matches the player's own scale.
+	# Knight matches the player's own scale.
 	var player = main.player
-	player.party_wolf = {"name": "Traitor Wolf", "dmg_mult": 0.6}
-	player.party_members.append({"name": "Blade Ally", "dmg_mult": 0.75})
+	player.recruit("wolf")
+	player.party_members.append({"name": "Knight", "dmg_mult": 0.75})
 	main._process(0.016)
 	var wolf_expected: Vector2 = Vector2(1.75, 1.75) * main.OVERWORLD_ENEMY_SCALE
 	print("the wolf follower matches an overworld Wolf enemy's size: %s (expected true)" % [
 		main.party_follower_nodes[0].scale.is_equal_approx(wolf_expected)
 	])
-	print("the Blade Ally follower matches the player's own scale: %s (expected true)" % [
+	print("the Knight follower matches the player's own scale: %s (expected true)" % [
 		main.party_follower_nodes[1].scale.is_equal_approx(main.PlayerScript.BASE_SPRITE_SCALE)
 	])
 

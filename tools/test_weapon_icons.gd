@@ -100,7 +100,7 @@ func _init() -> void:
 	])
 
 	# --- Names ---
-	print("names drop the tier (shown as a tag) and keep the material: %s | %s | %s | %s (expected Wooden Spear | Spear | Golden Greatsword | the Great Toothpicke)" % [
+	print("names drop the tier (shown as a tag) and keep the material: %s | %s | %s | %s (expected Wooden Spear | Spear | Golden Greatsword | The Great Toothpicke)" % [
 		icons_script.display_name(wood_spear), icons_script.display_name(weapons_script.get_owned_variant("spear_masterwork_steel")),
 		icons_script.display_name(weapons_script.get_owned_variant("greatsword_fine_gold")), icons_script.display_name(weapons_script.get_owned_variant("spear_mythic"))
 	])

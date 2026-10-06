@@ -24,15 +24,16 @@ func _init() -> void:
 	main._spawn_wave()
 	await physics_frame
 	var enemies: Array = main.get_tree().get_nodes_in_group("enemies")
-	print("boss wave spawns exactly one Boss: count=%d (expected 1), is_boss=%s (expected true)" % [
-		enemies.size(), enemies.size() == 1 and enemies[0].get_display_name() == "Boss"
+	print("the wave-5 miniboss spawns solo (Plains: Treant, a placeholder): count=%d (expected 1), is_treant=%s (expected true)" % [
+		enemies.size(), enemies.size() == 1 and enemies[0].get_display_name() == "Treant"
 	])
 	for e in enemies:
 		e.set_physics_process(false)
 
 	# Boss fights are solo -- no escorts get gathered even if enemies are
 	# standing right next to it.
-	var boss_script = load("res://scripts/Boss.gd")
+	# Iron Construct stands in for a generic boss-tier unit: windup, enrage, and fully immune to knockback.
+	var boss_script = load("res://scripts/IronConstruct.gd")
 	var goblin_script = load("res://scripts/Enemy.gd")
 	var boss = boss_script.new()
 	main.add_child(boss)
@@ -56,7 +57,7 @@ func _init() -> void:
 	main.battle_player_defending = false
 	main.battle_units = [{
 		"ref": boss, "tile": Vector2i(3, 2), "hp": 150, "max_hp": 150, "move_range": 1,
-		"damage": 6, "name": "Boss", "winding_up": false, "stunned": false,
+		"damage": 6, "name": "Iron Construct", "winding_up": false, "stunned": false,
 	}]
 	# Boost HP well past what the boss's hits deal so the checks below
 	# compare relative damage instead of everything clamping to 0 health.
@@ -90,7 +91,7 @@ func _init() -> void:
 	main.battle_terrain.clear()
 	var u := {
 		"ref": boss, "tile": Vector2i(3, 2), "hp": 9999, "max_hp": 9999,
-		"move_range": 1, "damage": 1, "name": "Boss", "winding_up": false, "stunned": false,
+		"move_range": 1, "damage": 1, "name": "Iron Construct", "winding_up": false, "stunned": false,
 	}
 	var resisted_all := true
 	for i in 10:
@@ -112,15 +113,15 @@ func _init() -> void:
 	main.enemies_alive += 1
 	main.battle_units = [{
 		"ref": weak_boss, "tile": Vector2i(3, 2), "hp": 1, "max_hp": 150, "move_range": 1,
-		"damage": 1, "name": "Boss", "winding_up": false, "stunned": false,
+		"damage": 1, "name": "Iron Construct", "winding_up": false, "stunned": false,
 	}]
 	main.battle_target_index = 0
 	player.stat_strength = 5
 	player.attack_damage = 5
-	# Set the level high enough that granting XP_REWARD (500) in one go can't
+	# Set the level high enough that granting XP_REWARD (710) in one go can't
 	# cross a level threshold and wrap xp around, which would make a plain
 	# before/after subtraction unreliable.
-	player.level = 65
+	player.level = 95
 	player.xp = 0
 	player.xp_to_next = player.XP_BASE + player.XP_PER_LEVEL * player.level
 	var xp_before: int = player.xp

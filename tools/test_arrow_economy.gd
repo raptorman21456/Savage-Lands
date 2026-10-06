@@ -118,7 +118,7 @@ func _init() -> void:
 	var g_corner := _make_goblin(main, Vector2i(4, 3), 999999)
 	var g_outside := _make_goblin(main, Vector2i(5, 2), 999999)
 	main.battle_units = [g_center, g_corner, g_outside]
-	main.battle_allies = [{"tile": Vector2i(3, 3), "hp": 999999, "max_hp": 999999, "dmg_mult": 1.0, "name": "Blade Ally", "move_range": 2, "attack_range": 1}]
+	main.battle_allies = [{"tile": Vector2i(3, 3), "hp": 999999, "max_hp": 999999, "dmg_mult": 1.0, "name": "Knight", "move_range": 2, "attack_range": 1}]
 	main._resolve_bomb_arrow(Vector2i(3, 2))
 	print("Bomb Arrow hits the center and the diagonal corner of the 3x3 blast: center=%s corner=%s (expected true, true, %d damage each)" % [
 		999999 - g_center.hp == main.ARROW_BOMB_FLAT_DMG, 999999 - g_corner.hp == main.ARROW_BOMB_FLAT_DMG, main.ARROW_BOMB_FLAT_DMG

@@ -5,7 +5,7 @@ const PickupScript := preload("res://scripts/Pickup.gd")
 
 signal died(xp_reward: int)
 
-# Tundra's world-ending boss (World Progression feature) -- Owlbear.gd's
+# Tundra's world-ending boss (World Progression feature) -- the original boss's
 # windup template (see Main.gd:ENEMY_TRAITS["White Dragon"] -- an icy
 # breath sweep).
 const SPEED := 42.0
@@ -25,6 +25,8 @@ const MEAT_CHANCE := 1.0
 
 var health := MAX_HEALTH
 var is_elite := false
+# Nothingness rush power multiplier (Main.NOTHINGNESS_POWER_TIERS); 1.0 in the normal campaign.
+var power_tier := 1.0
 var wander_dir := Vector2.ZERO
 var wander_timer := 0.0
 var windup_timer := 0.0

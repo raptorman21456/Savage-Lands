@@ -1,0 +1,192 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Battle sim self-test</title></head>
+<body style="font:13px monospace;background:#111;color:#ddd"><pre id="out">running...</pre>
+<script>
+/*__JS__*/
+</script>
+<script>
+const out = [];
+const P = (s) => out.push(s);
+
+async function fuzzPlay(sim, rnd) {
+  sim.promptHandler = async (type, data) => (type === "evasion" ? Object.keys(data.options)[Math.floor(rnd() * Object.keys(data.options).length)] : rnd() < 0.5);
+  let guard = 0;
+  while (sim.in_battle && !sim.over && guard++ < 400) {
+    const p = sim.player;
+    if (p.awaiting_bonus > 0) { p.apply_bonus_stat(PICK_STATS[Math.floor(rnd() * 5)]); continue; }
+    if (sim.battle_commanding_ally) {
+      const r = rnd();
+      if (r < 0.4) { sim.begin_move(); for (let i = 0; i < 3; i++) sim.step_move(CARDINAL_DIRS[Math.floor(rnd() * 4)]); if (rnd() < 0.3) sim.cancel_move(); else sim.confirm_move(); }
+      await sim.ally_action(["attack", "guard", "skip"][Math.floor(rnd() * 3)]);
+      if (sim.battle_commanding_ally && sim.battle_commanding_ally === sim._lastAlly && ++sim._allyStall > 5) await sim.ally_action("skip");
+      sim._lastAlly = sim.battle_commanding_ally;
+      continue;
+    }
+    if (!sim.can_act()) break;
+    const av = sim.availability();
+    const choices = [];
+    if (av.attack) choices.push(["attack"]); if (av.heavy) choices.push(["heavy"]);
+    av.specials.forEach((ok, i) => { if (ok) choices.push(["special", i]); });
+    if (av.mine) choices.push(["mine"]); if (av.item) choices.push(["item"]);
+    choices.push(["defend"]); if (av.skill) choices.push(["skill"]); if (av.taunt) choices.push(["taunt"]); if (av.stealth) choices.push(["stealth"]);
+    for (const k of ["flame", "freeze", "bomb"]) if (av.arrow && (p.owned_arrows[k] || 0) > 0) choices.push(["arrow", k]);
+    if (av.move && rnd() < 0.5) {
+      sim.begin_move(); const n = 1 + Math.floor(rnd() * 3);
+      for (let i = 0; i < n; i++) sim.step_move(CARDINAL_DIRS[Math.floor(rnd() * 4)]);
+      if (rnd() < 0.2) sim.cancel_move(); else sim.confirm_move();
+    }
+    const c = choices[Math.floor(rnd() * choices.length)];
+    await sim.do_action(c[0], c[1]);
+  }
+  return sim;
+}
+
+function mulberry(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+function parityBuildCfg(b) {
+  return { level: b.level, picks: b.picks, upgrades: b.upgrades, waves_cleared: b.waves_cleared, coins: b.coins, weapon: b.weapon, blacksmith: b.blacksmith, rune: b.rune, talismans: b.talismans, armor: b.armor, armor_level: b.armor_level, clothing: b.clothing, shield: b.shield, learn_all: true, real_miss: false, difficulty: "normal", enemies: [{ name: "Goblin" }], world: "plains", seed: 1 };
+}
+function parityStats(sim) {
+  const p = sim.player;
+  const wsum = { damage_mult: p.current_weapon.damage_mult, break_chance: p.current_weapon.break_chance || 0, specials: (p.current_weapon.specials || []).map((s) => ({ id: s.id, stamina_cost: s.stamina_cost })) };
+  for (const k of Object.keys(p.current_weapon)) if (k.startsWith("passive_")) wsum[k] = p.current_weapon[k];
+  return { max_health: p.max_health, attack_damage: p.attack_damage, max_stamina: p.max_stamina, stat_might: p.stat_might, stat_intimidation: p.stat_intimidation, stat_agility: p.stat_agility,
+    dodge: p.dodge_chance_total(), crit: p.crit_chance_total(), armor_dr: p.armor_damage_reduction(), resilience: p.resilience_reduction, move_range: sim._battle_player_move_range(),
+    hp_regen: p.hp_regen_per_turn(), stamina_regen: p.stamina_regen_per_turn(), block_heal: p.block_heal_amount(), luck: p.total_luck(), low_hp_bonus: p.low_hp_damage_bonus_total(), crit_mult: p.crit_damage_mult(),
+    shield_block: p.shield_block_chance(), shield_threshold: p.shield_defend_threshold_bonus(), shield_penalty: p.shield_damage_penalty_pct(), shield_dr: p.shield_damage_reduction_pct(), shield_push_immune: p.shield_push_immune(), party_capacity: p.party_capacity(), weapon: wsum };
+}
+function parityDiff(exp, got, path, out) {
+  if (exp !== null && typeof exp === "object") {
+    if (Array.isArray(exp)) { if (!Array.isArray(got) || got.length !== exp.length) { out.push(path + ": length " + (got && got.length) + " vs " + exp.length); return; } exp.forEach((e, i) => parityDiff(e, got[i], path + "[" + i + "]", out)); return; }
+    for (const k of Object.keys(exp)) { if (k === "miss_mastered") continue; parityDiff(exp[k], got ? got[k] : undefined, path + "." + k, out); }
+    if (got) for (const k of Object.keys(got)) if (!(k in exp) && typeof got[k] !== "function") out.push(path + "." + k + ": extra key in JS = " + JSON.stringify(got[k]));
+    return;
+  }
+  if (typeof exp === "number" && typeof got === "number") { if (Math.abs(exp - got) > 1e-6 * Math.max(1, Math.abs(exp))) out.push(path + ": game " + exp + " vs sim " + got); return; }
+  if (exp !== got) out.push(path + ": game " + JSON.stringify(exp) + " vs sim " + JSON.stringify(got));
+}
+async function runParity() {
+  if (typeof PARITY === "undefined") { P("no parity data"); return; }
+  const counts = {}, fails = [];
+  for (const c of PARITY) {
+    counts[c.kind] = counts[c.kind] || { n: 0, bad: 0 };
+    counts[c.kind].n++;
+    const sim = new Sim(7);
+    sim.player.configure(parityBuildCfg(c.build));
+    let got;
+    if (c.kind === "stats") got = parityStats(sim);
+    else if (c.kind === "hit") {
+      const p = sim.player, st = c.state, e = c.enemy;
+      sim.in_battle = true; sim.battle_terrain = {}; sim.battle_allies = []; sim.battle_player_tile = V(2, 2);
+      const etile = V(2 + st.distance, 2);
+      if (e.rock) sim.battle_terrain[vkey(V(etile.x, etile.y - 1))] = { type: "rock" };
+      sim.battle_first_attack_used = st.first_used; sim.battle_momentum_stacks = st.momentum; sim.battle_momentum_chain_stacks = st.chain; sim.player_burning = st.burning; sim.player_blind_turns = 0;
+      p.health = Math.max(1, round(p.max_health * st.health_frac));
+      p.potion_attack_turns = st.attack_potion ? 2 : 0; p.berserk_turns_remaining = st.berserk ? 2 : 0; p.pichaku_active = st.pichaku; p.stealth_turns_remaining = st.stealth ? 2 : 0;
+      if (p.talisman_bonus("bloodmoon_fang") > 0) { p.bloodmoon_stacks = st.bloodmoon; p._recalc_stats(); }
+      const tr = TRAITS[e.name] || {};
+      const unit = { ref: 1, tile: etile, hp: e.hp, max_hp: e.max_hp, move_range: 2, damage: 1, name: e.name, winding_up: false, stunned: false, size: tr.size ?? 1, attack_range: 1, is_elite: false, concussed_turns: 0, frozen_turns: e.frozen ? 2 : 0, burning: false, vulnerable_turns: e.vulnerable ? 2 : 0, aware_of_player: false, armored: e.armored, disarmed_tile: V(-1, -1), xp_reward: 0 };
+      sim.battle_units = [unit];
+      const hp0 = unit.hp, pl0 = p.health;
+      sim._apply_single_hit(0, c.action.dmg_mult, c.action.effect, p.current_weapon, "You", null, -1, false, -1.0);
+      got = { dmg: hp0 - unit.hp, player_delta: p.health - pl0 };
+    } else if (c.kind === "incoming") {
+      const p = sim.player, s = c.scenario;
+      sim.battle_terrain = {}; sim.battle_player_tile = V(2, 2); if (s.rock) sim.battle_terrain[vkey(V(2, 1))] = { type: "rock" };
+      sim.battle_player_defending = s.defending; p.berserk_turns_remaining = s.berserk ? 2 : 0; p.potion_resilience_turns = s.resilience_potion ? 2 : 0;
+      p.health = Math.max(1, round(p.max_health * s.health_frac));
+      got = { reduced: sim._apply_incoming_reductions(s.dmg, { ignore_cover: s.ignore_cover }) };
+    } else if (c.kind === "enemy_turn") {
+      const p = sim.player;
+      p.level = 99;
+      p.health = Math.max(1, round(p.max_health * c.state.health_frac));
+      sim.in_battle = true; sim.BATTLE_GRID_W = c.grid; sim.BATTLE_GRID_H = c.grid; sim.battle_terrain = {};
+      for (const t of c.terrain) { const e = { type: t.type }; if (t.type === "water") e.push_dir = V(t.push_dir[0], t.push_dir[1]); if (t.type === "ledge" || t.type === "cliff") e.dir = V(t.dir[0], t.dir[1]); sim.battle_terrain[t.x + "," + t.y] = e; }
+      sim.battle_player_tile = V(c.player_tile[0], c.player_tile[1]); sim.battle_player_defending = c.state.defending; sim.battle_player_taunting = c.state.taunting; p.stealth_turns_remaining = c.state.stealth ? 5 : 0;
+      sim.battle_allies = c.allies.map((a) => ({ ref: ++sim.ref_counter, tile: V(a.tile[0], a.tile[1]), hp: a.hp, max_hp: a.max_hp, name: a.name, kind: "mercenary", dmg_mult: 1, defense_pct: a.defense_pct, move_range: 2, attack_range: 1, defending: a.defending }));
+      sim.battle_units = c.units.map((u, idx) => { const tr = TRAITS[u.name] || {}; const aware = !(c.state.unaware_some && idx % 2 === 1); return { ref: ++sim.ref_counter, uid: u.uid, tile: V(u.tile[0], u.tile[1]), hp: u.hp, max_hp: u.max_hp, move_range: u.move_range, damage: u.damage, name: u.name, winding_up: u.winding, stunned: false, size: tr.size ?? 1, attack_range: tr.attack_range ?? 1, is_elite: false, concussed_turns: 0, frozen_turns: 0, burning: false, vulnerable_turns: 0, aware_of_player: aware, armored: u.armored || !!tr.armored, disarmed_tile: V(-1, -1), buffed_dmg_turns: u.buffed ? 2 : 0, buffed_dmg_pct: 0.3, xp_reward: 0 }; });
+      for (let t = 0; t < c.state.turns; t++) { if (!sim.battle_units.length || !sim.in_battle) break; await sim._process_enemy_turn(); sim.battle_player_defending = c.state.defending; sim.battle_player_taunting = c.state.taunting; }
+      const ou = {}; for (const u of sim.battle_units) ou[String(u.uid)] = { tile: [u.tile.x, u.tile.y], hp: u.hp, winding: !!u.winding_up, stunned: !!u.stunned };
+      got = { units: ou, player_hp: p.health, allies: sim.battle_allies.map((a) => a.hp), n_units: sim.battle_units.length };
+    } else if (c.kind === "player_action") {
+      const p = sim.player;
+      p.level = 99;
+      p.health = Math.max(1, round(p.max_health * c.state.health_frac));
+      p.stamina = c.state.stamina; p.exhausted = false;
+      sim.in_battle = true; sim.BATTLE_GRID_W = c.grid; sim.BATTLE_GRID_H = c.grid; sim.battle_terrain = {};
+      for (const t of c.terrain) { const e = { type: t.type }; if (t.type === "water") e.push_dir = V(t.push_dir[0], t.push_dir[1]); if (t.type === "ledge" || t.type === "cliff") e.dir = V(t.dir[0], t.dir[1]); sim.battle_terrain[t.x + "," + t.y] = e; }
+      sim.battle_player_tile = V(c.player_tile[0], c.player_tile[1]); sim.battle_allies = [];
+      sim.battle_units = c.units.map((u) => { const tr = TRAITS[u.name] || {}; return { ref: ++sim.ref_counter, uid: u.uid, tile: V(u.tile[0], u.tile[1]), hp: u.hp, max_hp: u.max_hp, move_range: u.move_range, damage: u.damage, name: u.name, winding_up: u.winding, stunned: false, size: tr.size ?? 1, attack_range: tr.attack_range ?? 1, is_elite: false, concussed_turns: 0, frozen_turns: 0, burning: false, vulnerable_turns: 0, aware_of_player: true, armored: u.armored || !!tr.armored, disarmed_tile: V(-1, -1), buffed_dmg_turns: 0, buffed_dmg_pct: 0.3, xp_reward: 0 }; });
+      sim.battle_target_index = 0; sim.battle_turn = "player";
+      await sim._battle_perform_attack(JSON.parse(JSON.stringify(c.action)));
+      const ou = {}; for (const u of sim.battle_units) ou[String(u.uid)] = { tile: [u.tile.x, u.tile.y], hp: u.hp, winding: !!u.winding_up, stunned: !!u.stunned };
+      got = { units: ou, player_hp: p.health, stamina: p.stamina, player_tile: [sim.battle_player_tile.x, sim.battle_player_tile.y], skip: sim.battle_player_turns_to_skip, n_units: sim.battle_units.length, in_battle: sim.in_battle };
+    }
+    const out = [];
+    parityDiff(c.expect, got, c.kind, out);
+    if (out.length) { counts[c.kind].bad++; if (fails.length < 40) fails.push({ kind: c.kind, diffs: out.slice(0, 4), weapon: c.build.weapon, tal: c.build.talismans, action: c.action && c.action.effect, i: PARITY.indexOf(c), enemy: c.units ? (c.action ? "ACTION " + c.action.name + " st" + c.state.stamina + " | " : "") + c.units.map((u) => u.name + "@" + u.tile.join(",") + " hp" + u.hp + (u.winding ? " W" : "")).join("; ") + " P@" + c.player_tile.join(",") + " grid" + c.grid + " st=" + JSON.stringify(c.state) : c.enemy ? c.enemy.name + " hp" + c.enemy.hp + "/" + c.enemy.max_hp + (c.enemy.armored ? " armored" : "") + (c.enemy.rock ? " rock" : "") : "", st: c.state ? JSON.stringify(c.state) : "" }); }
+  }
+  P("PARITY " + JSON.stringify(counts));
+  for (const f of fails) P("  MISMATCH #" + f.i + " " + f.kind + " " + f.enemy + " " + f.st + " " + JSON.stringify(f.weapon) + " tal=" + f.tal.join("+") + " act=" + f.action + " :: " + f.diffs.join(" ; "));
+}
+
+async function main() {
+  const errors = [];
+  await runParity();
+  // 1. basic auto battles
+  const cfg = { level: 5, weapon: { base: "club" }, armor: "armor_leather", talismans: [], upgrades: {}, enemies: [{ name: "Goblin" }, { name: "Goblin" }], world: "plains", seed: 123, consumables: [{ id: "potion_health", n: 2 }] };
+  const b = await runBatch(cfg, 40, {}, null);
+  P(`auto batch club L5 vs 2 goblins: win ${(b.win_rate * 100).toFixed(0)}% avgTurns ${b.avg_turns.toFixed(1)} avgHP% ${(b.avg_hp_pct_win * 100).toFixed(0)}`);
+
+  // 1b. per-level enemy scaling (Main._enemy_level_scale): regulars at the difficulty rate, bosses/minibosses at half of it.
+  const scaleCase = (diff, level, enemy) => {
+    const s = createSim({ level, difficulty: diff, weapon: { base: "club" }, armor: "armor_leather", talismans: [], upgrades: {}, enemies: [{ name: enemy }], world: "plains", seed: 1, consumables: [] }, 1);
+    return JSON.stringify([s.battle_units[0].hp, s.battle_units[0].damage]);
+  };
+  P(`scaling Hard L10 Goblin [hp,dmg]: ${scaleCase("hard", 10, "Goblin")} (expected [9,3])`);
+  P(`scaling Normal L10 Treant (miniboss, half rate) [hp,dmg]: ${scaleCase("normal", 10, "Treant")} (expected [214,7])`);
+  P(`scaling Baby L20 Goblin [hp,dmg]: ${scaleCase("baby", 20, "Goblin")} (expected [4,1])`);
+
+  // 2. fuzz every weapon / tier / material / random talismans / upgrades / party / enemies
+  const rnd = mulberry(99);
+  const pick = (a) => a[Math.floor(rnd() * a.length)];
+  const enemyNames = D.enemies.map((e) => e.name);
+  let ran = 0;
+  for (let i = 0; i < 400; i++) {
+    const base = pick(weaponBases());
+    const tier = pick(W.tiers).tier_name;
+    const material = pick(W.materials).id;
+    const tal = []; const n = Math.floor(rnd() * 5);
+    for (let k = 0; k < n; k++) { const t = pick(D.talismans.items).id; if (!tal.includes(t)) tal.push(t); }
+    const ups = {}; for (const id of D.upgrades.ids) if (rnd() < 0.35) ups[id] = Math.floor(rnd() * ((D.upgrades.defs[id].max_level || 3) + 1));
+    const party = []; const pc = Math.floor(rnd() * 3);
+    for (let k = 0; k < pc; k++) party.push({ kind: pick(Object.keys(D.party.kinds)), level: 1 + Math.floor(rnd() * 20), picks: {} });
+    const squad = []; const ec = 1 + Math.floor(rnd() * 3);
+    for (let k = 0; k < ec; k++) squad.push({ name: pick(enemyNames), elite: rnd() < 0.2 });
+    const level = 1 + Math.floor(rnd() * 60);
+    const picks = {}; for (let l = 1; l < level; l++) { const s = pick(PICK_STATS.slice(0, 5)); picks[s] = (picks[s] || 0) + 1; }
+    const c = {
+      level, picks, weapon: { base: base.id, tier, material }, blacksmith: Math.floor(rnd() * 6), rune: pick(["", "ember", "leech", "tempest", "warding"]),
+      armor: pick(D.armor).id, armor_level: Math.floor(rnd() * 4), shield: pick(["", ...Object.keys(D.shields)]),
+      clothing: { head: pick(["", "cloth_cap", "cloth_pelt_hood"]), body: pick(["", "cloth_cloak"]), feet: pick(["", "cloth_trail_boots"]) },
+      talismans: tal, upgrades: ups, party, enemies: squad, world: pick(D.worlds).id, seed: 1000 + i, coins: Math.floor(rnd() * 200),
+      arrows: { flame: 3, freeze: 3, bomb: 3 }, difficulty: pick(["baby", "normal", "hard", "apocalyptic"]),
+      consumables: [{ id: "potion_health", n: 2 }, { id: "potion_attack", n: 1 }, { id: "potion_stamina", n: 1 }, { id: "potion_regular", n: 1 }, { id: "food_haunch", n: 1 }],
+      whisperer: ["club_leg_blow", "spear_wombo_combo", "dagger_bleeding_cut"], real_miss: rnd() < 0.5,
+    };
+    try {
+      const sim = createSim(c, c.seed);
+      await fuzzPlay(sim, rnd);
+      ran++;
+    } catch (e) {
+      errors.push(`case ${i} (${base.id} ${tier} ${material} tal=${tal.join("+")} vs ${squad.map((s) => s.name).join(",")}): ${e.stack.split("\n").slice(0, 4).join(" | ")}`);
+      if (errors.length > 12) break;
+    }
+  }
+  P(`fuzz ok: ${ran} battles, ${errors.length} errors`);
+  errors.forEach((e) => P("ERR " + e));
+  document.getElementById("out").textContent = out.join("\n");
+  window.__selftest = out.join("\n");
+}
+main().catch((e) => { document.getElementById("out").textContent = "FATAL " + e.stack; window.__selftest = "FATAL " + e.stack; });
+</script></body></html>

@@ -12,6 +12,8 @@ const ClothingScript := preload("res://scripts/Clothing.gd")
 const BlacksmithScript := preload("res://scripts/Blacksmith.gd")
 const DojoScript := preload("res://scripts/Dojo.gd")
 const TalismansScript := preload("res://scripts/Talismans.gd")
+const PartyRulesScript := preload("res://scripts/PartyRules.gd")
+const PartyMemberScript := preload("res://scripts/PartyMember.gd")
 
 signal health_changed(current: int, max_health: int)
 signal xp_changed(current: int, needed: int)
@@ -171,10 +173,12 @@ var resilience_reduction := 0.0
 # _apply_meta_upgrades from the save's "difficulty" field, same as every
 # other save-derived value here.
 var difficulty_mult := 1.0
+# The id behind difficulty_mult ("baby"/"normal"/"hard"/"apocalyptic") -- picks Main's per-level enemy scaling rate.
+var difficulty_id := "normal"
 # Ancient Shrine random event: a temporary blessing/curse on damage dealt,
 # expiring after a fixed number of waves (see Main.gd:shrine_effect_waves_
 # remaining). Read generically in _apply_single_hit, so it affects the
-# player's own hits and the Blade Ally's alike.
+# player's own hits and the Knight's alike.
 var temp_damage_bonus_pct := 0.0
 
 # Skill tree tier-4 passives -- stamped onto whatever weapon gets equipped
@@ -271,8 +275,8 @@ var second_chance_used_this_battle := false
 # Second Breath: passive Stamina regen at the start of every player turn,
 # read in Main.gd's turn-cycle tail.
 var meta_stamina_regen_per_turn := 0
-# Pack Bond: extra waves added to WOLF_BASE_STAY_WAVES before a Traitor
-# Wolf's loyalty expires, read in Main.gd.
+# Pack Bond: extra battles added to a wolf's base loyalty (PartyRules.WOLF_BASE_STAY_BATTLES)
+# when it is recruited, alongside Wolf Fang (see recruit).
 var meta_wolf_bonus_waves := 0
 # Investor (repurposed): extra weapon slots rolled into every shop offering.
 var meta_investor_bonus_slots := 0
@@ -294,20 +298,72 @@ const WORLDWALKER_HP_BONUS_PCT := 0.15
 const WORLDWALKER_DAMAGE_BONUS_PCT := 0.10
 var meta_worldwalker := false
 
-# Party: combat companions that fight as real battle units on their own
-# tile, with their own turn (Main.gd:battle_allies/_process_ally_turn).
-# Each entry here is just the permanent roster: {"name": String, "dmg_mult":
-# float}
-# -- Blade Ally (skill tree) and a recruited Warrior (random event) are
-# mechanically identical, so they share this one shape rather than needing
-# separate flags. max_party_slots is upgraded by the Pack Leader skill tree
-# node. party_wolf is a Traitor Wolf recruited via combat (Main.gd:
-# _on_wolf_died) -- a single extra slot that doesn't count against
-# max_party_slots (empty dict = no wolf).
+# Party: combat companions that fight as real battle units on their own tile.
+# Two kinds of entry live side by side:
+#  - party_members: the older flat mercenaries -- Knight (skill tree) and a
+#    recruited Warrior (random event), each just {"name", "dmg_mult"}.
+#  - party: the full PartyMember roster (PartyMember.gd) -- Fickle Wolves, Druid,
+#    Guardian, Marksman, Rogue -- with their own levels, stats, gear and loyalty.
+# max_party_slots is upgraded by the Pack Leader / Warlord skill tree nodes; every
+# member counts toward it, wolves included, and the Wolf Fang talisman adds one
+# more slot that only a wolf can fill (see can_recruit).
 var party_members: Array = []
 const BASE_PARTY_SLOTS := 2
 var max_party_slots := BASE_PARTY_SLOTS
-var party_wolf: Dictionary = {}
+var party: Array = []
+var _next_party_id := 1
+# Wolf bodies harvested for their pelts (needed to craft some armours).
+var pelts := 0
+
+# The slot only a wolf may take, granted by Wolf Fang.
+func wolf_only_slots() -> int:
+	return 1 if talisman_bonus("wolf_slot") > 0.0 else 0
+
+func party_capacity() -> int:
+	return max_party_slots + wolf_only_slots()
+
+func party_wolves() -> Array:
+	return party.filter(func(m): return m.is_wolf())
+
+# Members that need an ordinary slot (everyone but wolves): the older mercenaries and
+# the non-wolf roster.
+func non_wolf_count() -> int:
+	return party_members.size() + party.size() - party_wolves().size()
+
+# Whether another member of this kind fits: the party is capped at party_capacity(),
+# and only wolves may use the wolf-only slot, so the others must still fit in the
+# ordinary ones. Any kind that isn't a PartyRules kind ("mercenary") counts as ordinary.
+func can_recruit(kind: String) -> bool:
+	if party_members.size() + party.size() >= party_capacity():
+		return false
+	if PartyRulesScript.is_wolf(kind):
+		return true
+	return non_wolf_count() < max_party_slots
+
+# Adds a new level-1 member of a PartyRules kind and returns it, or null when there is
+# no room. A wolf starts with its loyalty timer set.
+func recruit(kind: String) -> RefCounted:
+	if not PartyRulesScript.exists(kind) or not can_recruit(kind):
+		return null
+	var member: RefCounted = PartyMemberScript.create(_next_party_id, kind)
+	_next_party_id += 1
+	if member.is_wolf():
+		member.battles_left = PartyRulesScript.wolf_stay_battles(int(talisman_bonus("wolf_stay_bonus")), meta_wolf_bonus_waves)
+	party.append(member)
+	return member
+
+func dismiss_party_member(member_id: int) -> void:
+	for i in party.size():
+		if party[i].id == member_id:
+			party.remove_at(i)
+			return
+
+# The roster members that actually take the field. Normally everyone; if the party is
+# over capacity (Wolf Fang taken off while a wolf sits in its slot) the surplus waits
+# behind, later joiners first.
+func fielded_party() -> Array:
+	var room: int = maxi(0, party_capacity() - party_members.size())
+	return party.slice(0, room)
 
 # Battle-scoped weapon-special state, reset at the start of every battle
 # (Main.gd:_setup_battle_grid) -- none of it persists between fights.
@@ -354,12 +410,13 @@ var berserk_turns_remaining := 0
 # ally or wanders. The player's own next attack breaks stealth immediately
 # for a guaranteed crit (Main.gd:_apply_single_hit's stealth_forced_crit).
 var stealth_turns_remaining := 0
-# Bloodmoon Fang (talisman): kill-driven Bloodlust stacks, owned here but
-# driven entirely by Main.gd (_apply_single_hit's kill block increments it,
+# Bloodmoon Fang (talisman): hit-driven Bloodlust stacks, owned here but
+# driven entirely by Main.gd (_apply_single_hit increments it on every landed hit,
 # _setup_battle_grid/the crash-debuff reset it to 0). bloodmoon_debuffed is
 # the -50%-all-combat-stats crash from 3 quiet turns -- read directly in
 # Main.gd's damage formula and armor_damage_reduction() below.
-const BLOODMOON_PCT_PER_STACK := 0.075
+const BLOODMOON_DAMAGE_PCT_PER_STACK := 0.05
+const BLOODMOON_SPEED_PCT_PER_STACK := 0.075
 const BLOODMOON_MAX_STACKS := 5
 var bloodmoon_stacks := 0
 var bloodmoon_debuffed := false
@@ -437,7 +494,9 @@ func _ready() -> void:
 # ever happen once per run.
 func _apply_meta_upgrades() -> void:
 	var bonuses: Dictionary = SaveDataScript.get_applied_bonuses()
-	difficulty_mult = SaveDataScript.get_difficulty_mult(SaveDataScript.load_data().get("difficulty", ""))
+	var saved_difficulty: String = str(SaveDataScript.load_data().get("difficulty", ""))
+	difficulty_mult = SaveDataScript.get_difficulty_mult(saved_difficulty)
+	difficulty_id = saved_difficulty if saved_difficulty != "" else "normal"
 	_refresh_meta_passives(bonuses)
 	coins += bonuses.get("coins", 0)
 	max_health = int(round(stat_vigor * (1.0 + WORLDWALKER_HP_BONUS_PCT))) if meta_worldwalker else stat_vigor
@@ -459,12 +518,11 @@ func _apply_meta_upgrades() -> void:
 	# (see SaveData.gd:UPGRADES). Each is now a whole new mechanic rather than a
 	# flat stat, so the ally-granting ones just seed the party here.
 	if bonuses.get("battle_hardened", 0) > 0:
-		party_members.append({"name": "Blade Ally", "dmg_mult": 0.75})
-	# Beastmaster (repurposed): guarantees a Traitor Wolf from the start of
-	# the run instead of a bonus recruit-chance -- Main.gd reads party_wolf
-	# being non-empty at run start to seed wolf_waves_remaining.
+		party_members.append({"name": "Knight", "dmg_mult": 0.75})
+	# Beastmaster (repurposed): guarantees a Fickle Wolf from the start of
+	# the run instead of a bonus recruit-chance.
 	if bonuses.get("beastmaster", 0) > 0:
-		party_wolf = {"name": "Traitor Wolf", "dmg_mult": 0.6}
+		recruit("wolf")
 	# Appraisal is a plain stacking stat node (extra starting coins), applied
 	# the same way its tier-1 counterpart is.
 	coins += int(bonuses.get("appraisal", 0))
@@ -500,7 +558,7 @@ func _refresh_meta_passives(bonuses: Dictionary) -> void:
 	meta_free_specials = bonuses.get("silver_tongue", 0) > 0
 	has_merchant_prince = bonuses.get("golden_touch", 0) > 0
 	has_guardian_skill = bonuses.get("undying", 0) > 0
-	# Pack Leader -- a further Warrior-wing unlock past Blade Ally itself, so
+	# Pack Leader -- a further Warrior-wing unlock past Knight itself, so
 	# a fully-invested run can field 2 recruited allies, not just 1. Warlord
 	# (deeper still) pushes it one further, to 4.
 	if bonuses.get("warlord", 0) > 0:
@@ -567,11 +625,11 @@ func apply_meta_purchase(id: String) -> void:
 		"potions", "second_wind":
 			add_potion("potion_health")
 		"battle_hardened":
-			if not party_members.any(func(m): return m.get("name", "") == "Blade Ally"):
-				party_members.append({"name": "Blade Ally", "dmg_mult": 0.75})
+			if not party_members.any(func(m): return m.get("name", "") == "Knight"):
+				party_members.append({"name": "Knight", "dmg_mult": 0.75})
 		"beastmaster":
-			if party_wolf.is_empty():
-				party_wolf = {"name": "Traitor Wolf", "dmg_mult": 0.6}
+			if party_wolves().is_empty():
+				recruit("wolf")
 	# Worldwalker's +HP/+damage and the unlock-derived stats live in
 	# _recalc_stats; the weapon's baked passives (double-hit, lifesteal, free
 	# specials) only refresh on a re-equip.
@@ -663,10 +721,11 @@ func _apply_weapon_hit(body: Node) -> void:
 	body.take_damage(dmg)
 	if main.has_method("spawn_damage_number_world"):
 		main.spawn_damage_number_world(hit_pos, dmg)
-	# Knuckle Gloves' innate double_strike -- every plain swing lands twice.
-	# Guarded by is_instance_valid since the first hit may have already
-	# killed (and queue_free'd) the target.
-	if current_weapon.get("double_strike", false) and is_instance_valid(body):
+	# Knuckle Gloves' Quick Strikes-style passive_double_hit_chance (2026-09-29
+	# -- was an unconditional double_strike): a flat chance for a plain swing
+	# to land twice. Guarded by is_instance_valid since the first hit may have
+	# already killed (and queue_free'd) the target.
+	if randf() < minf(1.0, current_weapon.get("passive_double_hit_chance", 0.0) * secondary_chance_mult()) and is_instance_valid(body):
 		body.take_damage(dmg)
 		if main.has_method("spawn_damage_number_world"):
 			main.spawn_damage_number_world(hit_pos + Vector2(0, -10), dmg)
@@ -809,9 +868,39 @@ func _apply_talisman_to_weapon(weapon: Dictionary) -> Dictionary:
 	var pct_increase: float = talisman_bonus("special_stamina_pct_increase")
 	var break_cut: float = talisman_bonus("break_reduction")
 	var whisperer_active: bool = talisman_bonus("weapon_whisperer") > 0.0 and not weapon_whisperer_specials.is_empty()
-	if discount <= 0.0 and flat_reduction <= 0 and pct_increase <= 0.0 and break_cut <= 0.0 and not whisperer_active:
+	var amulet_material: Dictionary = {}
+	if talisman_bonus("material_passive_boost") > 0.0:
+		amulet_material = WeaponsScript.find_material(weapon.get("material_id", ""))
+	if discount <= 0.0 and flat_reduction <= 0 and pct_increase <= 0.0 and break_cut <= 0.0 and not whisperer_active and amulet_material.is_empty():
 		return weapon
 	var w: Dictionary = weapon.duplicate(true)
+	# Stone Amulet (talisman): swaps the weapon's material scales for the
+	# doubled set (Weapons.stone_amulet_scales) by multiplying out the old
+	# scale and in the new one -- so tier, Blacksmith level and rune bonuses
+	# already stacked on top are left alone. A special that already costs
+	# stamina never drops below 1 from this.
+	if not amulet_material.is_empty():
+		var boosted: Dictionary = WeaponsScript.stone_amulet_scales(amulet_material)
+		w.damage_mult = w.damage_mult * boosted.damage_scale / amulet_material.damage_scale
+		if w.has("price"):
+			w.price = int(round(w.price * boosted.price_scale / amulet_material.price_scale))
+		if amulet_material.break_chance > 0.0 and w.get("break_chance", 0.0) > 0.0:
+			w.break_chance = w.break_chance * boosted.break_chance / amulet_material.break_chance
+		var raw_costs := {}
+		for raw_special in WeaponsScript.get_base_type(weapon).get("specials", []):
+			raw_costs[raw_special.id] = int(raw_special.stamina_cost)
+		for special in w.get("specials", []):
+			if special.stamina_cost > 0:
+				# Rebuilt from the base cost when nothing but the material has
+				# touched it (so Obsidian reads exactly base x 1.6, not a double-
+				# rounded neighbour); an enchantment-adjusted cost scales by ratio.
+				var raw: int = raw_costs.get(special.id, -1)
+				var scaled: int
+				if raw >= 0 and special.stamina_cost == int(round(raw * amulet_material.stamina_scale)):
+					scaled = int(round(raw * boosted.stamina_scale))
+				else:
+					scaled = int(round(special.stamina_cost * boosted.stamina_scale / amulet_material.stamina_scale))
+				special.stamina_cost = maxi(1, scaled)
 	# Weapon Whisperer (talisman): swaps in up to 3 learned specials (any
 	# weapon type) in place of this weapon's own, by slot index. A weapon
 	# with fewer slots than chosen specials (or none at all, like the Bow)
@@ -846,6 +935,34 @@ func _stamp_learned_specials(weapon: Dictionary) -> void:
 
 func knows_special(special_id: String) -> bool:
 	return learned_specials.has(special_id)
+
+# Missing: every attack you make has a small chance to whiff entirely -- no damage
+# and none of its effects -- rolled separately for each hit of a multi-hit move.
+# Drilling every special move of the weapon in hand (at the Dojo) halves it. A
+# weapon with no specials to learn (the Bow, which uses arrows) has nothing to
+# master, so it stays at the base rate. Allies miss at a flat ALLY_MISS_CHANCE
+# (see Main.gd). miss_chance_override >= 0 replaces the whole calculation
+# (a test hook, and a handle for any future buff or curse).
+const MISS_CHANCE := 0.05
+const MISS_CHANCE_MASTERED := 0.025
+const ALLY_MISS_CHANCE := 0.03
+# Off (0.0) while a tools/test_*.gd script is driving the game, since those assert exact
+# damage numbers; a test that wants the real rates sets it back to -1.0.
+var miss_chance_override := 0.0 if OS.get_cmdline_args().has("--script") else -1.0
+
+func miss_chance_for(weapon: Dictionary) -> float:
+	if miss_chance_override >= 0.0:
+		return miss_chance_override
+	var specials: Array = weapon.get("specials", [])
+	if specials.is_empty():
+		return MISS_CHANCE
+	for special in specials:
+		if not knows_special(special.id):
+			return MISS_CHANCE
+	return MISS_CHANCE_MASTERED
+
+func ally_miss_chance() -> float:
+	return miss_chance_override if miss_chance_override >= 0.0 else ALLY_MISS_CHANCE
 
 # Weapon Whisperer (talisman): toggles a learned special in/out of the
 # player's custom 3-move loadout. Silently no-ops past 3 already chosen
@@ -977,6 +1094,17 @@ func crit_chance_total() -> float:
 func stamina_regen_per_turn() -> int:
 	return int(meta_stamina_regen_per_turn) + int(talisman_bonus("stamina_regen"))
 
+# Moss Charm (talisman): a flat amount every turn, plus (its own scaling half)
+# +1 more for every 20 max HP currently owned -- the tankier the build, the
+# bigger the tick.
+func secondary_chance_mult() -> float:
+	return 2.0 if talisman_bonus("double_secondary_chance") > 0.0 else 1.0
+
+func hp_regen_per_turn() -> int:
+	var flat: float = talisman_bonus("hp_regen_turn")
+	var scale: float = talisman_bonus("hp_regen_per_20_max_hp")
+	return int(flat) + int(floor(float(max_health) / 20.0) * scale)
+
 func windfall_chance_total() -> float:
 	return meta_windfall_chance + talisman_bonus("windfall_chance")
 
@@ -1101,8 +1229,11 @@ func try_buy_weapon(weapon: Dictionary) -> bool:
 	# Might gate: Masterwork/Legendary/Mythic (and anything else tagged with
 	# a required_might above 0) can't be bought OR re-equipped below the
 	# threshold -- same hard block whether this is a fresh purchase or
-	# switching back to something already owned.
+	# switching back to something already owned. Mythic alone also gates on
+	# a second stat, required_intimidation.
 	if int(weapon.get("required_might", 0)) > stat_might:
+		return false
+	if int(weapon.get("required_intimidation", 0)) > stat_intimidation:
 		return false
 	var id: String = weapon.id
 	if owned_weapons.has(id):
@@ -1248,6 +1379,12 @@ func shield_block_chance() -> float:
 		return 0.0
 	return equipped_shield.get("block_chance", 0.0) + meta_shield_block_bonus_pct
 
+# True when a carried shield is actually doing something right now: not forced off by
+# Berserk, and the weapon in hand leaves a hand free for it. The block minigame reads this
+# (a raised shield absorbs more than bare bracing does).
+func shield_usable() -> bool:
+	return berserk_turns_remaining <= 0 and not equipped_shield.is_empty() and _shield_weapon_ok()
+
 # Heavy Shield's passive: immune to forced repositioning (water push) while
 # raised. Same weapon-compat gating as shield_block_chance().
 func shield_push_immune() -> bool:
@@ -1388,6 +1525,15 @@ func restore_health(amount: int) -> void:
 
 func reset_stamina() -> void:
 	stamina = max_stamina
+	exhausted = false
+	stamina_changed.emit(stamina, max_stamina)
+
+# Battles start at a partial stamina bar, not a full one (2026-09-29 -- keeps
+# a special from being spammable right out of the gate). Stamina Potions and
+# the F5 debug cheat still use the full reset_stamina() above unchanged.
+const BATTLE_START_STAMINA_PCT := 0.5
+func reset_stamina_for_battle() -> void:
+	stamina = int(round(max_stamina * BATTLE_START_STAMINA_PCT))
 	exhausted = false
 	stamina_changed.emit(stamina, max_stamina)
 
@@ -1633,7 +1779,7 @@ func _recalc_stats() -> void:
 	# Bloodmoon Fang (talisman): battle-transient Bloodlust stacks add to move
 	# speed the same way a talisman's own move_speed_pct would (Main.gd drives
 	# bloodmoon_stacks directly -- see _apply_single_hit/_on_enemy_died).
-	move_speed = stat_agility * (1.0 + talisman_bonus("move_speed_pct") + bloodmoon_stacks * BLOODMOON_PCT_PER_STACK)
+	move_speed = stat_agility * (1.0 + talisman_bonus("move_speed_pct") + bloodmoon_stacks * BLOODMOON_SPEED_PCT_PER_STACK)
 	attack_cooldown_max = max(MIN_ATTACK_COOLDOWN, BASE_ATTACK_COOLDOWN - COOLDOWN_REDUCTION_PER_AGILITY * (stat_agility - AGILITY_START))
 	resilience_reduction = min(RESILIENCE_REDUCTION_CAP, stat_resilience * RESILIENCE_PCT_PER_POINT)
 	meta_dodge_chance = min(REFLEXES_DODGE_CAP, stat_reflexes * REFLEXES_PCT_PER_POINT)

@@ -75,10 +75,15 @@ func _init() -> void:
 	print("hover stat summary includes name/HP/damage: %s (expected true)" % [
 		summary.contains("Goblin") and summary.contains("999") and summary.contains("7")
 	])
-	var strahd_unit := {"tile": Vector2i(0, 0), "hp": 50, "max_hp": 100, "damage": 20, "name": "Count Strahd"}
-	var strahd_summary: String = main._enemy_stat_summary(strahd_unit)
-	print("a boss-tier, armored, evasive enemy's summary tags all three: %s (expected true)" % [
-		strahd_summary.contains("Boss") and strahd_summary.contains("Armored") and strahd_summary.contains("Evasive")
+	var oak_unit := {"tile": Vector2i(0, 0), "hp": 50, "max_hp": 100, "damage": 20, "name": "Elder Oak"}
+	var oak_summary: String = main._enemy_stat_summary(oak_unit)
+	print("a full boss's summary is tagged Boss and Armored: %s (expected true)" % [
+		oak_summary.contains("Boss") and oak_summary.contains("Armored") and not oak_summary.contains("Miniboss")
+	])
+	var wing_unit := {"tile": Vector2i(0, 0), "hp": 50, "max_hp": 100, "damage": 20, "name": "Voidwing"}
+	var wing_summary: String = main._enemy_stat_summary(wing_unit)
+	print("a miniboss's summary is tagged Miniboss and Evasive: %s (expected true)" % [
+		wing_summary.contains("Miniboss") and wing_summary.contains("Evasive")
 	])
 
 	# --- BeastiaryPanel: locked vs. unlocked rows, pause nesting ---
@@ -100,7 +105,7 @@ func _init() -> void:
 	print("an unseen creature shows as '???': %s (expected true)" % [dagger_row_seen])
 	print("detail panel auto-selects a seen creature on open: name=%s (expected Goblin or Orc, whichever sorts first)" % [panel.detail_name.text])
 
-	panel._select("Count Strahd")
+	panel._select("Elder Oak")
 	print("selecting a creature populates description and traits: desc_nonempty=%s traits_mention_boss=%s (expected true, true)" % [
 		panel.detail_description.text != "", panel.detail_traits.text.contains("Boss")
 	])

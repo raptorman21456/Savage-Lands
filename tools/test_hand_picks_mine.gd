@@ -65,12 +65,14 @@ func _init() -> void:
 	print("A click on a real targetable rock selects it: battle_rock_target=%s (expected (5, 4))" % [main.battle_rock_target])
 
 	# --- Mining breaks the tile, ends the turn, and clears the selection.
-	# battle_turn flips to "ally" via _end_player_turn -- confirms the action
-	# actually consumed the turn, same as any other Fight option. ---
+	# This synthetic battle has zero enemies, so ending the turn cascades
+	# straight through the (empty) ally-command phase to an instant victory --
+	# confirms the action actually consumed the turn, same as any other Fight
+	# option would. ---
 	main._resolve_mine_rock()
 	print("Mining removes the rock from battle_terrain: %s (expected false, tile gone)" % [main.battle_terrain.has(Vector2i(5, 4))])
 	print("...clears the selection: battle_rock_target=%s (expected (-1, -1))" % [main.battle_rock_target])
-	print("...and consumes the turn: battle_turn=%s (expected ally)" % [main.battle_turn])
+	print("...and consumes the turn, cascading to an instant victory (no enemies left): in_battle=%s (expected false)" % [main.in_battle])
 
 	# --- Rubble breaks the same way. ---
 	main.battle_turn = "player"

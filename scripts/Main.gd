@@ -3,41 +3,25 @@ extends Node2D
 const PlayerScript := preload("res://scripts/Player.gd")
 const EnemyScript := preload("res://scripts/Enemy.gd")
 const OrcScript := preload("res://scripts/Orc.gd")
-const BossScript := preload("res://scripts/Boss.gd")
 const ArcherScript := preload("res://scripts/Archer.gd")
-const ShamanScript := preload("res://scripts/Shaman.gd")
 const BruteScript := preload("res://scripts/Brute.gd")
 const ShadeScript := preload("res://scripts/Shade.gd")
 const WolfScript := preload("res://scripts/Wolf.gd")
-const OwlbearScript := preload("res://scripts/Owlbear.gd")
 const CentaurScript := preload("res://scripts/Centaur.gd")
 const FaeHutScript := preload("res://scripts/FaeHut.gd")
 const FaeScript := preload("res://scripts/Fae.gd")
 const GnomeScript := preload("res://scripts/Gnome.gd")
-const DruidScript := preload("res://scripts/Druid.gd")
-const AbolethScript := preload("res://scripts/Aboleth.gd")
-const WaterElementalScript := preload("res://scripts/WaterElemental.gd")
-const LizardSoldierSwarmScript := preload("res://scripts/LizardSoldierSwarm.gd")
+const LeviathanScript := preload("res://scripts/Leviathan.gd")
+const LizenWarbandScript := preload("res://scripts/LizenWarband.gd")
 const BlackDragonletScript := preload("res://scripts/BlackDragonlet.gd")
 const TreantScript := preload("res://scripts/Treant.gd")
 const ElderOakScript := preload("res://scripts/ElderOak.gd")
-const GibberingMoutherScript := preload("res://scripts/GibberingMouther.gd")
-const IronGolemScript := preload("res://scripts/IronGolem.gd")
-const StoneGiantScript := preload("res://scripts/StoneGiant.gd")
-const BeholderScript := preload("res://scripts/Beholder.gd")
-const FrostGiantScript := preload("res://scripts/FrostGiant.gd")
+const IronConstructScript := preload("res://scripts/IronConstruct.gd")
 const WhiteDragonScript := preload("res://scripts/WhiteDragon.gd")
-const RocScript := preload("res://scripts/Roc.gd")
-const BlueDragonScript := preload("res://scripts/BlueDragon.gd")
-const LavaGolemScript := preload("res://scripts/LavaGolem.gd")
+const LavaConstructScript := preload("res://scripts/LavaConstruct.gd")
 const RedWyrmScript := preload("res://scripts/RedWyrm.gd")
 const VoidwingScript := preload("res://scripts/Voidwing.gd")
-const SupremeWarlockScript := preload("res://scripts/SupremeWarlock.gd")
-const DemogorgonScript := preload("res://scripts/Demogorgon.gd")
-const TiamatScript := preload("res://scripts/Tiamat.gd")
-const CountStrahdScript := preload("res://scripts/CountStrahd.gd")
-const DukeZaltoScript := preload("res://scripts/DukeZalto.gd")
-const AcererakScript := preload("res://scripts/Acererak.gd")
+const ArchmageScript := preload("res://scripts/Archmage.gd")
 const HUDScript := preload("res://scripts/HUD.gd")
 const WeaponsScript := preload("res://scripts/Weapons.gd")
 const ArmorScript := preload("res://scripts/Armor.gd")
@@ -63,6 +47,12 @@ const WishingWellPanelScript := preload("res://scripts/WishingWellPanel.gd")
 const HorseRacePanelScript := preload("res://scripts/HorseRacePanel.gd")
 const FishingPanelScript := preload("res://scripts/FishingPanel.gd")
 const TalismansScript := preload("res://scripts/Talismans.gd")
+const SandboxScript := preload("res://scripts/Sandbox.gd")
+const SandboxPanelScript := preload("res://scripts/SandboxPanel.gd")
+const AttackPatternsScript := preload("res://scripts/AttackPatterns.gd")
+const DefenseMinigameScript := preload("res://scripts/DefenseMinigame.gd")
+const AttackTimingsScript := preload("res://scripts/AttackTimings.gd")
+const AttackMinigameScript := preload("res://scripts/AttackMinigame.gd")
 
 # Phantom Guard's "evasive" special: fired the instant the player picks one
 # of the offered dodge-roll directions -- see _prompt_evasion_reposition.
@@ -212,16 +202,12 @@ const FOLLOWER_TRAIL_SPACING := 18
 # Waves 1-100 are 10 themed worlds (WORLDS below) of 10 waves each; wave 101+
 # is world index 10, the Nothingness boss rush (see _spawn_nothingness_fight).
 const WAVES_PER_WORLD := 10
-# Kept as its own named constant (rather than inlining WAVES_PER_WORLD) since
-# a couple of tests read it directly to mean "Plains' own boss wave" --
-# _spawn_boss_wave itself no longer branches on this at all, it reads
-# WORLDS[current_world_index].boss_script generically (Plains' boss_script
-# happens to be Owlbear, same as always).
-const OWLBEAR_WAVE_START := WAVES_PER_WORLD
+# The wave within a world that is its full boss (the world's last wave) -- tests read this
+# directly; _spawn_boss_wave itself reads WORLDS[current_world_index].boss_script generically.
+const WORLD_BOSS_WAVE := WAVES_PER_WORLD
 # New enemy types phase in gradually rather than all at once, so each wave
 # introduces one new wrinkle instead of overwhelming a fresh run immediately.
 const ARCHER_WAVE_START := 1
-const SHAMAN_WAVE_START := 2
 const BRUTE_WAVE_START := 3
 const SHADE_WAVE_START := 4
 const WOLF_WAVE_START := 2
@@ -230,7 +216,6 @@ const CENTAUR_PACK_SIZE := 3
 const FAE_HUT_WAVE_START := 3
 const GNOME_WAVE_START := 2
 const GNOME_PACK_SIZE_MAX := 5
-const DRUID_WAVE_START := 5
 
 # Quest Board's "Cull the Herd" template picks from here, filtered to
 # whatever's already unlocked at the player's current wave (same *_WAVE_
@@ -239,11 +224,9 @@ const QUEST_ENEMY_POOL := [
 	{"name": "Goblin", "wave_start": 1},
 	{"name": "Orc", "wave_start": 1},
 	{"name": "Apprentice Mage", "wave_start": ARCHER_WAVE_START},
-	{"name": "Shaman", "wave_start": SHAMAN_WAVE_START},
 	{"name": "Brute", "wave_start": BRUTE_WAVE_START},
 	{"name": "Shade", "wave_start": SHADE_WAVE_START},
 	{"name": "Wolf", "wave_start": WOLF_WAVE_START},
-	{"name": "Druid", "wave_start": DRUID_WAVE_START},
 ]
 const QUEST_SLOT_COUNT := 3
 # The Seer sets out this many talismans at a time; a paid reroll costs
@@ -313,19 +296,21 @@ const CARDINAL_DIRS := [Vector2i(0, -1), Vector2i(0, 1), Vector2i(-1, 0), Vector
 # on weapon.material_id at each of this file's read sites. Steel (the plain
 # baseline) carries none. Stone Amulet (talisman) multiplies each of these by
 # STONE_AMULET_MATERIAL_BOOST_MULT -- see the material_passive_boost checks
-# below (Wood's Quick Hands gets a discrete 2nd free use instead, since a
-# one-shot freebie has no fractional "1.5x" to give).
-const STONE_AMULET_MATERIAL_BOOST_MULT := 1.5
-const OBSIDIAN_VOLATILE_CHANCE := 0.10
-const OBSIDIAN_VOLATILE_DAMAGE_MULT := 1.5
-const SILVER_CLEANSE_CHANCE := 0.08
+# below. (The weapon-side half of Stone Amulet -- doubled dmg/price/stamina/
+# break chance -- lives in Player._apply_talisman_to_weapon.)
+const STONE_AMULET_MATERIAL_BOOST_MULT := 2.0
+# Obsidian's Splinter Strike (renamed 2026-09-29 from Volatile Shard -- a
+# chance to cause Bleeding instead of a flat damage boost).
+const OBSIDIAN_SPLINTER_CHANCE := 0.05
+const SILVER_CLEANSE_CHANCE := 0.15
 const GOLD_KILL_COIN_BONUS := 1
-# Bone's Dread Aura: heavier, slower weapons (higher cooldown_mult) unnerve a
-# felled-but-surviving target more than a quick jab does.
-const BONE_DREAD_CHANCE_BY_TYPE := {
-	"spear": 0.03, "hand_picks": 0.03, "dagger": 0.03, "knuckle_gloves": 0.03,
-	"bow": 0.05, "greatsword": 0.08, "hammer": 0.09, "battle_axe": 0.10,
-}
+# Bone's Dreadful Strike: a flat chance regardless of weapon type (2026-09-29
+# -- was scaled by weapon cooldown_mult, heavier weapons unnerving more).
+const BONE_DREAD_CHANCE := 0.075
+# Wood's Quick Strikes (2026-09-29 -- was Quick Hands, a free first use):
+# a flat chance for any landed hit to strike again, same shape as a weapon's
+# own passive_double_hit_chance (see _battle_perform_attack).
+const WOOD_DOUBLE_HIT_CHANCE := 0.10
 
 # Wildcard talismans -- extreme, build-defining trade-offs (Talismans.gd's
 # "--- Wildcard ---" section). Each constant here belongs to exactly one of
@@ -335,7 +320,15 @@ const CHAOS_SHARD_MIN_MULT := 0.5
 const CHAOS_SHARD_MAX_MULT := 1.6
 const BLOODMOON_QUIET_TURNS_LIMIT := 3
 const WILDFIRE_EXPLOSION_RADIUS := 1
-const WILDFIRE_EXPLOSION_MAX_HP_PCT := 0.25
+# Wildfire Core: the blast is this many times the dying enemy's fire damage
+# per turn (see _burn_tick_damage).
+const WILDFIRE_EXPLOSION_FIRE_MULT := 3
+# Ember Charm's burn: (EMBER_BURN_BASE + attack / EMBER_BURN_ATTACK_DIV) on the
+# first tick, then x EMBER_BURN_DECAY each turn after (rounded up on the way
+# out), ending once what's left would be under 1.
+const EMBER_BURN_BASE := 5.0
+const EMBER_BURN_ATTACK_DIV := 5.0
+const EMBER_BURN_DECAY := 0.7
 
 # Reserved terrain types -- fully implemented (movement/damage/status
 # mechanics in _resolve_battle_step/_apply_terrain_tick/_apply_knockback,
@@ -357,13 +350,15 @@ const POISON_DAMAGE_PCT := 0.10
 # flat hit and Flame Arrow's old flat-duration burn.
 const BURN_DAMAGE_DIVISOR := 15
 const BURN_DAMAGE_DEALT_REDUCTION := 0.25
-# Bleeding: inflicted by ENEMY_TRAITS["inflicts_bleed"] on a landed hit
-# against the player (guaranteed, no roll), no natural duration -- lasts the
-# rest of the battle (cleared in the same per-battle reset every other
-# battle-scoped player status uses). %-of-max-HP, not flat, same as
-# Poison/Burn above.
-const BLEED_MOVE_DAMAGE_PCT := 0.05
-const BLEED_DODGE_DAMAGE_PCT := 0.10
+# Bleeding: a duration-based status (2026-09-29 rework) that works the same
+# for the player and an enemy alike -- BLEED_DAMAGE_PCT of max HP at the end
+# of every turn it's active, for BLEED_BASE_TURNS turns, and every tile the
+# bleeding unit actually moves lengthens it by one more turn instead of
+# dealing damage on the spot (see _extend_bleed_on_move, the enemy-side
+# equivalent in _move_enemy_unit/_move_big_unit, and the tick sites in
+# _process_enemy_turn).
+const BLEED_DAMAGE_PCT := 0.10
+const BLEED_BASE_TURNS := 2
 # Blindness: inflicted by ENEMY_TRAITS["inflicts_blind"] on a landed hit,
 # lasts a fixed number of turns like Concussion/Frozen. While active, the
 # player's own attacks have a high miss chance, but anything that lands is
@@ -383,6 +378,29 @@ const BLINDNESS_MISS_CHANCE := 0.75
 const BERSERK_TURNS := 2
 const BERSERK_DAMAGE_BONUS_PCT := 0.5
 const BERSERK_DEFENSE_MULT := 0.25
+# Dodge / block timing minigames (DefenseMinigame.gd; each enemy's attacks live in
+# AttackPatterns.gd). An enemy attack that would hit the hero first rolls for a DODGE opening
+# (the easier timing check -- it also lets the hero roll one tile away); with no opening it is
+# a BLOCK check instead. Defending keeps its classic guaranteed behaviour and skips the popup.
+# The old passive dice (Reflexes dodge, shield block %, Block Master) became timing bonuses:
+# dodge chance widens the opening chance and the dodge window, shield block chance and Block
+# Master widen the parry window.
+const MINIGAME_DODGE_BASE_CHANCE := 0.30
+const MINIGAME_DODGE_OPENING_CAP := 0.90
+const MINIGAME_DODGE_WINDOW_CAP := 1.6
+const MINIGAME_BLOCK_HELD_REDUCTION := 0.5    # shield raised at the impact (no parry)
+const MINIGAME_BRACE_HELD_REDUCTION := 0.25   # no usable shield: bracing with what you carry
+const MINIGAME_PARRY_BONUS_MS_PER_CHANCE := 60.0
+const MINIGAME_PARRY_BONUS_CAP_MS := 30.0
+# Weapon attack timing minigame (AttackMinigame.gd; each weapon family's command lives in
+# AttackTimings.gd). How well the command is executed scales the damage of every attack that deals
+# damage (regular, Heavy, damaging specials -- a flurry scales each hit); a perfect also refunds a
+# little stamina. Skipped for non-damaging specials (dmg_mult 0), arrows, ally attacks and the
+# tutorial, or when the setting is off. DRAFT numbers -- the user said "about 0.8x / 1x / 1.25x".
+const ATTACK_TIMING_MISS_MULT := 0.8
+const ATTACK_TIMING_HIT_MULT := 1.0
+const ATTACK_TIMING_PERFECT_MULT := 1.25
+const ATTACK_TIMING_PERFECT_STAMINA := 5
 # Vulnerable: a landed player crit (_apply_single_hit) marks the target,
 # increasing ALL damage it takes -- player's and every ally's, since they
 # all funnel through the same function -- for a few turns. "Focus this
@@ -428,9 +446,7 @@ const RUBBLE_CRUMBLE_CHANCE := 0.4
 # permanent roster -- so it scales with Vitality upgrades automatically, and
 # a KO'd ally is battle-scoped only (full HP again next fight) for free.
 const ALLY_MAX_HP_PCT := 0.7
-const WOLF_ALLY_MAX_HP_PCT := 0.55
 const ALLY_MOVE_RANGE := 2
-const ALLY_WOLF_MOVE_RANGE := 3
 const ALLY_ATTACK_RANGE := 1
 
 # A landed hit shoves the target one tile straight back from the attacker,
@@ -447,7 +463,7 @@ const BRUTE_KNOCKBACK_RESIST_CHANCE := 0.6
 const BOSS_ENRAGE_HP_THRESHOLD := 0.3
 const BOSS_ENRAGE_DAMAGE_MULT := 1.5
 
-# Shamans heal their worst-hurt ally instead of attacking whenever one needs
+# Healer-type enemies (heals_allies) heal their worst-hurt ally instead of attacking whenever one needs
 # it, so a squad built around one becomes a "kill the healer first" puzzle
 # instead of just more HP to chew through.
 const SHAMAN_HEAL_PCT := 0.25
@@ -471,7 +487,7 @@ const GNOME_DAMAGE_PCT_PER_PACKMATE := 0.2
 # its own, so leaving it up is a ticking clock, not a passive threat.
 const FAE_HUT_SPAWN_INTERVAL := 3
 
-# Druid: heals like a Shaman when someone's hurt, otherwise buffs an
+# Buffer-type enemies (buffs_allies): heal when someone's hurt, otherwise buffs an
 # un-buffed ally's damage for a few turns instead of attacking -- only
 # fights directly once no ally needs either and it's the last one standing.
 const DRUID_BUFF_DMG_PCT := 0.3
@@ -480,14 +496,14 @@ const DRUID_BUFF_TURNS := 3
 # A dagger special heals the player for a cut of the damage it just dealt.
 const LIFESTEAL_PCT := 0.5
 # Club's Second Wind: a flat heal based on max HP, regardless of damage dealt.
-const SELF_HEAL_PCT := 0.2
+const SELF_HEAL_PCT := 0.1
 # Spear's Target Practice: an instakill coin-flip, not a normal damage hit.
 const TARGET_PRACTICE_CHANCE := 0.3
 const TARGET_PRACTICE_BOSS_CHANCE := 0.05
 # Greatsword's Low Sweep: chance its move_range-halving actually lands.
 const LOW_SWEEP_CHANCE := 0.8
 # War Hammer's Maracas: bonus multiplier vs. an armored target.
-const MARACAS_ARMORED_MULT := 1.5
+const MARACAS_ARMORED_MULT := 200.0 / 130.0
 # War Hammer's BONK: how many turns Concussed lasts.
 const BONK_CONCUSSED_TURNS := 3
 # Player-side Concussion (distinct from BONK above, which only ever hits
@@ -505,7 +521,10 @@ const CONCUSSION_INFLICT_CHANCE := 0.5
 # every regular/heavy attack (effect == "" is what distinguishes those two
 # from every named special).
 const PICHAKU_DAMAGE_MULT := 0.8
-const PICHAKU_DOUBLE_HIT_CHANCE := 0.2
+const PICHAKU_DOUBLE_HIT_CHANCE := 1.0 / 3.0
+# Hand Picks' DIAMONDS: a real risk to the big jump, 2026-09-29.
+const DIAMONDS_MISS_CHANCE := 0.20
+const DIAMONDS_MISS_SELF_DAMAGE_PCT := 0.20
 
 # Special arrows (Bow-only, see WeaponsScript.ARROW_TYPES) -- flat damage
 # numbers, not scaled by weapon damage_mult like a normal hit.
@@ -549,24 +568,12 @@ const ENEMY_TRAITS := {
 	# charging straight in (see _flank_target_tile), and sometimes skips its
 	# telegraph for an immediate weak jab instead of the big windup hit.
 	"Orc": {"windup": true, "knockback_resist": ORC_KNOCKBACK_RESIST_CHANCE, "move_range": 1, "big_squad": true, "corners": true, "quick_jab_chance": ORC_QUICK_JAB_CHANCE, "armored": true, "inflicts_concussion": true},
-	"Boss": {"windup": true, "knockback_resist": 1.0, "move_range": 1, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "armored": true, "is_boss_tier": true},
-	# From OWLBEAR_WAVE_START on, replaces Boss as the wave-boss. A full 2x2
-	# footprint that ignores every terrain rule (like the Brute) and corners
-	# the player the same way the Orc's flank-tile steering does (like the
-	# Orc, extended to 2x2 units -- see _move_big_unit), plus a sweeping
-	# attack that can hit the player AND an adjacent ally in the same swing
-	# (see "sweeps", _sweep_targets).
-	"Owlbear": {"size": 2, "ignore_terrain": true, "ignore_cover": true, "knockback_resist": 0.8, "corners": true, "sweeps": true, "move_range": 1, "armored": true, "is_boss_tier": true},
 	# Reworked from the original Archer: shorter range than before but no
 	# longer needs a straight line to its target (see ignore_line on
 	# _can_battle_attack) -- a caster's arcing bolt instead of a bowstring's
 	# dead-straight shot. Doesn't kite/strafe -- that identity moved to the
 	# Centaur Archer variant below, so the two ranged enemies feel distinct.
 	"Apprentice Mage": {"attack_range": ARCHER_ATTACK_RANGE, "ignore_line": true, "inflicts_blind": true, "inflicts_fear": true},
-	# Heals its worst-hurt living ally instead of attacking whenever one
-	# exists, and refuses to engage directly at all while any other ally is
-	# still standing -- only fights once it's truly the last one left.
-	"Shaman": {"heals_allies": true},
 	# A full 2x2 footprint (see the "size" field in _setup_battle_grid) that
 	# ignores every terrain rule entirely -- rocks, water, ledges, cliffs all
 	# do nothing to it -- on top of shrugging off rock cover and resisting
@@ -600,76 +607,47 @@ const ENEMY_TRAITS := {
 	# big_squad so a Gnome-initiated fight can actually seat a pack of up to
 	# GNOME_PACK_SIZE_MAX (5) once _squad_size_bonus allows it.
 	"Gnome": {"big_squad": true},
-	"Druid": {"heals_allies": true, "buffs_allies": true},
-	# Beach's miniboss -- a short-range psychic reach (ignore_line, like the
+	# Beach's boss -- a short-range psychic reach (ignore_line, like the
 	# Apprentice Mage but shorter) instead of a straight-line melee attack,
 	# plus the same telegraph/enrage shape every Boss-tier unit uses.
-	"Aboleth": {"windup": true, "attack_range": 2, "ignore_line": true, "armored": true, "knockback_resist": ORC_KNOCKBACK_RESIST_CHANCE, "move_range": 1, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true},
-	# Beach's world-ending boss -- a sweeping wave (sweeps, like the Owlbear)
-	# that can catch the player and an adjacent ally at once, and resists
-	# being knocked around even harder than the Owlbear does.
-	"Water Elemental": {"windup": true, "sweeps": true, "armored": true, "knockback_resist": 0.9, "move_range": 1, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true},
-	# Swamp's miniboss -- fast and squishy, frequent quick jabs (many small
+	"Leviathan": {"windup": true, "attack_range": 2, "ignore_line": true, "armored": true, "knockback_resist": ORC_KNOCKBACK_RESIST_CHANCE, "move_range": 1, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true},
+	# Swamp's boss -- fast and squishy, frequent quick jabs (many small
 	# reptiles biting) instead of one heavy telegraphed hit.
-	"Lizard Soldier Swarm": {"windup": true, "move_range": 2, "quick_jab_chance": 0.5, "knockback_resist": ORC_KNOCKBACK_RESIST_CHANCE, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true},
-	# Swamp's world-ending boss -- a breath-weapon sweep.
-	"Black Dragonlet": {"windup": true, "sweeps": true, "armored": true, "knockback_resist": 0.7, "move_range": 1, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true, "inflicts_bleed": true},
-	# Forest's miniboss -- rooted and tanky, resists being shoved.
-	"Treant": {"windup": true, "armored": true, "knockback_resist": 0.85, "move_range": 1, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true},
+	"Lizen Warband": {"windup": true, "move_range": 2, "quick_jab_chance": 0.5, "knockback_resist": ORC_KNOCKBACK_RESIST_CHANCE, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true},
+	# A miniboss -- a breath-weapon sweep.
+	"Black Dragonlet": {"windup": true, "sweeps": true, "armored": true, "knockback_resist": 0.7, "move_range": 1, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true, "is_miniboss": true, "inflicts_bleed": true},
+	# A miniboss -- rooted and tanky, resists being shoved.
+	"Treant": {"windup": true, "armored": true, "knockback_resist": 0.85, "move_range": 1, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true, "is_miniboss": true},
 	# Forest's world-ending boss -- Treant aged up, a wide branch sweep.
 	"Elder Oak": {"windup": true, "sweeps": true, "armored": true, "knockback_resist": 0.9, "move_range": 1, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true},
-	# Desert's miniboss -- erratic: hard to pin down and bites more than once.
-	"Gibbering Mouther": {"windup": true, "ignore_line": true, "dodge_chance": 0.25, "quick_jab_chance": 0.4, "move_range": 2, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true, "inflicts_blind": true, "inflicts_fear": true},
-	# Desert's world-ending boss -- an immovable construct.
-	"Iron Golem": {"windup": true, "armored": true, "knockback_resist": 1.0, "move_range": 1, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true, "inflicts_concussion": true},
-	# Caves' miniboss -- a literal 2x2 giant footprint (like the Owlbear),
-	# the first of these new bosses to take up more than one tile.
-	"Stone Giant": {"windup": true, "size": 2, "armored": true, "knockback_resist": 0.8, "move_range": 1, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true, "inflicts_concussion": true},
-	# Caves' world-ending boss -- a wide-reaching multi-eye sweep (bigger
-	# attack_range than a melee-adjacent dragon's sweep).
-	"Beholder": {"windup": true, "sweeps": true, "attack_range": 2, "armored": true, "knockback_resist": 0.5, "move_range": 1, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true, "inflicts_blind": true},
-	# Tundra's miniboss -- an armored brawler with frequent quick jabs.
-	"Frost Giant": {"windup": true, "armored": true, "knockback_resist": 0.75, "quick_jab_chance": 0.3, "move_range": 1, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true, "inflicts_concussion": true},
+	# A miniboss -- an immovable construct.
+	"Iron Construct": {"windup": true, "armored": true, "knockback_resist": 1.0, "move_range": 1, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true, "is_miniboss": true, "inflicts_concussion": true},
 	# Tundra's world-ending boss -- an icy breath sweep.
 	"White Dragon": {"windup": true, "sweeps": true, "armored": true, "knockback_resist": 0.7, "move_range": 1, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true},
-	# Mountains' miniboss -- fast and evasive, frequent quick talon strikes.
-	"Roc": {"windup": true, "move_range": 3, "dodge_chance": 0.2, "quick_jab_chance": 0.3, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true},
-	# Mountains' world-ending boss -- a wide-reaching lightning-breath sweep.
-	"Blue Dragon": {"windup": true, "sweeps": true, "attack_range": 2, "armored": true, "knockback_resist": 0.75, "move_range": 1, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true},
-	# Volcano's miniboss -- a molten cousin of the Iron Golem, lumbering
+	# A miniboss -- a molten cousin of the Iron Construct, lumbering
 	# rather than fully immovable.
-	"Lava Golem": {"windup": true, "armored": true, "knockback_resist": 0.65, "move_range": 1, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true},
+	"Lava Construct": {"windup": true, "armored": true, "knockback_resist": 0.65, "move_range": 1, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true, "is_miniboss": true},
 	# Volcano's world-ending boss -- the tankiest dragon yet ("Wyrm" reads
-	# ancient/elder), with the same wide breath reach as Beholder/Blue Dragon.
+	# ancient/elder), with a wide breath reach.
 	"Red Wyrm": {"windup": true, "sweeps": true, "attack_range": 2, "armored": true, "knockback_resist": 0.8, "move_range": 1, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true, "inflicts_bleed": true},
-	# Voidlands' miniboss -- fast, evasive, and genuinely ranged (void bolts
-	# that ignore obstacles), unlike the melee-only Roc it echoes.
-	"Voidwing": {"windup": true, "move_range": 3, "dodge_chance": 0.3, "ignore_line": true, "attack_range": 2, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true, "inflicts_bleed": true},
+	# A miniboss -- fast, evasive, and genuinely ranged (void bolts
+	# that ignore obstacles).
+	"Voidwing": {"windup": true, "move_range": 3, "dodge_chance": 0.3, "ignore_line": true, "attack_range": 2, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true, "is_miniboss": true, "inflicts_bleed": true},
 	# Voidlands' world-ending boss -- the last "normal" world boss before
 	# Nothingness, and the one that gets rematched there (see
-	# scripts/SupremeWarlock.gd's power_tier). A wide multi-target spell
+	# scripts/Archmage.gd's power_tier). A wide multi-target spell
 	# that ignores obstacles entirely, unarmored (a glass-cannon caster,
 	# not a brute).
-	"Supreme Warlock": {"windup": true, "sweeps": true, "ignore_line": true, "attack_range": 2, "knockback_resist": 0.4, "move_range": 1, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true},
-	# --- Nothingness boss rush (World Progression feature) -- the hardest
-	# tier of enemy in the game, deliberately combining more traits at once
-	# than any single world's miniboss/boss. See _spawn_nothingness_fight
-	# and NOTHINGNESS_BOSSES/NOTHINGNESS_POWER_TIERS below. ---
-	"Demogorgon": {"windup": true, "sweeps": true, "armored": true, "knockback_resist": 0.85, "quick_jab_chance": 0.35, "move_range": 1, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true},
-	"Tiamat": {"windup": true, "sweeps": true, "attack_range": 2, "ignore_line": true, "armored": true, "knockback_resist": 0.8, "move_range": 1, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true},
-	"Count Strahd": {"windup": true, "move_range": 2, "dodge_chance": 0.35, "armored": true, "knockback_resist": 0.7, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true, "is_undead": true},
-	"Duke Zalto": {"windup": true, "size": 2, "armored": true, "knockback_resist": 1.0, "move_range": 1, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true},
-	"Acererak": {"windup": true, "sweeps": true, "attack_range": 2, "ignore_line": true, "armored": true, "knockback_resist": 0.6, "quick_jab_chance": 0.3, "move_range": 1, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true, "is_undead": true},
+	"Archmage": {"windup": true, "sweeps": true, "ignore_line": true, "attack_range": 2, "knockback_resist": 0.4, "move_range": 1, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true},
 }
 
 # The Nothingness (world index 10, WORLDS.size()-1) is a fixed 6-fight
 # sequential gauntlet, not the normal wave-climbing waterfall -- see
 # _spawn_wave's top-of-function branch and _spawn_nothingness_fight below.
-# Power climbs fight-to-fight via each script's power_tier field (same
-# generic hook _setup_battle_grid already reads for Supreme Warlock's
-# rematch, see e.get("power_tier") there) -- fight 6 re-fights Voidlands'
-# own Supreme Warlock at its highest tier, closing the loop.
-const NOTHINGNESS_BOSSES := [DemogorgonScript, TiamatScript, CountStrahdScript, DukeZaltoScript, AcererakScript, SupremeWarlockScript]
+# It is a rematch of all 6 full bosses, ending on the Archmage. Power climbs
+# fight-to-fight via each script's power_tier field (read generically by
+# _setup_battle_grid via e.get("power_tier")).
+const NOTHINGNESS_BOSSES := [LeviathanScript, LizenWarbandScript, ElderOakScript, WhiteDragonScript, RedWyrmScript, ArchmageScript]
 const NOTHINGNESS_POWER_TIERS := [1.0, 1.15, 1.3, 1.45, 1.6, 2.5]
 
 # Stamina exists only for the tile battle. The free regular attack and
@@ -679,11 +657,17 @@ const NOTHINGNESS_POWER_TIERS := [1.0, 1.15, 1.3, 1.45, 1.6, 2.5]
 # Defending grants noticeably more than attacking, since giving up your
 # turn's offense is the deliberate "bank a lot of stamina fast" choice.
 const STAMINA_REGEN_ON_ATTACK := 10
-const STAMINA_REGEN_ON_DEFEND := 25
+const STAMINA_REGEN_ON_DEFEND := 15
 
 # Enemy HP/damage in battle scale up with the player's level, so growing
-# stronger doesn't make the same enemies trivial forever.
+# stronger doesn't make the same enemies trivial forever. The per-level rate
+# depends on the save's difficulty, and bosses/minibosses (is_boss_tier) scale at
+# only BOSS_LEVEL_SCALING_FACTOR of it. DRAFT numbers -- the user hasn't set these
+# yet (they asked for "change depending on difficulty" and "bosses scale more
+# gently"); ENEMY_LEVEL_SCALING stays as the Normal rate other code and tests read.
 const ENEMY_LEVEL_SCALING := 0.05
+const ENEMY_LEVEL_SCALING_BY_DIFFICULTY := {"baby": 0.03, "normal": ENEMY_LEVEL_SCALING, "hard": 0.08, "apocalyptic": 0.12}
+const BOSS_LEVEL_SCALING_FACTOR := 0.5
 
 # Any non-Boss spawn has a flat chance to roll Elite -- a tougher fight that
 # guarantees a Runic Shard drop (the currency the shop's Enchant tab spends).
@@ -702,11 +686,6 @@ const ELITE_TINT := Color(1.3, 1.0, 1.5)
 const TRAITOR_WOLF_CHANCE := 0.15
 const TRAITOR_WOLF_RECRUIT_CHANCE := 0.25
 const TRAITOR_WOLF_TINT := Color(1.4, 0.6, 0.6)
-# A recruited (or Beastmaster-guaranteed) Traitor Wolf's loyalty doesn't
-# last forever -- see wolf_waves_remaining below, decremented once per wave
-# cleared in _on_shop_continue_pressed. Pack Bond (deep Warrior node) adds
-# player.meta_wolf_bonus_waves on top.
-const WOLF_BASE_STAY_WAVES := 5
 
 # Random events: rolled once per wave transition (_on_shop_continue_pressed),
 # against whatever's currently eligible (_available_event_ids).
@@ -725,29 +704,26 @@ const AGILITY_PER_EXTRA_MOVE := 20
 # The 10-world campaign (index 0-9) plus the Nothingness boss rush (index
 # 10). "terrain" is the RESERVED_TERRAIN_TYPES subset rolled into that
 # world's battles alongside the always-on rock/water/ledge/cliff set (empty
-# for Plains and Nothingness, which stick to the base 4). Plains reuses the
-# existing Boss/Owlbear pair -- see _spawn_boss_wave -- so it carries no
-# miniboss_script/boss_script of its own; every other world (and
-# Nothingness's own sequential rush, see _spawn_nothingness_fight) supplies
-# both.
-## miniboss_script/boss_script placeholders: every world reuses Boss/Owlbear
-# until its own dedicated pair is authored (see the World Progression plan's
-# Phase 3+) -- _spawn_boss_wave reads these generically, so a world "gains"
-# its real bosses just by swapping these two fields in, no other code
-# changes. Nothingness doesn't use this table at all (see
-# _spawn_nothingness_fight once that lands) -- its entry is a placeholder.
+# for Plains and Nothingness, which stick to the base 4).
+# miniboss_script (wave 5) / boss_script (wave 10): the game has 5 minibosses
+# (Black Dragonlet, Treant, Iron Construct, Lava Construct, Voidwing) and 6 full
+# bosses (Leviathan, Lizen Warband, Elder Oak, White Dragon, Red Wyrm, Archmage).
+# Worlds without a native one of their own (PLACEHOLDER entries below) reuse a
+# survivor until dedicated enemies are authored -- _spawn_boss_wave reads these
+# generically, so swapping a field is all it takes. Nothingness doesn't use this
+# table (see _spawn_nothingness_fight) -- its entry is a placeholder.
 static var WORLDS := [
-	{"id": "plains", "name": "Plains", "biome": "grass", "terrain": [], "ground_tint": Color(1, 1, 1), "battle_bg": Color(0.05, 0.05, 0.05), "miniboss_script": BossScript, "boss_script": OwlbearScript},
-	{"id": "beach", "name": "Beach", "biome": "sand", "terrain": [], "ground_tint": Color(1.15, 1.1, 0.85), "battle_bg": Color(0.08, 0.08, 0.1), "miniboss_script": AbolethScript, "boss_script": WaterElementalScript},
-	{"id": "swamp", "name": "Swamp", "biome": "swamp", "terrain": ["poison_bog"], "ground_tint": Color(0.75, 0.85, 0.65), "battle_bg": Color(0.04, 0.06, 0.03), "miniboss_script": LizardSoldierSwarmScript, "boss_script": BlackDragonletScript},
+	{"id": "plains", "name": "Plains", "biome": "grass", "terrain": [], "ground_tint": Color(1, 1, 1), "battle_bg": Color(0.05, 0.05, 0.05), "miniboss_script": TreantScript, "boss_script": LizenWarbandScript},  # PLACEHOLDER pair
+	{"id": "beach", "name": "Beach", "biome": "sand", "terrain": [], "ground_tint": Color(1.15, 1.1, 0.85), "battle_bg": Color(0.08, 0.08, 0.1), "miniboss_script": LavaConstructScript, "boss_script": LeviathanScript},  # miniboss is a PLACEHOLDER
+	{"id": "swamp", "name": "Swamp", "biome": "swamp", "terrain": ["poison_bog"], "ground_tint": Color(0.75, 0.85, 0.65), "battle_bg": Color(0.04, 0.06, 0.03), "miniboss_script": BlackDragonletScript, "boss_script": LizenWarbandScript},
 	{"id": "forest", "name": "Forest", "biome": "grass", "terrain": ["thicket"], "ground_tint": Color(0.7, 0.95, 0.7), "battle_bg": Color(0.03, 0.06, 0.03), "miniboss_script": TreantScript, "boss_script": ElderOakScript},
-	{"id": "desert", "name": "Desert", "biome": "sand", "terrain": ["quicksand"], "ground_tint": Color(1.3, 1.05, 0.7), "battle_bg": Color(0.1, 0.07, 0.03), "miniboss_script": GibberingMoutherScript, "boss_script": IronGolemScript},
-	{"id": "caves", "name": "Caves", "biome": "rock", "terrain": ["crumbling"], "ground_tint": Color(0.55, 0.55, 0.6), "battle_bg": Color(0.02, 0.02, 0.03), "miniboss_script": StoneGiantScript, "boss_script": BeholderScript},
-	{"id": "tundra", "name": "Tundra", "biome": "snow", "terrain": ["ice"], "ground_tint": Color(0.85, 0.95, 1.2), "battle_bg": Color(0.06, 0.07, 0.09), "miniboss_script": FrostGiantScript, "boss_script": WhiteDragonScript},
-	{"id": "mountains", "name": "Mountains", "biome": "rock", "terrain": ["rubble"], "ground_tint": Color(0.8, 0.78, 0.75), "battle_bg": Color(0.05, 0.05, 0.06), "miniboss_script": RocScript, "boss_script": BlueDragonScript},
-	{"id": "volcano", "name": "Volcano", "biome": "ash", "terrain": ["embers"], "ground_tint": Color(1.2, 0.6, 0.5), "battle_bg": Color(0.1, 0.02, 0.01), "miniboss_script": LavaGolemScript, "boss_script": RedWyrmScript},
-	{"id": "voidlands", "name": "Voidlands", "biome": "void", "terrain": ["caltrops", "spring"], "ground_tint": Color(0.6, 0.55, 0.85), "battle_bg": Color(0.02, 0.01, 0.05), "miniboss_script": VoidwingScript, "boss_script": SupremeWarlockScript},
-	{"id": "nothingness", "name": "Nothingness", "biome": "void", "terrain": [], "ground_tint": Color(0.25, 0.25, 0.3), "battle_bg": Color(0.0, 0.0, 0.0), "miniboss_script": BossScript, "boss_script": OwlbearScript},
+	{"id": "desert", "name": "Desert", "biome": "sand", "terrain": ["quicksand"], "ground_tint": Color(1.3, 1.05, 0.7), "battle_bg": Color(0.1, 0.07, 0.03), "miniboss_script": IronConstructScript, "boss_script": LeviathanScript},  # boss is a PLACEHOLDER
+	{"id": "caves", "name": "Caves", "biome": "rock", "terrain": ["crumbling"], "ground_tint": Color(0.55, 0.55, 0.6), "battle_bg": Color(0.02, 0.02, 0.03), "miniboss_script": LavaConstructScript, "boss_script": ElderOakScript},  # PLACEHOLDER pair
+	{"id": "tundra", "name": "Tundra", "biome": "snow", "terrain": ["ice"], "ground_tint": Color(0.85, 0.95, 1.2), "battle_bg": Color(0.06, 0.07, 0.09), "miniboss_script": BlackDragonletScript, "boss_script": WhiteDragonScript},  # miniboss is a PLACEHOLDER
+	{"id": "mountains", "name": "Mountains", "biome": "rock", "terrain": ["rubble"], "ground_tint": Color(0.8, 0.78, 0.75), "battle_bg": Color(0.05, 0.05, 0.06), "miniboss_script": VoidwingScript, "boss_script": WhiteDragonScript},  # PLACEHOLDER pair
+	{"id": "volcano", "name": "Volcano", "biome": "ash", "terrain": ["embers"], "ground_tint": Color(1.2, 0.6, 0.5), "battle_bg": Color(0.1, 0.02, 0.01), "miniboss_script": LavaConstructScript, "boss_script": RedWyrmScript},
+	{"id": "voidlands", "name": "Voidlands", "biome": "void", "terrain": ["caltrops", "spring"], "ground_tint": Color(0.6, 0.55, 0.85), "battle_bg": Color(0.02, 0.01, 0.05), "miniboss_script": VoidwingScript, "boss_script": ArchmageScript},
+	{"id": "nothingness", "name": "Nothingness", "biome": "void", "terrain": [], "ground_tint": Color(0.25, 0.25, 0.3), "battle_bg": Color(0.0, 0.0, 0.0), "miniboss_script": VoidwingScript, "boss_script": ArchmageScript},
 ]
 
 # Ground texture + decoration set per biome (see WORLDS' own "biome" field) --
@@ -818,6 +794,10 @@ const REROLL_COST_INCREMENT := 10
 const SHOP_LOCK_COST := 5
 
 var hud: HUDScript
+var defense_minigame: CanvasLayer = null
+# "" = the odds decide which popup opens; "dodge" or "block" forces one (the Sandbox uses this for practice, and tests use it to stay deterministic).
+var debug_minigame_mode: String = ""
+var attack_minigame: CanvasLayer = null
 var beastiary_panel: BeastiaryPanelScript
 var inventory_panel: InventoryPanelScript
 var healer_panel: HealerPanelScript
@@ -862,7 +842,7 @@ var pending_wave_advance := false
 var player_trail: Array = []
 var party_follower_nodes: Array = []
 # Cheap "did the roster actually change" check so follower nodes are only
-# rebuilt when party_wolf/party_members actually change, not every frame --
+# rebuilt when the roster actually changes, not every frame --
 # see _refresh_party_followers.
 var party_follower_signature := ""
 var shop_reroll_count := 0
@@ -915,11 +895,6 @@ var event_choosing := false
 var active_event_id := ""
 var pending_event_weapon: Dictionary = {}
 var shrine_effect_waves_remaining := 0
-# Traitor Wolf's loyalty timer -- see WOLF_BASE_STAY_WAVES. 0 whenever
-# player.party_wolf is empty; set the moment a wolf joins (recruited via
-# _on_wolf_died, or guaranteed at run start by Beastmaster), decremented
-# once per wave cleared in _on_shop_continue_pressed.
-var wolf_waves_remaining := 0
 var event_extra_goblins := 0
 var event_force_elite := false
 var prev_num_key := {1: false, 2: false, 3: false, 4: false, 5: false, 6: false, 7: false, 8: false}
@@ -937,6 +912,10 @@ var prev_escape_key := false
 var town_panels := {}
 
 var in_battle := false
+# Sandbox (debug) mode -- see _enter_sandbox. sandbox_result is "victory" /
+# "fled" / "defeat" for the sandbox battle in progress.
+var sandbox_panel: CanvasLayer = null
+var sandbox_result := ""
 # First-ever-battle interactive tutorial. Gated device-wide via
 # SaveData.gd:is_tutorial_completed_ever (not per-save-slot). tutorial_step:
 # 0=Move, 1=Fight, 2=Defend. Set once in trigger_battle, left untouched by
@@ -945,10 +924,25 @@ var tutorial_active := false
 var tutorial_step := 0
 var battle_terrain := {}
 var battle_units := []
-# Battle-time representation of the player's recruited party (party_members +
-# party_wolf), parallel to battle_units for the enemy side. Rebuilt fresh
+# Battle-time representation of the player's recruited party (the fielded roster +
+# the older party_members mercenaries), parallel to battle_units for the enemy side. Rebuilt fresh
 # every _setup_battle_grid call -- see the ALLY_* consts above for why.
 var battle_allies := []
+# PartyMembers knocked out this battle, for the faint/harvest rules at battle end.
+var battle_fainted_members: Array = []
+# Commanded ally turns: "you control allies, they get their own turns during your
+# turn" -- after the hero's own turn, every living fielded ally gets its own command
+# phase (Move/Attack/Guard/Skip for now; a kit's own specials/spells come later).
+# battle_turn stays "player" throughout this phase (reusing the hero's own input
+# gate) -- battle_commanding_ally is what actually distinguishes "whose turn is it."
+var battle_commanding_ally = null
+# Allies still waiting for their command this round, snapshotted once when the
+# phase starts so an ally moving doesn't reorder who's still due a turn.
+var battle_ally_queue: Array = []
+var battle_ally_moves_left := 0
+var battle_ally_move_undo_tile := Vector2i.ZERO
+var battle_ally_move_undo_moves_left := 0
+var battle_ally_move_undo_health := 0
 var battle_player_tile := Vector2i.ZERO
 var battle_player_moves_left := 0
 var battle_target_index := 0
@@ -962,6 +956,11 @@ var battle_player_defending := false
 # picking freely, protecting allies. See _process_enemy_turn's target_tile
 # line.
 var battle_player_taunting := false
+# Ironclad Ward (talisman): Move is only usable on alternating player turns --
+# true on the turn it's allowed, flipped at the start of every player turn
+# (see _setup_battle_grid for turn 1 and _process_enemy_turn's tail for every
+# turn after). Harmless bookkeeping when the talisman isn't equipped.
+var battle_ironclad_move_allowed := true
 # Guardian's Ultimatum (Survivor capstone): turns remaining before the Skill
 # button can be used again. Reset at battle start, decremented once per
 # player turn regardless of which action ended it.
@@ -983,9 +982,8 @@ var player_burning := false
 # rolled fresh each turn (PLAYER_CONCUSSION_CHANCE) rather than ticking a
 # guaranteed hit like poison/burn.
 var player_concussed_turns := 0
-# Bleeding: no turn counter, guaranteed-on-hit from an inflicts_bleed enemy,
-# lasts the rest of the battle (see BLEED_MOVE_DAMAGE_PCT/BLEED_DODGE_DAMAGE_PCT).
-var player_bleeding := false
+# Bleeding: turn-counted like Concussion/Frozen -- see BLEED_BASE_TURNS. 0 = not bleeding.
+var player_bleed_turns := 0
 # Blindness: turn-counted like Concussion/Frozen -- see BLINDNESS_TURNS.
 var player_blind_turns := 0
 # Fear: which enemy (by battle_units index, -1 = none) is currently forcing
@@ -1033,10 +1031,6 @@ var battle_had_combat_action_this_cycle := false
 # consumed in _apply_single_hit (which is only ever called for damage dealt TO
 # an enemy, so an enemy's own attack on the player can never consume it).
 var battle_first_attack_used := false
-# Wood's Quick Hands (material passive): counts free-of-charge
-# stamina-costing actions used this battle, capped at 1 (2 with Stone
-# Amulet) -- see _battle_perform_attack. Reset in _setup_battle_grid.
-var battle_free_abilities_used := 0
 var battle_turn := "player"
 # "main" shows Move/Fight/Item/Defend/Flee; "fight" shows the attack submenu
 # (Attack/Heavy/3 Specials/Back); "move" shows Confirm/Cancel while arrows
@@ -1112,6 +1106,62 @@ func _ready() -> void:
 	_build_town()
 	_init_quest_board()
 	_roll_seer_stock()
+	if SaveDataScript.sandbox_active:
+		_enter_sandbox()
+
+# ---------------------------------------------------------------------------
+# Sandbox (debug) mode: entered from the title screen's Sandbox button, never
+# mid-run. SandboxPanel.gd configures a build + squad and starts a REAL tile
+# battle through start_sandbox_battle; every outcome returns to the panel
+# instead of the overworld / game-over screen. SaveData.sandbox_active keeps
+# all of it out of the real save files.
+# ---------------------------------------------------------------------------
+func _enter_sandbox() -> void:
+	SandboxScript.clear_enemies(self)
+	tutorial_active = false
+	sandbox_panel = SandboxPanelScript.new()
+	_register_town_panel("sandbox", sandbox_panel)
+	sandbox_panel.open(player)
+
+func start_sandbox_battle(squad: Array, world_index: int) -> void:
+	if in_battle or squad.is_empty():
+		return
+	current_world_index = world_index
+	game_over = false
+	tutorial_active = false
+	sandbox_result = ""
+	run_damage_dealt = 0
+	run_damage_taken = 0
+	run_kills_by_name = {}
+	in_battle = true
+	get_tree().paused = true
+	_setup_battle_grid(squad)
+	hud.show_battle(WORLDS[current_world_index].battle_bg)
+	_focus_battle_main_menu()
+	_refresh_battle_display()
+
+func _sandbox_battle_finished() -> void:
+	var result: String = sandbox_result if sandbox_result != "" else "victory"
+	var kills := 0
+	for enemy_name in run_kills_by_name:
+		kills += int(run_kills_by_name[enemy_name])
+	var details := "You finished with %d/%d HP at level %d. Damage dealt %d, taken %d, enemies defeated %d." % [
+		player.health, player.max_health, player.level, run_damage_dealt, run_damage_taken, kills
+	]
+	if choosing_stat:
+		choosing_stat = false
+		hud.hide_levelup_choice()
+	sandbox_panel.return_from_battle(result, details)
+
+func _sandbox_player_died() -> void:
+	if not in_battle:
+		return
+	sandbox_result = "defeat"
+	in_battle = false
+	battle_units.clear()
+	battle_allies.clear()
+	hud.hide_battle()
+	_sandbox_battle_finished()
 
 # Every clip is synthesized once at startup (see Sfx.gd) and reused for
 # every playback -- a small round-robin player pool so overlapping sounds
@@ -1716,14 +1766,16 @@ func _update_town_label() -> void:
 		hud.show_message("You head back into the wild.")
 
 # Rebuilds the overworld follower sprites to match the CURRENT roster
-# (party_wolf + party_members) -- only when that roster actually changed
-# since the last check, so this is cheap to call every frame. Traitor Wolf
-# reuses the Wolf enemy sprite (tinted the same as an overworld Traitor Wolf
-# enemy); every other party member (Blade Ally, recruited Warriors) reuses
-# the Blade Ally icon, mirroring exactly how the battle grid already draws
-# both of them identically (see HUD.gd's battle_ally_icons).
+# (the fielded PartyMember roster + the older party_members mercenaries) -- only
+# when that roster actually changed since the last check, so this is cheap to call
+# every frame. A Fickle Wolf reuses the Wolf enemy sprite (tinted the same as an
+# overworld Traitor Wolf enemy); every other member reuses the Knight icon in
+# its kind's colour, mirroring how the battle grid draws them (see HUD.gd's
+# battle_ally_icons).
 func _refresh_party_followers() -> void:
-	var signature: String = ("wolf" if not player.party_wolf.is_empty() else "") + ":%d" % player.party_members.size()
+	var fielded: Array = player.fielded_party()
+	var ids: Array = fielded.map(func(m): return m.id)
+	var signature: String = "%s:%d" % [ids, player.party_members.size()]
 	if signature == party_follower_signature:
 		return
 	party_follower_signature = signature
@@ -1731,11 +1783,14 @@ func _refresh_party_followers() -> void:
 		if is_instance_valid(n):
 			n.queue_free()
 	party_follower_nodes.clear()
-	if not player.party_wolf.is_empty():
-		# Same on-screen size as an overworld Wolf enemy (Wolf.gd's own 1.75
-		# sprite scale, times the overworld enemy multiplier).
-		var wolf_scale := Vector2(1.75, 1.75) * OVERWORLD_ENEMY_SCALE
-		party_follower_nodes.append(_make_party_follower_sprite(preload("res://assets/enemy_wolf.png"), TRAITOR_WOLF_TINT, wolf_scale))
+	for member in fielded:
+		if member.is_wolf():
+			# Same on-screen size as an overworld Wolf enemy (Wolf.gd's own 1.75
+			# sprite scale, times the overworld enemy multiplier).
+			var wolf_scale := Vector2(1.75, 1.75) * OVERWORLD_ENEMY_SCALE
+			party_follower_nodes.append(_make_party_follower_sprite(preload("res://assets/enemy_wolf.png"), TRAITOR_WOLF_TINT, wolf_scale))
+		else:
+			party_follower_nodes.append(_make_party_follower_sprite(preload("res://assets/blade_ally.png"), member.rules().get("tint", Color(1, 1, 1)), PlayerScript.BASE_SPRITE_SCALE))
 	for i in player.party_members.size():
 		party_follower_nodes.append(_make_party_follower_sprite(preload("res://assets/blade_ally.png"), Color(1, 1, 1), PlayerScript.BASE_SPRITE_SCALE))
 	_snap_party_followers_to_player()
@@ -1787,12 +1842,6 @@ func _spawn_player() -> void:
 	player.coins_changed.connect(_on_player_coins_changed)
 	player.items_changed.connect(_on_player_items_changed)
 	add_child(player)
-	# Beastmaster guarantees a Traitor Wolf from the start of the run (set
-	# inside player._apply_meta_upgrades, already run by the time add_child
-	# returns) -- start its loyalty timer the same way a mid-run recruit
-	# via _on_wolf_died does.
-	if not player.party_wolf.is_empty():
-		wolf_waves_remaining = WOLF_BASE_STAY_WAVES + player.meta_wolf_bonus_waves
 
 # Waves 1-100 map onto WORLDS[0..9] ten waves apiece; 101+ is index 10
 # (Nothingness), which never advances further -- see _spawn_nothingness_fight
@@ -1875,8 +1924,6 @@ func _spawn_wave() -> void:
 	_spawn_enemies(OrcScript, orc_count)
 	if wave >= ARCHER_WAVE_START:
 		_spawn_enemies(ArcherScript, 1)
-	if wave >= SHAMAN_WAVE_START:
-		_spawn_enemies(ShamanScript, 1)
 	if wave >= BRUTE_WAVE_START:
 		_spawn_enemies(BruteScript, 1)
 	if wave >= SHADE_WAVE_START:
@@ -1893,8 +1940,6 @@ func _spawn_wave() -> void:
 		# actually gather into ONE battle instead of scattering across the
 		# map and trickling in as separate fights.
 		_spawn_enemies(GnomeScript, randi_range(2, GNOME_PACK_SIZE_MAX), false, BATTLE_GATHER_RADIUS * 0.4)
-	if wave >= DRUID_WAVE_START:
-		_spawn_enemies(DruidScript, 1)
 
 # force_elite guarantees the FIRST spawned enemy is elite (Elite Bounty
 # random event) regardless of the normal ELITE_CHANCE roll; every other
@@ -1965,9 +2010,8 @@ func _random_enemy_spawn_position() -> Vector2:
 func _spawn_boss_wave() -> void:
 	# Data-driven off WORLDS[current_world_index]: wave 5-of-10 in any world
 	# is that world's miniboss, wave 10-of-10 (the world's last wave) is its
-	# full boss -- both fields default to Boss/Owlbear (see WORLDS) until a
-	# world's own dedicated pair is authored, so this never has a missing
-	# script to fall back on.
+	# full boss -- every world has both fields filled in (see WORLDS), some with
+	# placeholder reuses, so this never has a missing script to fall back on.
 	var world: Dictionary = WORLDS[current_world_index]
 	var wave_in_world: int = ((wave - 1) % WAVES_PER_WORLD) + 1
 	var is_miniboss: bool = wave_in_world == WAVES_PER_WORLD / 2
@@ -1981,7 +2025,7 @@ func _spawn_boss_wave() -> void:
 	hud.show_message("%s approaches..." % boss.get_display_name())
 
 # fight_index is 0-based (wave 101 -> 0, ... wave 106 -> 5). power_tier is
-# set generically the same way SupremeWarlock's own rematch works --
+# set generically the same way Archmage's own rematch works --
 # `.get()` returns null (not an error) for the 4 scripts that don't define
 # the property, so this never assumes every NOTHINGNESS_BOSSES entry does.
 func _spawn_nothingness_fight(fight_index: int) -> void:
@@ -2051,6 +2095,7 @@ func _build_hud() -> void:
 	hud.battle_move_action.connect(_on_battle_move_action)
 	hud.battle_arrow_action.connect(_on_battle_arrow_action)
 	hud.battle_tactics_action.connect(_on_battle_tactics_action)
+	hud.battle_ally_action.connect(_on_battle_ally_action)
 	hud.enemy_hovered.connect(_on_enemy_hovered)
 	hud.enemy_unhovered.connect(_on_enemy_unhovered)
 	hud.battle_evasion_direction_pressed.connect(func(label: String): evasion_direction_chosen.emit(battle_evasion_options.get(label, Vector2i.ZERO)))
@@ -2300,6 +2345,9 @@ func _run_stats_summary() -> Dictionary:
 	}
 
 func _on_player_died() -> void:
+	if SaveDataScript.sandbox_active:
+		_sandbox_player_died()
+		return
 	if game_over:
 		return
 	game_over = true
@@ -2336,6 +2384,7 @@ func _on_enemy_died(xp_reward: int, enemy_name: String = "") -> void:
 	enemies_alive -= 1
 	hud.update_enemies(enemies_alive)
 	player.gain_xp(xp_reward)
+	_award_party_xp(xp_reward)
 	# Run-end stats recap: enemy_name is only ever empty for older direct/test
 	# call sites that don't bind it (see the .died.connect callers above) --
 	# a kill from one of those just doesn't show up in the per-name breakdown.
@@ -2376,6 +2425,9 @@ func _on_enemy_died(xp_reward: int, enemy_name: String = "") -> void:
 		player.heal(int(player.talisman_bonus("heal_on_kill")))
 	if game_over:
 		return
+	# No wave / tier progression in the sandbox -- every battle is a one-off.
+	if SaveDataScript.sandbox_active:
+		return
 	# The Nothingness rush (see _spawn_wave) is a fixed, curated sequence of
 	# solo boss duels, not part of the ambient wilderness -- it still
 	# advances the instant its one enemy is dead, same as every wave used to.
@@ -2400,12 +2452,13 @@ func _queue_wave_advance() -> void:
 		_advance_wave_tier()
 
 # A Traitor Wolf's death gets this SECOND listener alongside the normal
-# _on_enemy_died (which already handled XP/coins/wave-clear above) -- only
-# rolls if no wolf is already in the party; a failed roll or an
-# already-occupied slot is a silent no-op, matching this session's
-# established "graceful miss" pattern for near-miss outcomes elsewhere.
+# _on_enemy_died (which already handled XP/coins/wave-clear above) -- rolls to
+# recruit it as a level-1 Fickle Wolf whenever there is room for one (any ordinary
+# slot, or the wolf-only slot Wolf Fang adds); a failed roll or a full party is a
+# silent no-op, matching this session's established "graceful miss" pattern for
+# near-miss outcomes elsewhere.
 func _on_wolf_died(_xp_reward: int) -> void:
-	if not player.party_wolf.is_empty():
+	if not player.can_recruit("wolf"):
 		return
 	# Beastmaster (repurposed, deep Warrior node) now guarantees a wolf from
 	# the start of the run instead -- see Player.gd:_apply_meta_upgrades --
@@ -2415,8 +2468,7 @@ func _on_wolf_died(_xp_reward: int) -> void:
 	# of the base 25%, so this only ever helps (never lowers it below base).
 	var recruit_chance: float = maxf(TRAITOR_WOLF_RECRUIT_CHANCE, player.talisman_bonus("wolf_recruit_chance_min"))
 	if randf() < recruit_chance:
-		player.party_wolf = {"name": "Traitor Wolf", "dmg_mult": 0.6}
-		wolf_waves_remaining = WOLF_BASE_STAY_WAVES + player.meta_wolf_bonus_waves
+		player.recruit("wolf")
 		hud.show_message("The Traitor Wolf defects and joins your pack!")
 
 func _open_shop(default_tab: String = "gear") -> void:
@@ -2498,14 +2550,10 @@ func _try_open_panel(kind: String) -> void:
 		panel.open(player)
 
 # The Church (ChurchPanel.gd) just bought one level of skill `id` and saved it
-# to the slot: bring the run in progress up to date. Player handles its own
-# state; the one piece of Main-owned run state a purchase can touch is how
-# long a freshly granted Beastmaster wolf stays.
+# to the slot: bring the run in progress up to date. Player handles all of its own
+# state (a Beastmaster wolf is recruited there, with its loyalty already set).
 func apply_meta_purchase(id: String) -> void:
-	var had_wolf: bool = not player.party_wolf.is_empty()
 	player.apply_meta_purchase(id)
-	if id == "beastmaster" and not had_wolf:
-		wolf_waves_remaining = WOLF_BASE_STAY_WAVES + player.meta_wolf_bonus_waves
 	refresh_church_marker()
 
 func _any_town_panel_open() -> bool:
@@ -2772,7 +2820,7 @@ func _refresh_shop_display() -> void:
 	var shopkeeper_lines := []
 	for item in current_shop_offering:
 		shopkeeper_lines.append(_shop_row_keeper_line(item))
-	hud.show_shop(player.coins, player.runic_shards, current_shop_offering, prices, player.current_weapon.name, player.owned_weapons, player.equipped_armor.name, player.healing_items, _get_shop_reroll_cost(), _player_has_bow(), player.owned_arrows, arrow_prices, WeaponsScript.ARROW_MAX_HELD + player.arrow_cap_bonus(), player.equipped_shield.get("name", "None"), player.owned_shields, player.stat_might, shopkeeper_lines, player.has_unlimited_arrows())
+	hud.show_shop(player.coins, player.runic_shards, current_shop_offering, prices, player.current_weapon.name, player.owned_weapons, player.equipped_armor.name, player.healing_items, _get_shop_reroll_cost(), _player_has_bow(), player.owned_arrows, arrow_prices, WeaponsScript.ARROW_MAX_HELD + player.arrow_cap_bonus(), player.equipped_shield.get("name", "None"), player.owned_shields, player.stat_might, shopkeeper_lines, player.has_unlimited_arrows(), player.stat_intimidation)
 	_refresh_enchant_display()
 
 # Weapons get Shopkeeper.gd's per-type/tier/familiarity reaction (falling
@@ -3134,11 +3182,6 @@ func _advance_wave_tier() -> void:
 		shrine_effect_waves_remaining -= 1
 		if shrine_effect_waves_remaining == 0:
 			player.temp_damage_bonus_pct = 0.0
-	if not player.party_wolf.is_empty():
-		wolf_waves_remaining -= 1
-		if wolf_waves_remaining <= 0:
-			player.party_wolf = {}
-			hud.show_message("Your Traitor Wolf's loyalty fades -- it leaves your pack.")
 	# Hardened: permanent max-HP growth per wave cleared THIS run.
 	if player.meta_hardened_hp_per_wave > 0:
 		player.add_hardened_hp(player.meta_hardened_hp_per_wave)
@@ -3158,7 +3201,7 @@ func _advance_wave_tier() -> void:
 # rolling it when it can't deliver its own payoff.
 func _available_event_ids() -> Array:
 	var ids: Array = EventsScript.EVENT_IDS.duplicate()
-	if player.party_members.size() >= player.max_party_slots:
+	if not player.can_recruit("mercenary"):
 		ids.erase("warrior_joins")
 	return ids
 
@@ -3226,7 +3269,7 @@ func _resolve_event_choice(id: String, accepted: bool) -> void:
 		return
 	match id:
 		"warrior_joins":
-			if player.party_members.size() >= player.max_party_slots:
+			if not player.can_recruit("mercenary"):
 				player.add_coins(30)
 				hud.show_message("Your party has no room for them, so they wish you luck and split their coin with you. (+30 coins)")
 			else:
@@ -3353,11 +3396,16 @@ func _setup_battle_grid(squad: Array) -> void:
 	battle_terrain.clear()
 	battle_units.clear()
 	battle_allies.clear()
+	battle_fainted_members.clear()
+	battle_commanding_ally = null
+	battle_ally_queue = []
+	battle_ally_moves_left = 0
 	battle_turn = "player"
 	battle_menu_state = "main"
 	battle_move_trail = []
 	battle_player_defending = false
 	battle_player_taunting = false
+	battle_ironclad_move_allowed = true
 	battle_skill_cooldown = 0
 	battle_player_turns_to_skip = 0
 	battle_momentum_stacks = 0
@@ -3367,7 +3415,6 @@ func _setup_battle_grid(squad: Array) -> void:
 	player.bloodmoon_stacks = 0
 	player.bloodmoon_debuffed = false
 	battle_first_attack_used = false
-	battle_free_abilities_used = 0
 	player.disarmed_tile = Vector2i(-1, -1)
 	player.pichaku_active = false
 	player.second_chance_used_this_battle = false
@@ -3383,7 +3430,7 @@ func _setup_battle_grid(squad: Array) -> void:
 	player_poison_dmg = 0
 	player_burning = false
 	player_concussed_turns = 0
-	player_bleeding = false
+	player_bleed_turns = 0
 	player_blind_turns = 0
 	battle_feared_by_index = -1
 	battle_fear_cascade_depth = 0
@@ -3395,7 +3442,7 @@ func _setup_battle_grid(squad: Array) -> void:
 	used_tiles[battle_player_tile] = true
 	battle_target_index = 0
 	battle_player_moves_left = _battle_player_move_range()
-	player.reset_stamina()
+	player.reset_stamina_for_battle()
 
 	# The player's move allowance is small, so enemies still do most of the
 	# closing of distance -- start them a few tiles off rather than at the
@@ -3404,7 +3451,7 @@ func _setup_battle_grid(squad: Array) -> void:
 	var enemy_col: int = max(1, BATTLE_GRID_W - 3)
 	var enemy_rows := range(BATTLE_GRID_H)
 	enemy_rows.shuffle()
-	var scale_mult: float = 1.0 + (player.level - 1) * ENEMY_LEVEL_SCALING
+	# (the level-scaling multiplier is per enemy now: regulars and bosses scale at different rates)
 	# Gnome HP scaling is a one-time snapshot of how big THIS fight's pack
 	# started (unlike their damage bonus below, which is recomputed live
 	# every turn from however many are still standing) -- counted once here
@@ -3445,13 +3492,16 @@ func _setup_battle_grid(squad: Array) -> void:
 		# Read generically off whichever enemy instance this is, the same way
 		# is_elite already is -- null (property doesn't exist on this script)
 		# means "not applicable," not "unset," so it defaults to 1.0 rather
-		# than erroring. Only Supreme Warlock's script defines this today
-		# (see scripts/SupremeWarlock.gd), for its Nothingness rematch.
+		# than erroring. Only Archmage's script defines this today
+		# (see scripts/Archmage.gd), for its Nothingness rematch.
 		var power_tier_raw = e.get("power_tier")
+		if e.has_meta("sandbox_power_tier"):
+			power_tier_raw = e.get_meta("sandbox_power_tier")
 		var power_tier: float = power_tier_raw if power_tier_raw != null else 1.0
 		# Baby/Hard/Apocalyptic (SaveData.gd:DIFFICULTIES) scale the same two
 		# real combat numbers "enemy stats" already means everywhere else
 		# (elite bonuses, level scaling) -- not enemy counts or move ranges.
+		var scale_mult: float = _enemy_level_scale(traits.get("is_boss_tier", false))
 		var scaled_hp: int = max(1, int(round(e.MAX_HEALTH * scale_mult * elite_hp_mult * player.difficulty_mult * power_tier)))
 		if display_name == "Gnome" and gnome_pack_size > 1:
 			scaled_hp += (gnome_pack_size - 1) * GNOME_HP_PER_PACKMATE
@@ -3516,15 +3566,20 @@ func _setup_battle_grid(squad: Array) -> void:
 # (mirrors how enemy tiles are reserved first) -- candidates are drawn from
 # the player's own side of the grid (columns 0-1) so allies start clustered
 # near the player rather than scattered toward the enemy squad.
+#
+# Two kinds of ally: the older flat mercenaries (Knight, a recruited Warrior),
+# whose HP and damage are still a share of the hero's own, and PartyMember roster
+# members (Fickle Wolf, Druid, Guardian, Marksman, Rogue), who fight on their own
+# stats -- HP, attack, a defense percentage, move tiles, and stamina or mana pools.
 func _place_ally_units(used_tiles: Dictionary) -> void:
 	var roster: Array = []
 	for member in player.party_members:
 		# Warband (Warrior + Merchant convergence): recruited party members
 		# hit harder, but not the wolf companion -- it's not a "recruited
-		# mercenary" the way Blade Ally/Warrior are.
+		# mercenary" the way Knight/Warrior are.
 		roster.append({"name": member.name, "dmg_mult": member.dmg_mult + player.meta_warband_bonus, "move_range": ALLY_MOVE_RANGE, "max_hp_pct": ALLY_MAX_HP_PCT})
-	if not player.party_wolf.is_empty():
-		roster.append({"name": player.party_wolf.name, "dmg_mult": player.party_wolf.dmg_mult, "move_range": ALLY_WOLF_MOVE_RANGE, "max_hp_pct": WOLF_ALLY_MAX_HP_PCT})
+	for member in player.fielded_party():
+		roster.append({"member": member})
 	if roster.is_empty():
 		return
 
@@ -3536,7 +3591,7 @@ func _place_ally_units(used_tiles: Dictionary) -> void:
 				candidates.append(t)
 	candidates.shuffle()
 	# Extremely unlikely fallback if columns 0-1 somehow can't fit everyone
-	# (only the player plus up to 4 allies ever compete for those 12 tiles)
+	# (only the player plus up to 5 allies ever compete for those 12 tiles)
 	# -- scan the whole grid rather than skip seating an ally.
 	if candidates.size() < roster.size():
 		for x in range(BATTLE_GRID_W):
@@ -3545,22 +3600,54 @@ func _place_ally_units(used_tiles: Dictionary) -> void:
 				if not used_tiles.has(t) and not candidates.has(t):
 					candidates.append(t)
 
+	# Might: +0.5% ally damage per point owned, for every kind of ally.
+	var might_mult: float = 1.0 + player.stat_might * MIGHT_ALLY_DAMAGE_PCT_PER_POINT
 	for i in roster.size():
 		var entry: Dictionary = roster[i]
 		var tile: Vector2i = candidates[i]
 		used_tiles[tile] = true
+		if entry.has("member"):
+			battle_allies.append(_make_member_battle_unit(entry.member, tile, might_mult))
+			continue
 		var max_hp: int = max(1, int(round(player.max_health * float(entry.max_hp_pct))))
 		battle_allies.append({
 			"tile": tile,
 			"hp": max_hp,
 			"max_hp": max_hp,
-			# Might: +0.5% ally damage per point owned, applied to both
-			# recruited party members and the wolf companion alike.
-			"dmg_mult": entry.dmg_mult * (1.0 + player.stat_might * MIGHT_ALLY_DAMAGE_PCT_PER_POINT),
+			"dmg_mult": entry.dmg_mult * might_mult,
 			"name": entry.name,
+			"kind": "mercenary",
+			"defense_pct": 0.0,
 			"move_range": entry.move_range,
 			"attack_range": ALLY_ATTACK_RANGE,
 		})
+
+# A roster member as a battle unit. `member` keeps the link back to the persistent
+# PartyMember (XP, faints, gear); everything else is a snapshot taken now, so a
+# battle never changes a member's stats. Wolves and non-casters have no mana, casters
+# no stamina, and the pools that exist start full.
+func _make_member_battle_unit(member, tile: Vector2i, might_mult: float) -> Dictionary:
+	var rules: Dictionary = member.rules()
+	return {
+		"tile": tile,
+		"hp": member.max_hp(),
+		"max_hp": member.max_hp(),
+		"name": member.name,
+		"kind": member.kind,
+		"member": member,
+		# attack is the member's own attack stat; dmg_mult is only the ally-wide
+		# multiplier (Might), so the two are never confused with the hero's.
+		"attack": member.attack(),
+		"dmg_mult": might_mult,
+		"defense_pct": member.defense_pct(),
+		"move_range": member.move_tiles(),
+		"attack_range": int(rules.get("attack_range", ALLY_ATTACK_RANGE)),
+		"stamina": member.max_stamina(),
+		"max_stamina": member.max_stamina(),
+		"mana": member.max_mana(),
+		"max_mana": member.max_mana(),
+		"fainted": false,
+	}
 
 # Rock is the only terrain type that actually blocks movement outright (water
 # just pushes, ledges/cliffs are one-way but still crossable) -- with random
@@ -3853,6 +3940,7 @@ func _apply_water_push(tile: Vector2i, unit: Dictionary = {}) -> Vector2i:
 		player_burning = false
 	else:
 		unit.burning = false
+		unit.burn_value = 0.0
 	var pushed: Vector2i = tile + terrain.push_dir
 	if not _in_battle_bounds(pushed) or _battle_tile_occupied(pushed):
 		return tile
@@ -4054,7 +4142,10 @@ func _handle_battle(_delta: float) -> void:
 		for action in move_actions:
 			var pressed: bool = settings.is_action_pressed(action)
 			if pressed and not prev_battle_keys.get(action, false):
-				_try_battle_player_move(move_actions[action])
+				if battle_commanding_ally != null:
+					_try_battle_ally_move(move_actions[action])
+				else:
+					_try_battle_player_move(move_actions[action])
 			prev_battle_keys[action] = pressed
 
 		var confirm_pressed: bool = settings.is_action_pressed("confirm")
@@ -4083,7 +4174,7 @@ func _handle_battle(_delta: float) -> void:
 # Shared by both the battle keyboard shortcuts and the clickable HUD buttons,
 # so the two input paths can never drift out of sync with each other.
 func _on_battle_main_action(action: String) -> void:
-	if battle_turn != "player":
+	if battle_turn != "player" or battle_commanding_ally != null:
 		return
 	if tutorial_active and not _tutorial_action_allowed(action):
 		hud.battle_log("Follow the tutorial hint above.")
@@ -4101,8 +4192,8 @@ func _on_battle_main_action(action: String) -> void:
 		return
 	match action:
 		"move":
-			if player.talisman_bonus("ironclad_ward") > 0.0:
-				hud.battle_log("Ironclad Ward roots you to the spot.")
+			if player.talisman_bonus("ironclad_ward") > 0.0 and not battle_ironclad_move_allowed:
+				hud.battle_log("Ironclad Ward roots you to the spot this turn.")
 				return
 			if battle_player_moves_left <= 0:
 				hud.battle_log("No moves left this turn.")
@@ -4193,6 +4284,23 @@ func _on_battle_tactics_action(action: String) -> void:
 func _on_battle_move_action(action: String) -> void:
 	if battle_turn != "player":
 		return
+	if battle_commanding_ally != null:
+		match action:
+			"confirm":
+				battle_menu_state = "main"
+				battle_move_trail = []
+				_focus_battle_ally_menu()
+				_refresh_battle_display()
+			"cancel":
+				battle_commanding_ally.tile = battle_ally_move_undo_tile
+				battle_ally_moves_left = battle_ally_move_undo_moves_left
+				battle_commanding_ally.hp = battle_ally_move_undo_health
+				battle_menu_state = "main"
+				battle_move_trail = []
+				hud.battle_log("Movement undone.")
+				_focus_battle_ally_menu()
+				_refresh_battle_display()
+		return
 	match action:
 		"confirm":
 			if tutorial_active and tutorial_step == 0:
@@ -4252,7 +4360,7 @@ func _try_battle_player_move(dir: Vector2i) -> void:
 	battle_player_moves_left -= 2 if result.get("extra_cost", false) else 1
 	battle_move_trail.append({"tile": battle_player_tile, "dir": dir})
 	_check_disarm_reclaimed()
-	_apply_bleed_move_damage()
+	_extend_bleed_on_move()
 	if result.fell:
 		var fall_mult: float = player.equipped_armor.get("fall_damage_mult", 1.0) * player.fall_damage_factor()
 		if fall_mult <= 0.0:
@@ -4262,18 +4370,28 @@ func _try_battle_player_move(dir: Vector2i) -> void:
 			player.take_battle_damage(dmg)
 			hud.battle_log("You fall! Took %d damage." % dmg)
 
-# Bleeding: %-of-max-HP lost per tile moved -- shared by every way the
-# player can move a single step in battle (_try_battle_player_move and the
-# evasion reposition below both call this after a successful step).
-func _apply_bleed_move_damage() -> void:
-	if not player_bleeding:
+# Bleeding: every tile moved lengthens the status by another turn, rather
+# than dealing damage on the spot -- shared by every way the player can move
+# a single step in battle (_try_battle_player_move and the evasion reposition
+# below both call this after a successful step).
+func _extend_bleed_on_move() -> void:
+	if player_bleed_turns <= 0:
 		return
-	var dmg: int = max(1, int(round(player.max_health * BLEED_MOVE_DAMAGE_PCT)))
-	player.take_battle_damage(dmg)
-	hud.battle_log("Bleeding, the movement costs you %d HP." % dmg)
+	player_bleed_turns += 1
+	hud.battle_log("Bleeding, the movement tears the wound further.")
 
 func _targetable_indices() -> Array:
+	# Aimbot's passive_unlimited_range: every enemy on the field is
+	# targetable, full stop -- skip every other range/line/ledge check entirely.
+	if player.current_weapon.get("passive_unlimited_range", false):
+		var all_indices := []
+		for i in battle_units.size():
+			all_indices.append(i)
+		return all_indices
 	var max_range := 2 if _player_long_range_equipped() else 1
+	# The Looongblade's passive_extra_range: a flat tile of bonus reach on top
+	# of whatever the weapon normally gets, stacking with long_range.
+	max_range += int(player.current_weapon.get("passive_extra_range", 0))
 	var ignore_line: bool = _player_has_spear()
 	# Cliffwalker's Bead (talisman): sturdy footing lets you swing up a ledge
 	# or cliff drop with any weapon, not just something long_range. Only ever
@@ -4354,7 +4472,7 @@ func _enemy_stat_summary(u: Dictionary) -> String:
 	var parts := ["%s -- HP %d/%d, DMG %d" % [u.name, max(0, int(u.hp)), int(u.max_hp), int(u.get("damage", 0))]]
 	var tags := []
 	if traits.get("is_boss_tier", false):
-		tags.append("Boss")
+		tags.append("Miniboss" if traits.get("is_miniboss", false) else "Boss")
 	if traits.get("armored", false) or u.get("armored", false):
 		tags.append("Armored")
 	if traits.get("dodge_chance", 0.0) > 0.0:
@@ -4452,9 +4570,9 @@ func _apply_knockback(u: Dictionary, dir: Vector2i, bypass_resist: bool = false,
 # `attacker_tile` defaults to a sentinel (GDScript default params must be
 # constants, so this can't default to the instance var battle_player_tile
 # directly) -- resolves to the player's own tile when left unset, which
-# every existing player-attack call site relies on. _process_ally_turn is
+# every existing player-attack call site relies on. _battle_ally_attack is
 # the one caller that passes its own tile explicitly.
-func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictionary, attacker_label: String = "You", attacker_tile: Vector2i = Vector2i(-1, -1), flat_dmg: int = -1, is_multihit: bool = false) -> void:
+func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictionary, attacker_label: String = "You", attacker_tile: Vector2i = Vector2i(-1, -1), flat_dmg: int = -1, is_multihit: bool = false, attack_stat: float = -1.0) -> void:
 	if idx < 0 or idx >= battle_units.size():
 		return
 	var u = battle_units[idx]
@@ -4462,6 +4580,15 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 	if dodge_chance > 0.0 and randf() < dodge_chance:
 		hud.battle_log("The %s dodges out of the way!" % u.name)
 		return
+	# Missing: a small chance the attack whiffs entirely -- no damage and none of its
+	# effects. Rolled here, per hit, so every hit of a multi-hit move gets its own
+	# roll. Sits before stealth/blind bookkeeping so a whiff doesn't spend them, and
+	# skips a shield's passive thorns reflection, which isn't an attack being made.
+	if effect != "thorns":
+		var miss_chance: float = player.miss_chance_for(weapon) if attacker_label == "You" else player.ally_miss_chance()
+		if miss_chance > 0.0 and randf() < miss_chance:
+			hud.battle_log("%s missed the %s!" % ["You" if attacker_label == "You" else attacker_label, u.name])
+			return
 	# Blindness: gated on attacker_label the same way shield-vengeance/crit
 	# are below, so an ally's own attack funneling through this same function
 	# is never affected by the player's own blindness. A miss whiffs entirely
@@ -4487,7 +4614,18 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 		if player.stealth_turns_remaining > 0:
 			stealth_forced_crit = true
 			player.stealth_turns_remaining = 0
-	var dmg: int = int(round(player.attack_damage * weapon.get("damage_mult", 1.0) * dmg_mult))
+	# Dagger's Bleeding Cut: two independent 50% rolls -- one to force this
+	# hit to land as a crit (here), one to cause Bleeding (after damage is
+	# dealt, alongside the other on-hit effects below).
+	var bleeding_cut_forced_crit := effect == "bleed_or_crit" and randf() < 0.5
+	# attack_stat >= 0 is a PartyMember ally swinging on its OWN attack stat (see
+	# _make_member_battle_unit); everyone else builds on the hero's attack_damage.
+	var base_attack: float = attack_stat if attack_stat >= 0.0 else float(player.attack_damage)
+	var dmg: int = int(round(base_attack * weapon.get("damage_mult", 1.0) * dmg_mult))
+	# A connecting ally hit always does at least 1 -- their attack stats start below 1 x
+	# a weapon multiplier, and a swing that rounds to nothing would just feel broken.
+	if attack_stat >= 0.0:
+		dmg = maxi(1, dmg)
 	# Special arrows deal a flat/semi-flat amount computed by the caller
 	# (_battle_player_arrow) instead of the usual weapon-scaled formula --
 	# overridden here, before it, rather than after, so the modifiers below
@@ -4514,7 +4652,7 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 	if attacker_label == "You" and player.shield_damage_penalty_pct() > 0.0:
 		dmg = int(round(dmg * (1.0 - player.shield_damage_penalty_pct())))
 	# Ancient Shrine random event: a temporary blessing/curse on every hit
-	# this function resolves, including the Blade Ally's (it's a shared
+	# this function resolves, including the Knight's (it's a shared
 	# synthetic-weapon call into this same function).
 	if player.temp_damage_bonus_pct != 0.0:
 		dmg = int(round(dmg * (1.0 + player.temp_damage_bonus_pct)))
@@ -4548,7 +4686,7 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 	# Bloodmoon Fang (talisman): Bloodlust stacks (Player.bloodmoon_stacks,
 	# incremented on a kill below) add flat damage on top of everything else.
 	if attacker_label == "You" and player.bloodmoon_stacks > 0:
-		dmg = int(round(dmg * (1.0 + player.BLOODMOON_PCT_PER_STACK * player.bloodmoon_stacks)))
+		dmg = int(round(dmg * (1.0 + player.BLOODMOON_DAMAGE_PCT_PER_STACK * player.bloodmoon_stacks)))
 	# Bloodmoon Fang's crash: 3 quiet turns (see _advance_bloodmoon_quiet_turn)
 	# halves everything, including the damage you deal.
 	if attacker_label == "You" and player.bloodmoon_debuffed:
@@ -4579,6 +4717,10 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 		execute_bonus = max(execute_bonus, 0.5)
 	if execute_bonus > 0.0 and float(u.hp) < float(u.max_hp) * 0.3:
 		dmg = int(round(dmg * (1.0 + execute_bonus)))
+	# Club's Heavy Swing (renamed effect, 2026-09-29 -- was "execute", the
+	# opposite condition): +50% damage against a target still at full HP.
+	if effect == "full_hp_bonus" and u.hp >= u.max_hp:
+		dmg = int(round(dmg * 1.5))
 	# War Hammer's Maracas: extra damage specifically against an armored
 	# target -- the mirror image of Execution's "does nothing without armor."
 	if effect == "maracas" and u.get("armored", false):
@@ -4606,7 +4748,7 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 	# player's stat) -- doubles damage and ignores the rock-cover reduction
 	# below entirely ("ignores defense"), same as Blindness's guaranteed
 	# crit-on-hit reuses.
-	var is_crit := blind_forced_crit or stealth_forced_crit
+	var is_crit := blind_forced_crit or stealth_forced_crit or bleeding_cut_forced_crit
 	if attacker_label == "You" and not is_crit and player.crit_chance_total() > 0.0 and randf() < player.crit_chance_total():
 		is_crit = true
 	if is_crit:
@@ -4618,6 +4760,15 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 	# function) never picks it up.
 	if attacker_label == "You" and player.potion_attack_turns > 0:
 		dmg = int(round(dmg * (1.0 + ATTACK_POTION_DAMAGE_BONUS_PCT)))
+	# The Looongblade/Aimbot's passive_damage_per_tile_distance: damage scales
+	# with the Manhattan distance between attacker and target -- positive for
+	# the Looongblade (hits harder at range), negative for Aimbot (falls off
+	# the further its shot has to fly).
+	var distance_pct: float = weapon.get("passive_damage_per_tile_distance", 0.0)
+	if attacker_label == "You" and distance_pct != 0.0:
+		var origin: Vector2i = attacker_tile if attacker_tile.x >= 0 else battle_player_tile
+		var distance: int = abs(u.tile.x - origin.x) + abs(u.tile.y - origin.y)
+		dmg = maxi(1, int(round(dmg * (1.0 + distance_pct * distance))))
 	var ignores_cover: bool = is_crit or effect in ["ignore_cover", "leg_blow", "piercing_thrust"] or weapon.get("passive_ignore_cover", false)
 	if not ignores_cover and _has_adjacent_rock(u.tile):
 		dmg = int(round(dmg * (1.0 - ROCK_COVER_REDUCTION)))
@@ -4645,22 +4796,41 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 		dmg += KNIFE_STEALTH_CRIT_BONUS
 	if is_crit:
 		u.vulnerable_turns = VULNERABLE_TURNS
-	# Obsidian's Volatile Shard (material passive): a chance for the blow to
-	# erupt with extra force. Stone Amulet (talisman) raises the chance.
-	var volatile_shard_triggered := false
-	if attacker_label == "You" and weapon.get("material_id", "") == "obsidian":
-		var volatile_chance: float = OBSIDIAN_VOLATILE_CHANCE
+	# Obsidian's Splinter Strike (material passive): a chance for the blow to
+	# open a bleeding wound. Stone Amulet (talisman) raises the chance.
+	var splinter_triggered := false
+	if attacker_label == "You" and weapon.get("material_id", "") == "obsidian" and u.get("bleed_turns", 0) <= 0:
+		var splinter_chance: float = OBSIDIAN_SPLINTER_CHANCE
 		if player.talisman_bonus("material_passive_boost") > 0.0:
-			volatile_chance *= STONE_AMULET_MATERIAL_BOOST_MULT
-		if randf() < volatile_chance:
-			dmg = int(round(dmg * OBSIDIAN_VOLATILE_DAMAGE_MULT))
-			volatile_shard_triggered = true
+			splinter_chance *= STONE_AMULET_MATERIAL_BOOST_MULT
+		splinter_chance = _proc(splinter_chance)
+		if randf() < splinter_chance:
+			u.bleed_turns = BLEED_BASE_TURNS
+			splinter_triggered = true
 	# Last Stand Idol (talisman): every one of the player's hits instantly
 	# kills a non-boss enemy outright.
-	if attacker_label == "You" and player.talisman_bonus("oneshot_regular_enemies") > 0.0 and not ENEMY_TRAITS.get(u.name, {}).get("is_boss_tier", false):
+	var is_boss_target: bool = ENEMY_TRAITS.get(u.name, {}).get("is_boss_tier", false)
+	if attacker_label == "You" and player.talisman_bonus("oneshot_regular_enemies") > 0.0 and not is_boss_target:
 		dmg = u.hp
+	# The Executioner's Axe's passive_oneshot_chance: an independent per-hit
+	# chance at the same "bosses are immune" outright kill, rather than the
+	# guaranteed one Last Stand Idol grants -- only on a plain attack (effect
+	# == ""), not a named special (a Heavy Attack also reads as "" today; see
+	# the doc note on _battle_perform_attack for why specials/heavy aren't
+	# distinguished further here).
+	var executioner_triggered := false
+	var oneshot_chance: float = weapon.get("passive_oneshot_chance", 0.0)
+	if effect == "" and oneshot_chance > 0.0 and not is_boss_target and randf() < _proc(oneshot_chance):
+		dmg = u.hp
+		executioner_triggered = true
 	# Getting hit obviously reveals you -- an unaware target is always
 	# spotted by whatever just landed on it, player or ally alike.
+	# Damage dealt can't exceed what the target has left (2026-10-03): lifesteal,
+	# rune recoil and every other "% of damage dealt" effect below scale off what
+	# the blow actually took, so overkill never over-heals you -- or recoils you
+	# to death for hitting something that was already nearly dead.
+	if u.hp > 0:
+		dmg = mini(dmg, u.hp)
 	u["aware_of_player"] = true
 	u.hp -= dmg
 	run_damage_dealt += dmg
@@ -4676,11 +4846,18 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 		# damage first.
 		if player.talisman_bonus("momentum_chain") > 0.0:
 			battle_momentum_chain_stacks += 1
+		# Bloodmoon Fang (talisman): every hit you land stacks Bloodlust, up to
+		# BLOODMOON_MAX_STACKS.
+		if player.talisman_bonus("bloodmoon_fang") > 0.0 and player.bloodmoon_stacks < player.BLOODMOON_MAX_STACKS and not player.bloodmoon_debuffed:
+			player.bloodmoon_stacks += 1
+			player._recalc_stats()
 	play_sfx("hit")
 	if is_crit:
 		hud.battle_log("Critical hit!")
-	if volatile_shard_triggered:
-		hud.battle_log("Your obsidian blade erupts with volatile force!")
+	if splinter_triggered:
+		hud.battle_log("Your obsidian blade splinters into the wound -- it's bleeding!")
+	if executioner_triggered:
+		hud.battle_log("The axe finds the killing stroke!")
 	hud.battle_log("%s hit the %s for %d damage." % [attacker_label, u.name, dmg])
 	var origin_tile: Vector2i = attacker_tile if attacker_tile.x >= 0 else battle_player_tile
 	var lunge_color: Color = ATTACK_LUNGE_PLAYER_COLOR if origin_tile == battle_player_tile else ATTACK_LUNGE_ALLY_COLOR
@@ -4710,7 +4887,7 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 	if effect == "leg_blow" and u.hp > 0:
 		u.move_range = max(1, int(u.move_range) - 1)
 		hud.battle_log("The %s is hobbled, slowing it down!" % u.name)
-	if effect == "low_sweep" and u.hp > 0 and randf() < LOW_SWEEP_CHANCE:
+	if effect == "low_sweep" and u.hp > 0 and randf() < _proc(LOW_SWEEP_CHANCE):
 		u.move_range = max(1, int(u.move_range / 2))
 		hud.battle_log("The %s is swept off its feet, slowed dramatically!" % u.name)
 	if effect == "crushing_collision" and u.hp > 0 and u.get("armored", false):
@@ -4733,17 +4910,17 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 	# guarantee a burn every time that move is used.
 	if attacker_label == "You" and u.hp > 0 and not u.get("burning", false):
 		var burn_chance: float = player.talisman_bonus("burn_chance_multihit") if is_multihit else player.talisman_bonus("burn_chance")
+		burn_chance = _proc(burn_chance)
 		if burn_chance > 0.0 and randf() < burn_chance:
-			u.burning = true
+			_ignite_with_ember(u)
 			hud.battle_log("The %s catches fire!" % u.name)
-	# Bone's Dread Aura (material passive): a chance, scaled by weapon type
-	# (heavier/slower weapons unnerve more), to leave the target too scared to
-	# act next turn. Stone Amulet (talisman) raises the chance.
+	# Bone's Dreadful Strike (material passive): a flat chance to leave the
+	# target too scared to act next turn. Stone Amulet (talisman) raises it.
 	if attacker_label == "You" and u.hp > 0 and weapon.get("material_id", "") == "bone":
-		var base_type_id: String = WeaponsScript.get_base_type(weapon).get("id", "")
-		var dread_chance: float = BONE_DREAD_CHANCE_BY_TYPE.get(base_type_id, 0.0)
+		var dread_chance: float = BONE_DREAD_CHANCE
 		if player.talisman_bonus("material_passive_boost") > 0.0:
 			dread_chance *= STONE_AMULET_MATERIAL_BOOST_MULT
+		dread_chance = _proc(dread_chance)
 		if dread_chance > 0.0 and randf() < dread_chance:
 			u["feared"] = true
 			hud.battle_log("The %s cowers in dread!" % u.name)
@@ -4754,18 +4931,24 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 		var cleanse_chance: float = SILVER_CLEANSE_CHANCE
 		if player.talisman_bonus("material_passive_boost") > 0.0:
 			cleanse_chance *= STONE_AMULET_MATERIAL_BOOST_MULT
+		cleanse_chance = _proc(cleanse_chance)
 		if randf() < cleanse_chance:
 			_try_cleanse_one_player_status()
 	# Tax Collector's Seal (talisman): a chance for any landed hit -- not on a
 	# boss-tier enemy -- to drop an extra coin.
 	if attacker_label == "You" and not ENEMY_TRAITS.get(u.name, {}).get("is_boss_tier", false):
 		var coin_drop_chance: float = player.talisman_bonus("coin_drop_chance")
-		if coin_drop_chance > 0.0 and randf() < coin_drop_chance:
+		if coin_drop_chance > 0.0 and randf() < _proc(coin_drop_chance):
 			player.add_coins(1)
 			hud.battle_log("A coin drops from the blow!")
 	if effect == "arrow_freeze" and u.hp > 0:
 		u.frozen_turns = randi_range(ARROW_FREEZE_MIN_TURNS, ARROW_FREEZE_MAX_TURNS)
 		hud.battle_log("The %s freezes solid!" % u.name)
+	# Dagger's Bleeding Cut -- the independent bleed half of its two 50%
+	# rolls (the crit half is resolved earlier, before damage is calculated).
+	if effect == "bleed_or_crit" and u.hp > 0 and u.get("bleed_turns", 0) <= 0 and randf() < _proc(0.5):
+		u.bleed_turns = BLEED_BASE_TURNS
+		hud.battle_log("The cut leaves the %s bleeding!" % u.name)
 	# Clothesliner: pulls the target to the tile directly behind the player
 	# (opposite the direction they were just struck from) instead of the
 	# usual push-away knockback -- silently skipped if that tile is out of
@@ -4785,6 +4968,14 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 		var passive_heal: int = max(1, int(round(dmg * passive_lifesteal_pct)))
 		player.heal(passive_heal)
 		hud.battle_log("Your weapon drains %d HP from the wound." % passive_heal)
+	# The Great Toothpicke's passive_heal_chance/passive_heal_flat: an
+	# independent per-hit chance at a flat sip of HP back, regardless of how
+	# much damage the hit actually dealt (unlike the %-of-damage lifesteal above).
+	var heal_chance: float = weapon.get("passive_heal_chance", 0.0)
+	if heal_chance > 0.0 and randf() < _proc(heal_chance):
+		var heal_flat: int = int(weapon.get("passive_heal_flat", 0))
+		player.heal(heal_flat)
+		hud.battle_log("Your spear drinks deep -- you feel %d HP return." % heal_flat)
 	# Rune of Bloodlust's passive_self_damage_pct -- a cut of the damage just
 	# dealt comes back at the wielder as recoil, regardless of which action
 	# landed it. Gated on attacker_label so an ally's own attack (which
@@ -4798,7 +4989,7 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 	# Grunkle Gloves' passive_stun_chance -- an independent roll on every
 	# landed hit, regardless of which action triggered it.
 	var passive_stun_chance: float = weapon.get("passive_stun_chance", 0.0)
-	if passive_stun_chance > 0.0 and u.hp > 0 and is_instance_valid(u.ref) and randf() < passive_stun_chance:
+	if passive_stun_chance > 0.0 and u.hp > 0 and is_instance_valid(u.ref) and randf() < _proc(passive_stun_chance):
 		u["stunned"] = true
 		hud.battle_log("The %s is stunned!" % u.name)
 	if u.hp > 0:
@@ -4830,14 +5021,9 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 				gilded_bonus = int(round(gilded_bonus * STONE_AMULET_MATERIAL_BOOST_MULT))
 			player.add_coins(gilded_bonus)
 			hud.battle_log("Your golden blade leaves a coin behind!")
-		# Bloodmoon Fang (talisman): a kill stacks Bloodlust, up to
-		# BLOODMOON_MAX_STACKS.
-		if attacker_label == "You" and player.talisman_bonus("bloodmoon_fang") > 0.0:
-			player.bloodmoon_stacks = mini(player.BLOODMOON_MAX_STACKS, player.bloodmoon_stacks + 1)
-			player._recalc_stats()
 		# Wildfire Core (talisman): a burning kill explodes outward.
 		if player.talisman_bonus("wildfire_core") > 0.0 and u.get("burning", false):
-			_trigger_wildfire_explosion(u.tile, u.max_hp)
+			_trigger_wildfire_explosion(u.tile, _burn_tick_damage(u))
 		if is_instance_valid(u.ref):
 			u.ref.take_damage(9999)
 		battle_units.remove_at(idx)
@@ -4877,16 +5063,6 @@ func _try_cleanse_one_player_status() -> void:
 # special -- action is {stamina_cost, dmg_mult, effect, name}.
 func _battle_perform_attack(action: Dictionary) -> void:
 	var cost: int = action.get("stamina_cost", 0)
-	# Wood's Quick Hands (material passive): your first stamina-costing
-	# action(s) each battle are free. Stone Amulet (talisman) extends this
-	# from 1 use to 2.
-	var quick_hands_applied := false
-	if cost > 0 and player.current_weapon.get("material_id", "") == "wood":
-		var free_uses: int = 2 if player.talisman_bonus("material_passive_boost") > 0.0 else 1
-		if battle_free_abilities_used < free_uses:
-			battle_free_abilities_used += 1
-			quick_hands_applied = true
-			cost = 0
 	if cost > 0 and not player.spend_stamina(cost):
 		hud.battle_log("Not enough stamina for %s!" % action.name)
 		return
@@ -4900,8 +5076,6 @@ func _battle_perform_attack(action: Dictionary) -> void:
 		hud.battle_log("No enemy in range.")
 		if cost > 0:
 			player.regen_stamina(cost)
-		elif quick_hands_applied:
-			battle_free_abilities_used -= 1
 		return
 
 	if tutorial_active and tutorial_step == 1 and action.get("is_regular_attack", false):
@@ -4913,6 +5087,11 @@ func _battle_perform_attack(action: Dictionary) -> void:
 	# later hits in the SAME action use).
 	var weapon: Dictionary = player.current_weapon
 	var dmg_mult: float = action.get("dmg_mult", 1.0)
+	# Weapon attack timing minigame: how well the weapon's command is executed scales the damage.
+	var timing_result := ""
+	if _attack_minigame_on(action):
+		timing_result = await _run_attack_minigame(weapon)
+		dmg_mult *= _attack_timing_mult(timing_result)
 
 	# Spear's Target Practice is a coin-flip instakill, not a normal
 	# damage-dealing hit -- resolved entirely separately from the dmg_mult
@@ -5028,13 +5207,29 @@ func _battle_perform_attack(action: Dictionary) -> void:
 		# flurry uses the smaller multi-hit burn chance, not just the ones
 		# after the first.
 		var whirlwind_melee: bool = action.get("is_regular_attack", false) and player.talisman_bonus("whirlwind_double_melee") > 0.0 and not weapon.get("long_range", false)
+		# Wood's Quick Strikes (material passive): a flat chance to strike
+		# again, stacked onto the weapon's own passive_double_hit_chance
+		# (if any) rather than a separate roll -- amplified by Stone Amulet
+		# like every other material passive.
+		var double_hit_chance: float = weapon.get("passive_double_hit_chance", 0.0)
+		if weapon.get("material_id", "") == "wood":
+			var wood_chance: float = WOOD_DOUBLE_HIT_CHANCE
+			if player.talisman_bonus("material_passive_boost") > 0.0:
+				wood_chance *= STONE_AMULET_MATERIAL_BOOST_MULT
+			double_hit_chance += wood_chance
+		double_hit_chance = _proc(double_hit_chance)
 		var multihit_capable: bool = effect == "double_hit" or effect == "piercing_thrust" \
 			or (action.get("is_regular_attack", false) and weapon.get("double_strike", false)) \
-			or weapon.get("passive_double_hit_chance", 0.0) > 0.0 \
+			or double_hit_chance > 0.0 \
 			or (effect == "" and player.pichaku_active) \
 			or weapon.get("passive_cleave_pct", 0.0) > 0.0 \
 			or whirlwind_melee
 		_apply_single_hit(idx, dmg_mult, effect, weapon, "You", Vector2i(-1, -1), -1, multihit_capable)
+		# Knife Throw only leaves you disarmed if it actually kills the target
+		# (2026-09-29 -- used to disarm unconditionally, every time).
+		if effect == "knife_throw" and not still_primary_target.call():
+			player.disarmed_tile = _pick_disarm_tile()
+			hud.battle_log("The killing throw leaves you weaponless -- it lands on a random tile!")
 		if effect == "double_hit" and still_primary_target.call():
 			_apply_single_hit(idx, dmg_mult, effect, weapon, "You", Vector2i(-1, -1), -1, multihit_capable)
 		# Knuckle Gloves' innate double_strike (plain Attack only, not
@@ -5045,14 +5240,13 @@ func _battle_perform_attack(action: Dictionary) -> void:
 			if weapon.get("double_strike", false) or whirlwind_melee:
 				_apply_single_hit(idx, dmg_mult, effect, weapon, "You", Vector2i(-1, -1), -1, multihit_capable)
 		if still_primary_target.call():
-			var double_hit_chance: float = weapon.get("passive_double_hit_chance", 0.0)
 			if double_hit_chance > 0.0 and randf() < double_hit_chance:
 				_apply_single_hit(idx, dmg_mult, effect, weapon, "You", Vector2i(-1, -1), -1, multihit_capable)
 		# Pichaku (Hand Picks): while active, every regular/heavy attack gets
 		# an independent chance to hit a second time, stacking with any
 		# weapon's own passive_double_hit_chance rather than replacing it.
 		if effect == "" and player.pichaku_active and still_primary_target.call():
-			if randf() < PICHAKU_DOUBLE_HIT_CHANCE:
+			if randf() < _proc(PICHAKU_DOUBLE_HIT_CHANCE):
 				_apply_single_hit(idx, dmg_mult, effect, weapon, "You", Vector2i(-1, -1), -1, multihit_capable)
 		# Duskrender's passive_cleave_pct -- every hit also splashes onto
 		# whoever else is targetable, at a reduced fraction of this hit's
@@ -5081,9 +5275,6 @@ func _battle_perform_attack(action: Dictionary) -> void:
 		var heal_amt := int(round(player.max_health * SELF_HEAL_PCT))
 		player.heal(heal_amt)
 		hud.battle_log("You feel invigorated! Healed %d HP." % heal_amt)
-	if effect == "knife_throw":
-		player.disarmed_tile = _pick_disarm_tile()
-		hud.battle_log("The throw leaves you weaponless -- it lands on a random tile!")
 	if effect == "devastating_slash":
 		battle_player_turns_to_skip += 1
 		hud.battle_log("The devastating blow leaves you reeling!")
@@ -5093,6 +5284,8 @@ func _battle_perform_attack(action: Dictionary) -> void:
 	# forced to cost 0 shouldn't ALSO refund stamina like a genuine free hit.
 	if action.get("is_regular_attack", false):
 		player.regen_stamina(STAMINA_REGEN_ON_ATTACK)
+	if timing_result == AttackTimingsScript.PERFECT:
+		player.regen_stamina(ATTACK_TIMING_PERFECT_STAMINA)
 
 	if battle_units.is_empty():
 		_battle_victory()
@@ -5107,7 +5300,7 @@ func _battle_perform_attack(action: Dictionary) -> void:
 func _resolve_target_practice() -> void:
 	var idx := _effective_target_index()
 	var u = battle_units[idx]
-	var is_boss: bool = u.name in ["Boss", "Owlbear"]
+	var is_boss: bool = ENEMY_TRAITS.get(u.name, {}).get("is_boss_tier", false)
 	var chance: float = TARGET_PRACTICE_BOSS_CHANCE if is_boss else TARGET_PRACTICE_CHANCE
 	if randf() < chance:
 		hud.battle_log("Target Practice finds its mark -- the %s drops instantly!" % u.name)
@@ -5149,6 +5342,13 @@ func _resolve_execution() -> void:
 func _resolve_diamonds(weapon: Dictionary, dmg_mult: float) -> void:
 	var idx: int = battle_target_index if battle_target_index < battle_units.size() else 0
 	var target_tile: Vector2i = battle_units[idx].tile
+	# A 20% chance to miss the jump entirely (2026-09-29): no hit lands, no
+	# repositioning -- just a hard landing back where you started.
+	if randf() < DIAMONDS_MISS_CHANCE:
+		var self_dmg: int = max(1, int(round(player.max_health * DIAMONDS_MISS_SELF_DAMAGE_PCT)))
+		player.take_battle_damage(self_dmg)
+		hud.battle_log("You misjudge the jump and crash down hard, taking %d damage!" % self_dmg)
+		return
 	_spawn_battle_attack_lunge(battle_player_tile, target_tile, ATTACK_LUNGE_PLAYER_COLOR, false)
 	_apply_single_hit(idx, dmg_mult, "diamonds", weapon)
 	# The default knockback (see _apply_single_hit) already shoved the target
@@ -5184,11 +5384,17 @@ func _resolve_wide_cleave(weapon: Dictionary, dmg_mult: float) -> bool:
 	return true
 
 func _battle_player_fight() -> void:
-	_battle_perform_attack({"stamina_cost": 0, "dmg_mult": 1.0, "effect": "", "name": "Attack", "is_regular_attack": true})
+	# Every weapon's regular Attack is free except the Bow's, which costs its
+	# own flat stamina (2026-09-29 -- see Weapons.BOW's regular_attack_stamina_cost).
+	var cost: int = int(player.current_weapon.get("regular_attack_stamina_cost", 0))
+	_battle_perform_attack({"stamina_cost": cost, "dmg_mult": 1.0, "effect": "", "name": "Attack", "is_regular_attack": true})
 
 func _battle_player_heavy_attack() -> void:
+	# The Bow overrides the usual flat Heavy Attack cost with its own, lower
+	# one (2026-09-29 -- see Weapons.BOW's heavy_stamina_cost_override).
+	var cost: int = int(player.current_weapon.get("heavy_stamina_cost_override", WeaponsScript.HEAVY_STAMINA_COST))
 	_battle_perform_attack({
-		"stamina_cost": WeaponsScript.HEAVY_STAMINA_COST,
+		"stamina_cost": cost,
 		"dmg_mult": WeaponsScript.HEAVY_DAMAGE_MULT,
 		"effect": "",
 		"name": "Heavy Attack",
@@ -5210,6 +5416,15 @@ func _battle_player_special(index: int) -> void:
 	if player.current_weapon.get("passive_free_specials", false):
 		action = action.duplicate()
 		action.stamina_cost = 0
+	# Frying Pans' passive_free_special_chance -- an independent per-use chance
+	# at the same free ride, rather than Gravedigger's guaranteed one. Rolled
+	# after the guaranteed check so a weapon with both (never happens today,
+	# but there's no reason to forbid it) doesn't roll needlessly.
+	var free_chance: float = player.current_weapon.get("passive_free_special_chance", 0.0)
+	if action.stamina_cost > 0 and free_chance > 0.0 and randf() < _proc(free_chance):
+		action = action.duplicate()
+		action.stamina_cost = 0
+		hud.battle_log("Frying Pans serves it up for free!")
 	_battle_perform_attack(action)
 
 # Special arrows: not a weapon special (no stamina cost, no dmg_mult
@@ -5287,8 +5502,39 @@ func _resolve_bomb_arrow(center_tile: Vector2i) -> void:
 # (see battle_allies' shape), so they take the blast damage without igniting.
 # Dealt directly rather than through _apply_single_hit, so the explosion
 # itself never re-triggers Last Stand Idol/Momentum Chain/etc.
-func _trigger_wildfire_explosion(center_tile: Vector2i, source_max_hp: int) -> void:
-	var blast_dmg: int = max(1, int(round(source_max_hp * WILDFIRE_EXPLOSION_MAX_HP_PCT)))
+# What one burn tick deals to this unit right now: Ember Charm's own formula
+# while it still has fire left (burn_value), otherwise the old share of max HP
+# every other burn source (Flame Arrow, Embers terrain, Wildfire) uses.
+func _burn_tick_damage(u: Dictionary) -> int:
+	var ember_value: float = u.get("burn_value", 0.0)
+	if ember_value > 0.0:
+		return max(1, int(ceil(ember_value)))
+	return max(1, int(round(float(u.max_hp) / BURN_DAMAGE_DIVISOR)))
+
+# Called right after an Ember Charm burn deals a tick: shrinks what's left by
+# EMBER_BURN_DECAY and puts the fire out once it's under 1 ("until no more
+# damage"). A no-op for a legacy burn, which only water ever clears.
+func _decay_ember_burn(u: Dictionary) -> void:
+	if u.get("burn_value", 0.0) <= 0.0:
+		return
+	u.burn_value *= EMBER_BURN_DECAY
+	if u.burn_value < 1.0:
+		u.burn_value = 0.0
+		u.burning = false
+
+# Sets a unit alight; with Ember Charm equipped the fire uses its own damage
+# formula instead of a share of max HP.
+func _ignite_with_ember(u: Dictionary) -> void:
+	u.burning = true
+	if player.talisman_bonus("ember_burn") > 0.0:
+		u.burn_value = EMBER_BURN_BASE + float(player.attack_damage) / EMBER_BURN_ATTACK_DIV
+
+# Lucky Clover (talisman): doubles an on-hit proc chance, capped at 100%.
+func _proc(chance: float) -> float:
+	return minf(1.0, chance * player.secondary_chance_mult())
+
+func _trigger_wildfire_explosion(center_tile: Vector2i, fire_tick_dmg: int) -> void:
+	var blast_dmg: int = max(1, fire_tick_dmg * WILDFIRE_EXPLOSION_FIRE_MULT)
 	hud.battle_log("The blaze erupts outward!")
 	if _in_blast_radius(battle_player_tile, center_tile, WILDFIRE_EXPLOSION_RADIUS):
 		player.take_battle_damage(blast_dmg)
@@ -5356,7 +5602,7 @@ func _cleanse_player_status() -> void:
 	player_poison_turns = 0
 	player_poison_dmg = 0
 	player_burning = false
-	player_bleeding = false
+	player_bleed_turns = 0
 	player_concussed_turns = 0
 	player_blind_turns = 0
 
@@ -5463,84 +5709,206 @@ func _prompt_water_push() -> bool:
 	battle_awaiting_water_confirm = false
 	return accept
 
+# "You control allies, they get their own turns during your turn": every living
+# fielded ally, in order, gets its own command phase after the hero's -- Move/
+# Attack/Guard/Skip for now (a kit's own specials/spells come later). Skipped
+# entirely, straight to an instant victory, if the hero's own turn already
+# cleared the field -- no point commanding allies against nobody.
 func _start_ally_turn() -> void:
-	battle_turn = "ally"
-	_refresh_battle_display()
-	_process_ally_turn()
+	if battle_units.is_empty():
+		_battle_victory()
+		return
+	battle_turn = "player"
+	battle_ally_queue = battle_allies.filter(func(u): return u.hp > 0)
+	_advance_ally_queue()
 
-# Every recruited companion (party_members, up to max_party_slots, plus the
-# separate party_wolf slot that doesn't count against it) now fights as a
-# real unit on its own tile: closes distance on whatever the player has
-# targeted this battle (falling back to index 0 if that target's already
-# dead) via _move_ally_toward, then attacks with the existing
-# _apply_single_hit if now in range -- reusing that function's death/loot/
-# hit-log handling for the enemy side untouched. Enemies don't move during
-# this phase, so the target's tile is stable for the whole loop.
-func _process_ally_turn() -> void:
-	for u in battle_allies:
-		if u.hp <= 0 or battle_units.is_empty():
+# Hands control to the next ally still owed a turn, or -- once the queue is
+# empty -- sweeps whoever fainted this phase and moves on to the enemy turn
+# (mirrors _process_enemy_turn's own end-of-loop sweep; never mutate
+# battle_allies while a loop might still be iterating it).
+func _advance_ally_queue() -> void:
+	while not battle_ally_queue.is_empty():
+		var next = battle_ally_queue.pop_front()
+		if next.hp <= 0:
 			continue
-		var target_idx: int = battle_target_index if battle_target_index < battle_units.size() else 0
-		var target: Dictionary = battle_units[target_idx]
-		_move_ally_toward(u, target.tile)
-		if u.hp > 0 and _can_battle_attack(u.tile, target.tile, int(u.attack_range)):
-			_apply_single_hit(target_idx, u.dmg_mult, "", {"damage_mult": 1.0}, "Your " + u.name, u.tile)
-		if u.hp > 0:
-			u.tile = _apply_water_push(u.tile, u)
-
-	# Sweep any allies that fell to 0 HP from cliff-fall damage while moving
-	# -- deferred to here rather than removed on the spot, matching
-	# _process_enemy_turn's own end-of-loop sweep (never mutate battle_allies
-	# while still iterating it).
-	var ally_i := battle_allies.size() - 1
-	while ally_i >= 0:
-		if battle_allies[ally_i].hp <= 0:
-			hud.battle_log("Your %s is knocked out!" % battle_allies[ally_i].name)
-			_spawn_battle_death_burst(battle_allies[ally_i].tile)
-			battle_allies.remove_at(ally_i)
-		ally_i -= 1
-
+		battle_commanding_ally = next
+		battle_ally_moves_left = int(next.move_range)
+		next.defending = false
+		battle_menu_state = "main"
+		battle_move_trail = []
+		_focus_battle_ally_menu()
+		_refresh_battle_display()
+		return
+	battle_commanding_ally = null
+	_remove_fallen_allies()
 	if battle_units.is_empty():
 		_battle_victory()
 		return
 	_start_enemy_turn()
 
-# Chases an arbitrary target tile (the enemy the player currently has
-# targeted), mutating u.tile -- and u.hp on a cliff fall -- in place. Mirrors
-# _move_enemy_unit's step-toward-target loop, but is a separate function
-# rather than a reuse of it: that one's break condition is hardcoded to
-# battle_player_tile specifically (see _pick_enemy_target_tile for how the
-# enemy side of this is generalized instead).
-func _move_ally_toward(u: Dictionary, target_tile: Vector2i) -> void:
-	for i in int(u.move_range):
-		if _can_battle_attack(u.tile, target_tile, int(u.attack_range)):
-			break
-		var dx := 0
-		var dy := 0
-		if target_tile.x != u.tile.x:
-			dx = sign(target_tile.x - u.tile.x)
-		if target_tile.y != u.tile.y:
-			dy = sign(target_tile.y - u.tile.y)
-		var options := []
-		if dx != 0:
-			options.append(Vector2i(dx, 0))
-		if dy != 0:
-			options.append(Vector2i(0, dy))
-		var stepped := false
-		for dir in options:
-			var result := _resolve_battle_step(u.tile, dir, u.tile)
-			if result.moved:
-				u.tile = result.tile
-				if result.fell:
-					var dmg := int(round(float(u.max_hp) * CLIFF_FALL_DAMAGE_PCT))
-					u.hp -= dmg
-					hud.battle_log("Your %s falls and takes %d damage!" % [u.name, dmg])
-					if u.hp <= 0:
-						return
-				stepped = true
-				break
-		if not stepped:
-			break
+func _focus_battle_ally_menu() -> void:
+	hud.battle_ally_buttons["move"].grab_focus()
+
+func _on_battle_ally_action(action: String) -> void:
+	if battle_turn != "player" or battle_commanding_ally == null:
+		return
+	var u = battle_commanding_ally
+	match action:
+		"move":
+			if battle_ally_moves_left <= 0:
+				hud.battle_log("Your %s has no moves left." % u.name)
+				return
+			battle_menu_state = "move"
+			battle_ally_move_undo_tile = u.tile
+			battle_ally_move_undo_moves_left = battle_ally_moves_left
+			battle_ally_move_undo_health = u.hp
+			battle_move_trail = []
+			get_viewport().gui_release_focus()
+			_refresh_battle_display()
+		"attack":
+			_battle_ally_attack()
+		"guard":
+			u.defending = true
+			hud.battle_log("Your %s braces for impact." % u.name)
+			_end_ally_command()
+		"skip":
+			hud.battle_log("Your %s does nothing this turn." % u.name)
+			_end_ally_command()
+
+func _end_ally_command() -> void:
+	# Same end-of-turn terrain handling _end_player_turn gives the hero (water
+	# current, embers/spring/etc.) -- no Turtle Shell prompt, that's the
+	# hero's own talisman.
+	var u = battle_commanding_ally
+	if u != null and u.hp > 0:
+		u.tile = _apply_water_push(u.tile, u)
+		_apply_terrain_tick(u.tile, u)
+	battle_menu_state = "main"
+	battle_move_trail = []
+	_advance_ally_queue()
+
+# Attacks whatever the player currently has targeted (battle_target_index, same
+# preferred-target the hero's own Fight button reads), falling back to the nearest
+# in-range enemy if that one's out of this ally's own reach or already dead. Reuses
+# _apply_single_hit -- the ally's own attack stat, not the hero's -- for the
+# enemy-side hit/death handling untouched. Doesn't end the ally's turn by itself
+# (see _on_battle_ally_action) so a kill can hand off to victory immediately instead
+# of waiting on however many allies are still queued behind it.
+func _battle_ally_attack() -> void:
+	var u = battle_commanding_ally
+	var idx := _ally_effective_target_index(u)
+	if idx < 0:
+		hud.battle_log("No enemy in range.")
+		return
+	_apply_single_hit(idx, u.dmg_mult, "", {"damage_mult": 1.0}, "Your " + u.name, u.tile, -1, false, float(u.get("attack", -1.0)))
+	if battle_units.is_empty():
+		battle_commanding_ally = null
+		battle_ally_queue.clear()
+		_remove_fallen_allies()
+		_battle_victory()
+		return
+	_end_ally_command()
+
+# _targetable_indices' equivalent for an arbitrary ally's own tile/attack_range,
+# rather than the hero's battle_player_tile.
+func _ally_targetable_indices(u: Dictionary) -> Array:
+	var result := []
+	for i in battle_units.size():
+		var e: Dictionary = battle_units[i]
+		var size: int = e.get("size", 1)
+		var in_range: bool
+		if size > 1:
+			in_range = _footprint_dist(_footprint(e.tile, size), u.tile) <= int(u.attack_range)
+		else:
+			in_range = _can_battle_attack(u.tile, e.tile, int(u.attack_range))
+		if in_range:
+			result.append(i)
+	return result
+
+# battle_target_index if this ally can actually reach it, otherwise whichever
+# in-range enemy comes first -- -1 if none are in reach at all. Shared by
+# _battle_ally_attack and _refresh_battle_display's own "Target:" readout, so
+# what's shown on screen always matches what Attack would actually hit.
+func _ally_effective_target_index(u: Dictionary) -> int:
+	var targetable := _ally_targetable_indices(u)
+	if targetable.is_empty():
+		return -1
+	return battle_target_index if battle_target_index in targetable else targetable[0]
+
+# _try_battle_player_move's equivalent for the ally currently being commanded --
+# same one-step-at-a-time shape, spending from battle_ally_moves_left instead of
+# the hero's own budget. No bleed (allies don't carry that status) or armor/talisman
+# fall-damage mitigation (the hero's own gear, not the ally's) -- just the plain
+# cliff-fall damage every mover takes, scaled to the ally's own max HP.
+func _try_battle_ally_move(dir: Vector2i) -> void:
+	if battle_ally_moves_left <= 0:
+		return
+	var u = battle_commanding_ally
+	var result := _resolve_battle_step(u.tile, dir, u.tile)
+	if not result.moved:
+		return
+	u.tile = result.tile
+	battle_ally_moves_left -= 2 if result.get("extra_cost", false) else 1
+	battle_move_trail.append({"tile": u.tile, "dir": dir})
+	if result.fell:
+		var dmg := int(round(float(u.max_hp) * CLIFF_FALL_DAMAGE_PCT))
+		u.hp -= dmg
+		hud.battle_log("Your %s falls and takes %d damage!" % [u.name, dmg])
+		if u.hp <= 0:
+			battle_menu_state = "main"
+			_advance_ally_queue()
+
+# Removes every ally at 0 HP from the grid (never mutate battle_allies while an
+# enemy or ally loop is still iterating it -- both callers sweep after their loop).
+# A fallen PartyMember is remembered so the end-of-battle settlement can count the
+# faint against a wolf (see _settle_party_after_battle).
+func _remove_fallen_allies() -> void:
+	var ally_i := battle_allies.size() - 1
+	while ally_i >= 0:
+		var fallen: Dictionary = battle_allies[ally_i]
+		if fallen.hp <= 0:
+			hud.battle_log("Your %s is knocked out!" % fallen.name)
+			_spawn_battle_death_burst(fallen.tile)
+			if fallen.has("member") and not battle_fainted_members.has(fallen.member):
+				battle_fainted_members.append(fallen.member)
+			battle_allies.remove_at(ally_i)
+		ally_i -= 1
+
+# Every roster member gets the XP the hero does, straight from the kill (no
+# Scholar's Quill, which is the hero's). A wolf never levels, so it just ignores it.
+func _award_party_xp(xp_reward: int) -> void:
+	for member in player.party:
+		var gained: int = member.gain_xp(xp_reward)
+		if gained > 0:
+			hud.show_message("%s reached level %d!" % [member.name, member.level])
+
+# Runs once when a battle ends, before the units are thrown away:
+#  - a wolf that fainted this battle has it counted against it; the third faint is
+#    its last, and its body is harvested;
+#  - every wolf still with you spends one battle of loyalty, and leaves when it is
+#    spent. (Other kinds have no loyalty limit.)
+# A wolf that fainted but survives simply stands up again: the next battle rebuilds
+# every unit at full health.
+func _settle_party_after_battle() -> void:
+	for member in battle_fainted_members:
+		if member.record_faint():
+			_wolf_dies(member)
+	battle_fainted_members.clear()
+	for member in player.party.duplicate():
+		if member.is_wolf() and member.spend_loyalty_battle():
+			player.dismiss_party_member(member.id)
+			hud.show_message("Your %s's loyalty fades -- it leaves your pack." % member.name)
+
+# A wolf that has fainted its last time: gone from the party, and its body can be
+# harvested for meat and pelts (pelts are needed to make some armours).
+const WOLF_HARVEST_MEAT := 2
+const WOLF_HARVEST_PELTS := 2
+func _wolf_dies(member) -> void:
+	player.dismiss_party_member(member.id)
+	for i in WOLF_HARVEST_MEAT:
+		player.add_potion("food_haunch")
+	player.pelts += WOLF_HARVEST_PELTS
+	hud.show_message("Your %s has fallen for good. You harvest %d Roast Haunch and %d pelts." % [member.name, WOLF_HARVEST_MEAT, WOLF_HARVEST_PELTS])
 
 func _start_enemy_turn() -> void:
 	battle_turn = "enemy"
@@ -5673,7 +6041,7 @@ func _apply_evasion_step(dir: Vector2i) -> void:
 	if not result.moved:
 		return
 	battle_player_tile = result.tile
-	_apply_bleed_move_damage()
+	_extend_bleed_on_move()
 	if result.fell:
 		var fall_mult: float = player.equipped_armor.get("fall_damage_mult", 1.0) * player.fall_damage_factor()
 		if fall_mult <= 0.0:
@@ -5766,21 +6134,29 @@ func _pick_enemy_target_tile(u: Dictionary) -> Vector2i:
 # plain Taunt) since the whole point is "the yelling reached everyone."
 func _pick_confused_target_tile(u: Dictionary) -> Vector2i:
 	var footprint: Array = _footprint(u.tile, u.get("size", 1))
-	var best_tile: Vector2i = battle_player_tile
-	var best_dist: int = _footprint_dist(footprint, battle_player_tile)
+	# Every possible target (the player, every ally, every other living enemy)
+	# and how far each one is -- collected up front so an exact tie for nearest
+	# can be broken randomly, rather than always favoring whichever candidate
+	# happened to be checked first.
+	var candidate_tiles: Array = [battle_player_tile]
+	var candidate_dists: Array = [_footprint_dist(footprint, battle_player_tile)]
 	for a in battle_allies:
-		var d: int = _footprint_dist(footprint, a.tile)
-		if d < best_dist:
-			best_dist = d
-			best_tile = a.tile
+		candidate_tiles.append(a.tile)
+		candidate_dists.append(_footprint_dist(footprint, a.tile))
 	for other in battle_units:
 		if other.ref == u.ref or not is_instance_valid(other.ref):
 			continue
-		var d: int = _footprint_dist(footprint, other.tile)
+		candidate_tiles.append(other.tile)
+		candidate_dists.append(_footprint_dist(footprint, other.tile))
+	var best_dist: int = candidate_dists[0]
+	for d in candidate_dists:
 		if d < best_dist:
 			best_dist = d
-			best_tile = other.tile
-	return best_tile
+	var nearest: Array = []
+	for i in candidate_tiles.size():
+		if candidate_dists[i] == best_dist:
+			nearest.append(candidate_tiles[i])
+	return nearest[randi() % nearest.size()]
 
 # Shared "deal damage to whoever this enemy is currently attacking" step.
 # Branches between the player (the existing _apply_incoming_reductions
@@ -5789,10 +6165,24 @@ func _pick_confused_target_tile(u: Dictionary) -> Vector2i:
 # equivalent). Returns {dmg, is_player, target_name} rather than logging
 # itself, since the jab/regular-hit call sites in _process_enemy_turn use
 # different message wording.
-func _enemy_apply_damage(u: Dictionary, target_tile: Vector2i, raw_dmg: int, traits: Dictionary) -> Dictionary:
+#
+# attack_kind is how the caller reached the attack ("normal", "jab" = a quick un-telegraphed
+# jab, "heavy" = the blow after a wind-up) -- the dodge/block minigame uses it to pick which
+# of the enemy's attack patterns plays (AttackPatterns.pick).
+# The HP/damage multiplier a battle unit gets from the player's level: the difficulty's
+# per-level rate (bosses and minibosses at BOSS_LEVEL_SCALING_FACTOR of it).
+func _enemy_level_scale(is_boss_tier: bool) -> float:
+	var rate: float = ENEMY_LEVEL_SCALING_BY_DIFFICULTY.get(player.difficulty_id, ENEMY_LEVEL_SCALING)
+	if is_boss_tier:
+		rate *= BOSS_LEVEL_SCALING_FACTOR
+	return 1.0 + (player.level - 1) * rate
+
+func _enemy_apply_damage(u: Dictionary, target_tile: Vector2i, raw_dmg: int, traits: Dictionary, attack_kind: String = "normal") -> Dictionary:
 	if u.get("burning", false):
 		raw_dmg = int(round(raw_dmg * (1.0 - BURN_DAMAGE_DEALT_REDUCTION)))
 	if target_tile == battle_player_tile:
+		if _combat_minigame_on():
+			return await _enemy_hit_player_minigame(u, raw_dmg, traits, attack_kind)
 		# Precision (Warrior wing): a flat chance to fully avoid the hit,
 		# mirroring an enemy's own dodge_chance trait but for the player.
 		# Rage/Berserk cuts this to a quarter of its normal rate.
@@ -5817,12 +6207,6 @@ func _enemy_apply_damage(u: Dictionary, target_tile: Vector2i, raw_dmg: int, tra
 			# see _prompt_evasion_reposition's doc comment for why that's safe.
 			if player.shield_evasion_active():
 				await _prompt_evasion_reposition(u.tile)
-			# Bleeding: a successful dodge costs HP too -- the same wound that
-			# makes standing still risky makes flinging yourself aside worse.
-			if player_bleeding:
-				var dodge_bleed_dmg: int = max(1, int(round(player.max_health * BLEED_DODGE_DAMAGE_PCT)))
-				player.take_battle_damage(dodge_bleed_dmg)
-				hud.battle_log("The dodge tears your wound further! Lost %d HP." % dodge_bleed_dmg)
 			return {"dmg": 0, "is_player": true, "target_name": "", "dodged": true}
 		# Shield block: a passive, always-on chance (not gated on Defending,
 		# unlike Block Master) to no-sell the hit entirely. Independent roll
@@ -5833,36 +6217,7 @@ func _enemy_apply_damage(u: Dictionary, target_tile: Vector2i, raw_dmg: int, tra
 			_resolve_shield_block(u, raw_dmg)
 			return {"dmg": 0, "is_player": true, "target_name": "", "blocked": true}
 		var dmg: int = _apply_incoming_reductions(raw_dmg, traits)
-		player.take_battle_damage(dmg)
-		run_damage_taken += dmg
-		battle_had_combat_action_this_cycle = true
-		# Momentum Chain (talisman): taking a hit breaks the chain and costs
-		# the player their next turn.
-		if dmg > 0 and player.talisman_bonus("momentum_chain") > 0.0 and battle_momentum_chain_stacks > 0:
-			battle_momentum_chain_stacks = 0
-			battle_player_turns_to_skip += 1
-			hud.battle_log("The chain breaks -- you're staggered!")
-		_spawn_battle_attack_lunge(u.tile, target_tile, ATTACK_LUNGE_ENEMY_COLOR, traits.get("attack_range", 1) > 1)
-		_spawn_battle_damage_number(target_tile, dmg)
-		_flash_battle_tile(target_tile)
-		_shake_battle(5.0, 0.2)
-		# Concussion (blunt-wielding enemies): a chance to daze the player on
-		# any landed hit, same shape as BONK's own self-hit roll but rolled
-		# against the player's timer (player_concussed_turns) instead.
-		if traits.get("inflicts_concussion", false) and randf() < CONCUSSION_INFLICT_CHANCE:
-			player_concussed_turns = PLAYER_CONCUSSION_TURNS
-			hud.battle_log("The blow leaves you dazed!")
-		# Bleeding (sharp-wielding enemies): guaranteed on a landed hit, no
-		# roll -- persists for the rest of the battle (see BLEED_MOVE_DAMAGE_PCT/
-		# BLEED_DODGE_DAMAGE_PCT, ticked from movement/dodges, not here).
-		if traits.get("inflicts_bleed", false) and not player_bleeding:
-			player_bleeding = true
-			hud.battle_log("The wound leaves you bleeding!")
-		# Blindness (mage-type enemies): guaranteed on a landed hit, refreshes
-		# the full duration even if already active.
-		if traits.get("inflicts_blind", false):
-			player_blind_turns = BLINDNESS_TURNS
-			hud.battle_log("Your vision swims -- you're blinded!")
+		_land_enemy_hit_on_player(u, dmg, traits)
 		return {"dmg": dmg, "is_player": true, "target_name": "", "dodged": false}
 	var dmg: int = raw_dmg
 	if not traits.get("ignore_cover", false) and _has_adjacent_rock(target_tile):
@@ -5880,6 +6235,16 @@ func _enemy_apply_damage(u: Dictionary, target_tile: Vector2i, raw_dmg: int, tra
 		var ally_dr: float = player.talisman_bonus("ally_defense_pct")
 		if ally_dr > 0.0:
 			dmg = int(round(dmg * (1.0 - ally_dr)))
+		# A PartyMember's own defense (a percentage cut, one point = one percent, capped
+		# at 90% like the hero's armour), and never below 1 damage.
+		var ally_defense: float = float(target_ally.get("defense_pct", 0.0))
+		if ally_defense > 0.0:
+			dmg = maxi(1, int(round(dmg * (1.0 - minf(ally_defense / 100.0, 0.9)))))
+		# Guard (this ally's own commanded action, see _on_battle_ally_action):
+		# same flat reduction Defend gives the hero, cleared at the start of
+		# its next commanded turn.
+		if target_ally.get("defending", false):
+			dmg = maxi(1, int(round(dmg * (1.0 - DEFEND_DAMAGE_REDUCTION))))
 		target_ally.hp -= dmg
 		target_name = target_ally.name
 		battle_had_combat_action_this_cycle = true
@@ -5899,9 +6264,180 @@ func _enemy_apply_damage(u: Dictionary, target_tile: Vector2i, raw_dmg: int, tra
 	_shake_battle(5.0, 0.2)
 	return {"dmg": dmg, "is_player": false, "target_name": target_name, "dodged": false}
 
+# ---------------------------------------------------------------------------
+# Weapon attack timing minigame (see the ATTACK_TIMING_* constants).
+# ---------------------------------------------------------------------------
+func _attack_minigame_on(action: Dictionary) -> bool:
+	if settings == null or not settings.attack_minigame_enabled or tutorial_active:
+		return false
+	return float(action.get("dmg_mult", 1.0)) > 0.0
+
+func _get_attack_minigame() -> CanvasLayer:
+	if attack_minigame == null or not is_instance_valid(attack_minigame):
+		attack_minigame = AttackMinigameScript.new()
+		add_child(attack_minigame)
+	return attack_minigame
+
+func _attack_timing_mult(result: String) -> float:
+	match result:
+		AttackTimingsScript.PERFECT: return ATTACK_TIMING_PERFECT_MULT
+		AttackTimingsScript.HIT: return ATTACK_TIMING_HIT_MULT
+	return ATTACK_TIMING_MISS_MULT
+
+# Runs the popup for the wielded weapon's family and returns "miss" / "hit" / "perfect". The turn is
+# parked on "attack" meanwhile so the battle menus hide and no other input can sneak in.
+func _run_attack_minigame(weapon: Dictionary) -> String:
+	var command: Dictionary = AttackTimingsScript.command_for_weapon(weapon)
+	battle_turn = "attack"
+	_refresh_battle_display()
+	var outcome: Dictionary = await _get_attack_minigame().run(command)
+	battle_turn = "player"
+	var result: String = str(outcome.get("result", AttackTimingsScript.MISS))
+	match result:
+		AttackTimingsScript.PERFECT: hud.battle_log("Perfect timing! +%d%% damage." % int(round((ATTACK_TIMING_PERFECT_MULT - 1.0) * 100.0)))
+		AttackTimingsScript.HIT: pass
+		_: hud.battle_log("Mistimed -- the blow lands weakly (%d%% damage)." % int(round(ATTACK_TIMING_MISS_MULT * 100.0)))
+	return result
+
+# Everything that happens when an enemy blow actually connects with the hero (damage has
+# already been through every reduction): HP loss, Momentum Chain, the lunge / number / flash /
+# shake juice, and on-hit statuses. Shared by the classic roll path above and the minigame path.
+func _land_enemy_hit_on_player(u: Dictionary, dmg: int, traits: Dictionary) -> void:
+	var target_tile: Vector2i = battle_player_tile
+	player.take_battle_damage(dmg)
+	run_damage_taken += dmg
+	battle_had_combat_action_this_cycle = true
+	# Momentum Chain (talisman): taking a hit breaks the chain and costs
+	# the player their next turn.
+	if dmg > 0 and player.talisman_bonus("momentum_chain") > 0.0 and battle_momentum_chain_stacks > 0:
+		battle_momentum_chain_stacks = 0
+		battle_player_turns_to_skip += 1
+		hud.battle_log("The chain breaks -- you're staggered!")
+	_spawn_battle_attack_lunge(u.tile, target_tile, ATTACK_LUNGE_ENEMY_COLOR, traits.get("attack_range", 1) > 1)
+	_spawn_battle_damage_number(target_tile, dmg)
+	_flash_battle_tile(target_tile)
+	_shake_battle(5.0, 0.2)
+	# Concussion (blunt-wielding enemies): a chance to daze the player on
+	# any landed hit, same shape as BONK's own self-hit roll but rolled
+	# against the player's timer (player_concussed_turns) instead.
+	if traits.get("inflicts_concussion", false) and randf() < CONCUSSION_INFLICT_CHANCE:
+		player_concussed_turns = PLAYER_CONCUSSION_TURNS
+		hud.battle_log("The blow leaves you dazed!")
+	# Bleeding (sharp-wielding enemies): guaranteed on a landed hit, no
+	# roll -- BLEED_BASE_TURNS turns, ticking BLEED_DAMAGE_PCT at the end of
+	# each one, lengthened by any tile the player moves while it's active.
+	if traits.get("inflicts_bleed", false) and player_bleed_turns <= 0:
+		player_bleed_turns = BLEED_BASE_TURNS
+		hud.battle_log("The wound leaves you bleeding!")
+	# Blindness (mage-type enemies): guaranteed on a landed hit, refreshes
+	# the full duration even if already active.
+	if traits.get("inflicts_blind", false):
+		player_blind_turns = BLINDNESS_TURNS
+		hud.battle_log("Your vision swims -- you're blinded!")
+
+# ---------------------------------------------------------------------------
+# Dodge / block timing minigames. An enemy attack on the hero opens either a DODGE popup
+# (press a direction as the cue lands: the hero slips the blow and may roll one tile that way)
+# or a BLOCK popup (hold the block key; a raise or lower within the parry window of the impact
+# is a parry -- the whole hit is negated and the shield's special fires). Switched off by the
+# settings toggle, while Defending, and during the tutorial -- those keep the classic rolls.
+# ---------------------------------------------------------------------------
+func _combat_minigame_on() -> bool:
+	return settings != null and settings.combat_minigames_enabled and not tutorial_active and not battle_player_defending
+
+func _get_defense_minigame() -> CanvasLayer:
+	if defense_minigame == null or not is_instance_valid(defense_minigame):
+		defense_minigame = DefenseMinigameScript.new()
+		add_child(defense_minigame)
+	return defense_minigame
+
+# The odds side of a minigame attack: which popup opens and how generous its timing is.
+# Returns {"mode": "dodge"|"block", "opening_chance", "opts": {...run() options}}.
+func _minigame_setup(force_mode: String = "") -> Dictionary:
+	var dodge_stat: float = player.dodge_chance_total()
+	var master: float = player.meta_block_negate_chance
+	if player.berserk_turns_remaining > 0:
+		dodge_stat *= BERSERK_DEFENSE_MULT
+		master *= BERSERK_DEFENSE_MULT
+	var opening: float = minf(MINIGAME_DODGE_OPENING_CAP, MINIGAME_DODGE_BASE_CHANCE + dodge_stat)
+	var mode: String = force_mode if force_mode != "" else ("dodge" if randf() < opening else "block")
+	var opts := {}
+	if mode == "dodge":
+		opts["window_mult"] = minf(MINIGAME_DODGE_WINDOW_CAP, 1.0 + dodge_stat)
+	else:
+		var bonus_ms: float = minf(MINIGAME_PARRY_BONUS_CAP_MS, (player.shield_block_chance() + master) * MINIGAME_PARRY_BONUS_MS_PER_CHANCE)
+		opts["parry_ms"] = float(AttackPatternsScript.PARRY_MS) + bonus_ms
+	return {"mode": mode, "opening_chance": opening, "opts": opts}
+
+# Riposte (Warrior skill) on a dodge: a PERFECT dodge always counters; a plain good one rolls.
+func _minigame_riposte(u: Dictionary, perfect: bool) -> void:
+	if player.meta_riposte_chance <= 0.0:
+		return
+	if not perfect and randf() >= player.meta_riposte_chance:
+		return
+	var attacker_idx := _unit_index_at_tile(u.tile)
+	if attacker_idx >= 0:
+		hud.battle_log("You riposte!")
+		_apply_single_hit(attacker_idx, RIPOSTE_DAMAGE_PCT, "riposte", player.current_weapon)
+
+# The minigame version of _enemy_apply_damage's hero branch. Same return shape as the classic
+# path (dmg is the TOTAL that landed across the attack's impacts), plus minigame/parried flags.
+func _enemy_hit_player_minigame(u: Dictionary, raw_dmg: int, traits: Dictionary, attack_kind: String) -> Dictionary:
+	var pattern: Dictionary = AttackPatternsScript.pick(u.name, traits, attack_kind)
+	var setup: Dictionary = _minigame_setup(debug_minigame_mode)
+	var mode: String = setup.mode
+	hud.battle_log("The %s uses %s!" % [u.name, pattern.name])
+	var results: Array = await _get_defense_minigame().run(mode, pattern, setup.opts)
+	return _resolve_minigame_results(u, raw_dmg, traits, mode, results)
+
+# Turns the popup's per-impact outcomes into actual consequences. Split out from the await so a
+# test can feed it hand-made results.
+func _resolve_minigame_results(u: Dictionary, raw_dmg: int, traits: Dictionary, mode: String, results: Array) -> Dictionary:
+	var total_dmg := 0
+	var avoided := 0
+	var parried := 0
+	var roll_dir := Vector2i.ZERO
+	var shield_ok: bool = player.shield_usable()
+	for r in results:
+		var impact_raw: int = maxi(1, int(round(raw_dmg * float(r.get("mult", 1.0)))))
+		var outcome: String = str(r.get("outcome", "fail"))
+		match outcome:
+			"perfect", "good":
+				avoided += 1
+				if roll_dir == Vector2i.ZERO:
+					roll_dir = r.get("dir", Vector2i.ZERO)
+				hud.battle_log("Perfect dodge!" if outcome == "perfect" else "You slip the blow!")
+				_minigame_riposte(u, outcome == "perfect")
+			"parry":
+				avoided += 1
+				parried += 1
+				play_sfx("shield_block")
+				hud.battle_log("PARRY! You turn the blow aside.")
+				if shield_ok:
+					_resolve_shield_block(u, impact_raw)
+			_:
+				var reduced: int = impact_raw
+				if outcome == "block":
+					var cut: float = MINIGAME_BLOCK_HELD_REDUCTION if shield_ok else MINIGAME_BRACE_HELD_REDUCTION
+					reduced = int(round(impact_raw * (1.0 - cut)))
+					hud.battle_log("Your guard absorbs part of the blow.")
+				var dmg: int = _apply_incoming_reductions(reduced, traits)
+				_land_enemy_hit_on_player(u, dmg, traits)
+				total_dmg += dmg
+				if player.health <= 0:
+					break
+	if roll_dir != Vector2i.ZERO and player.health > 0 and mode == "dodge":
+		if _evasion_directions(u.tile).values().has(roll_dir):
+			_apply_evasion_step(roll_dir)
+			hud.battle_log("You roll aside!")
+			_refresh_battle_display()
+	var all_avoided: bool = avoided > 0 and avoided == results.size()
+	return {"dmg": total_dmg, "is_player": true, "target_name": "", "dodged": all_avoided and mode == "dodge",
+		"blocked": all_avoided and mode == "block", "minigame": true, "parried": parried}
+
 # Every currently-occupied tile (the player, and/or any living ally) within
 # this unit's attack_range of its own footprint -- used by the "sweeps"
-# trait (the Owlbear) so one swing can catch more than just its chosen
+# trait (the sweeping bosses) so one swing can catch more than just its chosen
 # target. _pick_enemy_target_tile already guarantees at least target_tile
 # itself is in range whenever this is called, so the result is never empty.
 func _sweep_targets(u: Dictionary) -> Array:
@@ -5935,13 +6471,14 @@ func _process_enemy_turn() -> void:
 		# below -- unlike every other status here it has no turn counter, it
 		# persists until the unit steps onto a water tile (_apply_water_push).
 		if u.get("burning", false):
-			var burn_dmg: int = max(1, int(round(float(u.max_hp) / BURN_DAMAGE_DIVISOR)))
+			var burn_dmg: int = _burn_tick_damage(u)
+			_decay_ember_burn(u)
 			u.hp -= burn_dmg
 			_spawn_battle_damage_number(u.tile, burn_dmg, u.get("size", 1))
 			hud.battle_log("The %s burns for %d damage!" % [u.name, burn_dmg])
 			if u.hp <= 0:
 				if player.talisman_bonus("wildfire_core") > 0.0:
-					_trigger_wildfire_explosion(u.tile, u.max_hp)
+					_trigger_wildfire_explosion(u.tile, burn_dmg)
 				continue
 
 		# Poison Bog's lingering DOT (reserved terrain) -- same "ticks
@@ -5952,6 +6489,18 @@ func _process_enemy_turn() -> void:
 			u.hp -= u.poison_dmg
 			_spawn_battle_damage_number(u.tile, u.poison_dmg, u.get("size", 1))
 			hud.battle_log("The %s is poisoned for %d damage!" % [u.name, u.poison_dmg])
+			if u.hp <= 0:
+				continue
+
+		# Bleeding: ticks the same way Poison does -- own counter, decremented
+		# here, every tile this unit actually moves (below) lengthens it by a
+		# turn instead of dealing damage on the spot.
+		if u.get("bleed_turns", 0) > 0:
+			u.bleed_turns -= 1
+			var bleed_dmg: int = max(1, int(round(float(u.max_hp) * BLEED_DAMAGE_PCT)))
+			u.hp -= bleed_dmg
+			_spawn_battle_damage_number(u.tile, bleed_dmg, u.get("size", 1))
+			hud.battle_log("The %s bleeds for %d damage!" % [u.name, bleed_dmg])
 			if u.hp <= 0:
 				continue
 
@@ -6016,7 +6565,7 @@ func _process_enemy_turn() -> void:
 					break
 			if has_other_allies:
 				# Refuses to engage at all while anyone else is still up --
-				# heals if it can, otherwise (Druid only) buffs an ally
+				# heals if it can, otherwise (buffers only) buffs an ally
 				# instead, otherwise just watches and waits.
 				if not _try_heal_ally(u):
 					if not (traits.get("buffs_allies", false) and _try_buff_ally(u)):
@@ -6102,7 +6651,7 @@ func _process_enemy_turn() -> void:
 		# at its own flank tile has nowhere left to go (movement_target ==
 		# its own tile gives it zero step options) and goes permanently idle
 		# every turn after, forever out of range of an attack it can never
-		# line up. Applies regardless of size -- the Owlbear (2x2) corners
+		# line up. Applies regardless of size -- a 2x2 unit corners
 		# the same way the Orc (1x1) already does.
 		var movement_target: Vector2i = target_tile
 		if traits.get("corners", false):
@@ -6171,11 +6720,11 @@ func _process_enemy_turn() -> void:
 			var quick_jab_chance: float = traits.get("quick_jab_chance", 0.0)
 			if has_windup and not already_winding_up and quick_jab_chance > 0.0 and randf() < quick_jab_chance:
 				# A quick, un-telegraphed jab instead of winding up this time.
-				var jab_result: Dictionary = await _enemy_apply_damage(u, target_tile, u.damage, traits)
+				var jab_result: Dictionary = await _enemy_apply_damage(u, target_tile, u.damage, traits, "jab")
 				if jab_result.get("dodged", false):
 					hud.battle_log("You dodge the %s's jab!" % u.name)
 				elif jab_result.get("blocked", false):
-					hud.battle_log("Your shield blocks the %s's jab!" % u.name)
+					hud.battle_log(("You parry the %s's jab!" if jab_result.get("minigame", false) else "Your shield blocks the %s's jab!") % u.name)
 				elif jab_result.is_player:
 					hud.battle_log("The %s jabs you for %d damage!" % [u.name, jab_result.dmg])
 					if player.health <= 0:
@@ -6213,7 +6762,7 @@ func _process_enemy_turn() -> void:
 					if live_pack_count > 1:
 						dmg = int(round(dmg * (1.0 + GNOME_DAMAGE_PCT_PER_PACKMATE * (live_pack_count - 1))))
 						hud.battle_log("The Gnome mob swarms with %d strong!" % live_pack_count)
-				# Druid's buff (see buffed_dmg_turns) -- decremented here, at
+				# A buffer's buff (see buffed_dmg_turns) -- decremented here, at
 				# the moment it actually pays off, same "consumed on use"
 				# shape Adrenaline/Momentum-style bonuses use elsewhere.
 				if u.get("buffed_dmg_turns", 0) > 0:
@@ -6223,7 +6772,7 @@ func _process_enemy_turn() -> void:
 				if enrage_threshold > 0.0 and float(u.hp) < float(u.max_hp) * enrage_threshold:
 					dmg = int(round(dmg * traits.get("enrage_mult", 1.0)))
 					hud.battle_log("The %s is enraged!" % u.name)
-				# The Owlbear's sweep hits every occupied tile within range,
+				# A sweeping boss's sweep hits every occupied tile within range,
 				# not just its chosen target -- dmg is computed once above and
 				# applied in full to each tile struck, not divided. Every
 				# other enemy's sweep_targets is just [target_tile], so this
@@ -6232,11 +6781,11 @@ func _process_enemy_turn() -> void:
 				var sweep_targets: Array = _sweep_targets(u) if traits.get("sweeps", false) else [target_tile]
 				var player_was_hit := false
 				for t in sweep_targets:
-					var hit_result: Dictionary = await _enemy_apply_damage(u, t, dmg, traits)
+					var hit_result: Dictionary = await _enemy_apply_damage(u, t, dmg, traits, "heavy" if already_winding_up else "normal")
 					if hit_result.get("dodged", false):
 						hud.battle_log("You dodge the %s's attack!" % u.name)
 					elif hit_result.get("blocked", false):
-						hud.battle_log("Your shield blocks the %s's attack!" % u.name)
+						hud.battle_log(("You parry the %s's attack!" if hit_result.get("minigame", false) else "Your shield blocks the %s's attack!") % u.name)
 					elif hit_result.is_player:
 						player_was_hit = true
 						hud.battle_log("The %s hits you for %d damage." % [u.name, hit_result.dmg])
@@ -6296,13 +6845,7 @@ func _process_enemy_turn() -> void:
 	# Same sweep for any ally an enemy just knocked out (cliff falls handled
 	# above via the retreat step; a direct hit is applied in
 	# _enemy_apply_damage, above).
-	var ally_i := battle_allies.size() - 1
-	while ally_i >= 0:
-		if battle_allies[ally_i].hp <= 0:
-			hud.battle_log("Your %s is knocked out!" % battle_allies[ally_i].name)
-			_spawn_battle_death_burst(battle_allies[ally_i].tile)
-			battle_allies.remove_at(ally_i)
-		ally_i -= 1
+	_remove_fallen_allies()
 
 	if battle_units.is_empty():
 		_battle_victory()
@@ -6318,6 +6861,17 @@ func _process_enemy_turn() -> void:
 		player_poison_turns -= 1
 		player.take_battle_damage(player_poison_dmg)
 		hud.battle_log("You're poisoned for %d damage!" % player_poison_dmg)
+		if player.health <= 0:
+			return
+
+	# Bleeding: ticks the same way Poison does -- every tile the player
+	# actually moves (see _extend_bleed_on_move) lengthens it by a turn
+	# instead of dealing damage on the spot.
+	if player_bleed_turns > 0:
+		player_bleed_turns -= 1
+		var bleed_dmg: int = max(1, int(round(player.max_health * BLEED_DAMAGE_PCT)))
+		player.take_battle_damage(bleed_dmg)
+		hud.battle_log("You're bleeding for %d damage!" % bleed_dmg)
 		if player.health <= 0:
 			return
 
@@ -6380,15 +6934,17 @@ func _process_enemy_turn() -> void:
 	battle_move_trail = []
 	battle_player_defending = false
 	battle_player_taunting = false
+	battle_ironclad_move_allowed = not battle_ironclad_move_allowed
 	battle_feared_unreachable = false
 	battle_player_moves_left = _battle_player_move_range()
 	# Second Breath: passive Stamina regen at the start of every player
 	# turn, regardless of what the previous turn's action was.
 	if player.stamina_regen_per_turn() > 0:
 		player.regen_stamina(player.stamina_regen_per_turn())
-	# Moss Charm (talisman): a little HP back at the start of every turn.
-	if player.talisman_bonus("hp_regen_turn") > 0.0:
-		player.heal(int(player.talisman_bonus("hp_regen_turn")))
+	# Moss Charm (talisman): a little HP back at the start of every turn,
+	# scaling up with how much max HP the player has.
+	if player.hp_regen_per_turn() > 0:
+		player.heal(player.hp_regen_per_turn())
 	_check_disarm_reclaimed()
 
 	# Fear: re-derived fresh every turn (not a stored duration) from whichever
@@ -6470,7 +7026,7 @@ func _try_heal_ally(u: Dictionary) -> bool:
 	hud.battle_log("The %s chants, healing the %s for %d HP!" % [u.name, target.name, heal_amt])
 	return true
 
-# Druid's second priority behind healing: picks the first other living ally
+# A buffer's second priority behind healing: picks the first other living ally
 # that isn't ALREADY buffed (so it spreads the buff around a squad instead
 # of stacking it on one unit) and arms buffed_dmg_turns/buffed_dmg_pct --
 # consumed turn-by-turn wherever pack_bonus_mult/GNOME's live bonus already
@@ -6518,6 +7074,8 @@ func _move_enemy_unit(u: Dictionary, attack_range: int, movement_target: Vector2
 			var result := _resolve_battle_step(u.tile, dir)
 			if result.moved:
 				u.tile = result.tile
+				if u.get("bleed_turns", 0) > 0:
+					u.bleed_turns += 1
 				if result.fell:
 					var dmg := int(round(float(u.max_hp) * CLIFF_FALL_DAMAGE_PCT))
 					u.hp -= dmg
@@ -6530,10 +7088,10 @@ func _move_enemy_unit(u: Dictionary, attack_range: int, movement_target: Vector2
 		if not stepped:
 			break
 
-# Movement for a multi-tile, terrain-ignoring unit (the Brute, the Owlbear)
+# Movement for a multi-tile, terrain-ignoring unit (the Brute)
 # -- otherwise mirrors _move_enemy_unit's movement_target/attack_check_target
 # split (Brute has no "corners" trait, so the two are always equal for it and
-# it still just charges target_tile directly; the Owlbear's flank tile is
+# it still just charges target_tile directly; a 2x2 unit's flank tile is
 # computed the same way a 1x1 cornering unit's already is, in
 # _process_enemy_turn).
 func _move_big_unit(u: Dictionary, movement_target: Vector2i, attack_check_target: Vector2i) -> void:
@@ -6558,6 +7116,8 @@ func _move_big_unit(u: Dictionary, movement_target: Vector2i, attack_check_targe
 			var result := _resolve_big_unit_step(u.tile, size, dir, u.ref)
 			if result.moved:
 				u.tile = result.tile
+				if u.get("bleed_turns", 0) > 0:
+					u.bleed_turns += 1
 				stepped = true
 				break
 		if not stepped:
@@ -6607,10 +7167,12 @@ func _flank_target_tile(target: Vector2i) -> Vector2i:
 
 func _battle_victory() -> void:
 	hud.battle_log("Victory!")
+	sandbox_result = "victory"
 	_end_battle()
 
 func _battle_flee() -> void:
 	hud.battle_log("You flee the fight!")
+	sandbox_result = "fled"
 	for u in battle_units:
 		if is_instance_valid(u.ref):
 			u.ref.set_battle_cooldown(BATTLE_FLEE_COOLDOWN)
@@ -6618,6 +7180,7 @@ func _battle_flee() -> void:
 
 func _end_battle() -> void:
 	in_battle = false
+	_settle_party_after_battle()
 	battle_units.clear()
 	battle_allies.clear()
 	hud.hide_battle()
@@ -6631,6 +7194,8 @@ func _end_battle() -> void:
 	if pending_wave_advance:
 		pending_wave_advance = false
 		_advance_wave_tier()
+	if SaveDataScript.sandbox_active:
+		_sandbox_battle_finished()
 
 func _refresh_battle_display() -> void:
 	# Hand Picks' Mine button only ever shows up when there's actually a
@@ -6646,7 +7211,17 @@ func _refresh_battle_display() -> void:
 	_update_enemy_awareness()
 	for u in battle_units:
 		u["spotted_you"] = u.get("aware_of_player", false)
-	hud.update_battle_grid(BATTLE_GRID_W, BATTLE_GRID_H, battle_terrain, battle_player_tile, battle_units, player.health, player.max_health, player.level, battle_turn, _effective_target_index(), battle_player_moves_left, player.stamina, player.max_stamina, player.current_weapon, battle_menu_state, player.healing_items, battle_move_trail, battle_allies, player.has_guardian_skill, battle_skill_cooldown, player.disarmed_tile != Vector2i(-1, -1), player.owned_arrows, battle_awaiting_evasion, can_mine, player.equipped_shield.get("name", ""), player.shield_block_chance(), player.berserk_turns_remaining, player.stealth_turns_remaining, STEALTH_STAMINA_COST, battle_evasion_options, battle_feared_unreachable, battle_awaiting_water_confirm)
+	# Whoever's being commanded right now glows on the grid (see HUD.gd's
+	# per-ally icon loop); every other ally, including the hero's own turn,
+	# clears it.
+	for a in battle_allies:
+		a["acting"] = a == battle_commanding_ally
+	var display_hp: int = battle_commanding_ally.hp if battle_commanding_ally != null else player.health
+	var display_max_hp: int = battle_commanding_ally.max_hp if battle_commanding_ally != null else player.max_health
+	var display_moves_left: int = battle_ally_moves_left if battle_commanding_ally != null else battle_player_moves_left
+	var display_target_index: int = _ally_effective_target_index(battle_commanding_ally) if battle_commanding_ally != null else _effective_target_index()
+	var commanding_ally_name: String = battle_commanding_ally.name if battle_commanding_ally != null else ""
+	hud.update_battle_grid(BATTLE_GRID_W, BATTLE_GRID_H, battle_terrain, battle_player_tile, battle_units, display_hp, display_max_hp, player.level, battle_turn, display_target_index, display_moves_left, player.stamina, player.max_stamina, player.current_weapon, battle_menu_state, player.healing_items, battle_move_trail, battle_allies, player.has_guardian_skill, battle_skill_cooldown, player.disarmed_tile != Vector2i(-1, -1), player.owned_arrows, battle_awaiting_evasion, can_mine, player.equipped_shield.get("name", ""), player.shield_block_chance(), player.berserk_turns_remaining, player.stealth_turns_remaining, STEALTH_STAMINA_COST, battle_evasion_options, battle_feared_unreachable, battle_awaiting_water_confirm, commanding_ally_name)
 	if tutorial_active and battle_turn == "player":
 		hud.show_battle_hint(_tutorial_hint_text(), _tutorial_hint_target_button())
 	else:

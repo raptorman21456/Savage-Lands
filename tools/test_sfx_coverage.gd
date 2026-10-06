@@ -1,7 +1,7 @@
 extends SceneTree
 
-# 5 previously-silent mechanics (Mine, shield block, shield knockback, Fae
-# Hut spawn, Druid heal/buff) now each play a distinct cue. play_sfx() has no
+# 4 previously-silent mechanics (Mine, shield block, shield knockback, Fae
+# Hut spawn) now each play a distinct cue. play_sfx() has no
 # return value or "last played" record, so each check snapshots
 # sfx_next_player beforehand and confirms THAT pool slot's stream ended up
 # matching the expected clip -- the same round-robin play_sfx() itself uses.
@@ -119,31 +119,6 @@ func _init() -> void:
 	main._process_enemy_turn()
 	print("A Fae Hut spawning a Fae plays the 'fae_spawn' cue: %s (expected true)" % [main.sfx_players[idx].stream == main.sfx_streams["fae_spawn"]])
 
-	# =========================================================
-	# Druid heal / buff
-	# =========================================================
-	var druid_script = load("res://scripts/Druid.gd")
-	var druid_ref = druid_script.new()
-	main.add_child(druid_ref)
-	druid_ref.died.connect(main._on_enemy_died)
-	main.enemies_alive += 1
-	var druid := {
-		"ref": druid_ref, "tile": Vector2i(1, 1), "hp": 12, "max_hp": 12, "move_range": 2,
-		"damage": 1, "name": "Druid", "winding_up": false, "stunned": false,
-		"attack_range": 1, "concussed_turns": 0, "frozen_turns": 0,
-		"burning": false, "armored": false,
-		"disarmed_tile": Vector2i(-1, -1),
-	}
-	var hurt_goblin := _make_goblin(main, Vector2i(2, 2), 3)
-	hurt_goblin.max_hp = 10
-	main.battle_units = [druid, hurt_goblin]
-	idx = main.sfx_next_player
-	main._process_enemy_turn()
-	print("Druid healing an ally plays the 'heal' cue: %s (expected true)" % [main.sfx_players[idx].stream == main.sfx_streams["heal"]])
-
-	hurt_goblin.hp = hurt_goblin.max_hp  # nobody hurt now -> Druid buffs instead
-	idx = main.sfx_next_player
-	main._process_enemy_turn()
-	print("Druid buffing an ally plays the 'buff' cue: %s (expected true)" % [main.sfx_players[idx].stream == main.sfx_streams["buff"]])
+	# (The Druid heal/buff cues have no enemy to trigger them since the Druid was removed.)
 
 	quit()

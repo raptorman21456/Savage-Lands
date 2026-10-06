@@ -61,10 +61,10 @@ func _init() -> void:
 	# --- Beastmaster (repurposed): guarantees a Traitor Wolf from the start
 	# of the run, no recruit roll needed -- and its loyalty timer is already
 	# ticking. Pack Bond (2 levels) extends how long it lasts. ---
-	print("Beastmaster guarantees a starting Traitor Wolf: %s (expected true, non-empty)" % [not player.party_wolf.is_empty()])
-	print("...and Pack Bond's bonus waves are stored for it: meta_wolf_bonus_waves=%d (expected 6, 2 levels * 3)" % [player.meta_wolf_bonus_waves])
-	print("...the wolf's stay timer is set at run start (WOLF_BASE_STAY_WAVES + Pack Bond): wolf_waves_remaining=%d (expected %d)" % [
-		main.wolf_waves_remaining, main.WOLF_BASE_STAY_WAVES + player.meta_wolf_bonus_waves
+	print("Beastmaster guarantees a starting Fickle Wolf: %s (expected true, one wolf)" % [player.party_wolves().size() == 1])
+	print("...and Pack Bond's bonus battles are stored for it: meta_wolf_bonus_waves=%d (expected 6, 2 levels * 3)" % [player.meta_wolf_bonus_waves])
+	print("...the wolf's loyalty is already ticking (10 base + Pack Bond): battles_left=%d (expected %d)" % [
+		player.party_wolves()[0].battles_left, 10 + player.meta_wolf_bonus_waves
 	])
 
 	# --- Appraisal is a plain stacking stat node (extra starting coins). ---
@@ -324,8 +324,7 @@ func _init() -> void:
 	var hardened_base_hp: int = player.max_health
 	player.health = player.max_health
 	main.shrine_effect_waves_remaining = 0
-	main.wolf_waves_remaining = 0
-	player.party_wolf = {}
+	player.party = []
 	main.wave = 1
 	main._advance_wave_tier()
 	print("Hardened permanently grows max HP each wave cleared: max_health=%d health=%d (expected %d, %d)" % [player.max_health, player.health, hardened_base_hp + 4, hardened_base_hp + 4])
@@ -335,12 +334,13 @@ func _init() -> void:
 	player.meta_hardened_hp_per_wave = 0
 	player._recalc_stats()
 
-	# --- Wolf expiry: a recruited wolf's loyalty runs out after
-	# WOLF_BASE_STAY_WAVES (+ Pack Bond) waves cleared, then leaves. ---
-	player.party_wolf = {"name": "Traitor Wolf", "dmg_mult": 0.6}
-	main.wolf_waves_remaining = 1
-	main._advance_wave_tier()
-	print("A Traitor Wolf's loyalty runs out and it leaves the pack: party_wolf_empty=%s (expected true)" % [player.party_wolf.is_empty()])
+	# --- Wolf expiry: a recruited wolf's loyalty is spent one BATTLE at a time
+	# (see Main._settle_party_after_battle), and it leaves when none are left. ---
+	player.party = []
+	var loyal_wolf = player.recruit("wolf")
+	loyal_wolf.battles_left = 1
+	main._settle_party_after_battle()
+	print("A wolf's loyalty runs out after its last battle and it leaves the pack: wolves=%d (expected 0)" % [player.party_wolves().size()])
 
 	# Reset the scratch save for whatever test runs next.
 	save_data_script.save_data({"essence": 0, "upgrades": {}, "best_wave": 0})

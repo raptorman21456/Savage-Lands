@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Savage Lands Battle Simulator</title>
+<style>
+/*__CSS__*/
+</style>
+</head>
+<body>
+
+<!-- ============ SCREEN 1: SETUP ============ -->
+<div id="setupView" class="screen">
+  <header class="top">
+    <h1>Savage Lands &mdash; Battle Simulator</h1>
+    <span class="dim" id="viewLabel">Step 1 of 2 &mdash; set up your build</span>
+    <span class="spacer"></span>
+    <button id="btnBatchSetup" title="Run many auto-played battles for balance stats">Batch run&hellip;</button>
+    <button id="btnSave">Save config</button>
+    <button id="btnLoad">Load config</button>
+    <button id="btnAbout">About</button>
+  </header>
+  <main>
+    <div class="setup-intro">
+      <h2>Set up your fighter</h2>
+      <div class="dim">Choose a level, stat points, weapon, gear, talismans, Astral upgrades, party and enemies &mdash; then press <b>Start battle</b> to enter the battle screen.</div>
+    </div>
+    <div id="config"></div>
+  </main>
+  <div class="startbar" id="startbar">
+    <div class="summary" id="setupSummary"></div>
+    <span class="dim">seed</span><input id="seedBoxSetup" type="number" style="width:110px"><button id="btnSeedSetup" title="Random seed">&#127922;</button>
+    <button class="primary big" id="btnStart">Start battle &rarr;</button>
+  </div>
+</div>
+
+<!-- ============ SCREEN 2: BATTLE (full screen, nothing from setup shown) ============ -->
+<div id="battleView" class="screen" hidden>
+  <header class="top">
+    <button id="btnBack" class="primary">&larr; Back to setup</button>
+    <h1>Battle</h1>
+    <span class="spacer"></span>
+    <button id="btnRestart" title="Same seed: same terrain, enemy rows and rolls">Restart (same seed)</button>
+    <button id="btnNewSeed">New seed</button>
+    <span class="dim">seed</span><input id="seedBox" type="number" style="width:110px">
+    <button id="btnAuto" title="Auto-play the rest of this battle">Auto-play</button>
+    <button id="btnAutoTurn" title="Auto-play one turn">Auto turn</button>
+    <button id="btnBatch">Batch run&hellip;</button>
+  </header>
+  <div class="battle-body">
+    <section class="b-main" id="battle">
+      <div class="panel banner" id="banner"></div>
+      <div class="panel b-grid"><div id="gridwrap"><div id="grid"></div></div><div class="legend" id="legend"></div></div>
+      <div class="panel" id="menu"></div>
+    </section>
+    <aside class="b-side">
+      <div id="side"></div>
+      <div class="panel b-log"><h2>Battle log <button id="btnCopyLog" style="float:right;padding:1px 8px">Copy log</button></h2><div id="log"></div></div>
+    </aside>
+  </div>
+</div>
+
+<div id="modalRoot"></div>
+<script>
+/*__JS__*/
+</script>
+</body>
+</html>

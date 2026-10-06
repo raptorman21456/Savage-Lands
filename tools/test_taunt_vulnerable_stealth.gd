@@ -189,7 +189,7 @@ func _init() -> void:
 	print("...but NOT spotted at the same distance while Stealth shrinks the range: aware_of_player=%s (expected false)" % [u_mid_stealthed.aware_of_player])
 	player.stealth_turns_remaining = 0
 
-	var u_boss := _make_unit(main, "Owlbear", Vector2i(0, 0), 999999, 2, 2)
+	var u_boss := _make_unit(main, "Elder Oak", Vector2i(0, 0), 999999, 2, 2)
 	print("Boss-tier enemies are always aware regardless of distance or their own stored flag: sees=%s (expected true, aware_of_player itself stays %s)" % [main._enemy_currently_sees_player(u_boss), u_boss.aware_of_player])
 
 	var g_reveal := _make_unit(main, "Goblin", Vector2i(0, 0))

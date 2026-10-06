@@ -41,7 +41,7 @@ func _init() -> void:
 	for base in weapons_script.UPGRADABLE_TYPES:
 		var mythic: Dictionary = weapons_script.MYTHIC_WEAPONS[base.id]
 		var variant: Dictionary = weapons_script.make_variant(base, mythic_rank)
-		var expected_dmg: float = base.damage_mult * 3.0
+		var expected_dmg: float = base.damage_mult * 2.5
 		var expected_price: int = int(round(base.price * 6.0))
 		print("%s -> %s: id=%s (expected %s_mythic), tier=%s, dmg=%.3f (expected %.3f), price=%d (expected %d)" % [
 			base.name, variant.name, variant.id, base.id, variant.tier_name, variant.damage_mult, expected_dmg, variant.price, expected_price
@@ -51,31 +51,46 @@ func _init() -> void:
 
 	print("--- battle behavior ---")
 
-	# Stormfang: passive_lifesteal_pct heals on every hit, no lifesteal
-	# special needed.
+	# The Great Toothpicke: passive_heal_chance/passive_heal_flat is a flat,
+	# probabilistic sip of HP on a landed hit -- 25% chance, always exactly 5
+	# HP, not a %-of-damage lifesteal. Health is reset to 1 before every
+	# trial so a heal (health goes above 1) is unambiguous, and any heal that
+	# ISN'T exactly to 6 would mean the flat amount drifted.
 	player.current_weapon = weapons_script.make_variant(weapons_script.SPEAR, mythic_rank)
-	player.stamina = player.MAX_STAMINA
-	player.health = 1
-	var g_storm = _make_unit(main, "Goblin", Vector2i(3, 2), 999, 0)
-	main.battle_units = [g_storm]
-	main._battle_player_fight()
-	var storm_dmg: int = 999 - g_storm.hp
-	var expected_storm_heal: int = max(1, int(round(storm_dmg * 0.25)))
-	print("Stormfang lifesteal on a plain attack: dealt=%d, player_health=%d (expected 1+%d=%d)" % [
-		storm_dmg, player.health, expected_storm_heal, 1 + expected_storm_heal
-	])
+	var heal_trials := 150
+	var heals := 0
+	var wrong_heal_amount := false
+	for i in heal_trials:
+		player.stamina = player.MAX_STAMINA
+		player.health = 1
+		var g_tooth := _make_unit(main, "Goblin", Vector2i(3, 2), 999999)
+		main.battle_units = [g_tooth]
+		main.battle_target_index = 0
+		main._battle_player_fight()
+		if player.health > 1:
+			heals += 1
+			if player.health != 6:
+				wrong_heal_amount = true
+		if is_instance_valid(g_tooth.ref):
+			g_tooth.ref.queue_free()
+	print("The Great Toothpicke's 25%% heal-chance over %d trials: %d (expected roughly 20-55, ~37 mean), always exactly 5 flat HP: wrong_amount=%s (expected false)" % [heal_trials, heals, wrong_heal_amount])
 
-	# Duskrender: passive_cleave_pct splashes onto a second targetable enemy.
+	# The Looongblade: passive_extra_range adds a flat tile of reach on top of
+	# whatever the weapon normally gets -- turns Greatsword's usual melee-only
+	# range (1) into 2, same as a long_range weapon, but not further than that.
 	player.current_weapon = weapons_script.make_variant(weapons_script.GREATSWORD, mythic_rank)
 	player.stamina = player.MAX_STAMINA
+	var g_long = _make_unit(main, "Goblin", Vector2i(4, 2), 999) # 2 tiles from (2,2) -- out of Greatsword's normal range
+	main.battle_units = [g_long]
 	main.battle_target_index = 0
-	var g_dusk_primary = _make_unit(main, "Goblin", Vector2i(3, 2))
-	var g_dusk_splash = _make_unit(main, "Goblin", Vector2i(2, 1))
-	main.battle_units = [g_dusk_primary, g_dusk_splash]
 	main._battle_player_fight()
-	print("Duskrender cleave splashes a second enemy: primary_dealt=%d (expected >0), splash_dealt=%d (expected >0)" % [
-		999 - g_dusk_primary.hp, 999 - g_dusk_splash.hp
-	])
+	print("The Looongblade reaches 2 tiles instead of Greatsword's usual 1: dealt=%d (expected >0)" % [999 - g_long.hp])
+	player.stamina = player.MAX_STAMINA
+	var g_too_far = _make_unit(main, "Goblin", Vector2i(5, 2), 999) # 3 tiles -- the flat +1 doesn't reach this far
+	main.battle_units = [g_too_far]
+	main.battle_target_index = 0
+	main._battle_player_fight()
+	print("...but not 3 tiles: dealt=%d (expected 0, no target in range)" % [999 - g_too_far.hp])
 
 	# Worldbreaker: passive_guaranteed_knockback always knocks back an Orc,
 	# same guarantee the existing guaranteed_knockback special has. Called
@@ -96,45 +111,58 @@ func _init() -> void:
 	main._apply_single_hit(0, 1.0, "", player.current_weapon)
 	print("Worldbreaker always knocks back even an Orc: tile=%s (expected (5, 2), pushed back 2 tiles)" % [orc_unit.tile])
 
-	# Bloodreaver: passive_execute_bonus applies +50% vs a target below 30% HP,
-	# without needing the explicit execute effect. max_hp=999 keeps the
-	# knockback-fall math irrelevant and hp=100 (<30% of 999) guarantees the
-	# threshold is met going in.
+	# The Executioner's Axe: passive_oneshot_chance is an independent 5%
+	# per-hit chance to kill a regular enemy outright, same "bosses are
+	# immune" carve-out as the Last Stand Idol talisman's guaranteed version.
 	player.current_weapon = weapons_script.make_variant(weapons_script.BATTLE_AXE, mythic_rank)
-	player.stamina = player.MAX_STAMINA
-	var g_reaver := {
-		"ref": load("res://scripts/Enemy.gd").new(), "tile": Vector2i(3, 2), "hp": 100, "max_hp": 999,
-		"move_range": 2, "damage": 0, "name": "Goblin", "winding_up": false, "stunned": false,
-	}
-	main.add_child(g_reaver.ref)
-	g_reaver.ref.died.connect(main._on_enemy_died)
-	main.enemies_alive += 1
-	main.battle_units = [g_reaver]
-	main._battle_player_fight()
-	var base_dmg: int = int(round(10 * player.current_weapon.damage_mult))
-	var expected_reaver_dmg: int = int(round(base_dmg * 1.5))
-	print("Bloodreaver executes a low-HP target without the execute effect: dealt=%d (expected %d, +50%% of %d)" % [
-		100 - g_reaver.hp, expected_reaver_dmg, base_dmg
-	])
-
-	# Nightwhisper: passive_double_hit_chance is probabilistic (30%) -- over
-	# many single hits, roughly 30% should land the bonus second hit.
-	player.current_weapon = weapons_script.make_variant(weapons_script.DAGGER, mythic_rank)
-	var extra_hits := 0
-	var trials := 150
-	for i in trials:
+	var oneshot_trials := 200
+	var oneshots := 0
+	for i in oneshot_trials:
 		player.stamina = player.MAX_STAMINA
-		var g := _make_unit(main, "Goblin", Vector2i(3, 2), 999999)
-		main.battle_units = [g]
+		var g_axe := _make_unit(main, "Goblin", Vector2i(3, 2), 999999)
+		main.battle_units = [g_axe]
+		main.battle_target_index = 0
 		main._battle_player_fight()
-		var hits_landed: int = 1 if (999999 - g.hp) > 0 else 0
-		# A landed double-hit deals roughly 2x a single hit's damage.
-		var single_hit: int = int(round(10 * player.current_weapon.damage_mult))
-		if (999999 - g.hp) >= single_hit * 2 - 1:
-			extra_hits += 1
-		if is_instance_valid(g.ref):
-			g.ref.queue_free()
-	print("Nightwhisper's 30%% double-hit chance over %d trials: %d (expected roughly 30-60, ~45 mean)" % [trials, extra_hits])
+		if g_axe.hp <= 0:
+			oneshots += 1
+		if is_instance_valid(g_axe.ref):
+			g_axe.ref.queue_free()
+	print("The Executioner's Axe's 35%% oneshot-chance over %d trials: %d (expected roughly 55-115, ~70 mean)" % [oneshot_trials, oneshots])
+	# A boss-tier target is immune, same as Last Stand Idol. Elder Oak's own
+	# 35% dodge_chance means not every trial actually lands, so only landed
+	# hits (dealt > 0) count toward the "never a full kill" check.
+	var boss_trials := 60
+	var boss_landed := 0
+	var boss_oneshot := false
+	for i in boss_trials:
+		player.stamina = player.MAX_STAMINA
+		var g_boss := _make_unit(main, "Elder Oak", Vector2i(3, 2), 999999)
+		main.battle_units = [g_boss]
+		main.battle_target_index = 0
+		main._battle_player_fight()
+		var boss_dealt: int = 999999 - g_boss.hp
+		if boss_dealt > 0:
+			boss_landed += 1
+			if g_boss.hp <= 0:
+				boss_oneshot = true
+		if is_instance_valid(g_boss.ref):
+			g_boss.ref.queue_free()
+	print("...but never a boss-tier enemy, across %d landed hits: oneshot=%s (expected false)" % [boss_landed, boss_oneshot])
+
+	# The Implement: passive_lifesteal_pct heals back 20% of the damage just
+	# dealt, on every landed hit -- guaranteed, not a chance roll.
+	player.current_weapon = weapons_script.make_variant(weapons_script.DAGGER, mythic_rank)
+	player.stamina = player.MAX_STAMINA
+	player.health = 1
+	var g_implement = _make_unit(main, "Goblin", Vector2i(3, 2), 999999)
+	main.battle_units = [g_implement]
+	main.battle_target_index = 0
+	main._battle_player_fight()
+	var implement_dmg: int = 999999 - g_implement.hp
+	var expected_implement_heal: int = max(1, int(round(implement_dmg * 0.20)))
+	print("The Implement's 20%% lifesteal on a plain attack: dealt=%d, player_health=%d (expected 1+%d=%d)" % [
+		implement_dmg, player.health, expected_implement_heal, 1 + expected_implement_heal
+	])
 
 	# Grunkle Gloves: passive_stun_chance is probabilistic (20%) -- called via
 	# _apply_single_hit directly rather than the full attack flow, same
@@ -156,7 +184,7 @@ func _init() -> void:
 	print("Grunkle Gloves' 20%% stun chance over %d trials: %d (expected roughly 20-40, ~30 mean)" % [stun_trials, stuns])
 
 	# Grunkle Gloves: passive_undead_boss_bonus deals 30% more against an
-	# undead or boss-tier enemy (Count Strahd is both) than a plain Goblin.
+	# undead or boss-tier enemy (Elder Oak is both) than a plain Goblin.
 	# Averaged over many landed hits, via _apply_single_hit directly -- Count
 	# Strahd's own 35% dodge_chance would otherwise swing a single trial
 	# either way, so whiffed (0-damage) hits are excluded from the average.
@@ -177,7 +205,7 @@ func _init() -> void:
 	var strahd_total := 0
 	var strahd_hits := 0
 	for i in bonus_trials:
-		var g_s := _make_unit(main, "Count Strahd", Vector2i(3, 2), 999999)
+		var g_s := _make_unit(main, "Elder Oak", Vector2i(3, 2), 999999)
 		main.battle_units = [g_s]
 		main._apply_single_hit(0, 1.0, "", player.current_weapon)
 		var dealt: int = 999999 - g_s.hp
@@ -192,12 +220,29 @@ func _init() -> void:
 		plain_avg, plain_hits, strahd_avg, strahd_hits, plain_avg * 1.3
 	])
 
-	# Gravedigger: passive_free_specials means a special costs 0 stamina.
+	# Frying Pans: passive_free_special_chance is a probabilistic 10% chance
+	# per use, not Gravedigger's guaranteed free ride -- pichaku (0 stamina
+	# regardless) is a clean special to repeat since it never actually needs
+	# the free roll to succeed, so stamina is drained back to 0 every trial
+	# and only the free-roll's own log line proves whether it fired.
 	player.current_weapon = weapons_script.make_variant(weapons_script.HAND_PICKS, mythic_rank)
-	player.stamina = 0
-	var g_grave = _make_unit(main, "Goblin", Vector2i(3, 2))
-	main.battle_units = [g_grave]
-	main._battle_player_special(0)
-	print("Gravedigger's specials are free even at 0 stamina: dealt=%d (expected >0, attack still landed)" % [999 - g_grave.hp])
+	var free_trials := 200
+	var frees := 0
+	for i in free_trials:
+		player.stamina = 0
+		var special_idx := -1
+		for s in player.current_weapon.specials.size():
+			if player.current_weapon.specials[s].effect == "diamonds":
+				special_idx = s
+				break
+		var g_pan = _make_unit(main, "Goblin", Vector2i(3, 2))
+		main.battle_units = [g_pan]
+		main.battle_target_index = 0
+		main._battle_player_special(special_idx)
+		if 999 - g_pan.hp > 0:
+			frees += 1
+		if is_instance_valid(g_pan.ref):
+			g_pan.ref.queue_free()
+	print("Frying Pans' 10%% free-special-chance over %d trials at 0 stamina: %d (expected roughly 10-35, ~20 mean)" % [free_trials, frees])
 
 	quit()

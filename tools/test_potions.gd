@@ -68,7 +68,7 @@ func _init() -> void:
 	main.player_poison_turns = 3
 	main.player_poison_dmg = 4
 	main.player_burning = true
-	main.player_bleeding = true
+	main.player_bleed_turns = 2
 	main.player_concussed_turns = 2
 	main.player_blind_turns = 2
 	player.potion_queue = ["potion_regular"]
@@ -77,8 +77,8 @@ func _init() -> void:
 	main.battle_turn = "player"
 	main._battle_player_item()
 	print("Cleansing Potion heals 12 HP: health=%d (expected 62)" % [player.health])
-	print("...and strips every negative status: poison_turns=%d poison_dmg=%d burning=%s bleeding=%s concussed_turns=%d blind_turns=%d (expected 0, 0, false, false, 0, 0)" % [
-		main.player_poison_turns, main.player_poison_dmg, main.player_burning, main.player_bleeding, main.player_concussed_turns, main.player_blind_turns
+	print("...and strips every negative status: poison_turns=%d poison_dmg=%d burning=%s bleed_turns=%d concussed_turns=%d blind_turns=%d (expected 0, 0, false, 0, 0, 0)" % [
+		main.player_poison_turns, main.player_poison_dmg, main.player_burning, main.player_bleed_turns, main.player_concussed_turns, main.player_blind_turns
 	])
 
 	# --- Attack Potion: no healing, but +25% damage dealt for a few turns. ---

@@ -13,7 +13,7 @@ extends Node
 #
 # Deliberately NOT covered here (would need real code changes first, see
 # each note below before attempting):
-#   - Enemy display names -- "Goblin"/"Count Strahd"/etc. double as the
+#   - Enemy display names -- "Goblin"/"Archmage"/etc. double as the
 #     ENEMY_TRAITS lookup key all through Main.gd and HUD.gd, so renaming one
 #     would silently strip that enemy of its traits instead of just relabeling it.
 #   - Weapon quality tier names ("Broken".."Mythic") -- tier_name doubles as

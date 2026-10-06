@@ -17,6 +17,7 @@ const LOGO_COMPACT_WIDTH_FRACTION := 0.26
 var play_button: Button
 var quit_button: Button
 var stats_button: Button
+var sandbox_button: Button
 var description_label: Label
 var main_menu_box: VBoxContainer
 var beastiary_panel: BeastiaryPanelScript
@@ -92,6 +93,9 @@ var copy_source_slot := 0
 var save_data: Dictionary
 
 func _ready() -> void:
+	# Coming back from the sandbox (or anywhere else): the real save is live again.
+	SaveDataScript.sandbox_active = false
+	SaveDataScript.sandbox_data = {}
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	_bind_extra_select_key()
 	save_data = SaveDataScript.load_data()
@@ -187,6 +191,14 @@ func _ready() -> void:
 
 	beastiary_panel = BeastiaryPanelScript.new()
 	add_child(beastiary_panel)
+
+	sandbox_button = Button.new()
+	sandbox_button.text = "Sandbox"
+	sandbox_button.custom_minimum_size = Vector2(180, 44)
+	sandbox_button.pressed.connect(_on_sandbox_pressed)
+	_setup_hover_button(sandbox_button, "Debug sandbox: build any character, pick the enemies, and fight a real battle. Nothing in it is saved.")
+	_style_skill_node_button(sandbox_button)
+	main_menu_box.add_child(sandbox_button)
 
 	quit_button = Button.new()
 	quit_button.text = "Quit"
@@ -562,6 +574,13 @@ func _bind_extra_select_key() -> void:
 	InputMap.action_add_event("ui_accept", z_event)
 
 func _on_play_pressed() -> void:
+	get_tree().change_scene_to_file("res://Main.tscn")
+
+# Debug sandbox: a throwaway run whose every save read/write stays in memory
+# (SaveData.sandbox_active) -- see Sandbox.gd / SandboxPanel.gd.
+func _on_sandbox_pressed() -> void:
+	SaveDataScript.sandbox_active = true
+	SaveDataScript.sandbox_data = {}
 	get_tree().change_scene_to_file("res://Main.tscn")
 
 func _on_quit_pressed() -> void:

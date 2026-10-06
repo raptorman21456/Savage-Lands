@@ -156,7 +156,7 @@ func _init() -> void:
 	# --- _enemy_apply_damage, ally-target branch: same guarantees, against a
 	# battle_allies entry instead of the player. ---
 	var ally_tile := Vector2i(6, 6)
-	main.battle_allies = [{"tile": ally_tile, "hp": 20, "max_hp": 20, "dmg_mult": 1.0, "name": "Blade Ally", "move_range": 2, "attack_range": 1}]
+	main.battle_allies = [{"tile": ally_tile, "hp": 20, "max_hp": 20, "dmg_mult": 1.0, "name": "Knight", "move_range": 2, "attack_range": 1}]
 	main.battle_shake_timer = 0.0
 	var attacker_b := {"tile": Vector2i(7, 5)}
 	var result_ally: Dictionary = main._enemy_apply_damage(attacker_b, ally_tile, 6, {})

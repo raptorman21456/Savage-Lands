@@ -1,9 +1,9 @@
 extends SceneTree
 
-# Batch A worlds (World Progression feature): Swamp (Lizard Soldier Swarm /
-# Black Dragonlet), Forest (Treant / Elder Oak), Desert (Gibbering Mouther /
-# Iron Golem) -- same end-to-end shape as test_beach_world.gd, run for all 3
-# worlds in one file since the pattern is now fully proven.
+# Batch A worlds (World Progression feature): Swamp (Black Dragonlet miniboss /
+# Lizen Warband boss), Forest (Treant / Elder Oak), Desert (Iron Construct miniboss /
+# Leviathan boss -- a placeholder boss until the Desert gets its own) -- same
+# end-to-end shape as test_beach_world.gd, run for all 3 worlds in one file.
 
 func _check_world(main, wave_mini: int, wave_boss: int, world_name: String, mini_name: String, boss_name: String) -> void:
 	main.wave = wave_mini
@@ -57,7 +57,7 @@ func _init() -> void:
 		e.set_physics_process(false)
 
 	# --- Data sanity: ENEMY_TRAITS + HUD icons for all 6 new enemies ---
-	var names := ["Lizard Soldier Swarm", "Black Dragonlet", "Treant", "Elder Oak", "Gibbering Mouther", "Iron Golem"]
+	var names := ["Lizen Warband", "Black Dragonlet", "Treant", "Elder Oak", "Iron Construct", "Leviathan"]
 	var all_boss_tier := true
 	var all_have_icons := true
 	for n in names:
@@ -69,22 +69,23 @@ func _init() -> void:
 	print("All 6 Batch A enemies have HUD icons: %s (expected true)" % [all_have_icons])
 
 	# --- Distinguishing mechanics ---
-	print("Lizard Soldier Swarm is fast with frequent quick jabs: move_range=%d quick_jab_chance=%.1f (expected 2, 0.5)" % [
-		main.ENEMY_TRAITS["Lizard Soldier Swarm"].move_range, main.ENEMY_TRAITS["Lizard Soldier Swarm"].quick_jab_chance
+	print("Lizen Warband is fast with frequent quick jabs: move_range=%d quick_jab_chance=%.1f (expected 2, 0.5)" % [
+		main.ENEMY_TRAITS["Lizen Warband"].move_range, main.ENEMY_TRAITS["Lizen Warband"].quick_jab_chance
 	])
 	print("Black Dragonlet breathes a sweeping attack: sweeps=%s (expected true)" % [main.ENEMY_TRAITS["Black Dragonlet"].sweeps])
 	print("Treant resists being shoved: knockback_resist=%.2f (expected 0.85)" % [main.ENEMY_TRAITS["Treant"].knockback_resist])
 	print("Elder Oak sweeps too, tankier than Treant: sweeps=%s hp=%d>%d (expected true, true)" % [
 		main.ENEMY_TRAITS["Elder Oak"].sweeps, main.ElderOakScript.MAX_HEALTH, main.TreantScript.MAX_HEALTH
 	])
-	print("Gibbering Mouther is erratic: dodge_chance=%.2f ignore_line=%s (expected 0.25, true)" % [
-		main.ENEMY_TRAITS["Gibbering Mouther"].dodge_chance, main.ENEMY_TRAITS["Gibbering Mouther"].ignore_line
+	print("Leviathan reaches with a psychic strike: attack_range=%d ignore_line=%s (expected 2, true)" % [
+		main.ENEMY_TRAITS["Leviathan"].attack_range, main.ENEMY_TRAITS["Leviathan"].ignore_line
 	])
-	print("Iron Golem is immovable: knockback_resist=%.1f (expected 1.0)" % [main.ENEMY_TRAITS["Iron Golem"].knockback_resist])
+	print("is_miniboss flags (Lizen Warband, Black Dragonlet, Treant, Elder Oak, Iron Construct, Leviathan): %s (expected [false, true, true, false, true, false])" % [[main.ENEMY_TRAITS["Lizen Warband"].get("is_miniboss", false), main.ENEMY_TRAITS["Black Dragonlet"].get("is_miniboss", false), main.ENEMY_TRAITS["Treant"].get("is_miniboss", false), main.ENEMY_TRAITS["Elder Oak"].get("is_miniboss", false), main.ENEMY_TRAITS["Iron Construct"].get("is_miniboss", false), main.ENEMY_TRAITS["Leviathan"].get("is_miniboss", false)]])
+	print("Iron Construct is immovable: knockback_resist=%.1f (expected 1.0)" % [main.ENEMY_TRAITS["Iron Construct"].knockback_resist])
 
 	# --- End-to-end per world ---
-	await _check_world(main, 25, 30, "Swamp", "Lizard Soldier Swarm", "Black Dragonlet")
+	await _check_world(main, 25, 30, "Swamp", "Black Dragonlet", "Lizen Warband")
 	await _check_world(main, 35, 40, "Forest", "Treant", "Elder Oak")
-	await _check_world(main, 45, 50, "Desert", "Gibbering Mouther", "Iron Golem")
+	await _check_world(main, 45, 50, "Desert", "Iron Construct", "Leviathan")
 
 	quit()

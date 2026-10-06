@@ -132,7 +132,7 @@ func _init() -> void:
 	player2.meta_crit_chance = 0.0
 	main2.battle_terrain.clear()
 	main2.battle_terrain[main2.battle_units[0].tile + Vector2i(1, 0)] = {"type": "rock"}
-	main2._apply_single_hit(0, 1.0, "", weapons_script.CLUB, "Blade Ally")
+	main2._apply_single_hit(0, 1.0, "", weapons_script.CLUB, "Knight")
 	var ally_dmg: int = 999999 - main2.battle_units[0].hp
 	print("...and never crits for an ally's own hit through the same function: ally_dmg=%d (expected == normal_with_cover, not doubled)" % [ally_dmg])
 	player2.meta_crit_chance = 0.0
@@ -160,8 +160,9 @@ func _init() -> void:
 
 	# --- Might's ally damage bonus: +0.5% per point, applied to both
 	# recruited party members and the wolf companion via _place_ally_units. ---
-	player2.party_members = [{"name": "Blade Ally", "dmg_mult": 0.75}]
-	player2.party_wolf = {"name": "Traitor Wolf", "dmg_mult": 0.6}
+	player2.party_members = [{"name": "Knight", "dmg_mult": 0.75}]
+	player2.party = []
+	player2.recruit("wolf")
 	player2.stat_might = 0
 	main2.battle_allies = []
 	main2._place_ally_units({})

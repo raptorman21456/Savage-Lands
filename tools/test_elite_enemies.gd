@@ -44,7 +44,7 @@ func _init() -> void:
 	])
 
 	# --- boss never rolls elite, even spawned many times ---
-	var boss_script = load("res://scripts/Boss.gd")
+	var boss_script = load("res://scripts/LizenWarband.gd")
 	var boss_elite_count := 0
 	for i in 50:
 		main._spawn_boss_wave()

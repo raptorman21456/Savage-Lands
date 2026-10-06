@@ -1,8 +1,8 @@
 extends SceneTree
 
 # Voidlands world (World Progression feature): Voidwing (miniboss) /
-# Supreme Warlock (world-ending boss) -- the last "normal" world before
-# Nothingness. Supreme Warlock's power_tier field is the hook the
+# Archmage (world-ending boss) -- the last "normal" world before
+# Nothingness. Archmage's power_tier field is the hook the
 # Nothingness rematch will use later (Phase 6) to re-fight the same boss at
 # higher stats -- tested here directly since this is where it's introduced.
 
@@ -20,7 +20,7 @@ func _init() -> void:
 		e.set_physics_process(false)
 
 	# --- Data sanity ---
-	var names := ["Voidwing", "Supreme Warlock"]
+	var names := ["Voidwing", "Archmage"]
 	var all_boss_tier := true
 	var all_have_icons := true
 	for n in names:
@@ -34,9 +34,9 @@ func _init() -> void:
 		main.ENEMY_TRAITS["Voidwing"].move_range, main.ENEMY_TRAITS["Voidwing"].dodge_chance,
 		main.ENEMY_TRAITS["Voidwing"].ignore_line, main.ENEMY_TRAITS["Voidwing"].attack_range
 	])
-	print("Supreme Warlock is an unarmored glass-cannon caster with a wide obstacle-ignoring spell: armored=%s sweeps=%s ignore_line=%s attack_range=%d (expected false, true, true, 2)" % [
-		main.ENEMY_TRAITS["Supreme Warlock"].get("armored", false), main.ENEMY_TRAITS["Supreme Warlock"].sweeps,
-		main.ENEMY_TRAITS["Supreme Warlock"].ignore_line, main.ENEMY_TRAITS["Supreme Warlock"].attack_range
+	print("Archmage is an unarmored glass-cannon caster with a wide obstacle-ignoring spell: armored=%s sweeps=%s ignore_line=%s attack_range=%d (expected false, true, true, 2)" % [
+		main.ENEMY_TRAITS["Archmage"].get("armored", false), main.ENEMY_TRAITS["Archmage"].sweeps,
+		main.ENEMY_TRAITS["Archmage"].ignore_line, main.ENEMY_TRAITS["Archmage"].attack_range
 	])
 
 	# --- End-to-end wave-gated spawn ---
@@ -65,7 +65,7 @@ func _init() -> void:
 	main._spawn_boss_wave()
 	await physics_frame
 	var full_enemies: Array = main.get_tree().get_nodes_in_group("enemies")
-	print("Voidlands' world-ending wave (wave 100) spawns a Supreme Warlock: count=%d (expected 1), name=%s (expected Supreme Warlock)" % [
+	print("Voidlands' world-ending wave (wave 100) spawns an Archmage: count=%d (expected 1), name=%s (expected Archmage)" % [
 		full_enemies.size(), full_enemies[0].get_display_name() if full_enemies.size() == 1 else "none"
 	])
 	for e in full_enemies:
@@ -76,7 +76,7 @@ func _init() -> void:
 	# and damage than a normal power_tier=1.0 instance, all else equal. ---
 	player.level = 1
 	player.difficulty_mult = 1.0
-	var warlock_script = load("res://scripts/SupremeWarlock.gd")
+	var warlock_script = load("res://scripts/Archmage.gd")
 
 	var normal_warlock = warlock_script.new()
 	normal_warlock.power_tier = 1.0
@@ -94,7 +94,7 @@ func _init() -> void:
 	var rematch_dmg: int = main.battle_units[0].damage
 	rematch_warlock.set_physics_process(false)
 
-	print("power_tier=1.0 Supreme Warlock has its base stats: hp=%d (expected %d), dmg=%d (expected %d)" % [
+	print("power_tier=1.0 Archmage has its base stats: hp=%d (expected %d), dmg=%d (expected %d)" % [
 		normal_hp, warlock_script.MAX_HEALTH, normal_dmg, warlock_script.ATTACK_DAMAGE
 	])
 	print("power_tier=2.5 rematch scales both HP and damage by 2.5x: hp=%d (expected %d), dmg=%d (expected %d)" % [

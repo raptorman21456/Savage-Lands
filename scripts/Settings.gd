@@ -6,23 +6,26 @@ extends Node
 
 const SaveDataScript := preload("res://scripts/SaveData.gd")
 
-# Only these 11 actions are rebindable -- shop quick-buy numbers, Enter, and R
+# Only these 12 actions are rebindable -- shop quick-buy numbers, Enter, and R
 # (reroll/retry) stay hardcoded, since they're positional/mnemonic
 # conventions that don't gain anything from rebinding.
 const DEFAULT_KEYBINDS := {
 	"move_up": KEY_UP, "move_down": KEY_DOWN, "move_left": KEY_LEFT, "move_right": KEY_RIGHT,
 	"attack_up": KEY_W, "attack_down": KEY_S, "attack_left": KEY_A, "attack_right": KEY_D,
 	"confirm": KEY_Z, "cancel": KEY_X, "pause": KEY_C,
+	"block": KEY_SPACE,
 }
 const ACTION_ORDER := [
 	"move_up", "move_down", "move_left", "move_right",
 	"attack_up", "attack_down", "attack_left", "attack_right",
 	"confirm", "cancel", "pause",
+	"block",
 ]
 const ACTION_LABELS := {
 	"move_up": "Move Up", "move_down": "Move Down", "move_left": "Move Left", "move_right": "Move Right",
 	"attack_up": "Attack Up", "attack_down": "Attack Down", "attack_left": "Attack Left", "attack_right": "Attack Right",
 	"confirm": "Confirm", "cancel": "Cancel / Back", "pause": "Pause Menu",
+	"block": "Raise Shield (Block)",
 }
 
 const MIN_VOLUME_DB := -40.0
@@ -38,6 +41,14 @@ var music_volume := 1.0
 # it.
 var screen_shake_enabled := true
 var damage_numbers_enabled := true
+# The dodge / block timing popups (DefenseMinigame.gd). Off = enemy attacks resolve
+# instantly with the classic odds, the way they did before the minigames existed.
+# Scripted runs (the test suite) start with it off; a test that wants the popups
+# flips it on directly, which never touches the saved file.
+var combat_minigames_enabled := true
+# The weapon attack timing popup (AttackMinigame.gd): off = attacks deal their normal damage
+# instantly. Separate from the dodge/block toggle since it comes up every turn. Off in scripted runs too.
+var attack_minigame_enabled := true
 
 func _ready() -> void:
 	_ensure_audio_buses()
@@ -89,6 +100,14 @@ func set_damage_numbers_enabled(v: bool) -> void:
 	damage_numbers_enabled = v
 	_save()
 
+func set_combat_minigames_enabled(v: bool) -> void:
+	combat_minigames_enabled = v
+	_save()
+
+func set_attack_minigame_enabled(v: bool) -> void:
+	attack_minigame_enabled = v
+	_save()
+
 func _apply_bus_volume(bus_name: String, linear: float) -> void:
 	var idx := AudioServer.get_bus_index(bus_name)
 	if idx < 0:
@@ -117,6 +136,8 @@ func _load() -> void:
 	music_volume = saved.get("music_volume", 1.0)
 	screen_shake_enabled = saved.get("screen_shake_enabled", true)
 	damage_numbers_enabled = saved.get("damage_numbers_enabled", true)
+	combat_minigames_enabled = saved.get("combat_minigames_enabled", true) and not OS.get_cmdline_args().has("--script")
+	attack_minigame_enabled = saved.get("attack_minigame_enabled", true) and not OS.get_cmdline_args().has("--script")
 	_apply_bus_volume("Master", master_volume)
 	_apply_bus_volume("SFX", sfx_volume)
 	_apply_bus_volume("Music", music_volume)
@@ -133,4 +154,6 @@ func _save() -> void:
 		"music_volume": music_volume,
 		"screen_shake_enabled": screen_shake_enabled,
 		"damage_numbers_enabled": damage_numbers_enabled,
+		"combat_minigames_enabled": combat_minigames_enabled,
+		"attack_minigame_enabled": attack_minigame_enabled,
 	})

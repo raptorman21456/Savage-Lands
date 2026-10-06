@@ -62,8 +62,10 @@ func _init() -> void:
 	var g_bleed = _make_goblin(main, Vector2i(3, 2))
 	g_bleed.damage = 0
 	main.battle_units = [g_bleed]
-	main._battle_player_special(1)
-	var bleed_dmg: int = int(round(10 * weapons_script.DAGGER.damage_mult * player.current_weapon.specials[1].dmg_mult))
+	# No weapon carries the lifesteal effect anymore (Bleeding Cut became bleed_or_crit),
+	# so the mechanism is driven through a synthetic action.
+	main._battle_perform_attack({"name": "Test Lifesteal", "stamina_cost": 0, "dmg_mult": 0.9, "effect": "lifesteal"})
+	var bleed_dmg: int = int(round(10 * weapons_script.DAGGER.damage_mult * 0.9))
 	var expected_lifesteal: int = max(1, int(round(bleed_dmg * main.LIFESTEAL_PCT)))
 	print("lifesteal special heals the player for a cut of the damage dealt: dealt=%d, player_health=%d (expected 1+%d=%d)" % [
 		999 - g_bleed.hp, player.health, expected_lifesteal, 1 + expected_lifesteal

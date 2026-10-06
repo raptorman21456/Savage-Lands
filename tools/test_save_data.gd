@@ -65,7 +65,7 @@ func _init() -> void:
 	# Essence is earned per enemy: 5 ordinary kills and one boss.
 	for i in 5:
 		main._on_enemy_died(0, "Goblin")
-	main._on_enemy_died(0, "Demogorgon")
+	main._on_enemy_died(0, "Archmage")
 	var expected_earned: int = 5 * save_data_script.ESSENCE_PER_KILL + save_data_script.ESSENCE_PER_BOSS_KILL
 	player.health = 1
 	player.take_battle_damage(1)

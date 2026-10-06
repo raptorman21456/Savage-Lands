@@ -30,7 +30,7 @@ func _init() -> void:
 	print("warrior_joins is offered while the party has room: %s (expected true)" % [
 		main._available_event_ids().has("warrior_joins")
 	])
-	player.party_members = [{"name": "Blade Ally", "dmg_mult": 0.75}, {"name": "Warrior", "dmg_mult": 0.75}]
+	player.party_members = [{"name": "Knight", "dmg_mult": 0.75}, {"name": "Warrior", "dmg_mult": 0.75}]
 	print("warrior_joins is excluded once the party is full: %s (expected false)" % [
 		main._available_event_ids().has("warrior_joins")
 	])

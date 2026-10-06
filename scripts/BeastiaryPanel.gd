@@ -159,7 +159,7 @@ func _select(creature_name: String) -> void:
 	var traits: Dictionary = MainScript.ENEMY_TRAITS.get(creature_name, {})
 	var tags := []
 	if traits.get("is_boss_tier", false):
-		tags.append("Boss-tier")
+		tags.append("Miniboss" if traits.get("is_miniboss", false) else "Boss")
 	if traits.get("armored", false):
 		tags.append("Armored")
 	if traits.get("dodge_chance", 0.0) > 0.0:

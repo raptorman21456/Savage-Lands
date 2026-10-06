@@ -64,17 +64,17 @@ func _init() -> void:
 	player.coins = 0
 	print("can't afford a rune: %s (expected false)" % player.try_apply_enchantment("leech"))
 
-	# --- lifesteal stacks with a Mythic weapon's own passive (the Great
-	# Toothpicke's own 25% + Rune of the Leech's own 25%) ---
-	var mythic_spear: Dictionary = weapons_script.make_variant(weapons_script.SPEAR, 5)
-	player.owned_weapons[mythic_spear.id] = true
-	player._equip_weapon(mythic_spear)
+	# --- lifesteal stacks with a Mythic weapon's own passive (The Implement's
+	# own 20% + Rune of the Leech's own 25%) ---
+	var mythic_dagger: Dictionary = weapons_script.make_variant(weapons_script.DAGGER, 5)
+	player.owned_weapons[mythic_dagger.id] = true
+	player._equip_weapon(mythic_dagger)
 	player.runic_shards = 10
 	player.coins = 100
 	player.try_apply_enchantment("leech")
-	print("Mythic spear + Rune of the Leech stacks lifesteal: %.2f (expected 0.50 = 0.25+0.25)" % player.current_weapon.passive_lifesteal_pct)
+	print("Mythic dagger + Rune of the Leech stacks lifesteal: %.2f (expected 0.45 = 0.20+0.25)" % player.current_weapon.passive_lifesteal_pct)
 	print("Leech's -20%% damage downside merged: dmg=%.3f (expected %.3f)" % [
-		player.current_weapon.damage_mult, mythic_spear.damage_mult * 0.8
+		player.current_weapon.damage_mult, mythic_dagger.damage_mult * 0.8
 	])
 
 	# --- Warding merges its control upside and its (reworked) recoil

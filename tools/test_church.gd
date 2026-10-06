@@ -135,17 +135,17 @@ func _init() -> void:
 	# --- Allies from the capstones ---
 	save_data_script.save_data({"essence": 5000, "upgrades": {"strength": 1, "agility": 1, "vigor": 1, "berserker_edge": 3, "reflexes_unlock": 1, "adrenaline": 2}, "best_wave": 0})
 	panel._refresh()
-	var ally_before: int = player.party_members.filter(func(m): return m.get("name", "") == "Blade Ally").size()
+	var ally_before: int = player.party_members.filter(func(m): return m.get("name", "") == "Knight").size()
 	panel._on_node_pressed("battle_hardened")
-	var ally_after: int = player.party_members.filter(func(m): return m.get("name", "") == "Blade Ally").size()
-	print("the Blade Ally joins at once, once: before=%d after=%d (expected 0, 1)" % [ally_before, ally_after])
+	var ally_after: int = player.party_members.filter(func(m): return m.get("name", "") == "Knight").size()
+	print("the Knight joins at once, once: before=%d after=%d (expected 0, 1)" % [ally_before, ally_after])
 	panel._on_node_pressed("pack_leader")
 	print("Pack Leader opens a party slot right away: max_party_slots=%d (expected 3)" % [player.max_party_slots])
-	main.wolf_waves_remaining = 0
-	player.party_wolf = {}
+	player.party = []
 	panel._on_node_pressed("beastmaster")
-	print("Beastmaster puts a wolf in the pack with its stay timer running: wolf=%s waves=%d (expected true, %d)" % [
-		not player.party_wolf.is_empty(), main.wolf_waves_remaining, main.WOLF_BASE_STAY_WAVES + player.meta_wolf_bonus_waves
+	var church_wolves: Array = player.party_wolves()
+	print("Beastmaster puts a wolf in the pack with its loyalty timer running: wolves=%d battles_left=%d (expected 1, %d)" % [
+		church_wolves.size(), church_wolves[0].battles_left if not church_wolves.is_empty() else -1, load("res://scripts/PartyRules.gd").wolf_stay_battles(0, player.meta_wolf_bonus_waves)
 	])
 
 	# --- Worldwalker: gated by the lifetime flag ---

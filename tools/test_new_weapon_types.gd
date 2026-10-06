@@ -38,14 +38,18 @@ func _init() -> void:
 		weapons_script.UPGRADABLE_TYPES.any(func(w): return w.id == "hand_picks"),
 	])
 
-	# Knuckle Gloves: innate double_strike means the plain Attack action (not
-	# a special) lands twice in the tile battle.
+	# Knuckle Gloves: a flat passive_double_hit_chance (10%, 2026-09-29 -- was an
+	# unconditional double_strike). The checks below pin the chance to 100% / 0%
+	# so the mechanism is deterministic; the shipped value is asserted separately.
 	player.coins = 100
 	var bought_gloves: bool = player.try_buy_weapon(weapons_script.KNUCKLE_GLOVES)
 	# Specials have to be learned at the Dojo now -- this test is about what the
 	# moves DO, not how you get them.
 	player.learn_all_specials()
 	player.stamina = player.MAX_STAMINA
+	print("knuckle gloves ship with a 10%% double-hit chance: %.2f (expected 0.10)" % [weapons_script.KNUCKLE_GLOVES.passive_double_hit_chance])
+	player.current_weapon = player.current_weapon.duplicate(true)
+	player.current_weapon["passive_double_hit_chance"] = 1.0
 	var g_gloves = _make_goblin(main, Vector2i(3, 2))
 	main.battle_units = [g_gloves]
 	main._battle_player_fight()
@@ -54,20 +58,22 @@ func _init() -> void:
 		bought_gloves, 999 - g_gloves.hp, expected_per_hit, expected_per_hit * 2
 	])
 
-	# Knuckle Gloves double_strike must NOT double a special (which already
-	# has its own explicit effect) -- Haymaker (index 1) should land once.
+	# With the chance at 0% a special (Wrist Strike, index 1) lands exactly once.
+	player.current_weapon["passive_double_hit_chance"] = 0.0
 	player.stamina = player.MAX_STAMINA
 	var g_special = _make_goblin(main, Vector2i(3, 2))
 	main.battle_units = [g_special]
 	main._battle_player_special(1)
 	var expected_haymaker: int = int(round(10 * weapons_script.KNUCKLE_GLOVES.damage_mult * player.current_weapon.specials[1].dmg_mult))
-	print("knuckle gloves specials are NOT doubled: dealt=%d (expected %d, a single hit)" % [999 - g_special.hp, expected_haymaker])
+	print("knuckle gloves with no double-hit chance: a special lands once: dealt=%d (expected %d)" % [999 - g_special.hp, expected_haymaker])
+	player.current_weapon["passive_double_hit_chance"] = 1.0
 
 	# Knuckle Gloves double_strike also applies in the overworld swing.
 	var overworld_target = load("res://scripts/Enemy.gd").new()
 	main.add_child(overworld_target)
 	overworld_target.died.connect(main._on_enemy_died)
 	var health_before: int = overworld_target.health
+	player.current_weapon["passive_double_hit_chance"] = 1.0
 	player._apply_weapon_hit(overworld_target)
 	print("knuckle gloves double_strike also lands twice in the overworld: health %d -> %d (expected dropped by 2 hits or dead)" % [
 		health_before, overworld_target.health if is_instance_valid(overworld_target) else -1

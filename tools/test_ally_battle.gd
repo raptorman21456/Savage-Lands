@@ -21,12 +21,13 @@ func _init() -> void:
 	# Leader + a wolf). Same overlap-checking shape as
 	# test_squad_placement_overlap.gd, extended to cover battle_allies too. ---
 	player.party_members = [
-		{"name": "Blade Ally", "dmg_mult": 0.75},
+		{"name": "Knight", "dmg_mult": 0.75},
 		{"name": "Warrior", "dmg_mult": 0.75},
 		{"name": "Warrior", "dmg_mult": 0.75},
 	]
-	player.max_party_slots = 3
-	player.party_wolf = {"name": "Traitor Wolf", "dmg_mult": 0.6}
+	player.max_party_slots = 4
+	player.party = []
+	player.recruit("wolf")
 
 	var any_overlap := false
 	var any_out_of_bounds := false
@@ -57,15 +58,16 @@ func _init() -> void:
 			e.queue_free()
 		await physics_frame
 
-	print("every ally in the roster gets seated: wrong_ally_count=%s (expected false, 4 allies -- 3 party + 1 wolf)" % [wrong_ally_count])
+	print("every ally in the roster gets seated: wrong_ally_count=%s (expected false, 4 allies -- 3 mercenaries + 1 wolf)" % [wrong_ally_count])
 	print("no ally tile ever collides with the player, an enemy footprint, or another ally, across %d trials: any_overlap=%s (expected false)" % [trials, any_overlap])
 	print("every ally tile stays within grid bounds: any_out_of_bounds=%s (expected false)" % [any_out_of_bounds])
 
 	# --- max_hp scaling: derived fresh from the player's CURRENT max_health
 	# every battle, not stored on the permanent roster. ---
-	player.party_members = [{"name": "Blade Ally", "dmg_mult": 0.75}]
+	player.party_members = [{"name": "Knight", "dmg_mult": 0.75}]
 	player.max_party_slots = 2
-	player.party_wolf = {"name": "Traitor Wolf", "dmg_mult": 0.6}
+	player.party = []
+	player.recruit("wolf")
 	player.max_health = 40
 	player.health = 40
 	main._setup_battle_grid([])
@@ -74,15 +76,18 @@ func _init() -> void:
 	print("a party member's max_hp scales off the player's CURRENT max_health: %d (expected %d, 40*0.7)" % [
 		blade_ally.max_hp, roundi(40 * main.ALLY_MAX_HP_PCT)
 	])
-	print("the wolf companion's max_hp uses its own, lower percentage: %d (expected %d, 40*0.55)" % [
-		wolf_ally.max_hp, roundi(40 * main.WOLF_ALLY_MAX_HP_PCT)
+	print("a roster wolf fights on its OWN stats, not a share of the hero's HP: %d (expected %d, its 20 x 0.9)" % [
+		wolf_ally.max_hp, 18
 	])
 	print("both start at full HP: %s (expected true, true)" % [[blade_ally.hp == blade_ally.max_hp, wolf_ally.hp == wolf_ally.max_hp]])
 
-	# --- Movement + attack via _process_ally_turn: an ally out of range moves
-	# closer without attacking; one already in range attacks the current
-	# target instead, reusing _apply_single_hit's existing hit/death handling
-	# for the enemy side untouched. ---
+	# --- Commanded actions: the player explicitly drives Move/Attack now,
+	# rather than an ally auto-pathing and auto-attacking on its own (see
+	# Main.gd's battle_commanding_ally). Told to Attack while out of range,
+	# it does nothing; told to Move, it steps exactly where sent; back in
+	# range, the same Attack lands with the ally's own stats, reusing
+	# _apply_single_hit's existing hit/death handling for the enemy side
+	# untouched. ---
 	main.in_battle = true
 	main.battle_terrain.clear()
 	main.battle_player_tile = Vector2i(2, 2)
@@ -94,12 +99,15 @@ func _init() -> void:
 	main.enemies_alive += 1
 	var far_goblin := {"ref": far_goblin_ref, "tile": Vector2i(5, 5), "hp": 999, "max_hp": 999, "move_range": 2, "damage": 1, "name": "Goblin", "winding_up": false, "stunned": false, "attack_range": 1}
 	main.battle_units = [far_goblin]
-	main.battle_allies = [{"tile": Vector2i(0, 0), "hp": 20, "max_hp": 20, "dmg_mult": 0.75, "name": "Blade Ally", "move_range": 2, "attack_range": 1}]
-	var ally_start_tile: Vector2i = main.battle_allies[0].tile
-	main._process_ally_turn()
-	print("an ally out of range moves closer without attacking: moved=%s (expected true), goblin_untouched=%s (expected true, still 999)" % [
-		main.battle_allies[0].tile != ally_start_tile, far_goblin.hp == 999
-	])
+	var far_ally := {"tile": Vector2i(0, 0), "hp": 20, "max_hp": 20, "dmg_mult": 0.75, "name": "Knight", "move_range": 2, "attack_range": 1}
+	main.battle_allies = [far_ally]
+	main.battle_commanding_ally = far_ally
+	main._battle_ally_attack()
+	print("commanded to Attack while out of range, it does nothing: goblin_untouched=%s (expected true, still 999)" % [far_goblin.hp == 999])
+	main.battle_ally_moves_left = 2
+	main._try_battle_ally_move(Vector2i(1, 1))
+	print("commanded to Move, it steps exactly where the player sends it: tile=%s (expected (1, 1))" % [far_ally.tile])
+	main.battle_commanding_ally = null
 
 	var near_goblin_ref = goblin_script.new()
 	main.add_child(near_goblin_ref)
@@ -107,10 +115,13 @@ func _init() -> void:
 	main.enemies_alive += 1
 	var near_goblin := {"ref": near_goblin_ref, "tile": Vector2i(1, 0), "hp": 999, "max_hp": 999, "move_range": 2, "damage": 1, "name": "Goblin", "winding_up": false, "stunned": false, "attack_range": 1}
 	main.battle_units = [near_goblin]
-	main.battle_allies = [{"tile": Vector2i(0, 0), "hp": 20, "max_hp": 20, "dmg_mult": 1.0, "name": "Blade Ally", "move_range": 2, "attack_range": 1}]
+	var near_ally := {"tile": Vector2i(0, 0), "hp": 20, "max_hp": 20, "dmg_mult": 1.0, "name": "Knight", "move_range": 2, "attack_range": 1}
+	main.battle_allies = [near_ally]
+	main.battle_commanding_ally = near_ally
 	main.battle_target_index = 0
-	main._process_ally_turn()
-	print("an ally already in range attacks the current target instead of moving into it: goblin_hp=%d (expected < 999, took a hit)" % [near_goblin.hp])
+	main._battle_ally_attack()
+	print("commanded to Attack while already in range, it hits the current target with its own stats: goblin_hp=%d (expected < 999, took a hit)" % [near_goblin.hp])
+	main.battle_commanding_ally = null
 
 	# --- Enemies can now target allies: one closer to a lone ally than to
 	# the player picks the ally as its target and damages it -- this is the
@@ -123,13 +134,13 @@ func _init() -> void:
 	main.enemies_alive += 1
 	var attacker := {"ref": attacker_ref, "tile": Vector2i(0, 1), "hp": 999, "max_hp": 999, "move_range": 2, "damage": 3, "name": "Goblin", "winding_up": false, "stunned": false, "attack_range": 1}
 	main.battle_units = [attacker]
-	main.battle_allies = [{"tile": Vector2i(0, 0), "hp": 20, "max_hp": 20, "dmg_mult": 1.0, "name": "Blade Ally", "move_range": 2, "attack_range": 1}]
+	main.battle_allies = [{"tile": Vector2i(0, 0), "hp": 20, "max_hp": 20, "dmg_mult": 1.0, "name": "Knight", "move_range": 2, "attack_range": 1}]
 	main._process_enemy_turn()
 	print("an enemy closer to an ally than the player picks the ally as its target and damages it: ally_hp=%d (expected < 20)" % [main.battle_allies[0].hp])
 
 	# --- KO: an ally reduced to 0 HP is removed from battle_allies, but the
 	# rest of the enemy turn -- and the battle itself -- keeps going. ---
-	main.battle_allies = [{"tile": Vector2i(0, 0), "hp": 1, "max_hp": 20, "dmg_mult": 1.0, "name": "Blade Ally", "move_range": 2, "attack_range": 1}]
+	main.battle_allies = [{"tile": Vector2i(0, 0), "hp": 1, "max_hp": 20, "dmg_mult": 1.0, "name": "Knight", "move_range": 2, "attack_range": 1}]
 	main.battle_units = [attacker]
 	attacker.hp = 999
 	main._process_enemy_turn()
@@ -144,8 +155,8 @@ func _init() -> void:
 	# --- Battle-scoped only: HP isn't stored on the permanent roster, so a
 	# fresh _setup_battle_grid rebuilds a KO'd ally at full HP next battle,
 	# regardless of how the last battle ended. ---
-	player.party_members = [{"name": "Blade Ally", "dmg_mult": 0.75}]
-	player.party_wolf = {}
+	player.party_members = [{"name": "Knight", "dmg_mult": 0.75}]
+	player.party = []
 	player.max_party_slots = 2
 	main._setup_battle_grid([])
 	print("a fresh battle rebuilds the party at full HP regardless of the last battle's outcome: hp=%d max_hp=%d (expected equal)" % [
@@ -155,13 +166,13 @@ func _init() -> void:
 	# --- Baseline: a battle with zero allies still sets up and runs its
 	# ally-turn phase without crashing on an empty battle_allies. ---
 	player.party_members = []
-	player.party_wolf = {}
+	player.party = []
 	main._setup_battle_grid([])
 	print("zero allies is a valid, crash-free roster: battle_allies=%d (expected 0)" % [main.battle_allies.size()])
 	main.in_battle = true
 	main.battle_units = [far_goblin]
-	main._process_ally_turn()
-	print("_process_ally_turn with zero allies is a safe no-op: %s (expected true, still 0 allies, no crash)" % [main.battle_allies.is_empty()])
+	main._start_ally_turn()
+	print("starting the ally phase with zero allies is a safe no-op, straight through to the enemy turn: %s (expected true, still 0 allies, no crash)" % [main.battle_allies.is_empty()])
 
 	# Reset the scratch save for whatever test runs next.
 	var save_data_script = load("res://scripts/SaveData.gd")

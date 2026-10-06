@@ -66,7 +66,7 @@ func make_barbarian() -> Image:
 
 	return img
 
-# Blade Ally: the Warrior-branch skill tree companion. Reuses the
+# Knight: the Warrior-branch skill tree companion. Reuses the
 # barbarian's overall silhouette proportions (same humanoid shape reads
 # instantly as "a person", not a monster) but in a cool hooded-rogue palette
 # instead of the player's warm tan/brown, so it's unmistakably a second,

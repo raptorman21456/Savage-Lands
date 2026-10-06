@@ -46,7 +46,7 @@ const UPGRADE_IDS := [
 static var UPGRADES := {
 	# --- Warrior wing: combat stats, splitting into a raw-power path
 	# (Vitality -> Berserker's Edge) and a finesse path (Precision ->
-	# Adrenaline) that reconverge at the Blade Ally capstone, which then
+	# Adrenaline) that reconverge at the Knight capstone, which then
 	# splits three ways into the wing's deepest, most powerful nodes. ---
 	# Renamed from "Might" -- that name now belongs to the new core Might
 	# stat (see the "dexterity_unlock"/"resilience_unlock"/"reflexes_unlock"
@@ -70,11 +70,11 @@ static var UPGRADES := {
 	# Ally companion, applied via Player.has_blade_ally, not a stat delta.
 	# Both the power path (Berserker's Edge) and the finesse path
 	# (Adrenaline) feed into it -- the wing's two branches reconverging.
-	"battle_hardened": {"name": "Blade Ally", "stat_bonus": 1, "base_cost": 350, "cost_step": 0, "max_level": 1, "description": "Warrior capstone -- a combat companion joins every battle and auto-attacks once per turn, scaling with your own Strength.", "prereqs": [{"id": "berserker_edge", "min_level": 3}, {"id": "adrenaline", "min_level": 2}]},
+	"battle_hardened": {"name": "Friends in High Places", "stat_bonus": 1, "base_cost": 350, "cost_step": 0, "max_level": 1, "description": "Warrior capstone -- unlocks the Knight as a permanent ally who fights beside you in every battle.", "prereqs": [{"id": "berserker_edge", "min_level": 3}, {"id": "adrenaline", "min_level": 2}]},
 	# A further Warrior-wing unlock past the capstone itself -- stat_bonus
 	# is again just an ownership flag, the real effect is +1 max party slot
 	# (Player.max_party_slots), applied in Player.gd:_apply_meta_upgrades.
-	"pack_leader": {"name": "Pack Leader", "stat_bonus": 1, "base_cost": 500, "cost_step": 0, "max_level": 1, "description": "+1 max party slot (3 total) -- a second recruited ally can now fight alongside your Blade Ally.", "prereqs": [{"id": "battle_hardened", "min_level": 1}]},
+	"pack_leader": {"name": "Pack Leader", "stat_bonus": 1, "base_cost": 500, "cost_step": 0, "max_level": 1, "description": "+1 max party slot (3 total) -- a second recruited ally can now fight alongside your Knight.", "prereqs": [{"id": "battle_hardened", "min_level": 1}]},
 	# Three deep nodes split off Pack Leader -- the wing's most powerful,
 	# furthest-from-the-root abilities.
 	"prodigy": {"name": "Prodigy", "stat_bonus": 1, "base_cost": 450, "cost_step": 0, "max_level": 1, "description": "The level-up bonus-stat choice now grants +2 instead of +1.", "prereqs": [{"id": "pack_leader", "min_level": 1}]},
@@ -172,6 +172,15 @@ static var DIFFICULTIES := [
 # relies on surviving a scene change.
 static var active_slot := 1
 
+# Sandbox mode (Sandbox.gd / SandboxPanel.gd, the title screen's Sandbox button):
+# while sandbox_active is set, every load/save below reads and writes an
+# in-memory copy instead of the real slot / lifetime files, so a sandbox session
+# can never change Essence, Church upgrades, the Beastiary or lifetime stats.
+# The tutorial and the Worldwalker lock are treated as already cleared.
+static var sandbox_active := false
+static var sandbox_data: Dictionary = {}
+static var sandbox_lifetime: Dictionary = {"tutorial_completed_ever": true, "game_completed_ever": true}
+
 static func get_difficulty_mult(difficulty_id: String) -> float:
 	for d in DIFFICULTIES:
 		if d.id == difficulty_id:
@@ -194,6 +203,10 @@ static func _resolve_save_path(slot: int = -1) -> String:
 
 static func load_data() -> Dictionary:
 	var data := {"essence": 0, "upgrades": {}, "best_wave": 0}
+	if sandbox_active:
+		for key in sandbox_data:
+			data[key] = sandbox_data[key].duplicate(true) if typeof(sandbox_data[key]) in [TYPE_DICTIONARY, TYPE_ARRAY] else sandbox_data[key]
+		return data
 	var path := _resolve_save_path()
 	if not FileAccess.file_exists(path):
 		return data
@@ -209,6 +222,9 @@ static func load_data() -> Dictionary:
 	return data
 
 static func save_data(data: Dictionary) -> void:
+	if sandbox_active:
+		sandbox_data = data.duplicate(true)
+		return
 	var f := FileAccess.open(_resolve_save_path(), FileAccess.WRITE)
 	if f == null:
 		return
@@ -366,6 +382,8 @@ static func _resolve_lifetime_path() -> String:
 	return "user://lifetime_progress.json"
 
 static func load_lifetime_data() -> Dictionary:
+	if sandbox_active:
+		return sandbox_lifetime.duplicate(true)
 	var path := _resolve_lifetime_path()
 	if not FileAccess.file_exists(path):
 		return {}
@@ -380,6 +398,9 @@ static func load_lifetime_data() -> Dictionary:
 	return {}
 
 static func save_lifetime_data(data: Dictionary) -> void:
+	if sandbox_active:
+		sandbox_lifetime = data.duplicate(true)
+		return
 	var f := FileAccess.open(_resolve_lifetime_path(), FileAccess.WRITE)
 	if f == null:
 		return
@@ -523,6 +544,8 @@ static func try_buy_upgrade(data: Dictionary, id: String) -> bool:
 # their enemies tougher (Main.gd:_setup_battle_grid). waves_reached only feeds
 # the slot's best_wave record.
 static func record_run_result(raw_essence: int, waves_reached: int = 0) -> int:
+	if sandbox_active:
+		return 0
 	var data := load_data()
 	var mult: float = get_difficulty_mult(data.get("difficulty", ""))
 	var earned: int = int(round(max(0, raw_essence) * mult))

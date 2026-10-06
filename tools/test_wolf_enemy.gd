@@ -80,33 +80,35 @@ func _init() -> void:
 	await physics_frame
 	main.enemies_alive = 0
 
-	# --- Killing a plain (non-traitor) Wolf never touches party_wolf. ---
-	player.party_wolf = {}
+	# --- Killing a plain (non-traitor) Wolf never recruits one. ---
+	player.party = []
 	var plain_wolf = wolf_script.new()
 	main.add_child(plain_wolf)
 	plain_wolf.died.connect(main._on_enemy_died)
 	main.enemies_alive += 1
 	plain_wolf.take_damage(9999)
-	print("killing a plain Wolf never grants party_wolf: %s (expected true, still empty)" % [player.party_wolf.is_empty()])
+	print("killing a plain Wolf never recruits a wolf: %s (expected true, still empty)" % [player.party_wolves().is_empty()])
 
-	# --- Killing a Traitor Wolf with a wolf already in the party never
-	# overwrites it. ---
-	player.party_wolf = {"name": "Traitor Wolf", "dmg_mult": 0.6}
-	var traitor_occupied = wolf_script.new()
-	traitor_occupied.is_traitor = true
-	main.add_child(traitor_occupied)
-	traitor_occupied.died.connect(main._on_wolf_died)
-	traitor_occupied.died.connect(main._on_enemy_died)
+	# --- Killing a Traitor Wolf with the party already full never adds another. ---
+	player.party = []
+	player.max_party_slots = 2
+	player.recruit("wolf")
+	player.recruit("wolf")
+	var traitor_full = wolf_script.new()
+	traitor_full.is_traitor = true
+	main.add_child(traitor_full)
+	traitor_full.died.connect(main._on_wolf_died)
+	traitor_full.died.connect(main._on_enemy_died)
 	main.enemies_alive += 1
-	traitor_occupied.take_damage(9999)
-	print("an already-occupied party_wolf slot is never overwritten by a second recruit: %s (expected 0.6, unchanged)" % [player.party_wolf.dmg_mult])
+	traitor_full.take_damage(9999)
+	print("a full party never takes a third wolf: wolves=%d (expected 2)" % [player.party_wolves().size()])
 
-	# --- Over many trials, an unoccupied party_wolf slot gets filled roughly
+	# --- Over many trials, an open slot gets filled roughly
 	# TRAITOR_WOLF_RECRUIT_CHANCE of the time. ---
 	var recruit_trials := 200
 	var recruited := 0
 	for i in recruit_trials:
-		player.party_wolf = {}
+		player.party = []
 		var t = wolf_script.new()
 		t.is_traitor = true
 		main.add_child(t)
@@ -114,7 +116,7 @@ func _init() -> void:
 		t.died.connect(main._on_enemy_died)
 		main.enemies_alive += 1
 		t.take_damage(9999)
-		if not player.party_wolf.is_empty():
+		if not player.party_wolves().is_empty():
 			recruited += 1
 	var expected_recruits: float = recruit_trials * main.TRAITOR_WOLF_RECRUIT_CHANCE
 	print("recruitment rate roughly matches TRAITOR_WOLF_RECRUIT_CHANCE over %d trials: %d (expected roughly %.0f)" % [

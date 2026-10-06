@@ -95,11 +95,11 @@ func _init() -> void:
 	# Boss-tier generalization: is_boss_tier trait (not a hardcoded name
 	# list) drives solo-fight/big-arena detection, and _spawn_boss_wave picks
 	# world-relative miniboss (wave 5-of-10) vs. boss (wave 10-of-10)
-	# generically off WORLDS -- Beach still resolves to Boss/Owlbear today
-	# (placeholder scripts, see WORLDS) but through the NEW mechanism.
+	# generically off WORLDS -- Beach resolves to Lava Construct (a placeholder
+	# miniboss) / Leviathan (its boss), see WORLDS.
 	# =========================================================
-	print("is_boss_tier drives solo-squad detection, not a name list: Boss=%s (expected true), Goblin=%s (expected false)" % [
-		main.ENEMY_TRAITS.get("Boss", {}).get("is_boss_tier", false), main.ENEMY_TRAITS.get("Goblin", {}).get("is_boss_tier", false)
+	print("is_boss_tier drives solo-squad detection, not a name list: Leviathan=%s (expected true), Goblin=%s (expected false)" % [
+		main.ENEMY_TRAITS.get("Leviathan", {}).get("is_boss_tier", false), main.ENEMY_TRAITS.get("Goblin", {}).get("is_boss_tier", false)
 	])
 
 	main.wave = 15  # Beach, wave-in-world 5 -> miniboss
@@ -111,7 +111,7 @@ func _init() -> void:
 	main._spawn_boss_wave()
 	await physics_frame
 	var mini_enemies: Array = main.get_tree().get_nodes_in_group("enemies")
-	print("wave 15 (Beach, world-relative wave 5) spawns that world's miniboss: count=%d (expected 1), name=%s (expected Boss)" % [
+	print("wave 15 (Beach, world-relative wave 5) spawns that world's miniboss: count=%d (expected 1), name=%s (expected Lava Construct)" % [
 		mini_enemies.size(), mini_enemies[0].get_display_name() if mini_enemies.size() == 1 else "none"
 	])
 	for e in mini_enemies:
@@ -126,7 +126,7 @@ func _init() -> void:
 	main._spawn_boss_wave()
 	await physics_frame
 	var full_enemies: Array = main.get_tree().get_nodes_in_group("enemies")
-	print("wave 20 (Beach, world-relative wave 10) spawns that world's full boss: count=%d (expected 1), name=%s (expected Owlbear)" % [
+	print("wave 20 (Beach, world-relative wave 10) spawns that world's full boss: count=%d (expected 1), name=%s (expected Leviathan)" % [
 		full_enemies.size(), full_enemies[0].get_display_name() if full_enemies.size() == 1 else "none"
 	])
 	for e in full_enemies:

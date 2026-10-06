@@ -5,11 +5,9 @@ const PickupScript := preload("res://scripts/Pickup.gd")
 
 signal died(xp_reward: int)
 
-# Volcano's world-ending boss (World Progression feature) -- Owlbear.gd's
-# windup template, the tankiest of the 4 dragons seen so far ("Wyrm" reads
-# as ancient/elder) with the widest breath reach (see
-# Main.gd:ENEMY_TRAITS["Red Wyrm"] -- attack_range 2, matching Beholder's
-# and Blue Dragon's wide sweep).
+# Volcano's world-ending boss (World Progression feature) -- the original boss's
+# windup template, the tankiest of the dragons ("Wyrm" reads as ancient/elder)
+# with a wide breath reach (see Main.gd:ENEMY_TRAITS["Red Wyrm"] -- attack_range 2).
 const SPEED := 42.0
 const WINDUP_SPEED_FRACTION := 0.3
 const MAX_HEALTH := 250
@@ -27,6 +25,8 @@ const MEAT_CHANCE := 1.0
 
 var health := MAX_HEALTH
 var is_elite := false
+# Nothingness rush power multiplier (Main.NOTHINGNESS_POWER_TIERS); 1.0 in the normal campaign.
+var power_tier := 1.0
 var wander_dir := Vector2.ZERO
 var wander_timer := 0.0
 var windup_timer := 0.0

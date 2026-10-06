@@ -36,7 +36,7 @@ func _init() -> void:
 	# --- None of the 9 are ever rolled by a real battle yet -- confirmed
 	# across many rolls of both a normal and a boss-sized grid. ---
 	var goblin_script = load("res://scripts/Enemy.gd")
-	var boss_script = load("res://scripts/Boss.gd")
+	var boss_script = load("res://scripts/IronConstruct.gd")
 	var any_reserved_spawned := false
 	for i in 40:
 		var squad_member = goblin_script.new()

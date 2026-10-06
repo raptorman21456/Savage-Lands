@@ -14,16 +14,15 @@ const SHOP_LOCK_COST := 5
 # a generic letter, keyed by the same display name battle_units already
 # carries.
 const BLADE_ALLY_ICON := preload("res://assets/blade_ally.png")
+# The most allies a battle can hold: a full party of 4 plus the wolf-only slot.
+const MAX_BATTLE_ALLIES := 5
 const TOGGLE_OFF_ICON := preload("res://assets/toggle_off.png")
 const TOGGLE_ON_ICON := preload("res://assets/toggle_on.png")
 
 const ENEMY_ICONS := {
 	"Goblin": preload("res://assets/enemy_goblin.png"),
 	"Orc": preload("res://assets/enemy_orc.png"),
-	"Boss": preload("res://assets/enemy_boss.png"),
-	"Owlbear": preload("res://assets/enemy_owlbear.png"),
 	"Apprentice Mage": preload("res://assets/enemy_apprentice_mage.png"),
-	"Shaman": preload("res://assets/enemy_shaman.png"),
 	"Brute": preload("res://assets/enemy_brute.png"),
 	"Shade": preload("res://assets/enemy_shade.png"),
 	# Traitor Wolf shares Wolf's sprite -- distinguished by tint at spawn
@@ -38,30 +37,17 @@ const ENEMY_ICONS := {
 	"Fae Hut": preload("res://assets/enemy_fae_hut.png"),
 	"Fae": preload("res://assets/enemy_fae.png"),
 	"Gnome": preload("res://assets/enemy_gnome.png"),
-	"Druid": preload("res://assets/enemy_druid.png"),
-	"Aboleth": preload("res://assets/enemy_aboleth.png"),
-	"Water Elemental": preload("res://assets/enemy_water_elemental.png"),
-	"Lizard Soldier Swarm": preload("res://assets/enemy_lizard_soldier_swarm.png"),
+	"Leviathan": preload("res://assets/enemy_aboleth.png"),
+	"Lizen Warband": preload("res://assets/enemy_lizard_soldier_swarm.png"),
 	"Black Dragonlet": preload("res://assets/enemy_black_dragonlet.png"),
 	"Treant": preload("res://assets/enemy_treant.png"),
 	"Elder Oak": preload("res://assets/enemy_elder_oak.png"),
-	"Gibbering Mouther": preload("res://assets/enemy_gibbering_mouther.png"),
-	"Iron Golem": preload("res://assets/enemy_iron_golem.png"),
-	"Stone Giant": preload("res://assets/enemy_stone_giant.png"),
-	"Beholder": preload("res://assets/enemy_beholder.png"),
-	"Frost Giant": preload("res://assets/enemy_frost_giant.png"),
+	"Iron Construct": preload("res://assets/enemy_iron_golem.png"),
 	"White Dragon": preload("res://assets/enemy_white_dragon.png"),
-	"Roc": preload("res://assets/enemy_roc.png"),
-	"Blue Dragon": preload("res://assets/enemy_blue_dragon.png"),
-	"Lava Golem": preload("res://assets/enemy_lava_golem.png"),
+	"Lava Construct": preload("res://assets/enemy_lava_golem.png"),
 	"Red Wyrm": preload("res://assets/enemy_red_wyrm.png"),
 	"Voidwing": preload("res://assets/enemy_voidwing.png"),
-	"Supreme Warlock": preload("res://assets/enemy_supreme_warlock.png"),
-	"Demogorgon": preload("res://assets/enemy_demogorgon.png"),
-	"Tiamat": preload("res://assets/enemy_tiamat.png"),
-	"Count Strahd": preload("res://assets/enemy_count_strahd.png"),
-	"Duke Zalto": preload("res://assets/enemy_duke_zalto.png"),
-	"Acererak": preload("res://assets/enemy_acererak.png"),
+	"Archmage": preload("res://assets/enemy_supreme_warlock.png"),
 }
 
 # Battle-grid terrain tiles -- the other 3 match battle_terrain's "type"
@@ -167,6 +153,8 @@ var settings_sfx_value_label: Label
 var settings_music_value_label: Label
 var settings_shake_checkbox: CheckButton
 var settings_damage_numbers_checkbox: CheckButton
+var settings_minigames_checkbox: CheckButton
+var settings_attack_minigame_checkbox: CheckButton
 var settings_rebind_buttons := {}
 var settings_back_button: Button
 var settings_node: Node
@@ -215,6 +203,11 @@ signal battle_fight_action(action: String)
 signal battle_move_action(action: String)
 signal battle_arrow_action(action: String)
 signal battle_tactics_action(action: String)
+# The 4 generic actions available while commanding a party member's own turn
+# (see Main.gd's battle_commanding_ally) -- Move/Attack/Guard/Skip. A kit's
+# own specials/spells (Wolf, Druid, Guardian, Marksman, Rogue) aren't built
+# yet; this signal grows a "special"/"spell" action once one exists.
+signal battle_ally_action(action: String)
 signal battle_evasion_direction_pressed(label: String)
 # Turtle Shell's "the water wants to carry you, go with it?" prompt -- the
 # same shape as battle_evasion_direction_pressed, just yes/no instead of a
@@ -334,6 +327,8 @@ var battle_main_menu_box: HBoxContainer
 var battle_fight_submenu_box: HBoxContainer
 var battle_move_submenu_box: HBoxContainer
 var battle_arrow_submenu_box: HBoxContainer
+var battle_ally_menu_box: HBoxContainer
+var battle_ally_buttons := {}
 var battle_tactics_submenu_box: HBoxContainer
 var battle_evasion_submenu_box: HBoxContainer
 var battle_confirm_box: HBoxContainer
@@ -356,7 +351,7 @@ static var UI_TEXT := {
 	"battle.main.move": "Reposition on the grid. Doesn't end your turn.",
 	"battle.main.fight": "Choose an attack: a free regular hit, a costly heavy hit, or one of your weapon's specials.",
 	"battle.main.item": "Use a healing potion.",
-	"battle.main.defend": "Brace for impact -- reduces damage taken this turn and recovers a big chunk of stamina (+25).",
+	"battle.main.defend": "Brace for impact -- reduces damage taken this turn and recovers a big chunk of stamina (+15).",
 	"battle.main.skill": "Guardian's Ultimatum: instantly heal 40% of max HP. Once every 4 turns.",
 	"battle.main.arrow": "Fire a purchased special arrow. Costs no stamina, but consumes 1 of that arrow.",
 	"battle.main.tactics": "Taunt to force every enemy's attention onto you, or vanish into Stealth.",
@@ -374,6 +369,10 @@ static var UI_TEXT := {
 	"battle.evasion.left": "Roll to your left, relative to the attacker.",
 	"battle.evasion.right": "Roll to your right, relative to the attacker.",
 	"battle.arrow.back": "Return to the main menu.",
+	"battle.ally.move": "Move this ally on the grid. Doesn't end its turn.",
+	"battle.ally.attack": "This ally attacks with its own weapon and stats.",
+	"battle.ally.guard": "This ally braces for impact, taking less damage until its next turn.",
+	"battle.ally.skip": "This ally does nothing this turn.",
 	"shop.reroll": "Reroll the shop's offering. Costs more each time you use it this visit.",
 	"shop.continue": "Step back outside.",
 	"shop.lock": "Protect this offer from being rerolled away, for %d gold.",
@@ -1215,10 +1214,10 @@ func _build_battle_ui() -> void:
 	# enemy pool above) -- allies now stand on their own real battle tile
 	# (see Main.gd:battle_allies) rather than a fixed stacked slot, so this
 	# pool just needs to be big enough for the max possible simultaneous
-	# allies: 3 party_members (2 base + Pack Leader's +1) plus 1 wolf. Each
+	# allies: a full party of 4 plus the 1 slot Wolf Fang adds for a wolf. Each
 	# also gets a small health-bar background/fill pair, drawn under its
 	# icon.
-	for i in 4:
+	for i in MAX_BATTLE_ALLIES:
 		var ally_icon := TextureRect.new()
 		ally_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		ally_icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -1478,6 +1477,30 @@ func _build_battle_ui() -> void:
 		battle_arrow_submenu_box.add_child(button)
 		battle_arrow_buttons[action[1]] = button
 
+	# Ally command menu: shown instead of the hero's own main menu while
+	# Main.gd is running a party member's commanded turn (see
+	# battle_commanding_ally) -- 4 generic actions every kind can already do.
+	# Move reuses the hero's own Move submenu below (Confirm/Cancel read the
+	# same either way); Attack/Guard/Skip are self-contained.
+	battle_ally_menu_box = HBoxContainer.new()
+	battle_ally_menu_box.position = Vector2(20, 425)
+	battle_ally_menu_box.add_theme_constant_override("separation", 8)
+	battle_ally_menu_box.visible = false
+	battle_content_root.add_child(battle_ally_menu_box)
+	for action in [
+		["Move", "move", UI_TEXT["battle.ally.move"]],
+		["Attack", "attack", UI_TEXT["battle.ally.attack"]],
+		["Guard", "guard", UI_TEXT["battle.ally.guard"]],
+		["Skip", "skip", UI_TEXT["battle.ally.skip"]],
+	]:
+		var button := Button.new()
+		button.text = action[0]
+		button.pressed.connect(func(): battle_ally_action.emit(action[1]))
+		_setup_hover_button(button, action[2], battle_description_label)
+		_style_standard_button(button)
+		battle_ally_menu_box.add_child(button)
+		battle_ally_buttons[action[1]] = button
+
 	# First-ever-battle tutorial hint bubble + its Skip control -- see
 	# Main.gd's tutorial_active/tutorial_step for the sequencing logic that
 	# drives show_battle_hint/hide_battle_hint below. Both live as children
@@ -1612,6 +1635,8 @@ func _build_settings_panel() -> void:
 	var toggle_rows := [
 		["Screen Shake", "shake"],
 		["Damage Numbers", "damage_numbers"],
+		["Dodge / Block Minigames", "minigames"],
+		["Attack Timing Minigame", "attack_minigame"],
 	]
 	for i in toggle_rows.size():
 		var row_label := Label.new()
@@ -1635,16 +1660,22 @@ func _build_settings_panel() -> void:
 			"damage_numbers":
 				settings_damage_numbers_checkbox = checkbox
 				checkbox.toggled.connect(func(v): settings_node.set_damage_numbers_enabled(v))
+			"minigames":
+				settings_minigames_checkbox = checkbox
+				checkbox.toggled.connect(func(v): settings_node.set_combat_minigames_enabled(v))
+			"attack_minigame":
+				settings_attack_minigame_checkbox = checkbox
+				checkbox.toggled.connect(func(v): settings_node.set_attack_minigame_enabled(v))
 
 	var controls_label := Label.new()
-	controls_label.position = Vector2(60, 262)
+	controls_label.position = Vector2(60, 322)
 	controls_label.add_theme_font_size_override("font_size", 18)
 	controls_label.text = "Controls"
 	settings_panel.add_child(controls_label)
 
 	var controls_scroll := ScrollContainer.new()
-	controls_scroll.position = Vector2(60, 292)
-	controls_scroll.custom_minimum_size = Vector2(680, 260)
+	controls_scroll.position = Vector2(60, 350)
+	controls_scroll.custom_minimum_size = Vector2(680, 204)
 	controls_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	settings_panel.add_child(controls_scroll)
 
@@ -2006,6 +2037,8 @@ func _refresh_settings_display() -> void:
 	settings_music_value_label.text = "%d%%" % [roundi(settings_node.music_volume * 100)]
 	settings_shake_checkbox.button_pressed = settings_node.screen_shake_enabled
 	settings_damage_numbers_checkbox.button_pressed = settings_node.damage_numbers_enabled
+	settings_minigames_checkbox.button_pressed = settings_node.combat_minigames_enabled
+	settings_attack_minigame_checkbox.button_pressed = settings_node.attack_minigame_enabled
 	for action in settings_node.ACTION_ORDER:
 		settings_rebind_buttons[action].text = settings_node.key_name(action)
 
@@ -2028,7 +2061,7 @@ func _input(event: InputEvent) -> void:
 func update_coins(amount: int) -> void:
 	coins_label.text = "Coins: %d" % amount
 
-func show_shop(coins: int, runic_shards: int, offering: Array, prices: Array, current_weapon_name: String, owned_weapons: Dictionary, current_armor_name: String, potion_count: int, reroll_cost: int, is_bow_equipped: bool = false, owned_arrows: Dictionary = {}, arrow_prices: Dictionary = {}, arrow_cap: int = WeaponsScript.ARROW_MAX_HELD, current_shield_name: String = "None", owned_shields: Dictionary = {}, player_might: int = 0, shopkeeper_lines: Array = [], unlimited_arrows: bool = false) -> void:
+func show_shop(coins: int, runic_shards: int, offering: Array, prices: Array, current_weapon_name: String, owned_weapons: Dictionary, current_armor_name: String, potion_count: int, reroll_cost: int, is_bow_equipped: bool = false, owned_arrows: Dictionary = {}, arrow_prices: Dictionary = {}, arrow_cap: int = WeaponsScript.ARROW_MAX_HELD, current_shield_name: String = "None", owned_shields: Dictionary = {}, player_might: int = 0, shopkeeper_lines: Array = [], unlimited_arrows: bool = false, player_intimidation: int = 0) -> void:
 	for n in shop_row_nodes:
 		n.queue_free()
 	shop_row_nodes.clear()
@@ -2054,9 +2087,13 @@ func show_shop(coins: int, runic_shards: int, offering: Array, prices: Array, cu
 		# Might gate: Masterwork/Legendary/Mythic (Weapons.gd:required_might)
 		# render locked, same visual treatment as an unaffordable item, until
 		# the player's Might stat meets the requirement -- see Player.gd:
-		# try_buy_weapon for the matching server-side block.
+		# try_buy_weapon for the matching server-side block. Mythic alone also
+		# gates on a second stat, required_intimidation.
 		var required_might: int = int(item.get("required_might", 0))
 		var might_locked: bool = item.category == "weapon" and required_might > player_might
+		var required_intimidation: int = int(item.get("required_intimidation", 0))
+		var intimidation_locked: bool = item.category == "weapon" and required_intimidation > player_intimidation
+		var stat_locked: bool = might_locked or intimidation_locked
 
 		var button := Button.new()
 		button.custom_minimum_size = Vector2(0, 52)
@@ -2065,7 +2102,7 @@ func show_shop(coins: int, runic_shards: int, offering: Array, prices: Array, cu
 		button.expand_icon = true
 		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		button.text = "[%d] %s%s%s" % [i + 1, "🔒 " if is_locked else "", "★ " if is_mythic else "", item.name]
-		button.disabled = (not already_owned and coins < prices[i]) or might_locked
+		button.disabled = (not already_owned and coins < prices[i]) or stat_locked
 		button.pressed.connect(func(): shop_buy_pressed.emit(i))
 		# Stat descriptions live in the Inventory screen now, not here --
 		# the shop only ever shows the Shopkeeper's own flavor bark on hover.
@@ -2088,9 +2125,14 @@ func show_shop(coins: int, runic_shards: int, offering: Array, prices: Array, cu
 		price_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		price_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		price_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		price_label.text = ("MGT %d" % required_might) if might_locked else ("OWNED" if already_owned else "%d" % prices[i])
+		var stat_lock_label := ""
+		if might_locked:
+			stat_lock_label = "MGT %d" % required_might
+		if intimidation_locked:
+			stat_lock_label = ("%s/INT %d" % [stat_lock_label, required_intimidation]) if stat_lock_label != "" else ("INT %d" % required_intimidation)
+		price_label.text = stat_lock_label if stat_locked else ("OWNED" if already_owned else "%d" % prices[i])
 		price_label.add_theme_font_size_override("font_size", 15)
-		price_label.add_theme_color_override("font_color", Color(1, 0.4, 0.4) if might_locked else (Color(0.55, 0.85, 0.4) if already_owned else Color(1, 0.85, 0.3)))
+		price_label.add_theme_color_override("font_color", Color(1, 0.4, 0.4) if stat_locked else (Color(0.55, 0.85, 0.4) if already_owned else Color(1, 0.85, 0.3)))
 		button.add_child(price_label)
 
 		if is_lockable and not is_locked:
@@ -2320,7 +2362,12 @@ func show_battle_confirm(prompt: String, yes_label: String, no_label: String) ->
 	battle_confirm_no_button.text = no_label
 	battle_confirm_yes_button.grab_focus()
 
-func update_battle_grid(grid_w: int, grid_h: int, terrain: Dictionary, player_tile: Vector2i, units: Array, player_hp: int, player_max_hp: int, player_level: int, turn: String, target_index: int, moves_left: int, stamina: int, max_stamina: int, current_weapon: Dictionary, menu_state: String, healing_items: int, move_trail: Array, allies: Array, has_guardian_skill: bool, skill_cooldown: int, is_disarmed: bool = false, owned_arrows: Dictionary = {}, is_evasion_prompt: bool = false, can_mine: bool = false, shield_name: String = "", shield_block_pct: float = 0.0, berserk_turns: int = 0, stealth_turns: int = 0, stealth_cost: int = 0, evasion_options: Dictionary = {}, feared_unreachable: bool = false, is_confirm_prompt: bool = false) -> void:
+func update_battle_grid(grid_w: int, grid_h: int, terrain: Dictionary, player_tile: Vector2i, units: Array, player_hp: int, player_max_hp: int, player_level: int, turn: String, target_index: int, moves_left: int, stamina: int, max_stamina: int, current_weapon: Dictionary, menu_state: String, healing_items: int, move_trail: Array, allies: Array, has_guardian_skill: bool, skill_cooldown: int, is_disarmed: bool = false, owned_arrows: Dictionary = {}, is_evasion_prompt: bool = false, can_mine: bool = false, shield_name: String = "", shield_block_pct: float = 0.0, berserk_turns: int = 0, stealth_turns: int = 0, stealth_cost: int = 0, evasion_options: Dictionary = {}, feared_unreachable: bool = false, is_confirm_prompt: bool = false, commanding_ally_name: String = "") -> void:
+	# commanding_ally_name is non-empty while Main.gd is running a party member's own
+	# commanded turn (see battle_commanding_ally) -- moves_left/player_hp/player_max_hp
+	# are already that ally's own numbers in this case, not the hero's; only the name
+	# and which menu box shows need to branch on it here.
+	var in_ally_turn: bool = commanding_ally_name != ""
 	# The grid always renders within the same on-screen footprint regardless
 	# of size (a boss fight's bigger grid_w/grid_h -- see
 	# Main.gd:BOSS_BATTLE_GRID_SIZE -- just packs in smaller tiles) rather
@@ -2389,7 +2436,7 @@ func update_battle_grid(grid_w: int, grid_h: int, terrain: Dictionary, player_ti
 	# Party members now have a real tile of their own (Main.gd:battle_allies)
 	# -- rendered the same way as an enemy icon (tile origin + padding), plus
 	# a small health bar under it. Traitor Wolf reuses the enemy Wolf icon;
-	# any other ally (Blade Ally, Warrior) uses the shared companion icon.
+	# any other ally (Knight, Warrior) uses the shared companion icon.
 	for i in battle_ally_icons.size():
 		var ally_icon: TextureRect = battle_ally_icons[i]
 		var hp_bg: ColorRect = battle_ally_hp_bg[i]
@@ -2398,7 +2445,13 @@ func update_battle_grid(grid_w: int, grid_h: int, terrain: Dictionary, player_ti
 			var a: Dictionary = allies[i]
 			var a_tile_origin: Vector2 = battle_grid_origin + Vector2(a.tile.x, a.tile.y) * battle_tile_size
 			var a_padding := 6.0
-			ally_icon.texture = ENEMY_ICONS.get("Wolf", null) if a.name == "Traitor Wolf" else BLADE_ALLY_ICON
+			var is_wolf_ally: bool = a.get("kind", "") == "wolf"
+			ally_icon.texture = ENEMY_ICONS.get("Wolf", null) if is_wolf_ally else BLADE_ALLY_ICON
+			# Roster members wear their kind's colour on the shared companion icon.
+			ally_icon.modulate = a.member.rules().get("tint", Color(1, 1, 1)) if (a.has("member") and not is_wolf_ally) else Color(1, 1, 1)
+			# Whoever the player is commanding right now glows, like the current target.
+			if a.get("acting", false):
+				ally_icon.modulate = ally_icon.modulate * Color(1.4, 1.4, 0.75)
 			ally_icon.position = a_tile_origin + Vector2(a_padding, a_padding)
 			ally_icon.size = Vector2(battle_tile_size - a_padding * 2, battle_tile_size - a_padding * 2)
 			ally_icon.visible = ally_icon.texture != null
@@ -2488,7 +2541,15 @@ func update_battle_grid(grid_w: int, grid_h: int, terrain: Dictionary, player_ti
 		aware_marker.position = tile_origin + Vector2(footprint_span / 2.0 - 6, -18)
 		aware_marker.visible = u.get("spotted_you", false)
 
-	var turn_text: String = ("Your turn (moves left: %d)" % moves_left) if turn == "player" else "Enemy turn..."
+	var turn_text: String
+	if in_ally_turn:
+		turn_text = "%s's turn (moves left: %d)" % [commanding_ally_name, moves_left]
+	elif turn == "player":
+		turn_text = "Your turn (moves left: %d)" % moves_left
+	elif turn == "attack":
+		turn_text = "Attacking..."
+	else:
+		turn_text = "Enemy turn..."
 	battle_status_label.text = "LV %d   %s" % [player_level, turn_text]
 
 	var hp_ratio: float = clampf(float(player_hp) / float(max(1, player_max_hp)), 0.0, 1.0)
@@ -2535,10 +2596,16 @@ func update_battle_grid(grid_w: int, grid_h: int, terrain: Dictionary, player_ti
 		else:
 			trail_marker.visible = false
 
-	var is_player_turn: bool = turn == "player"
+	# battle_turn stays "player" throughout a party member's commanded turn too
+	# (see Main.gd:battle_commanding_ally) -- in_ally_turn is what actually tells
+	# the hero's own menus and the ally's apart, not turn itself.
+	var is_player_turn: bool = turn == "player" and not in_ally_turn
 	battle_main_menu_box.visible = is_player_turn and menu_state == "main" and not is_evasion_prompt and not is_confirm_prompt
+	battle_ally_menu_box.visible = in_ally_turn and menu_state == "main" and not is_evasion_prompt and not is_confirm_prompt
 	battle_fight_submenu_box.visible = is_player_turn and menu_state == "fight" and not is_evasion_prompt and not is_confirm_prompt
-	battle_move_submenu_box.visible = is_player_turn and menu_state == "move" and not is_evasion_prompt and not is_confirm_prompt
+	# Move is the one submenu shared by both -- Confirm/Cancel behave the same
+	# shape for an ally as for the hero (see Main.gd's _on_battle_move_action).
+	battle_move_submenu_box.visible = (is_player_turn or in_ally_turn) and menu_state == "move" and not is_evasion_prompt and not is_confirm_prompt
 	battle_arrow_submenu_box.visible = is_player_turn and menu_state == "arrow" and not is_evasion_prompt and not is_confirm_prompt
 	battle_tactics_submenu_box.visible = is_player_turn and menu_state == "tactics" and not is_evasion_prompt and not is_confirm_prompt
 	# Independent of is_player_turn -- this shows mid-"enemy" turn, the one
@@ -2555,6 +2622,7 @@ func update_battle_grid(grid_w: int, grid_h: int, terrain: Dictionary, player_ti
 
 	battle_main_buttons["item"].disabled = healing_items <= 0 or feared_unreachable
 	battle_main_buttons["move"].disabled = moves_left <= 0
+	battle_ally_buttons["move"].disabled = moves_left <= 0
 	# Disarmed (Spear's Target Practice miss, Dagger's Knife Throw): Fight is
 	# off-limits until you're standing back on the tile your weapon landed on
 	# -- everything else (Move/Item/Defend/Flee/Skill/Arrow) stays available.
@@ -2581,8 +2649,14 @@ func update_battle_grid(grid_w: int, grid_h: int, terrain: Dictionary, player_ti
 
 	var specials: Array = current_weapon.get("specials", [])
 	var special_keys := ["special_0", "special_1", "special_2"]
-	battle_fight_buttons["heavy"].text = "Heavy Attack (%d STA)" % WeaponsScript.HEAVY_STAMINA_COST
-	battle_fight_buttons["heavy"].disabled = stamina < WeaponsScript.HEAVY_STAMINA_COST
+	# The Bow overrides both of these with its own, flat costs (2026-09-29) --
+	# every other weapon's regular Attack stays free, Heavy stays the usual rate.
+	var regular_cost: int = int(current_weapon.get("regular_attack_stamina_cost", 0))
+	battle_fight_buttons["attack"].text = "Attack (%d STA)" % regular_cost if regular_cost > 0 else "Attack"
+	battle_fight_buttons["attack"].disabled = stamina < regular_cost
+	var heavy_cost: int = int(current_weapon.get("heavy_stamina_cost_override", WeaponsScript.HEAVY_STAMINA_COST))
+	battle_fight_buttons["heavy"].text = "Heavy Attack (%d STA)" % heavy_cost
+	battle_fight_buttons["heavy"].disabled = stamina < heavy_cost
 	battle_tactics_buttons["stealth"].text = "Stealth (%d STA)" % stealth_cost
 	battle_tactics_buttons["stealth"].disabled = stamina < stealth_cost
 	for i in special_keys.size():

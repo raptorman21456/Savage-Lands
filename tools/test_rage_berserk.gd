@@ -85,7 +85,7 @@ func _init() -> void:
 	])
 
 	g_dmg.hp = 999999
-	main._apply_single_hit(0, 1.0, "", weapons_script.CLUB, "Blade Ally")
+	main._apply_single_hit(0, 1.0, "", weapons_script.CLUB, "Knight")
 	var ally_dmg: int = 999999 - g_dmg.hp
 	print("...but never applies to an ally's own hit through the same function: ally_dmg=%d (expected == normal_dmg=%d, not boosted)" % [ally_dmg, normal_dmg])
 	player.meta_rage_bonus_pct = 0.0

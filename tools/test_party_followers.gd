@@ -20,9 +20,9 @@ func _init() -> void:
 	var player = main.player
 	print("no followers with an empty roster: count=%d (expected 0)" % [main.party_follower_nodes.size()])
 
-	player.party_wolf = {"name": "Traitor Wolf", "dmg_mult": 0.6}
+	player.recruit("wolf")
 	main._process(0.016)
-	print("a Traitor Wolf recruit spawns exactly one follower: count=%d (expected 1)" % [main.party_follower_nodes.size()])
+	print("a Fickle Wolf recruit spawns exactly one follower: count=%d (expected 1)" % [main.party_follower_nodes.size()])
 	var signature_after_wolf: String = main.party_follower_signature
 
 	# Moving the player should NOT immediately drag the follower along with
@@ -49,13 +49,13 @@ func _init() -> void:
 		main.party_follower_nodes[0].global_position.x <= player.global_position.x
 	])
 
-	# Recruiting a Blade Ally adds a second follower -- and rebuilding the
+	# Recruiting a Knight adds a second follower -- and rebuilding the
 	# roster snaps BOTH back to the player's current position, rather than
 	# leaving the wolf's progress along the old trail in place while a brand
 	# new second follower pops in at Vector2.ZERO.
-	player.party_members.append({"name": "Blade Ally", "dmg_mult": 0.75})
+	player.party_members.append({"name": "Knight", "dmg_mult": 0.75})
 	main._process(0.016)
-	print("recruiting a Blade Ally adds a second follower: count=%d (expected 2), signature_changed=%s (expected true)" % [
+	print("recruiting a Knight adds a second follower: count=%d (expected 2), signature_changed=%s (expected true)" % [
 		main.party_follower_nodes.size(), main.party_follower_signature != signature_after_wolf
 	])
 	var max_gap := 0.0

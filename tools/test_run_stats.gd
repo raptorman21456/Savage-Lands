@@ -30,9 +30,9 @@ func _init() -> void:
 	main.enemies_alive = 10
 	main._on_enemy_died(5, "Goblin")
 	main._on_enemy_died(5, "Goblin")
-	main._on_enemy_died(50, "Owlbear")
+	main._on_enemy_died(50, "Elder Oak")
 	main._on_enemy_died(3, "")
-	print("kills_by_name tracks named kills: %s (expected {\"Goblin\": 2, \"Owlbear\": 1})" % [main.run_kills_by_name])
+	print("kills_by_name tracks named kills: %s (expected {\"Goblin\": 2, \"Elder Oak\": 1})" % [main.run_kills_by_name])
 	print("bosses_defeated only counts is_boss_tier kills: %d (expected 1)" % [main.run_bosses_defeated])
 
 	# --- Damage dealt (_apply_single_hit) ---

@@ -59,9 +59,9 @@ func _init() -> void:
 			])
 		if v.tier_name == "Masterwork" and v.material_name == "Golden" and not found_masterwork_gold:
 			found_masterwork_gold = true
-			var expected_dmg2: float = weapons_script.SPEAR.damage_mult * 1.3 * 1.15
-			var expected_price2: int = int(round(weapons_script.SPEAR.price * 1.7 * 1.2))
-			print("Masterwork Golden Spear composes correctly: name=%s (expected 'Masterwork Golden Spear'), dmg=%.3f (expected %.3f), price=%d (expected %d), break_chance=%.2f (expected 0.03)" % [
+			var expected_dmg2: float = weapons_script.SPEAR.damage_mult * 1.3 * 1.25
+			var expected_price2: int = int(round(weapons_script.SPEAR.price * 1.7 * 1.4))
+			print("Masterwork Golden Spear composes correctly: name=%s (expected 'Masterwork Golden Spear'), dmg=%.3f (expected %.3f), price=%d (expected %d), break_chance=%.2f (expected 0.00)" % [
 				v.name, v.damage_mult, expected_dmg2, v.price, expected_price2, v.break_chance
 			])
 
@@ -152,36 +152,35 @@ func _init() -> void:
 		known_material_ids.has(rolled_variant.get("material_id", "")), known_material_ids
 	])
 
-	# Wood's Quick Hands: the first stamina-costing action(s) each battle are
-	# free (the base Attack already costs 0 stamina -- only observable on a
-	# Special/Heavy Attack). Stone Amulet extends 1 free use to 2.
+	# Wood's Quick Strikes (renamed 2026-09-29 from Quick Hands -- a free first
+	# use): a flat 10% chance for a landed hit to strike again, same shape as
+	# a weapon's own passive_double_hit_chance. A hit landing for MORE than
+	# a single hit's damage is the double-hit firing.
 	var wood_weapon: Dictionary = weapons_script.SPEAR.duplicate(true)
 	wood_weapon.material_id = "wood"
 	player.current_weapon = wood_weapon
-	player.stamina = player.MAX_STAMINA
-	main.battle_free_abilities_used = 0
-	main.battle_units = [_make_enemy(main, Vector2i(3, 2))]
-	main._battle_player_special(0)
-	print("Wood's Quick Hands: the battle's first special costs 0 stamina: %d (expected %d)" % [player.stamina, player.MAX_STAMINA])
-	var stamina_after_first: int = player.stamina
-	main.battle_units = [_make_enemy(main, Vector2i(3, 2))]
-	main._battle_player_special(0)
-	print("...but the second special of the same battle costs normally: %d (expected %d)" % [
-		stamina_after_first - player.stamina, wood_weapon.specials[0].stamina_cost
-	])
+	var wood_target := _make_enemy(main, Vector2i(3, 2), 999999)
+	main.battle_units = [wood_target]
+	var wood_trials := 300
+	var wood_doubles := 0
+	var single_hit_dmg: int = int(round(10 * wood_weapon.damage_mult))
+	for i in wood_trials:
+		player.stamina = player.MAX_STAMINA
+		var hp_before: int = wood_target.hp
+		main._battle_player_fight()
+		if (hp_before - wood_target.hp) >= single_hit_dmg * 2 - 1:
+			wood_doubles += 1
+	print("Wood's Quick Strikes: a flat 10%% chance to hit again over %d trials: %d (expected roughly 15-55, ~30 mean)" % [wood_trials, wood_doubles])
 	player._talisman_cache["material_passive_boost"] = 1.0
-	main.battle_free_abilities_used = 0
-	player.stamina = player.MAX_STAMINA
-	main.battle_units = [_make_enemy(main, Vector2i(3, 2))]
-	main._battle_player_special(0)
-	var stamina_after_boosted_first: int = player.stamina
-	main.battle_units = [_make_enemy(main, Vector2i(3, 2))]
-	main._battle_player_special(0)
-	print("Stone Amulet extends Quick Hands to 2 free uses: first_cost=%d second_cost=%d (expected 0 0)" % [
-		player.MAX_STAMINA - stamina_after_boosted_first, stamina_after_boosted_first - player.stamina
-	])
+	var wood_doubles_boosted := 0
+	for i in wood_trials:
+		player.stamina = player.MAX_STAMINA
+		var hp_before2: int = wood_target.hp
+		main._battle_player_fight()
+		if (hp_before2 - wood_target.hp) >= single_hit_dmg * 2 - 1:
+			wood_doubles_boosted += 1
+	print("Stone Amulet raises Quick Strikes to roughly 15%%: %d (expected roughly 25-70, clearly more than a 10%% baseline)" % [wood_doubles_boosted])
 	player._talisman_cache.erase("material_passive_boost")
-	main.battle_free_abilities_used = 0
 	player.stamina = player.MAX_STAMINA
 
 	# Gold's Gilded Strike: a coin for landing the killing blow yourself --
@@ -210,42 +209,29 @@ func _init() -> void:
 	print("Steel carries no material passive: coins unchanged=%d (expected 0)" % [player.coins])
 	player.berserk_turns_remaining = 0
 
-	# Bone's Dread Aura: chance scaled by weapon type (heavier/slower weapons
-	# unnerve more), amplified by Stone Amulet.
-	# get_base_type() only recognizes a fully-tiered id ("spear_fine_bone"),
-	# not a bare base constant's own id ("spear") -- give these a realistic
-	# tiered id so the lookup resolves the same way it would for a real
-	# rolled weapon.
+	# Bone's Dreadful Strike: a flat 7.5% chance regardless of weapon type
+	# (2026-09-29 -- was scaled by weapon cooldown_mult), amplified by Stone
+	# Amulet.
 	var bone_spear: Dictionary = weapons_script.SPEAR.duplicate(true)
 	bone_spear.material_id = "bone"
-	bone_spear.id = "spear_fine_bone"
-	var bone_axe: Dictionary = weapons_script.BATTLE_AXE.duplicate(true)
-	bone_axe.material_id = "bone"
-	bone_axe.id = "battle_axe_fine_bone"
 	var dread_target := {"ref": null, "tile": Vector2i(3, 2), "hp": 999999, "max_hp": 999999, "move_range": 2, "damage": 0, "name": "Goblin"}
 	main.battle_units = [dread_target]
-	var spear_dread_procs := 0
-	var axe_dread_procs := 0
+	var dread_procs := 0
 	var dread_trials := 1000
 	for i in dread_trials:
 		dread_target.feared = false
 		main._apply_single_hit(0, 1.0, "", bone_spear, "You", Vector2i(-1, -1), 1, false)
 		if dread_target.feared:
-			spear_dread_procs += 1
-		dread_target.feared = false
-		main._apply_single_hit(0, 1.0, "", bone_axe, "You", Vector2i(-1, -1), 1, false)
-		if dread_target.feared:
-			axe_dread_procs += 1
-	print("Bone's Dread Aura on a Spear procs roughly 3%% over %d trials: %d (expected roughly 30, within +/-60%%)" % [dread_trials, spear_dread_procs])
-	print("...and roughly 10%% on a Battle Axe (heavier weapons unnerve more): %d (expected roughly 100, within +/-50%%)" % [axe_dread_procs])
+			dread_procs += 1
+	print("Bone's Dreadful Strike procs roughly 7.5%% over %d trials: %d (expected roughly 75, within +/-40%%)" % [dread_trials, dread_procs])
 	player._talisman_cache["material_passive_boost"] = 1.0
-	var axe_dread_boosted := 0
+	var dread_boosted := 0
 	for i in dread_trials:
 		dread_target.feared = false
-		main._apply_single_hit(0, 1.0, "", bone_axe, "You", Vector2i(-1, -1), 1, false)
+		main._apply_single_hit(0, 1.0, "", bone_spear, "You", Vector2i(-1, -1), 1, false)
 		if dread_target.feared:
-			axe_dread_boosted += 1
-	print("Stone Amulet raises the Battle Axe's Dread Aura chance to roughly 15%%: %d (expected roughly 150, clearly more than %d)" % [axe_dread_boosted, axe_dread_procs])
+			dread_boosted += 1
+	print("Stone Amulet raises Dreadful Strike's chance to roughly 11.25%%: %d (expected roughly 112, clearly more than %d)" % [dread_boosted, dread_procs])
 	player._talisman_cache.erase("material_passive_boost")
 	dread_target.feared = false
 
@@ -285,31 +271,33 @@ func _init() -> void:
 		main._apply_single_hit(0, 1.0, "", silver_weapon, "You", Vector2i(-1, -1), 1, false)
 		if main.player_poison_turns == 0:
 			silver_cleanses += 1
-	print("Silver's Cleansing Strike procs roughly 8%% of hits over %d trials: %d (expected roughly 40, within +/-60%%)" % [silver_trials, silver_cleanses])
+	print("Silver's Cleansing Strike procs roughly 15%% of hits over %d trials: %d (expected roughly 75, within +/-40%%)" % [silver_trials, silver_cleanses])
 	main.player_poison_turns = 0
 
-	# Obsidian's Volatile Shard: a chance for a landed hit to deal 1.5x
-	# damage, amplified by Stone Amulet.
+	# Obsidian's Splinter Strike (renamed 2026-09-29 from Volatile Shard): a
+	# 5% chance for a landed hit to cause Bleeding instead of extra damage,
+	# amplified by Stone Amulet. Never re-triggers while already bleeding
+	# (see the bleed_turns <= 0 guard in _apply_single_hit).
 	var obsidian_weapon: Dictionary = weapons_script.SPEAR.duplicate(true)
 	obsidian_weapon.material_id = "obsidian"
-	var obsidian_target := {"ref": null, "tile": Vector2i(3, 2), "hp": 100000000, "max_hp": 100000000, "move_range": 2, "damage": 0, "name": "Goblin"}
-	main.battle_units = [obsidian_target]
 	var obsidian_trials := 500
-	var obsidian_boosted := 0
+	var obsidian_procs := 0
 	for i in obsidian_trials:
-		var hp_before: int = obsidian_target.hp
+		var obsidian_target := {"ref": null, "tile": Vector2i(3, 2), "hp": 100000000, "max_hp": 100000000, "move_range": 2, "damage": 0, "name": "Goblin", "bleed_turns": 0}
+		main.battle_units = [obsidian_target]
 		main._apply_single_hit(0, 1.0, "", obsidian_weapon, "You", Vector2i(-1, -1), 10, false)
-		if hp_before - obsidian_target.hp > 10:
-			obsidian_boosted += 1
-	print("Obsidian's Volatile Shard erupts on roughly 10%% of hits over %d trials: %d (expected roughly 50, within +/-50%%)" % [obsidian_trials, obsidian_boosted])
+		if obsidian_target.bleed_turns > 0:
+			obsidian_procs += 1
+	print("Obsidian's Splinter Strike causes Bleeding on roughly 5%% of hits over %d trials: %d (expected roughly 25, within +/-60%%)" % [obsidian_trials, obsidian_procs])
 	player._talisman_cache["material_passive_boost"] = 1.0
-	var obsidian_boosted2 := 0
+	var obsidian_procs_boosted := 0
 	for i in obsidian_trials:
-		var hp_before2: int = obsidian_target.hp
+		var obsidian_target2 := {"ref": null, "tile": Vector2i(3, 2), "hp": 100000000, "max_hp": 100000000, "move_range": 2, "damage": 0, "name": "Goblin", "bleed_turns": 0}
+		main.battle_units = [obsidian_target2]
 		main._apply_single_hit(0, 1.0, "", obsidian_weapon, "You", Vector2i(-1, -1), 10, false)
-		if hp_before2 - obsidian_target.hp > 10:
-			obsidian_boosted2 += 1
-	print("Stone Amulet raises Volatile Shard's chance to roughly 15%%: %d (expected roughly 75, clearly more than %d)" % [obsidian_boosted2, obsidian_boosted])
+		if obsidian_target2.bleed_turns > 0:
+			obsidian_procs_boosted += 1
+	print("Stone Amulet raises Splinter Strike's chance to roughly 7.5%%: %d (expected roughly 38, clearly more than %d)" % [obsidian_procs_boosted, obsidian_procs])
 	player._talisman_cache.erase("material_passive_boost")
 
 	main.in_battle = false

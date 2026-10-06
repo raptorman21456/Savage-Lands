@@ -52,23 +52,26 @@ func _init() -> void:
 		player.current_weapon.get("passive_double_hit_chance", 0.0), player.current_weapon.get("passive_lifesteal_pct", 0.0), player.current_weapon.get("passive_free_specials", false)
 	])
 
-	var nightwhisper: Dictionary = weapons_script.make_variant(weapons_script.DAGGER, 5)
-	player._equip_weapon(nightwhisper)
-	print("meta double-hit chance stacks additively with a Mythic weapon's own passive: %.2f (expected 0.3+0.24=0.54)" % [
-		player.current_weapon.get("passive_double_hit_chance", 0.0)
+	# The Implement (Mythic Dagger) carries its own passive_lifesteal_pct
+	# (0.20) -- Vampiric Grit's meta_lifesteal_pct (2 levels = 0.10) should
+	# stack additively on top of it, not replace it.
+	var mythic_dagger: Dictionary = weapons_script.make_variant(weapons_script.DAGGER, 5)
+	player._equip_weapon(mythic_dagger)
+	print("meta lifesteal stacks additively with a Mythic weapon's own passive: %.2f (expected 0.20+0.10=0.30)" % [
+		player.current_weapon.get("passive_lifesteal_pct", 0.0)
 	])
 
-	# --- Blade Ally (now a party member fighting as a real unit on its own
-	# tile, with its own turn): scales off the player's own Strength,
-	# independent of whatever weapon is equipped. meta_double_hit_chance is
+	# --- Knight (now a party member fighting as a real unit on its own
+	# tile, with its own commanded turn): scales off the player's own
+	# Strength, independent of whatever weapon is equipped. meta_double_hit_chance is
 	# reset to 0 here so the player's own regular attack (which DOES roll
 	# for a random double-hit) can't randomly interfere with an otherwise-
 	# deterministic damage check. main.battle_allies (not just
 	# player.party_members) has to be populated directly, same as
 	# main.battle_units already is for the enemy side in this file -- it's
-	# the battle-time representation _process_ally_turn actually reads.
+	# the battle-time representation _battle_ally_attack actually reads.
 	player.meta_double_hit_chance = 0.0
-	player.party_members = [{"name": "Blade Ally", "dmg_mult": 0.75}]
+	player.party_members = [{"name": "Knight", "dmg_mult": 0.75}]
 	player.stat_strength = 10
 	player.attack_damage = 10
 	player.try_buy_weapon(weapons_script.CLUB)
@@ -82,23 +85,32 @@ func _init() -> void:
 	# adjacent to the goblin so it attacks without needing to move first.
 	var g_ally_direct := _make_goblin(main, Vector2i(3, 2))
 	main.battle_units = [g_ally_direct]
-	main.battle_allies = [{"tile": Vector2i(3, 3), "hp": 20, "max_hp": 20, "dmg_mult": 0.75, "name": "Blade Ally", "move_range": main.ALLY_MOVE_RANGE, "attack_range": main.ALLY_ATTACK_RANGE}]
-	main._process_ally_turn()
+	var blade_ally_direct := {"tile": Vector2i(3, 3), "hp": 20, "max_hp": 20, "dmg_mult": 0.75, "name": "Knight", "move_range": main.ALLY_MOVE_RANGE, "attack_range": main.ALLY_ATTACK_RANGE}
+	main.battle_allies = [blade_ally_direct]
+	main.battle_commanding_ally = blade_ally_direct
+	main._battle_ally_attack()
 	var expected_ally_hit: int = roundi(10 * 0.75)
-	print("the party member deals damage scaling off Strength alone, independent of the equipped weapon: dealt=%d (expected %d)" % [
+	print("commanded to Attack, the party member deals damage scaling off Strength alone, independent of the equipped weapon: dealt=%d (expected %d)" % [
 		999 - g_ally_direct.hp, expected_ally_hit
 	])
+	main.battle_commanding_ally = null
 
 	# Then confirm it's actually wired into the real turn-ending flow, not
-	# just directly callable -- a regular attack must deal MORE than the
-	# player's own hit alone once the ally is following along.
+	# just directly callable -- ending the player's own turn opens a command
+	# phase for the ally, and only then does an explicit Attack land its hit.
 	var g_via_fight := _make_goblin(main, Vector2i(3, 2))
 	main.battle_units = [g_via_fight]
-	main.battle_allies = [{"tile": Vector2i(3, 3), "hp": 20, "max_hp": 20, "dmg_mult": 0.75, "name": "Blade Ally", "move_range": main.ALLY_MOVE_RANGE, "attack_range": main.ALLY_ATTACK_RANGE}]
+	main.battle_allies = [{"tile": Vector2i(3, 3), "hp": 20, "max_hp": 20, "dmg_mult": 0.75, "name": "Knight", "move_range": main.ALLY_MOVE_RANGE, "attack_range": main.ALLY_ATTACK_RANGE}]
 	main._battle_player_fight()
-	print("the party member also fires automatically when a real turn-ending action is taken: ally_contributed=%s (expected true, total dealt %d > the player's own hit of 10)" % [
+	print("ending the player's own turn opens a command phase for the ally: commanding=%s (expected true)" % [main.battle_commanding_ally != null])
+	# The player's own hit just knocked the goblin back a tile -- Move the
+	# ally into range first, same as a real player would, before Attack.
+	main._try_battle_ally_move(Vector2i(1, 0))
+	main._battle_ally_attack()
+	print("the party member fires once explicitly commanded to Move then Attack: ally_contributed=%s (expected true, total dealt %d > the player's own hit of 10)" % [
 		(999 - g_via_fight.hp) > 10, 999 - g_via_fight.hp
 	])
+	main.battle_commanding_ally = null
 
 	player.party_members = []
 	main.battle_allies = []
@@ -109,32 +121,36 @@ func _init() -> void:
 
 	# An ally turn with zero enemies left resolves as an instant victory
 	# instead of crashing on an out-of-range battle_units access.
-	player.party_members = [{"name": "Blade Ally", "dmg_mult": 0.75}]
-	main.battle_allies = [{"tile": Vector2i(3, 3), "hp": 20, "max_hp": 20, "dmg_mult": 0.75, "name": "Blade Ally", "move_range": main.ALLY_MOVE_RANGE, "attack_range": main.ALLY_ATTACK_RANGE}]
+	player.party_members = [{"name": "Knight", "dmg_mult": 0.75}]
+	main.battle_allies = [{"tile": Vector2i(3, 3), "hp": 20, "max_hp": 20, "dmg_mult": 0.75, "name": "Knight", "move_range": main.ALLY_MOVE_RANGE, "attack_range": main.ALLY_ATTACK_RANGE}]
 	main.battle_units = []
 	main.in_battle = true
-	main._process_ally_turn()
-	print("an ally turn with zero enemies left resolves as an instant victory instead of crashing: in_battle=%s (expected false)" % [main.in_battle])
+	main._start_ally_turn()
+	print("starting the ally phase with zero enemies left resolves as an instant victory instead of crashing: in_battle=%s (expected false)" % [main.in_battle])
 
 	# Two party members (Pack Leader's payoff) both land a hit the same turn
 	# -- both start adjacent to the goblin, on distinct tiles.
 	main.in_battle = true
-	player.party_members = [{"name": "Blade Ally", "dmg_mult": 0.75}, {"name": "Warrior", "dmg_mult": 0.75}]
+	player.party_members = [{"name": "Knight", "dmg_mult": 0.75}, {"name": "Warrior", "dmg_mult": 0.75}]
 	player.max_party_slots = 3
 	main.battle_allies = [
-		{"tile": Vector2i(3, 3), "hp": 20, "max_hp": 20, "dmg_mult": 0.75, "name": "Blade Ally", "move_range": main.ALLY_MOVE_RANGE, "attack_range": main.ALLY_ATTACK_RANGE},
+		{"tile": Vector2i(3, 3), "hp": 20, "max_hp": 20, "dmg_mult": 0.75, "name": "Knight", "move_range": main.ALLY_MOVE_RANGE, "attack_range": main.ALLY_ATTACK_RANGE},
 		{"tile": Vector2i(4, 2), "hp": 20, "max_hp": 20, "dmg_mult": 0.75, "name": "Warrior", "move_range": main.ALLY_MOVE_RANGE, "attack_range": main.ALLY_ATTACK_RANGE},
 	]
 	var g_two_allies := _make_goblin(main, Vector2i(3, 2))
 	main.battle_units = [g_two_allies]
 	main.battle_target_index = 0
-	main._process_ally_turn()
-	print("two party members (Pack Leader's payoff) both land a hit: dealt=%d (expected %d, two hits of %d)" % [
+	main.battle_commanding_ally = main.battle_allies[0]
+	main._battle_ally_attack()
+	main.battle_commanding_ally = main.battle_allies[1]
+	main._battle_ally_attack()
+	main.battle_commanding_ally = null
+	print("two party members (Pack Leader's payoff), each commanded to Attack, both land a hit: dealt=%d (expected %d, two hits of %d)" % [
 		999 - g_two_allies.hp, expected_ally_hit * 2, expected_ally_hit
 	])
 	player.max_party_slots = 2
 	main.battle_allies = []
-	# Cleared rather than left with a Blade Ally in the roster -- the
+	# Cleared rather than left with a Knight in the roster -- the
 	# sections below call _setup_battle_grid([]) with no enemies, and an
 	# ally turn with a real party member but nothing to fight would resolve
 	# as an instant victory (see the "instant victory" check above), ending

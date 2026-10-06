@@ -43,8 +43,8 @@ func _init() -> void:
 	for e in main.get_tree().get_nodes_in_group("enemies"):
 		var n: String = e.get_display_name()
 		wave1_counts[n] = wave1_counts.get(n, 0) + 1
-	print("wave 1 introduces only the Apprentice Mage among new types: archer=%d (expected 1), shaman=%d (expected 0), brute=%d (expected 0), shade=%d (expected 0)" % [
-		wave1_counts.get("Apprentice Mage", 0), wave1_counts.get("Shaman", 0), wave1_counts.get("Brute", 0), wave1_counts.get("Shade", 0)
+	print("wave 1 introduces only the Apprentice Mage among new types: archer=%d (expected 1), brute=%d (expected 0), shade=%d (expected 0)" % [
+		wave1_counts.get("Apprentice Mage", 0), wave1_counts.get("Brute", 0), wave1_counts.get("Shade", 0)
 	])
 
 	main.wave = main.SHADE_WAVE_START
@@ -55,7 +55,7 @@ func _init() -> void:
 	main._spawn_wave()
 	# Same stray-contact-battle risk as above -- freeze immediately, before
 	# the await below gives these fresh spawns (which by this wave include
-	# an Archer, Brute, Shade and Shaman) a live tick.
+	# an Archer, Brute and Shade) a live tick.
 	for e in main.get_tree().get_nodes_in_group("enemies"):
 		e.set_physics_process(false)
 	await physics_frame
@@ -63,8 +63,8 @@ func _init() -> void:
 	for e in main.get_tree().get_nodes_in_group("enemies"):
 		var n: String = e.get_display_name()
 		wave4_counts[n] = wave4_counts.get(n, 0) + 1
-	print("by wave 4 all four new types are present: archer=%d shaman=%d brute=%d shade=%d (all expected >=1)" % [
-		wave4_counts.get("Apprentice Mage", 0), wave4_counts.get("Shaman", 0), wave4_counts.get("Brute", 0), wave4_counts.get("Shade", 0)
+	print("by wave 4 all three new types are present: archer=%d brute=%d shade=%d (all expected >=1)" % [
+		wave4_counts.get("Apprentice Mage", 0), wave4_counts.get("Brute", 0), wave4_counts.get("Shade", 0)
 	])
 
 	# --- Goblin: very aggressive and persistent -- once it spots the
@@ -102,7 +102,6 @@ func _init() -> void:
 	player._recalc_stats()
 
 	var archer_script = load("res://scripts/Archer.gd")
-	var shaman_script = load("res://scripts/Shaman.gd")
 	var brute_script = load("res://scripts/Brute.gd")
 	var shade_script = load("res://scripts/Shade.gd")
 	var orc_script = load("res://scripts/Orc.gd")
@@ -278,61 +277,6 @@ func _init() -> void:
 		player.health, player.max_health - 4
 	])
 
-	# --- Shaman: refuses to engage at all while any other ally is alive
-	# (heals if it can, otherwise just watches), only fighting once it's
-	# truly the last one standing. ---
-	var shaman = shaman_script.new()
-	main.add_child(shaman)
-	shaman.died.connect(main._on_enemy_died)
-	main.enemies_alive += 1
-	var goblin_for_shaman = goblin_script.new()
-	main.add_child(goblin_for_shaman)
-	goblin_for_shaman.died.connect(main._on_enemy_died)
-	main.enemies_alive += 1
-
-	main.battle_terrain.clear()
-	main.battle_player_tile = Vector2i(2, 2)
-	main.battle_player_defending = false
-	player.health = player.max_health
-	var player_health_before: int = player.health
-	main.battle_units = [
-		_make_unit(main, shaman, Vector2i(5, 5), 12, "Shaman", 1),
-		_make_unit(main, goblin_for_shaman, Vector2i(5, 4), 1, "Goblin", 1),
-	]
-	main.battle_units[1].max_hp = 3
-	main._process_enemy_turn()
-	var expected_heal: int = max(1, int(round(3 * main.SHAMAN_HEAL_PCT)))
-	print("shaman heals its worst-hurt ally instead of attacking: goblin_hp=%d (expected %d), player_health=%d (expected unchanged %d)" % [
-		main.battle_units[1].hp, min(3, 1 + expected_heal), player.health, player_health_before
-	])
-
-	# Even with nobody left to heal, it still refuses to engage while an
-	# ally is alive -- it just watches and waits.
-	main.battle_terrain.clear()
-	main.battle_player_tile = Vector2i(2, 2)
-	main.battle_player_defending = false
-	player.health = player.max_health
-	main.battle_units = [
-		_make_unit(main, shaman, Vector2i(3, 2), 12, "Shaman", 1),
-		_make_unit(main, goblin_for_shaman, Vector2i(5, 5), 3, "Goblin", 1),
-	]
-	main._process_enemy_turn()
-	print("shaman refuses to engage while any ally is alive, even at full HP: player_health=%d (expected unchanged %d)" % [
-		player.health, player.max_health
-	])
-
-	# Shaman: falls back to attacking directly once it's the last one
-	# standing (nothing left to heal, no one left to wait for).
-	main.battle_terrain.clear()
-	main.battle_player_tile = Vector2i(2, 2)
-	main.battle_player_defending = false
-	player.health = player.max_health
-	main.battle_units = [_make_unit(main, shaman, Vector2i(3, 2), 12, "Shaman", 1)]
-	main._process_enemy_turn()
-	print("shaman attacks directly once it's the last unit standing: player_health=%d (expected max_health-1=%d)" % [
-		player.health, player.max_health - 1
-	])
-
 	# --- Squad gathering: Brute (and Shade) generalize the old Orc-only
 	# "tough" escort logic instead of being treated as goblin-tier fodder. ---
 	var initial_orc = orc_script.new()
@@ -402,7 +346,6 @@ func _init() -> void:
 		main.ENEMY_TRAITS["Apprentice Mage"].attack_range, main.ENEMY_TRAITS["Apprentice Mage"].ignore_line,
 		main.ENEMY_TRAITS["Apprentice Mage"].get("kites", false), main.ENEMY_TRAITS["Apprentice Mage"].get("strafes", false)
 	])
-	print("shaman trait data: heals_allies=%s (expected true)" % [main.ENEMY_TRAITS["Shaman"].heals_allies])
 	print("goblin trait data: pack_bonus_mult=%.2f (expected 1.50)" % [main.ENEMY_TRAITS["Goblin"].pack_bonus_mult])
 	print("orc trait data: corners=%s (expected true), quick_jab_chance=%.2f (expected 0.40)" % [
 		main.ENEMY_TRAITS["Orc"].corners, main.ENEMY_TRAITS["Orc"].quick_jab_chance

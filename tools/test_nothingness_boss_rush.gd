@@ -1,9 +1,9 @@
 extends SceneTree
 
-# Nothingness boss rush (World Progression feature): 6 sequential fights
-# (Demogorgon, Tiamat, Count Strahd, Duke Zalto, Acererak, then a Supreme
-# Warlock rematch at power_tier 2.5), the game's first-ever win condition,
-# and the Worldwalker skill-tree capstone it unlocks lifetime-wide.
+# Nothingness boss rush (World Progression feature): 6 sequential fights -- a rematch of
+# the 6 full bosses (Leviathan, Lizen Warband, Elder Oak, White Dragon, Red Wyrm, then the
+# Archmage at power_tier 2.5) -- the game's first-ever win condition, and the Worldwalker
+# skill-tree capstone it unlocks lifetime-wide.
 
 func _init() -> void:
 	# Fixed seed: every random roll below repeats run to run, so a changed result
@@ -28,7 +28,12 @@ func _init() -> void:
 		e.set_physics_process(false)
 
 	# --- Data sanity ---
-	var names := ["Demogorgon", "Tiamat", "Count Strahd", "Duke Zalto", "Acererak"]
+	var names := ["Leviathan", "Lizen Warband", "Elder Oak", "White Dragon", "Red Wyrm", "Archmage"]
+	var all_full_bosses := true
+	for n in names:
+		if main.ENEMY_TRAITS.get(n, {}).get("is_miniboss", false):
+			all_full_bosses = false
+	print("None of the rush bosses is a miniboss: %s (expected true)" % [all_full_bosses])
 	var all_boss_tier := true
 	var all_have_icons := true
 	for n in names:
@@ -36,14 +41,14 @@ func _init() -> void:
 			all_boss_tier = false
 		if main.hud.ENEMY_ICONS.get(n, null) == null:
 			all_have_icons = false
-	print("All 5 new Nothingness bosses are is_boss_tier: %s (expected true)" % [all_boss_tier])
-	print("All 5 new Nothingness bosses have HUD icons: %s (expected true)" % [all_have_icons])
-	print("NOTHINGNESS_BOSSES has exactly 6 entries (5 new + Supreme Warlock rematch): %d (expected 6)" % [main.NOTHINGNESS_BOSSES.size()])
+	print("All 6 Nothingness bosses are is_boss_tier: %s (expected true)" % [all_boss_tier])
+	print("All 6 Nothingness bosses have HUD icons: %s (expected true)" % [all_have_icons])
+	print("NOTHINGNESS_BOSSES has exactly 6 entries (the 6 full bosses): %d (expected 6)" % [main.NOTHINGNESS_BOSSES.size()])
 	print("NOTHINGNESS_POWER_TIERS climbs fight-to-fight, ending at the same 2.5x already proven for the rematch: %s (expected [1.0, 1.15, 1.3, 1.45, 1.6, 2.5])" % [main.NOTHINGNESS_POWER_TIERS])
 
 	# --- wave 101-106 spawn the 6 fights in order, through the real
 	# _spawn_wave routing (not calling _spawn_nothingness_fight directly) ---
-	var expected_names := ["Demogorgon", "Tiamat", "Count Strahd", "Duke Zalto", "Acererak", "Supreme Warlock"]
+	var expected_names := ["Leviathan", "Lizen Warband", "Elder Oak", "White Dragon", "Red Wyrm", "Archmage"]
 	var all_correct := true
 	for i in 6:
 		main.wave = 101 + i
@@ -64,8 +69,8 @@ func _init() -> void:
 	print("waves 101-106 spawn all 6 rush fights in the correct order: %s (expected true)" % [all_correct])
 
 	# --- power_tier actually reaches the enemy instance for a mid-rush
-	# fight too, not just the already-tested Supreme Warlock rematch ---
-	main.wave = 104  # fight_index 3 -> Duke Zalto, power_tier 1.45
+	# fight too, not just the already-tested Archmage rematch ---
+	main.wave = 104  # fight_index 3 -> White Dragon, power_tier 1.45
 	main.current_world_index = main._world_index_for_wave(main.wave)
 	for e in main.get_tree().get_nodes_in_group("enemies"):
 		e.queue_free()
@@ -73,15 +78,15 @@ func _init() -> void:
 	main.enemies_alive = 0
 	main._spawn_wave()
 	await physics_frame
-	var zalto_nodes: Array = main.get_tree().get_nodes_in_group("enemies")
-	var zalto_script = load("res://scripts/DukeZalto.gd")
-	if zalto_nodes.size() == 1:
-		print("Duke Zalto (fight 4) carries power_tier=1.45: %.2f (expected 1.45)" % [zalto_nodes[0].power_tier])
-		main._setup_battle_grid([zalto_nodes[0]])
-		print("...and _setup_battle_grid scales its HP accordingly: hp=%d (expected %d)" % [
-			main.battle_units[0].hp, int(round(zalto_script.MAX_HEALTH * 1.45))
+	var dragon_nodes: Array = main.get_tree().get_nodes_in_group("enemies")
+	var dragon_script = load("res://scripts/WhiteDragon.gd")
+	if dragon_nodes.size() == 1:
+		print("White Dragon (fight 4) carries power_tier=1.45: %.2f (expected 1.45)" % [dragon_nodes[0].power_tier])
+		main._setup_battle_grid([dragon_nodes[0]])
+		print("...and _setup_battle_grid scales its HP accordingly (player level 1, so no level scaling): hp=%d (expected %d)" % [
+			main.battle_units[0].hp, int(round(dragon_script.MAX_HEALTH * 1.45 * main.player.difficulty_mult))
 		])
-	for e in zalto_nodes:
+	for e in dragon_nodes:
 		e.set_physics_process(false)
 
 	# --- First-ever completion: wave 107 triggers Victory, banks essence,

@@ -37,7 +37,7 @@ func _init() -> void:
 	# --- A clear, unambiguous nearest target (no tie) -- every unit's
 	# assignment matches exactly what _pick_enemy_target_tile alone would
 	# already give it. ---
-	main.battle_allies = [{"tile": Vector2i(7, 7), "hp": 20, "max_hp": 20, "dmg_mult": 1.0, "name": "Blade Ally", "move_range": 2, "attack_range": 1}]
+	main.battle_allies = [{"tile": Vector2i(7, 7), "hp": 20, "max_hp": 20, "dmg_mult": 1.0, "name": "Knight", "move_range": 2, "attack_range": 1}]
 	var clear_goblin_ref = goblin_script.new()
 	main.add_child(clear_goblin_ref)
 	var clear_goblin := {"ref": clear_goblin_ref, "tile": Vector2i(3, 2), "hp": 10, "max_hp": 10, "move_range": 2, "damage": 1, "name": "Goblin", "winding_up": false, "stunned": false, "attack_range": 1}
@@ -53,7 +53,7 @@ func _init() -> void:
 	# between the player and a living ally, end up split across both targets
 	# instead of both converging on the same one. ---
 	main.battle_player_tile = Vector2i(2, 2)
-	main.battle_allies = [{"tile": Vector2i(4, 2), "hp": 20, "max_hp": 20, "dmg_mult": 1.0, "name": "Blade Ally", "move_range": 2, "attack_range": 1}]
+	main.battle_allies = [{"tile": Vector2i(4, 2), "hp": 20, "max_hp": 20, "dmg_mult": 1.0, "name": "Knight", "move_range": 2, "attack_range": 1}]
 	var ally_tile: Vector2i = main.battle_allies[0].tile
 
 	var goblin_a_ref = goblin_script.new()

@@ -10,26 +10,25 @@ func _init() -> void:
 	await physics_frame
 	await physics_frame
 
-	var boss_script = load("res://scripts/Boss.gd")
-	var owlbear_script = load("res://scripts/Owlbear.gd")
+	var boss_script = load("res://scripts/IronConstruct.gd")
+	var owlbear_script = load("res://scripts/ElderOak.gd")
 	var goblin_script = load("res://scripts/Enemy.gd")
 	var orc_script = load("res://scripts/Orc.gd")
 
-	# --- A plain Boss fight gets the bigger 15x15 arena. ---
+	# --- A miniboss fight (Iron Construct) gets the bigger 15x15 arena. ---
 	var boss = boss_script.new()
 	main.add_child(boss)
 	main._setup_battle_grid([boss])
-	print("a Boss fight sets up on a 15x15 grid: w=%d h=%d (expected 15, 15)" % [main.BATTLE_GRID_W, main.BATTLE_GRID_H])
+	print("a miniboss fight sets up on a 15x15 grid: w=%d h=%d (expected 15, 15)" % [main.BATTLE_GRID_W, main.BATTLE_GRID_H])
 	print("_in_battle_bounds matches the 15x15 grid: (14,14)=%s (expected true), (15,15)=%s (expected false)" % [
 		main._in_battle_bounds(Vector2i(14, 14)), main._in_battle_bounds(Vector2i(15, 15))
 	])
 
-	# --- The Owlbear that replaces it from OWLBEAR_WAVE_START on gets the
-	# same bigger arena. ---
+	# --- A full boss (Elder Oak) gets the same bigger arena. ---
 	var owlbear = owlbear_script.new()
 	main.add_child(owlbear)
 	main._setup_battle_grid([owlbear])
-	print("an Owlbear fight also sets up on a 15x15 grid: w=%d h=%d (expected 15, 15)" % [main.BATTLE_GRID_W, main.BATTLE_GRID_H])
+	print("an Elder Oak fight also sets up on a 15x15 grid: w=%d h=%d (expected 15, 15)" % [main.BATTLE_GRID_W, main.BATTLE_GRID_H])
 
 	# --- A normal (non-boss) wave battle still gets the standard 8x8 --
 	# proves the var-instead-of-const change didn't leak a stale 15 into
@@ -45,7 +44,7 @@ func _init() -> void:
 	])
 
 	# A squad with an Orc (tough-tier, but not solo) never gets the boss
-	# grid either -- the size check is specifically "solo Boss/Owlbear", not
+	# grid either -- the size check is specifically "solo boss-tier unit", not
 	# "any dangerous unit."
 	var orc = orc_script.new()
 	main.add_child(orc)

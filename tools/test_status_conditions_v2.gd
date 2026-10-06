@@ -45,39 +45,31 @@ func _init() -> void:
 	player.meta_crit_chance = 0.0
 
 	# =========================================================
-	# Bleeding: no natural duration -- 5%/tile moved, 10% on a successful
-	# dodge, guaranteed on a landed hit from an inflicts_bleed enemy.
+	# Bleeding (2026-09-29 rework): a duration -- BLEED_BASE_TURNS turns,
+	# BLEED_DAMAGE_PCT of max HP at the end of each one -- lengthened by a
+	# turn for every tile moved while it's active (no damage on the spot
+	# anymore), guaranteed on a landed hit from an inflicts_bleed enemy.
 	# =========================================================
 	player.max_health = 1000
 	player.health = 1000
-	main.player_bleeding = false
+	main.player_bleed_turns = 0
 	main.battle_player_moves_left = 5
-	main.player_bleeding = true
+	main.player_bleed_turns = 2
 	main._try_battle_player_move(Vector2i(1, 0))
-	var expected_move_bleed: int = int(round(1000 * main.BLEED_MOVE_DAMAGE_PCT))
-	print("Bleeding costs %%-of-max-HP per tile moved: health=%d (expected %d), tile=%s (expected (4, 3))" % [
-		player.health, 1000 - expected_move_bleed, main.battle_player_tile
+	print("Moving while bleeding costs no HP directly, but lengthens it by a turn: health=%d (expected 1000, unchanged), bleed_turns=%d (expected 3), tile=%s (expected (4, 3))" % [
+		player.health, main.player_bleed_turns, main.battle_player_tile
 	])
-
+	main.player_bleed_turns = 0
 	player.health = 1000
-	player.meta_dodge_chance = 1.0
-	var dodge_result: Dictionary = main._enemy_apply_damage(_make_unit(main, "Goblin", Vector2i(5, 3)), main.battle_player_tile, 10, {})
-	var expected_dodge_bleed: int = int(round(1000 * main.BLEED_DODGE_DAMAGE_PCT))
-	print("...and a successful dodge costs even more while bleeding: dodged=%s (expected true), health=%d (expected %d)" % [
-		dodge_result.get("dodged", false), player.health, 1000 - expected_dodge_bleed
-	])
-	player.meta_dodge_chance = 0.0
-	player.health = 1000
-	main.player_bleeding = false
 
 	main._enemy_apply_damage(_make_unit(main, "Goblin", Vector2i(5, 3)), main.battle_player_tile, 5, {"inflicts_bleed": true})
-	print("A landed hit from an inflicts_bleed enemy guarantees the status (no roll): player_bleeding=%s (expected true)" % [main.player_bleeding])
+	print("A landed hit from an inflicts_bleed enemy guarantees the status (no roll): bleed_turns=%d (expected %d)" % [main.player_bleed_turns, main.BLEED_BASE_TURNS])
 
 	main.battle_terrain.clear()
 	var goblin_for_reset = load("res://scripts/Enemy.gd").new()
 	main.add_child(goblin_for_reset)
 	main._setup_battle_grid([goblin_for_reset])
-	print("Bleeding (like every other battle-scoped player status) clears on the next battle setup: player_bleeding=%s (expected false)" % [main.player_bleeding])
+	print("Bleeding (like every other battle-scoped player status) clears on the next battle setup: bleed_turns=%d (expected 0)" % [main.player_bleed_turns])
 	main.battle_terrain.clear()
 	main.in_battle = true
 	main.battle_allies = []
@@ -236,7 +228,7 @@ func _init() -> void:
 	player.health = 1000
 	player.max_health = 1000
 	main.player_burning = false
-	main.player_bleeding = false
+	main.player_bleed_turns = 0
 	main.player_concussed_turns = 0
 	main.player_blind_turns = 0
 
