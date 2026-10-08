@@ -202,7 +202,47 @@ static var HAND_PICKS := {
 	],
 }
 
+# The Staff: a caster's weapon that only PARTY MEMBERS can wield (the player can never equip
+# one -- see Player.gd:_equip_weapon). Damage comes from the wielder's MAGIC stat, it adds 2
+# tiles of attack range and 6 magic, and every ranged attack (a target 2+ tiles away) has a 10%
+# chance to blind. Its three specials spend MANA (casters), or stamina for anyone without a
+# mana pool. Numbers: the user's design doc; costs are my drafts (Fireball 40, Landfall 60,
+# Channel 20). Keys: range_bonus = extra attack range, magic_bonus = flat magic while wielded,
+# uses_magic = damage uses the magic stat, ally_only = the player can't equip it.
+static var STAFF := {
+	"id": "staff", "name": "Staff", "price": 30,
+	"damage_mult": 1.0, "cooldown_mult": 1.3, "active_duration": 0.18,
+	"shape": "rect", "reach": 40.0, "width": 16.0,
+	"ally_only": true, "uses_magic": true, "range_bonus": 2, "magic_bonus": 6,
+	"passive_ranged_blind_chance": 0.10,
+	"description": "Party members only. +2 range and +6 magic; damage uses the wielder's magic stat. Ranged attacks have a 10% chance to blind.",
+	"shop_description": "Not for the likes of you. It listens to people who already know how to listen back.",
+	"icon": "staff",
+	"specials": [
+		{"id": "staff_i_cast_fireball", "name": "I CAST FIREBALL", "stamina_cost": 40, "dmg_mult": 1.2, "effect": "fireball", "description": "Takes one turn to charge (no moving). The next turn, a fireball flies to any target on the field, sets it on fire, and explodes in a 3x3: magic x 1.2 damage at the centre, 5 less for every tile away from it."},
+		{"id": "staff_landfall", "name": "Landfall", "stamina_cost": 60, "dmg_mult": 1.0, "effect": "landfall", "description": "Damages every enemy on the field for (attack x 3) + (magic / 2), with a 25% chance to stun each."},
+		{"id": "staff_channel", "name": "Channel", "stamina_cost": 20, "dmg_mult": 0.0, "effect": "channel", "description": "Restores an ally's mana (stamina, for anyone without mana) by 20% of its maximum."},
+	],
+}
+
 static var UPGRADABLE_TYPES := [SPEAR, GREATSWORD, HAMMER, BATTLE_AXE, DAGGER, BOW, KNUCKLE_GLOVES, HAND_PICKS]
+
+# Weapons only party members can wield: they never appear in the player's shop rolls, Dojo or
+# weapon picker (those read UPGRADABLE_TYPES), but ids, tiers, materials and Mythics work the
+# same -- see all_base_types().
+static var ALLY_ONLY_TYPES := [STAFF]
+
+static func all_base_types() -> Array:
+	var out: Array = UPGRADABLE_TYPES.duplicate()
+	out.append_array(ALLY_ONLY_TYPES)
+	return out
+
+# True for any weapon (a base const or a built variant) the player may not equip.
+static func is_ally_only(weapon: Dictionary) -> bool:
+	if weapon.get("ally_only", false):
+		return true
+	var base := get_base_type(weapon)
+	return bool(base.get("ally_only", false))
 
 # Inverse of make_variant()'s id construction: a purchased/offered weapon's
 # id is always "<base_id>_<tier>_<material>" (or "<base_id>_mythic"), except
@@ -213,7 +253,7 @@ static func get_base_type(weapon: Dictionary) -> Dictionary:
 	var id: String = weapon.get("id", "")
 	if id == "club":
 		return CLUB
-	for base in UPGRADABLE_TYPES:
+	for base in all_base_types():
 		if id.begins_with("%s_" % base.id):
 			return base
 	return {}
@@ -286,6 +326,13 @@ static var MYTHIC_WEAPONS := {
 		"name": "Frying Pans",
 		"description": "Once wielded by an unkillable prisoner, these were once a makeshift weapon. However, in the right hands...",
 		"passive": {"passive_free_special_chance": 0.10},
+	},
+	# Party members only. Doubles whatever magic its wielder GAINS from levelling (see
+	# Main.gd:_make_member_battle_unit).
+	"staff": {
+		"name": "Moonstick",
+		"description": "Whoever carries it learns the old words twice as fast.",
+		"passive": {"passive_magic_gain_mult": 2.0},
 	},
 }
 
@@ -433,7 +480,7 @@ static func make_variant(base: Dictionary, min_rank: int = 0, luck_bonus: float 
 static func get_owned_variant(id: String) -> Dictionary:
 	if id == "club":
 		return CLUB
-	for base in UPGRADABLE_TYPES:
+	for base in all_base_types():
 		if not id.begins_with("%s_" % base.id):
 			continue
 		var rest: String = id.substr(base.id.length() + 1)

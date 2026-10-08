@@ -365,6 +365,105 @@ func fielded_party() -> Array:
 	var room: int = maxi(0, party_capacity() - party_members.size())
 	return party.slice(0, room)
 
+# --- Party gear ---------------------------------------------------------------------
+# Party members wear a weapon and talismans from YOUR collection (owned_weapons /
+# owned_talismans). An item is on one unit at a time -- you or exactly one member -- except the
+# Club, the always-free fallback, which anyone may carry. A wolf carries nothing, and the Staff
+# (WeaponsScript.is_ally_only) can only ever be held by a member, never by you.
+
+# The member currently holding this weapon id, or null.
+func weapon_holder(weapon_id: String) -> RefCounted:
+	for m in party:
+		if m.weapon_id() == weapon_id:
+			return m
+	return null
+
+func talisman_holder(talisman_id: String) -> RefCounted:
+	for m in party:
+		if m.talisman_ids().has(talisman_id):
+			return m
+	return null
+
+# Why this member cannot take the weapon ("" = it can). Used by the picker to grey things out.
+func ally_weapon_block_reason(member: RefCounted, weapon_id: String) -> String:
+	if member == null or not member.can_carry_gear():
+		return "This member can't carry gear."
+	if not owned_weapons.has(weapon_id):
+		return "You don't own that weapon."
+	if weapon_id == "club":
+		return ""
+	if current_weapon_base.get("id", "") == weapon_id:
+		return "You are using it."
+	var holder: RefCounted = weapon_holder(weapon_id)
+	if holder != null and holder != member:
+		return "%s is using it." % holder.name
+	return ""
+
+func equip_ally_weapon(member: RefCounted, weapon_id: String) -> bool:
+	if ally_weapon_block_reason(member, weapon_id) != "":
+		return false
+	member.gear.weapon = weapon_id
+	return true
+
+func unequip_ally_weapon(member: RefCounted) -> void:
+	if member != null:
+		member.gear.weapon = ""
+
+func ally_talisman_block_reason(member: RefCounted, talisman_id: String) -> String:
+	if member == null or not member.can_carry_gear():
+		return "This member can't carry gear."
+	if not owned_talismans.has(talisman_id):
+		return "You don't own that talisman."
+	if member.talisman_ids().has(talisman_id):
+		return "Already worn."
+	if equipped_talismans.has(talisman_id):
+		return "You are wearing it."
+	var holder: RefCounted = talisman_holder(talisman_id)
+	if holder != null:
+		return "%s is wearing it." % holder.name
+	if member.talisman_ids().size() >= member.talisman_slot_count():
+		return "No free slot."
+	return ""
+
+func equip_ally_talisman(member: RefCounted, talisman_id: String) -> bool:
+	if ally_talisman_block_reason(member, talisman_id) != "":
+		return false
+	member.gear.talismans.append(talisman_id)
+	return true
+
+func unequip_ally_talisman(member: RefCounted, talisman_id: String) -> bool:
+	if member == null or not member.gear.talismans.has(talisman_id):
+		return false
+	member.gear.talismans.erase(talisman_id)
+	return true
+
+# You took an item a member was holding: it comes off them (you have the final say).
+func _strip_from_allies(weapon_id: String, talisman_id: String) -> void:
+	for m in party:
+		if weapon_id != "" and weapon_id != "club" and m.weapon_id() == weapon_id:
+			m.gear.weapon = ""
+		if talisman_id != "":
+			m.gear.talismans.erase(talisman_id)
+
+# A level-appropriate slot cap can shrink if a member is ever re-levelled; trim any surplus.
+func trim_ally_talismans(member: RefCounted) -> void:
+	while member.talisman_ids().size() > member.talisman_slot_count():
+		member.gear.talismans.pop_back()
+
+# The weapon dict a member fights with: its weapon id rebuilt into a full variant, then put
+# through the same stamping the hero's weapon gets -- rune, Blacksmith level, THIS member's own
+# talismans (cheaper specials, Stone Amulet...), and the Astral weapon passives (double-hit,
+# lifesteal, free specials). No weapon = bare hands = {"damage_mult": 1.0}, as before.
+func build_ally_weapon(member: RefCounted) -> Dictionary:
+	var id: String = member.weapon_id()
+	if id == "":
+		return {"damage_mult": 1.0}
+	var base: Dictionary = WeaponsScript.get_owned_variant(id)
+	if base.is_empty():
+		return {"damage_mult": 1.0}
+	var bonuses: Dictionary = member.effect_mods(str(WeaponsScript.get_base_type(base).get("id", "")))
+	return _apply_meta_passives_to_weapon(_apply_talisman_to_weapon(_apply_upgrade_to_weapon(_apply_enchantment_to_weapon(base)), bonuses))
+
 # Battle-scoped weapon-special state, reset at the start of every battle
 # (Main.gd:_setup_battle_grid) -- none of it persists between fights.
 # Disarmed (Spear's Target Practice on a miss, Dagger's Knife Throw): while
@@ -782,6 +881,10 @@ func _play_attack_animation() -> void:
 	attack_tween.tween_property(sprite, "scale", BASE_SPRITE_SCALE, return_time)
 
 func _equip_weapon(weapon: Dictionary) -> void:
+	# Party-only weapons (the Staff) can never be wielded by the player.
+	if WeaponsScript.is_ally_only(weapon):
+		return
+	_strip_from_allies(str(weapon.get("id", "")), "")
 	current_weapon_base = weapon
 	current_weapon = _apply_meta_passives_to_weapon(_apply_talisman_to_weapon(_apply_upgrade_to_weapon(_apply_enchantment_to_weapon(weapon))))
 	_stamp_learned_specials(current_weapon)
@@ -862,14 +965,17 @@ func _apply_upgrade_to_weapon(weapon: Dictionary) -> Dictionary:
 # time (like an enchantment's stamina discount), so the HUD's stamina labels
 # and the real cost always agree; equip/unequip of a talisman re-equips the
 # weapon to refresh it. No talisman -> the weapon is returned untouched.
-func _apply_talisman_to_weapon(weapon: Dictionary) -> Dictionary:
-	var discount: float = talisman_bonus("special_stamina_discount")
-	var flat_reduction: int = int(talisman_bonus("special_stamina_flat_reduction"))
-	var pct_increase: float = talisman_bonus("special_stamina_pct_increase")
-	var break_cut: float = talisman_bonus("break_reduction")
-	var whisperer_active: bool = talisman_bonus("weapon_whisperer") > 0.0 and not weapon_whisperer_specials.is_empty()
+# `bonuses` (a summed-effects dictionary) stamps a PARTY MEMBER's talismans instead of your own.
+func _apply_talisman_to_weapon(weapon: Dictionary, bonuses = null) -> Dictionary:
+	var tb := func(key: String) -> float:
+		return float(bonuses.get(key, 0.0)) if bonuses != null else talisman_bonus(key)
+	var discount: float = tb.call("special_stamina_discount")
+	var flat_reduction: int = int(tb.call("special_stamina_flat_reduction"))
+	var pct_increase: float = tb.call("special_stamina_pct_increase")
+	var break_cut: float = tb.call("break_reduction")
+	var whisperer_active: bool = bonuses == null and talisman_bonus("weapon_whisperer") > 0.0 and not weapon_whisperer_specials.is_empty()
 	var amulet_material: Dictionary = {}
-	if talisman_bonus("material_passive_boost") > 0.0:
+	if tb.call("material_passive_boost") > 0.0:
 		amulet_material = WeaponsScript.find_material(weapon.get("material_id", ""))
 	if discount <= 0.0 and flat_reduction <= 0 and pct_increase <= 0.0 and break_cut <= 0.0 and not whisperer_active and amulet_material.is_empty():
 		return weapon
@@ -1049,6 +1155,7 @@ func equip_talisman(talisman_id: String) -> bool:
 		return false
 	if equipped_talismans.size() >= talisman_slots():
 		return false
+	_strip_from_allies("", talisman_id)
 	equipped_talismans.append(talisman_id)
 	_on_talismans_changed()
 	return true
@@ -1226,6 +1333,9 @@ func try_apply_enchantment(rune_id: String) -> bool:
 	return true
 
 func try_buy_weapon(weapon: Dictionary) -> bool:
+	# The Staff is for party members only -- use try_buy_weapon_for_party.
+	if WeaponsScript.is_ally_only(weapon):
+		return false
 	# Might gate: Masterwork/Legendary/Mythic (and anything else tagged with
 	# a required_might above 0) can't be bought OR re-equipped below the
 	# threshold -- same hard block whether this is a fresh purchase or
@@ -1246,6 +1356,21 @@ func try_buy_weapon(weapon: Dictionary) -> bool:
 	coins_changed.emit(coins)
 	owned_weapons[id] = true
 	_equip_weapon(weapon)
+	return true
+
+# Buys a weapon into your collection WITHOUT equipping it, so a party member can carry it
+# (the Staff can only be bought this way). The Might/Intimidation gates are about wielding it
+# yourself, so they do not apply. False if you can't afford it or already own it.
+func try_buy_weapon_for_party(weapon: Dictionary) -> bool:
+	var id: String = weapon.id
+	if owned_weapons.has(id):
+		return false
+	var price := get_weapon_price(weapon)
+	if coins < price:
+		return false
+	coins -= price
+	coins_changed.emit(coins)
+	owned_weapons[id] = true
 	return true
 
 func get_armor_price(armor: Dictionary) -> int:

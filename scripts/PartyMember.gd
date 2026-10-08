@@ -29,6 +29,39 @@ var gear := {"weapon": "", "armor": "", "shield": "", "talismans": []}
 # Druid spells the Wizard's Tower has upgraded ({spell_id: true}).
 var upgraded_spells := {}
 
+# --- Gear ---------------------------------------------------------------------------
+# Item rules (who may hold what) live in Player.gd, which knows the whole collection; this just
+# answers questions about what the member currently wears.
+
+func can_carry_gear() -> bool:
+	return PartyRulesScript.can_carry_gear(kind)
+
+func weapon_id() -> String:
+	return str(gear.get("weapon", ""))
+
+func talisman_ids() -> Array:
+	return gear.get("talismans", [])
+
+func talisman_slot_count() -> int:
+	return PartyRulesScript.talisman_slots(kind, level)
+
+# The summed effects of everything it wears (the same vocabulary as the hero's talismans).
+func talisman_effects() -> Dictionary:
+	return PartyRulesScript.TalismansScript.sum_effects(talisman_ids())
+
+# Everything that modifies its combat: its talismans plus the favour buffs its kind gets from
+# the weapon in hand (weapon_base_id = "staff", "greatsword"...). Favour buffs use the same key
+# vocabulary as talismans (damage_pct, crit_chance, special_stamina_discount...), plus
+# range_bonus; the structural keys "weapon" and "magic_mult" are read separately.
+func effect_mods(weapon_base_id: String) -> Dictionary:
+	var mods := talisman_effects()
+	var favour: Dictionary = PartyRulesScript.favour_for(kind, weapon_base_id)
+	for key in favour:
+		if key == "weapon" or key == "magic_mult":
+			continue
+		mods[key] = float(mods.get(key, 0.0)) + float(favour[key])
+	return mods
+
 static func create(member_id: int, member_kind: String) -> PartyMember:
 	var m := PartyMember.new()
 	m.id = member_id

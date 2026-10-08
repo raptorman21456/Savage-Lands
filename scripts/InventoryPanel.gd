@@ -215,7 +215,8 @@ func _build_weapons_tab(container: VBoxContainer) -> void:
 	var owned_variants: Array = []
 	for id in _player.owned_weapons:
 		var variant: Dictionary = WeaponsScript.get_owned_variant(id)
-		if not variant.is_empty():
+		# Party-only weapons (the Staff) live on the Party tab, not here.
+		if not variant.is_empty() and not WeaponsScript.is_ally_only(variant):
 			owned_variants.append(variant)
 	owned_variants.sort_custom(func(a, b):
 		var rank_a: int = _tier_rank(a)
@@ -585,6 +586,10 @@ func _on_potion_cell_pressed(potion_id: String) -> void:
 # ---------------------------------------------------------------------
 
 func _build_party_tab(container: VBoxContainer) -> void:
+	_build_party_roster(container)
+	_build_party_gear(container)
+
+func _build_party_roster(container: VBoxContainer) -> void:
 	_add_section_heading(container, "PARTY")
 	if _player.party.is_empty() and _player.party_members.is_empty():
 		_add_plain_label(container, "No party members recruited yet.")
@@ -609,6 +614,107 @@ func _build_party_tab(container: VBoxContainer) -> void:
 			"%d%% dmg" % int(member.get("dmg_mult", 1.0) * 100), false,
 			"A recruited companion, fighting at your side. Follows you in the field.", Callable()
 		))
+
+# --- Party gear: a weapon and talismans per member, taken from YOUR collection. Each item can
+# only be on one unit at a time (Player.gd: ally_weapon_block_reason / ally_talisman_block_reason).
+# A Staff, which only members can wield, is chosen here too.
+
+func _build_party_gear(container: VBoxContainer) -> void:
+	var carriers: Array = _player.party.filter(func(m): return m.can_carry_gear())
+	if carriers.is_empty():
+		return
+	_add_section_heading(container, "PARTY GEAR")
+	_add_plain_label(container, "Members use weapons and talismans from your own collection -- each item can only be with one of you at a time.")
+	for member in carriers:
+		_add_member_gear_rows(container, member)
+
+func _add_member_gear_rows(container: VBoxContainer, member) -> void:
+	var title := Label.new()
+	title.text = "%s   Lv %d" % [member.name, member.level]
+	title.add_theme_font_size_override("font_size", 15)
+	title.add_theme_color_override("font_color", Color(0.95, 0.9, 0.7))
+	container.add_child(title)
+
+	var weapon_row := HBoxContainer.new()
+	weapon_row.add_theme_constant_override("separation", 10)
+	container.add_child(weapon_row)
+	var weapon_label := Label.new()
+	weapon_label.text = "Weapon"
+	weapon_label.custom_minimum_size = Vector2(100, 0)
+	weapon_row.add_child(weapon_label)
+	var weapon_pick := OptionButton.new()
+	weapon_pick.custom_minimum_size = Vector2(330, 0)
+	weapon_pick.add_item("(bare hands)")
+	weapon_pick.set_item_metadata(0, "")
+	var current_id: String = member.weapon_id()
+	var ids: Array = _player.owned_weapons.keys()
+	ids.sort_custom(func(a, b): return str(WeaponsScript.get_owned_variant(a).get("name", a)) < str(WeaponsScript.get_owned_variant(b).get("name", b)))
+	for id in ids:
+		var variant: Dictionary = WeaponsScript.get_owned_variant(id)
+		if variant.is_empty():
+			continue
+		var reason: String = _player.ally_weapon_block_reason(member, id)
+		var idx: int = weapon_pick.item_count
+		weapon_pick.add_item(str(variant.get("name", id)) if reason == "" else "%s  (%s)" % [variant.get("name", id), reason])
+		weapon_pick.set_item_metadata(idx, id)
+		weapon_pick.set_item_disabled(idx, reason != "")
+		if id == current_id:
+			weapon_pick.select(idx)
+	weapon_pick.item_selected.connect(func(i): _on_member_weapon_picked(member, str(weapon_pick.get_item_metadata(i))))
+	weapon_row.add_child(weapon_pick)
+
+	var talisman_row := HBoxContainer.new()
+	talisman_row.add_theme_constant_override("separation", 8)
+	container.add_child(talisman_row)
+	var talisman_label := Label.new()
+	talisman_label.text = "Talismans  %d / %d" % [member.talisman_ids().size(), member.talisman_slot_count()]
+	talisman_label.custom_minimum_size = Vector2(100, 0)
+	talisman_row.add_child(talisman_label)
+	for id in member.talisman_ids():
+		var talisman: Dictionary = TalismansScript.get_talisman(id)
+		var worn_button := Button.new()
+		worn_button.text = "%s  ✕" % talisman.get("name", id)
+		worn_button.tooltip_text = "%s (click to take it off)" % talisman.get("description", "")
+		worn_button.pressed.connect(func(): _on_member_talisman_removed(member, id))
+		talisman_row.add_child(worn_button)
+	if member.talisman_ids().size() < member.talisman_slot_count():
+		var add_pick := OptionButton.new()
+		add_pick.add_item("+ add a talisman")
+		add_pick.set_item_metadata(0, "")
+		for item in TalismansScript.ITEMS:
+			if _player.ally_talisman_block_reason(member, item.id) == "":
+				var idx: int = add_pick.item_count
+				add_pick.add_item(item.name)
+				add_pick.set_item_metadata(idx, item.id)
+		if add_pick.item_count > 1:
+			add_pick.item_selected.connect(func(i): _on_member_talisman_added(member, str(add_pick.get_item_metadata(i))))
+			talisman_row.add_child(add_pick)
+	else:
+		var full_label := Label.new()
+		full_label.text = "(slots full)"
+		full_label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.65))
+		talisman_row.add_child(full_label)
+
+func _on_member_weapon_picked(member, weapon_id: String) -> void:
+	var ok := true
+	if weapon_id == "":
+		_player.unequip_ally_weapon(member)
+	else:
+		ok = _player.equip_ally_weapon(member, weapon_id)
+	_play_sfx("purchase" if ok else "error")
+	_refresh()
+
+func _on_member_talisman_added(member, talisman_id: String) -> void:
+	if talisman_id == "":
+		return
+	var ok: bool = _player.equip_ally_talisman(member, talisman_id)
+	_play_sfx("purchase" if ok else "error")
+	_refresh()
+
+func _on_member_talisman_removed(member, talisman_id: String) -> void:
+	var ok: bool = _player.unequip_ally_talisman(member, talisman_id)
+	_play_sfx("purchase" if ok else "error")
+	_refresh()
 
 # --- Map tab: a schematic (not a live camera capture) of wherever you
 # currently are, scaled to fit -- see _on_map_draw. --------------------

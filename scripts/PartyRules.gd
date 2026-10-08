@@ -13,6 +13,8 @@ class_name PartyRules
 # level 1 with 10 HP, levelled five times with every pick into HP, has
 # 10 + (5 passive + 5 chosen) x 1.2 = 22 HP.
 
+const TalismansScript := preload("res://scripts/Talismans.gd")
+
 const STAT_NAMES := ["hp", "attack", "defense", "speed", "magic"]
 
 # Passive gain per level and gain per bonus pick, before the kind's multiplier.
@@ -57,12 +59,18 @@ const KINDS := {
 		"stats": ["hp", "attack", "defense", "speed", "magic"],
 		"stamina": 0, "caster": true,
 		"move": {},
+		# A "favour" is a buff that only applies while a specific weapon is wielded (like the
+		# Marksman's crit with bows). Keys: weapon = the weapon family id, then buff keys that
+		# Main.gd:_make_member_battle_unit reads -- magic_mult (x the wielder's magic stat),
+		# special_stamina_discount, crit_chance, double_hit_chance, range_bonus, damage_mult.
+		# Doc: the Druid's magic stat is multiplied by 15% when she carries a staff.
+		"favour": {"weapon": "staff", "magic_mult": 1.15},
 		"attack_range": 1, "tint": Color(0.55, 1.0, 0.65),
 	},
 	"guardian": {
 		"name": "Guardian", "levels": true,
 		"base": {"hp": 25.0, "attack": 1.0, "defense": 5.0, "speed": 5.0, "magic": 0.0},
-		"growth": {"hp": 1.25, "attack": 1.0, "defense": 1.5, "speed": 1.0, "magic": 1.0},
+		"growth": {"hp": 1.25, "attack": 1.0, "defense": 2.0, "speed": 1.0, "magic": 1.0},
 		"stats": ["hp", "attack", "defense"],
 		"stamina": 100, "caster": false,
 		# Speed is ALWAYS one tile.
@@ -97,6 +105,27 @@ const KINDS := {
 
 # Mana: a pool for magic-users only, 5 per point of Magic.
 const MANA_PER_MAGIC := 5
+
+# Gear a member can carry: weapon / armor / shield / talismans. A wolf carries nothing.
+# talisman_slots (a kind's own number) overrides the level-based count -- the Shaman has 4
+# from the start.
+static func can_carry_gear(kind: String) -> bool:
+	return not is_wolf(kind) and exists(kind)
+
+static func talisman_slots(kind: String, level: int) -> int:
+	if not can_carry_gear(kind):
+		return 0
+	var rule: Dictionary = KINDS.get(kind, {})
+	if rule.has("talisman_slots"):
+		return int(rule.talisman_slots)
+	return TalismansScript.slots_for_level(level)
+
+# The favour buffs a kind gets from the weapon it wields ({} if the weapon is not its favourite).
+static func favour_for(kind: String, weapon_base_id: String) -> Dictionary:
+	var favour: Dictionary = KINDS.get(kind, {}).get("favour", {})
+	if favour.is_empty() or str(favour.get("weapon", "")) != weapon_base_id:
+		return {}
+	return favour
 
 static func exists(kind: String) -> bool:
 	return KINDS.has(kind)

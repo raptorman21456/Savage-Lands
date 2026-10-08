@@ -53,6 +53,7 @@ const AttackPatternsScript := preload("res://scripts/AttackPatterns.gd")
 const DefenseMinigameScript := preload("res://scripts/DefenseMinigame.gd")
 const AttackTimingsScript := preload("res://scripts/AttackTimings.gd")
 const AttackMinigameScript := preload("res://scripts/AttackMinigame.gd")
+const PartyRulesScript := preload("res://scripts/PartyRules.gd")
 
 # Phantom Guard's "evasive" special: fired the instant the player picks one
 # of the offered dodge-roll directions -- see _prompt_evasion_reposition.
@@ -401,6 +402,10 @@ const ATTACK_TIMING_MISS_MULT := 0.8
 const ATTACK_TIMING_HIT_MULT := 1.0
 const ATTACK_TIMING_PERFECT_MULT := 1.25
 const ATTACK_TIMING_PERFECT_STAMINA := 5
+# Staff special Landfall: each enemy it hits has this chance to be stunned.
+const LANDFALL_STUN_CHANCE := 0.25
+# I CAST FIREBALL: damage lost for every tile between a victim and the blast's centre.
+const FIREBALL_FALLOFF_PER_TILE := 5.0
 # Vulnerable: a landed player crit (_apply_single_hit) marks the target,
 # increasing ALL damage it takes -- player's and every ally's, since they
 # all funnel through the same function -- for a few turns. "Focus this
@@ -928,6 +933,15 @@ var battle_units := []
 # the older party_members mercenaries), parallel to battle_units for the enemy side. Rebuilt fresh
 # every _setup_battle_grid call -- see the ALLY_* consts above for why.
 var battle_allies := []
+# Allies at 0 HP: knocked out of the fight (no collision, enemies ignore them) but still on the
+# field and still targetable by your own side -- the Necromancer's Revival Blessing stands them
+# back up. Moved here from battle_allies by _remove_fallen_allies.
+var battle_downed_allies: Array = []
+# The friendly-target picker: the special waiting for its target, the candidates offered
+# ({"label", "target"}), and the chosen target while the action resolves ("hero" or an ally unit).
+var battle_ally_pending_action: Dictionary = {}
+var battle_ally_pick_candidates: Array = []
+var battle_ally_target = null
 # PartyMembers knocked out this battle, for the faint/harvest rules at battle end.
 var battle_fainted_members: Array = []
 # Commanded ally turns: "you control allies, they get their own turns during your
@@ -1160,6 +1174,7 @@ func _sandbox_player_died() -> void:
 	in_battle = false
 	battle_units.clear()
 	battle_allies.clear()
+	battle_downed_allies.clear()
 	hud.hide_battle()
 	_sandbox_battle_finished()
 
@@ -2748,6 +2763,10 @@ func _roll_shop_offering() -> void:
 		var pool: Array = WeaponsScript.UPGRADABLE_TYPES.duplicate()
 		var extra_base: Dictionary = pool[randi() % pool.size()]
 		current_shop_offering.append(_tagged(WeaponsScript.make_variant(extra_base, 3, player.total_luck()), "weapon"))
+	# A Staff turns up while a caster is in your party -- it is bought FOR them (the player can
+	# never wield one), see _on_shop_buy_pressed.
+	if player.party.any(func(m): return m.is_caster()):
+		current_shop_offering.append(_tagged(WeaponsScript.make_variant(WeaponsScript.STAFF, 0, player.total_luck()), "weapon"))
 
 # One random item for a single shop slot -- category first (SHOP_CATEGORY_
 # WEIGHTS), then a specific item within it. Weapons additionally roll a
@@ -3139,7 +3158,8 @@ func _on_shop_buy_pressed(index: int) -> void:
 			bought = player.try_buy_potion(item)
 		_:
 			var is_new_weapon: bool = not player.owned_weapons.has(item.id)
-			bought = player.try_buy_weapon(item)
+			# Party-only weapons (the Staff) are bought into the collection, not equipped.
+			bought = player.try_buy_weapon_for_party(item) if WeaponsScript.is_ally_only(item) else player.try_buy_weapon(item)
 			if bought and is_new_weapon:
 				var base_type: Dictionary = WeaponsScript.get_base_type(item)
 				if not base_type.is_empty():
@@ -3396,6 +3416,8 @@ func _setup_battle_grid(squad: Array) -> void:
 	battle_terrain.clear()
 	battle_units.clear()
 	battle_allies.clear()
+	battle_downed_allies.clear()
+	battle_actor = {}
 	battle_fainted_members.clear()
 	battle_commanding_ally = null
 	battle_ally_queue = []
@@ -3628,25 +3650,56 @@ func _place_ally_units(used_tiles: Dictionary) -> void:
 # no stamina, and the pools that exist start full.
 func _make_member_battle_unit(member, tile: Vector2i, might_mult: float) -> Dictionary:
 	var rules: Dictionary = member.rules()
+	# Gear: the weapon is rebuilt from the member's weapon id and stamped with its own talismans
+	# (Player.build_ally_weapon); `mods` is everything it wears plus its favour buffs, in the
+	# talisman effect vocabulary, read by the hit pipeline through _actor_tb.
+	var weapon: Dictionary = player.build_ally_weapon(member) if member.can_carry_gear() else {"damage_mult": 1.0}
+	var base_id: String = str(WeaponsScript.get_base_type(weapon).get("id", ""))
+	var favour: Dictionary = PartyRulesScript.favour_for(member.kind, base_id)
+	var mods: Dictionary = member.effect_mods(base_id)
+	# Magic: the member's own (a Moonstick doubles what levelling GAINED), plus what the weapon
+	# adds, times the kind's favour for it (the Druid's staff).
+	var magic_gain_mult: float = float(weapon.get("passive_magic_gain_mult", 1.0))
+	var magic_value: float = float(rules.get("base", {}).get("magic", 0.0)) + float(member.bonus.get("magic", 0.0)) * magic_gain_mult
+	magic_value = (magic_value + float(weapon.get("magic_bonus", 0.0))) * float(favour.get("magic_mult", 1.0))
+	var mana_pool: int = int(round(magic_value * PartyRulesScript.MANA_PER_MAGIC)) if member.is_caster() else 0
+	var hp_value: int = member.max_hp() + int(mods.get("max_hp", 0.0))
+	hp_value = int(round(hp_value * (1.0 + float(mods.get("max_hp_pct", 0.0)))))
+	if float(mods.get("lock_hp_to_one", 0.0)) > 0.0:
+		hp_value = 1
+	hp_value = maxi(1, hp_value)
+	var attack_range: int = int(rules.get("attack_range", ALLY_ATTACK_RANGE)) + int(weapon.get("range_bonus", 0)) + int(weapon.get("passive_extra_range", 0)) + int(mods.get("range_bonus", 0.0))
+	if weapon.get("long_range", false):
+		attack_range += 1
+	var stamina_pool: int = member.max_stamina() + (int(mods.get("max_stamina", 0.0)) if member.max_stamina() > 0 else 0)
 	return {
 		"tile": tile,
-		"hp": member.max_hp(),
-		"max_hp": member.max_hp(),
+		"hp": hp_value,
+		"max_hp": hp_value,
 		"name": member.name,
 		"kind": member.kind,
 		"member": member,
 		# attack is the member's own attack stat; dmg_mult is only the ally-wide
 		# multiplier (Might), so the two are never confused with the hero's.
 		"attack": member.attack(),
+		"magic": magic_value,
 		"dmg_mult": might_mult,
-		"defense_pct": member.defense_pct(),
-		"move_range": member.move_tiles(),
-		"attack_range": int(rules.get("attack_range", ALLY_ATTACK_RANGE)),
-		"stamina": member.max_stamina(),
-		"max_stamina": member.max_stamina(),
-		"mana": member.max_mana(),
-		"max_mana": member.max_mana(),
+		"defense_pct": minf(90.0, member.defense_pct() + float(mods.get("damage_reduction", 0.0)) * 100.0),
+		"move_range": member.move_tiles() + int(mods.get("move_range", 0.0)),
+		"attack_range": attack_range,
+		"stamina": stamina_pool,
+		"max_stamina": stamina_pool,
+		"mana": mana_pool,
+		"max_mana": mana_pool,
+		"hp_as_mana": bool(rules.get("hp_as_mana", false)),
+		"weapon": weapon,
+		"mods": mods,
 		"fainted": false,
+		"skip_turns": 0,
+		"charging": {},
+		"disarmed_tile": Vector2i(-1, -1),
+		"pichaku_active": false,
+		"survive_used": false,
 	}
 
 # Rock is the only terrain type that actually blocks movement outright (water
@@ -4643,7 +4696,7 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 	# Pichaku (Hand Picks): only touches the plain Attack/Heavy Attack
 	# (effect == "" is what distinguishes those two from every named
 	# special) -- doesn't stack onto a special's own already-tuned numbers.
-	if player.pichaku_active and effect == "":
+	if _actor_pichaku() and effect == "":
 		dmg = int(round(dmg * PICHAKU_DAMAGE_MULT))
 	# Shield damage penalty: fighting one-handed with a shield raised costs
 	# some commitment behind every swing -- gated on attacker_label so an
@@ -4656,21 +4709,27 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 	# synthetic-weapon call into this same function).
 	if player.temp_damage_bonus_pct != 0.0:
 		dmg = int(round(dmg * (1.0 + player.temp_damage_bonus_pct)))
-	# A flat percentage on everything you deal -- Duelist's Coin sets this
-	# negative (less damage, but see its crit rework below).
-	if player.talisman_bonus("damage_pct") != 0.0:
-		dmg = int(round(dmg * (1.0 + player.talisman_bonus("damage_pct"))))
+	# A flat percentage on everything the ACTING unit deals (the hero's talismans, or the member's
+	# own) -- Duelist's Coin sets this negative (less damage, but see its crit rework below).
+	if _actor_tb("damage_pct") != 0.0:
+		dmg = int(round(dmg * (1.0 + _actor_tb("damage_pct"))))
 	# Adrenaline (repurposed): extra damage DEALT while at or below the low-HP
 	# threshold (30% by default; Berserker's Knot tightens it, see
-	# Player.low_hp_threshold) -- a berserker's edge, not a defensive cushion.
-	if player.low_hp_damage_bonus_total() > 0.0 and float(player.health) < float(player.max_health) * player.low_hp_threshold():
+	# Player.low_hp_threshold) -- a berserker's edge, not a defensive cushion. A party member
+	# gets the Astral half of it at face value plus its own talismans, measured on ITS own HP.
+	if _actor_is_ally():
+		var ally_low_bonus: float = player.meta_low_hp_damage_bonus_pct + _actor_tb("low_hp_damage_pct")
+		var ally_low_threshold: float = _actor_tb("low_hp_threshold") if _actor_tb("low_hp_threshold") > 0.0 else 0.3
+		if ally_low_bonus > 0.0 and float(battle_actor.hp) < float(battle_actor.max_hp) * ally_low_threshold:
+			dmg = int(round(dmg * (1.0 + ally_low_bonus)))
+	elif player.low_hp_damage_bonus_total() > 0.0 and float(player.health) < float(player.max_health) * player.low_hp_threshold():
 		dmg = int(round(dmg * (1.0 + player.low_hp_damage_bonus_total())))
 	# Whetstone Pendant (talisman): whichever hit lands first this battle --
 	# player's or an ally's -- hits harder. Consumed regardless of whether the
 	# talisman is actually equipped, so there's only ever one "first hit" per
 	# battle to track.
 	if not battle_first_attack_used:
-		var first_hit_bonus: float = player.talisman_bonus("first_attack_damage_pct")
+		var first_hit_bonus: float = player.talisman_bonus("first_attack_damage_pct") + (_actor_tb("first_attack_damage_pct") if _actor_is_ally() else 0.0)
 		if first_hit_bonus > 0.0:
 			dmg = int(round(dmg * (1.0 + first_hit_bonus)))
 		battle_first_attack_used = true
@@ -4693,7 +4752,7 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 		dmg = int(round(dmg * 0.5))
 	# Chaos Shard (talisman): every hit's damage is rerolled to somewhere
 	# between 50% and 160% of normal, replacing consistency with variance.
-	if attacker_label == "You" and player.talisman_bonus("chaos_shard") > 0.0:
+	if (attacker_label == "You" or _actor_is_ally()) and _actor_tb("chaos_shard") > 0.0:
 		dmg = int(round(dmg * randf_range(CHAOS_SHARD_MIN_MULT, CHAOS_SHARD_MAX_MULT)))
 	# Rage/Berserk: gated on attacker_label the same way every other
 	# player-only bonus here is, so an ally's own attack (funneling through
@@ -4749,11 +4808,13 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 	# below entirely ("ignores defense"), same as Blindness's guaranteed
 	# crit-on-hit reuses.
 	var is_crit := blind_forced_crit or stealth_forced_crit or bleeding_cut_forced_crit
-	if attacker_label == "You" and not is_crit and player.crit_chance_total() > 0.0 and randf() < player.crit_chance_total():
+	# A member crits off its own crit chance (talismans, favours) -- never the hero's stat.
+	var actor_crit_chance: float = _actor_tb("crit_chance") if _actor_is_ally() else (player.crit_chance_total() if attacker_label == "You" else 0.0)
+	if not is_crit and actor_crit_chance > 0.0 and randf() < actor_crit_chance:
 		is_crit = true
 	if is_crit:
 		# 2.0 by default; Duelist's Coin raises this (see Player.crit_damage_mult).
-		dmg = int(round(dmg * player.crit_damage_mult()))
+		dmg = int(round(dmg * (2.0 + _actor_tb("crit_damage_mult_bonus") if _actor_is_ally() else player.crit_damage_mult())))
 	# Attack Potion: a flat damage bonus for a few of the player's own turns,
 	# gated on attacker_label the same way every other player-only modifier
 	# here is, so an ally's own attack (which funnels through this same
@@ -4769,7 +4830,7 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 		var origin: Vector2i = attacker_tile if attacker_tile.x >= 0 else battle_player_tile
 		var distance: int = abs(u.tile.x - origin.x) + abs(u.tile.y - origin.y)
 		dmg = maxi(1, int(round(dmg * (1.0 + distance_pct * distance))))
-	var ignores_cover: bool = is_crit or effect in ["ignore_cover", "leg_blow", "piercing_thrust"] or weapon.get("passive_ignore_cover", false)
+	var ignores_cover: bool = is_crit or effect in ["ignore_cover", "leg_blow", "piercing_thrust", "fireball", "landfall"] or weapon.get("passive_ignore_cover", false)
 	if not ignores_cover and _has_adjacent_rock(u.tile):
 		dmg = int(round(dmg * (1.0 - ROCK_COVER_REDUCTION)))
 	# Frozen (Freeze Arrow): +20% damage taken from every hit while the
@@ -4799,9 +4860,9 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 	# Obsidian's Splinter Strike (material passive): a chance for the blow to
 	# open a bleeding wound. Stone Amulet (talisman) raises the chance.
 	var splinter_triggered := false
-	if attacker_label == "You" and weapon.get("material_id", "") == "obsidian" and u.get("bleed_turns", 0) <= 0:
+	if (attacker_label == "You" or _actor_is_ally()) and weapon.get("material_id", "") == "obsidian" and u.get("bleed_turns", 0) <= 0:
 		var splinter_chance: float = OBSIDIAN_SPLINTER_CHANCE
-		if player.talisman_bonus("material_passive_boost") > 0.0:
+		if _actor_tb("material_passive_boost") > 0.0:
 			splinter_chance *= STONE_AMULET_MATERIAL_BOOST_MULT
 		splinter_chance = _proc(splinter_chance)
 		if randf() < splinter_chance:
@@ -4810,7 +4871,7 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 	# Last Stand Idol (talisman): every one of the player's hits instantly
 	# kills a non-boss enemy outright.
 	var is_boss_target: bool = ENEMY_TRAITS.get(u.name, {}).get("is_boss_tier", false)
-	if attacker_label == "You" and player.talisman_bonus("oneshot_regular_enemies") > 0.0 and not is_boss_target:
+	if (attacker_label == "You" or _actor_is_ally()) and _actor_tb("oneshot_regular_enemies") > 0.0 and not is_boss_target:
 		dmg = u.hp
 	# The Executioner's Axe's passive_oneshot_chance: an independent per-hit
 	# chance at the same "bosses are immune" outright kill, rather than the
@@ -4837,11 +4898,12 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 	# Bloodmoon Fang (talisman): ANY landed hit -- player's or an ally's --
 	# keeps the combat-action clock alive (_advance_bloodmoon_quiet_turn).
 	battle_had_combat_action_this_cycle = true
-	if attacker_label == "You":
-		# Vampire's Pact (talisman): heals back a cut of damage just dealt.
-		var lifesteal_pct: float = player.talisman_bonus("lifesteal_pct")
+	# Vampire's Pact (talisman): heals the ACTING unit back a cut of the damage just dealt.
+	if attacker_label == "You" or _actor_is_ally():
+		var lifesteal_pct: float = _actor_tb("lifesteal_pct")
 		if lifesteal_pct > 0.0 and dmg > 0:
-			player.heal(max(1, int(round(dmg * lifesteal_pct))))
+			_actor_heal(max(1, int(round(dmg * lifesteal_pct))))
+	if attacker_label == "You":
 		# Momentum Chain (talisman): consecutive hits landed without taking
 		# damage first.
 		if player.talisman_bonus("momentum_chain") > 0.0:
@@ -4882,8 +4944,8 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 		hud.battle_log("Your %s shatters! You're back to bare fists." % broken_name)
 	if effect == "lifesteal":
 		var heal_amt: int = max(1, int(round(dmg * LIFESTEAL_PCT)))
-		player.heal(heal_amt)
-		hud.battle_log("You drain %d HP from the wound." % heal_amt)
+		_actor_heal(heal_amt)
+		hud.battle_log("%s %d HP from the wound." % ["You drain" if attacker_label == "You" else attacker_label + " drains", heal_amt])
 	if effect == "leg_blow" and u.hp > 0:
 		u.move_range = max(1, int(u.move_range) - 1)
 		hud.battle_log("The %s is hobbled, slowing it down!" % u.name)
@@ -4908,17 +4970,17 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 	# at every _battle_perform_attack call site) use a much smaller per-hit
 	# chance, since several hits from one action would otherwise nearly
 	# guarantee a burn every time that move is used.
-	if attacker_label == "You" and u.hp > 0 and not u.get("burning", false):
-		var burn_chance: float = player.talisman_bonus("burn_chance_multihit") if is_multihit else player.talisman_bonus("burn_chance")
+	if (attacker_label == "You" or _actor_is_ally()) and u.hp > 0 and not u.get("burning", false):
+		var burn_chance: float = _actor_tb("burn_chance_multihit") if is_multihit else _actor_tb("burn_chance")
 		burn_chance = _proc(burn_chance)
 		if burn_chance > 0.0 and randf() < burn_chance:
 			_ignite_with_ember(u)
 			hud.battle_log("The %s catches fire!" % u.name)
 	# Bone's Dreadful Strike (material passive): a flat chance to leave the
 	# target too scared to act next turn. Stone Amulet (talisman) raises it.
-	if attacker_label == "You" and u.hp > 0 and weapon.get("material_id", "") == "bone":
+	if (attacker_label == "You" or _actor_is_ally()) and u.hp > 0 and weapon.get("material_id", "") == "bone":
 		var dread_chance: float = BONE_DREAD_CHANCE
-		if player.talisman_bonus("material_passive_boost") > 0.0:
+		if _actor_tb("material_passive_boost") > 0.0:
 			dread_chance *= STONE_AMULET_MATERIAL_BOOST_MULT
 		dread_chance = _proc(dread_chance)
 		if dread_chance > 0.0 and randf() < dread_chance:
@@ -4954,8 +5016,8 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 	# usual push-away knockback -- silently skipped if that tile is out of
 	# bounds or already occupied, damage still applies either way.
 	if effect == "clotheslined" and u.hp > 0:
-		var behind_dir: Vector2i = _knockback_dir(battle_player_tile, u.tile)
-		var behind_tile: Vector2i = battle_player_tile - behind_dir
+		var behind_dir: Vector2i = _knockback_dir(origin_tile, u.tile)
+		var behind_tile: Vector2i = origin_tile - behind_dir
 		if _in_battle_bounds(behind_tile) and not _battle_tile_occupied(behind_tile, u.ref):
 			u.tile = behind_tile
 			hud.battle_log("The %s is hurled behind you!" % u.name)
@@ -4966,34 +5028,43 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 	var passive_lifesteal_pct: float = weapon.get("passive_lifesteal_pct", 0.0)
 	if passive_lifesteal_pct > 0.0 and dmg > 0:
 		var passive_heal: int = max(1, int(round(dmg * passive_lifesteal_pct)))
-		player.heal(passive_heal)
-		hud.battle_log("Your weapon drains %d HP from the wound." % passive_heal)
+		_actor_heal(passive_heal)
+		hud.battle_log("%s weapon drains %d HP from the wound." % ["Your" if attacker_label == "You" else attacker_label + "'s", passive_heal])
 	# The Great Toothpicke's passive_heal_chance/passive_heal_flat: an
 	# independent per-hit chance at a flat sip of HP back, regardless of how
 	# much damage the hit actually dealt (unlike the %-of-damage lifesteal above).
 	var heal_chance: float = weapon.get("passive_heal_chance", 0.0)
 	if heal_chance > 0.0 and randf() < _proc(heal_chance):
 		var heal_flat: int = int(weapon.get("passive_heal_flat", 0))
-		player.heal(heal_flat)
-		hud.battle_log("Your spear drinks deep -- you feel %d HP return." % heal_flat)
+		_actor_heal(heal_flat)
+		hud.battle_log("The spear drinks deep -- %d HP returns." % heal_flat)
 	# Rune of Bloodlust's passive_self_damage_pct -- a cut of the damage just
 	# dealt comes back at the wielder as recoil, regardless of which action
 	# landed it. Gated on attacker_label so an ally's own attack (which
 	# funnels through this same function) is never hurt by the player's own
 	# cursed weapon.
 	var self_damage_pct: float = weapon.get("passive_self_damage_pct", 0.0)
-	if self_damage_pct > 0.0 and dmg > 0 and attacker_label == "You":
+	if self_damage_pct > 0.0 and dmg > 0 and (attacker_label == "You" or _actor_is_ally()):
 		var recoil: int = max(1, int(round(dmg * self_damage_pct)))
-		player.take_battle_damage(recoil)
-		hud.battle_log("The recoil sears you for %d damage." % recoil)
+		_actor_take_damage(recoil)
+		hud.battle_log("The recoil sears %s for %d damage." % ["you" if attacker_label == "You" else attacker_label, recoil])
 	# Grunkle Gloves' passive_stun_chance -- an independent roll on every
 	# landed hit, regardless of which action triggered it.
 	var passive_stun_chance: float = weapon.get("passive_stun_chance", 0.0)
 	if passive_stun_chance > 0.0 and u.hp > 0 and is_instance_valid(u.ref) and randf() < _proc(passive_stun_chance):
 		u["stunned"] = true
 		hud.battle_log("The %s is stunned!" % u.name)
+	# The Staff: every RANGED hit (target two or more tiles away) has a chance to blind -- a
+	# blinded enemy's attacks may whiff for a few turns (see _process_enemy_turn).
+	var blind_chance: float = weapon.get("passive_ranged_blind_chance", 0.0)
+	if blind_chance > 0.0 and u.hp > 0 and abs(u.tile.x - origin_tile.x) + abs(u.tile.y - origin_tile.y) >= 2 and randf() < _proc(blind_chance):
+		u["blind_turns"] = BLINDNESS_TURNS
+		hud.battle_log("The %s is blinded!" % u.name)
+	if effect == "landfall" and u.hp > 0 and randf() < _proc(LANDFALL_STUN_CHANCE):
+		u["stunned"] = true
+		hud.battle_log("The %s is stunned!" % u.name)
 	if u.hp > 0:
-		var dir := _knockback_dir(battle_player_tile, u.tile)
+		var dir := _knockback_dir(origin_tile, u.tile)
 		if effect == "guaranteed_knockback" or weapon.get("passive_guaranteed_knockback", false):
 			_apply_knockback(u, dir, true, true)
 		elif effect != "whirlwind_strike" and effect != "clotheslined" and not effect.begins_with("arrow_"):
@@ -5022,7 +5093,7 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 			player.add_coins(gilded_bonus)
 			hud.battle_log("Your golden blade leaves a coin behind!")
 		# Wildfire Core (talisman): a burning kill explodes outward.
-		if player.talisman_bonus("wildfire_core") > 0.0 and u.get("burning", false):
+		if (player.talisman_bonus("wildfire_core") > 0.0 or _actor_tb("wildfire_core") > 0.0) and u.get("burning", false):
 			_trigger_wildfire_explosion(u.tile, _burn_tick_damage(u))
 		if is_instance_valid(u.ref):
 			u.ref.take_damage(9999)
@@ -5059,23 +5130,211 @@ func _try_cleanse_one_player_status() -> void:
 			player.disarmed_tile = Vector2i(-1, -1)
 	hud.battle_log("Your silver blade's purity washes an affliction away!")
 
+# ---------------------------------------------------------------------------
+# Actors. _battle_perform_attack (and the hit pipeline under it) serves the hero AND the party
+# members. battle_actor is {} while the hero acts; during a member's command it is that member's
+# battle unit (set by _ally_perform, cleared when the action finishes). Everything below answers
+# "who is acting" so the dispatcher never has to care: tile, weapon, resource pool, talismans...
+# ---------------------------------------------------------------------------
+var battle_actor: Dictionary = {}
+
+# 1 HP of the Necromancer-style "HP as mana" casters buys this much mana worth of spell (the user's
+# ruling: a spell costs 1 HP per 5 mana).
+const HP_PER_MANA := 0.2
+
+func _actor_is_ally() -> bool:
+	return not battle_actor.is_empty()
+
+func _actor_tile() -> Vector2i:
+	return battle_actor.tile if _actor_is_ally() else battle_player_tile
+
+func _actor_set_tile(t: Vector2i) -> void:
+	if _actor_is_ally():
+		battle_actor.tile = t
+	else:
+		battle_player_tile = t
+
+func _actor_label() -> String:
+	return ("Your " + str(battle_actor.name)) if _actor_is_ally() else "You"
+
+func _actor_weapon() -> Dictionary:
+	if _actor_is_ally():
+		return battle_actor.get("weapon", {"damage_mult": 1.0})
+	return player.current_weapon
+
+# The stat a swing is built on: -1 = the hero\'s attack_damage; for a member its own attack stat,
+# or its MAGIC stat when the weapon says damage uses magic (the Staff). A flat mercenary has no
+# attack stat of its own and keeps using the hero\'s.
+func _actor_attack_stat() -> float:
+	if not _actor_is_ally():
+		return -1.0
+	if bool(battle_actor.get("weapon", {}).get("uses_magic", false)):
+		return float(battle_actor.get("magic", 0.0))
+	return float(battle_actor.get("attack", -1.0))
+
+func _actor_targetable() -> Array:
+	return _ally_targetable_indices(battle_actor) if _actor_is_ally() else _targetable_indices()
+
+func _actor_effective_target() -> int:
+	if _actor_is_ally():
+		return _ally_effective_target_index(battle_actor)
+	return _effective_target_index()
+
+# One summed talisman/favour effect for whoever is acting (see Talismans.gd\'s key list).
+func _actor_tb(key: String) -> float:
+	if not _actor_is_ally():
+		return player.talisman_bonus(key)
+	return float(battle_actor.get("mods", {}).get(key, 0.0))
+
+func _actor_luck() -> float:
+	return _actor_tb("luck") if _actor_is_ally() else player.total_luck()
+
+func _actor_max_hp() -> int:
+	return int(battle_actor.max_hp) if _actor_is_ally() else player.max_health
+
+func _actor_heal(amount: int) -> void:
+	if _actor_is_ally():
+		battle_actor.hp = mini(int(battle_actor.max_hp), int(battle_actor.hp) + amount)
+	else:
+		player.heal(amount)
+
+func _actor_take_damage(amount: int) -> void:
+	if _actor_is_ally():
+		battle_actor.hp -= amount
+	else:
+		player.take_battle_damage(amount)
+
+func _actor_pichaku() -> bool:
+	return bool(battle_actor.get("pichaku_active", false)) if _actor_is_ally() else player.pichaku_active
+
+func _actor_set_pichaku() -> void:
+	if _actor_is_ally():
+		battle_actor["pichaku_active"] = true
+		hud.battle_log("%s gets in the zone -- lighter, faster strikes for the rest of the fight!" % _actor_label())
+	else:
+		player.pichaku_active = true
+		hud.battle_log("You get in the zone -- lighter, faster strikes for the rest of the fight!")
+
+func _actor_disarm() -> void:
+	if _actor_is_ally():
+		battle_actor["disarmed_tile"] = _pick_disarm_tile()
+	else:
+		player.disarmed_tile = _pick_disarm_tile()
+
+func _actor_skip_next_turn() -> void:
+	if _actor_is_ally():
+		battle_actor["skip_turns"] = int(battle_actor.get("skip_turns", 0)) + 1
+	else:
+		battle_player_turns_to_skip += 1
+
+# Which pool pays for specials: a member with a mana pool (a caster) pays mana, everyone else
+# stamina; an "HP as mana" caster (the Necromancer) pays 1 HP per 5 mana and never to zero.
+func _actor_pool_name() -> String:
+	if not _actor_is_ally():
+		return "stamina"
+	return _unit_pool_name(battle_actor)
+
+func _unit_pool_name(u: Dictionary) -> String:
+	if bool(u.get("hp_as_mana", false)):
+		return "HP"
+	if int(u.get("max_mana", 0)) > 0:
+		return "mana"
+	return "stamina"
+
+# What a unit would have to pay for a cost (HP casters pay in HP) and whether it can right now.
+func _unit_cost_amount(u: Dictionary, cost: int) -> int:
+	if bool(u.get("hp_as_mana", false)):
+		return int(ceil(float(cost) * HP_PER_MANA))
+	return cost
+
+func _unit_can_pay(u: Dictionary, cost: int) -> bool:
+	if cost <= 0:
+		return true
+	match _unit_pool_name(u):
+		"HP": return int(u.hp) - _unit_cost_amount(u, cost) >= 1
+		"mana": return int(u.get("mana", 0)) >= cost
+	return int(u.get("stamina", 0)) >= cost
+
+func _actor_pays(cost: int) -> bool:
+	if not _actor_is_ally():
+		return player.spend_stamina(cost)
+	if not _unit_can_pay(battle_actor, cost):
+		return false
+	match _actor_pool_name():
+		"HP": battle_actor.hp -= _unit_cost_amount(battle_actor, cost)
+		"mana": battle_actor.mana = int(battle_actor.mana) - cost
+		_: battle_actor.stamina = int(battle_actor.stamina) - cost
+	return true
+
+func _actor_refund(amount: int) -> void:
+	if not _actor_is_ally():
+		player.regen_stamina(amount)
+		return
+	match _actor_pool_name():
+		"HP": battle_actor.hp = mini(int(battle_actor.max_hp), int(battle_actor.hp) + _unit_cost_amount(battle_actor, amount))
+		"mana": battle_actor.mana = mini(int(battle_actor.max_mana), int(battle_actor.mana) + amount)
+		_: battle_actor.stamina = mini(int(battle_actor.max_stamina), int(battle_actor.stamina) + amount)
+
+# Stamina earned by acting (a regular attack, Guarding). Casters have no stamina; they regain
+# mana a different way (Guard, Channel).
+func _actor_gain_stamina(amount: int) -> void:
+	if not _actor_is_ally():
+		player.regen_stamina(amount)
+		return
+	if int(battle_actor.get("max_stamina", 0)) > 0:
+		battle_actor.stamina = mini(int(battle_actor.max_stamina), int(battle_actor.stamina) + amount)
+
+# The one door every attack hit goes through: the hero as before, or a member on its own attack
+# stat, its own tile, its own talismans (see _apply_single_hit) and the ally-wide damage multiplier.
+func _hit(idx: int, mult: float, effect: String, weapon: Dictionary, flat: int = -1, multihit: bool = false) -> void:
+	if not _actor_is_ally():
+		_apply_single_hit(idx, mult, effect, weapon, "You", Vector2i(-1, -1), flat, multihit)
+		return
+	_apply_single_hit(idx, mult * float(battle_actor.get("dmg_mult", 1.0)), effect, weapon, _actor_label(), battle_actor.tile, flat, multihit, _actor_attack_stat())
+
+# The end of an attack action: the hero ends its turn; a member ends its command, and a kill
+# that clears the field hands straight to victory instead of waiting for the rest of the queue.
+func _actor_finish_action() -> void:
+	if not _actor_is_ally():
+		if battle_units.is_empty():
+			_battle_victory()
+			return
+		_end_player_turn()
+		return
+	battle_actor = {}
+	if battle_units.is_empty():
+		battle_commanding_ally = null
+		battle_ally_queue.clear()
+		_remove_fallen_allies()
+		_battle_victory()
+		return
+	_end_ally_command()
+
 # Shared entry point for the regular attack, heavy attack, and every weapon
 # special -- action is {stamina_cost, dmg_mult, effect, name}.
 func _battle_perform_attack(action: Dictionary) -> void:
 	var cost: int = action.get("stamina_cost", 0)
-	if cost > 0 and not player.spend_stamina(cost):
-		hud.battle_log("Not enough stamina for %s!" % action.name)
+	if cost > 0 and not _actor_pays(cost):
+		hud.battle_log("Not enough %s for %s!" % [_actor_pool_name(), action.name])
 		return
 	var effect: String = action.get("effect", "")
-	var targetable := _targetable_indices()
+	var targetable := _actor_targetable()
 	# Hand Picks' DIAMONDS can strike any enemy anywhere on the grid, not
 	# just one within normal range -- it checks battle_units directly
 	# instead of the range-limited targetable list every other action uses.
-	var no_target: bool = battle_units.is_empty() if effect == "diamonds" else targetable.is_empty()
+	# Some actions do not need an enemy in melee reach: DIAMONDS and the Staff's fireball/landfall
+	# strike anywhere on the field, and Channel / Revival target your own side (picked beforehand).
+	var no_target: bool
+	if effect == "channel" or effect == "revive":
+		no_target = false
+	elif effect == "diamonds" or effect == "fireball" or effect == "landfall":
+		no_target = battle_units.is_empty()
+	else:
+		no_target = targetable.is_empty()
 	if no_target:
 		hud.battle_log("No enemy in range.")
 		if cost > 0:
-			player.regen_stamina(cost)
+			_actor_refund(cost)
 		return
 
 	if tutorial_active and tutorial_step == 1 and action.get("is_regular_attack", false):
@@ -5085,7 +5344,7 @@ func _battle_perform_attack(action: Dictionary) -> void:
 	# _apply_single_hit call -- see that function's comment for why (a break
 	# roll partway through a multi-hit action must not change the stats
 	# later hits in the SAME action use).
-	var weapon: Dictionary = player.current_weapon
+	var weapon: Dictionary = _actor_weapon()
 	var dmg_mult: float = action.get("dmg_mult", 1.0)
 	# Weapon attack timing minigame: how well the weapon's command is executed scales the damage.
 	var timing_result := ""
@@ -5104,7 +5363,7 @@ func _battle_perform_attack(action: Dictionary) -> void:
 	# cover blocks it outright -- the action never actually happened.
 	elif effect == "wide_cleave":
 		if not _resolve_wide_cleave(weapon, dmg_mult) and cost > 0:
-			player.regen_stamina(cost)
+			_actor_refund(cost)
 	# Battle Axe's Execution: another coin-flip-shaped instakill (this time
 	# on the target's armored flag, not a random roll), same reasoning as
 	# Target Practice for resolving it outside the dmg_mult pipeline.
@@ -5114,7 +5373,16 @@ func _battle_perform_attack(action: Dictionary) -> void:
 	# still costs the turn (falls through to _end_player_turn() below like
 	# everything else), it just skips the whole dmg_mult pipeline.
 	elif effect == "pichaku":
-		player.pichaku_active = true
+		_actor_set_pichaku()
+	# The Staff's three specials (party members only) and Revival.
+	elif effect == "fireball":
+		_resolve_fireball(action, weapon)
+	elif effect == "landfall":
+		_resolve_landfall(weapon)
+	elif effect == "channel":
+		_resolve_channel()
+	elif effect == "revive":
+		_resolve_revive()
 		hud.battle_log("You get in the zone -- lighter, faster strikes for the rest of the fight!")
 	# Hand Picks' DIAMONDS: teleport-strike, resolved separately since it
 	# targets by grid position rather than the range-limited targetable list.
@@ -5125,50 +5393,50 @@ func _battle_perform_attack(action: Dictionary) -> void:
 		# full dmg_mult if it's the only one in range, or splits between it
 		# and the next-closest enemy at the special's own (lower)
 		# split_dmg_mult if a second one is available.
-		var primary_idx := _effective_target_index()
+		var primary_idx := _actor_effective_target()
 		var others: Array = targetable.duplicate()
 		others.erase(primary_idx)
 		if others.is_empty():
-			_apply_single_hit(primary_idx, dmg_mult, effect, weapon, "You", Vector2i(-1, -1), -1, true)
+			_hit(primary_idx, dmg_mult, effect, weapon, -1, true)
 			if primary_idx < battle_units.size():
-				_apply_single_hit(primary_idx, dmg_mult, effect, weapon, "You", Vector2i(-1, -1), -1, true)
+				_hit(primary_idx, dmg_mult, effect, weapon, -1, true)
 		else:
 			var split_mult: float = action.get("split_dmg_mult", dmg_mult)
 			others.sort()
 			# The secondary's index can shift if the primary hit kills a
 			# lower-indexed unit -- captured by reference, re-found after.
 			var secondary_ref = battle_units[others[0]].ref
-			_apply_single_hit(primary_idx, split_mult, effect, weapon, "You", Vector2i(-1, -1), -1, true)
+			_hit(primary_idx, split_mult, effect, weapon, -1, true)
 			var secondary_idx := -1
 			for j in battle_units.size():
 				if battle_units[j].ref == secondary_ref:
 					secondary_idx = j
 					break
 			if secondary_idx >= 0:
-				_apply_single_hit(secondary_idx, split_mult, effect, weapon, "You", Vector2i(-1, -1), -1, true)
+				_hit(secondary_idx, split_mult, effect, weapon, -1, true)
 	elif effect == "cleave_all":
 		var targets := targetable.duplicate()
 		targets.sort()
 		targets.reverse()
 		for idx in targets:
-			_apply_single_hit(idx, dmg_mult, effect, weapon, "You", Vector2i(-1, -1), -1, true)
+			_hit(idx, dmg_mult, effect, weapon, -1, true)
 	elif action.has("pass_count_min"):
 		# Greatsword's Whirlwind Strike -- several full cleave_all-style
 		# passes in a row, re-querying who's still targetable before each
 		# pass so a kill mid-flurry doesn't leave a stale index behind.
 		var passes: int = randi_range(action.pass_count_min, action.pass_count_max)
 		for p in passes:
-			var pass_targets := _targetable_indices()
+			var pass_targets := _actor_targetable()
 			pass_targets.sort()
 			pass_targets.reverse()
 			for idx in pass_targets:
-				_apply_single_hit(idx, dmg_mult, effect, weapon, "You", Vector2i(-1, -1), -1, true)
+				_hit(idx, dmg_mult, effect, weapon, -1, true)
 	elif action.has("hit_count_min"):
 		# A randomized flurry of hits on one target (Spear's Wombo Combo,
 		# Dagger's Flurry Slice, Hand Picks' Minernado) -- stops early if an
 		# earlier hit in the flurry already killed the target, same
 		# still-primary-target guard the rest of this function uses.
-		var idx := _effective_target_index()
+		var idx := _actor_effective_target()
 		var primary_ref = null
 		if idx < battle_units.size():
 			primary_ref = battle_units[idx].ref
@@ -5176,13 +5444,13 @@ func _battle_perform_attack(action: Dictionary) -> void:
 			return idx < battle_units.size() and battle_units[idx].ref == primary_ref
 		var hit_count: int = randi_range(action.hit_count_min, action.hit_count_max)
 		if action.get("luck_scales_hits", false):
-			hit_count += int(floor(player.total_luck() * 10))
+			hit_count += int(floor(_actor_luck() * 10))
 		for i in hit_count:
 			if not still_primary_target.call():
 				break
-			_apply_single_hit(idx, dmg_mult, effect, weapon, "You", Vector2i(-1, -1), -1, true)
+			_hit(idx, dmg_mult, effect, weapon, -1, true)
 	else:
-		var idx := _effective_target_index()
+		var idx := _actor_effective_target()
 		# Captured by reference (not index) before the hit lands, since a
 		# kill shifts every later index down by one via remove_at. Every
 		# follow-up hit below (double_hit, double_strike,
@@ -5206,7 +5474,7 @@ func _battle_perform_attack(action: Dictionary) -> void:
 		# below actually fire this time -- so every hit from a kit that CAN
 		# flurry uses the smaller multi-hit burn chance, not just the ones
 		# after the first.
-		var whirlwind_melee: bool = action.get("is_regular_attack", false) and player.talisman_bonus("whirlwind_double_melee") > 0.0 and not weapon.get("long_range", false)
+		var whirlwind_melee: bool = action.get("is_regular_attack", false) and _actor_tb("whirlwind_double_melee") > 0.0 and not weapon.get("long_range", false)
 		# Wood's Quick Strikes (material passive): a flat chance to strike
 		# again, stacked onto the weapon's own passive_double_hit_chance
 		# (if any) rather than a separate roll -- amplified by Stone Amulet
@@ -5214,83 +5482,80 @@ func _battle_perform_attack(action: Dictionary) -> void:
 		var double_hit_chance: float = weapon.get("passive_double_hit_chance", 0.0)
 		if weapon.get("material_id", "") == "wood":
 			var wood_chance: float = WOOD_DOUBLE_HIT_CHANCE
-			if player.talisman_bonus("material_passive_boost") > 0.0:
+			if _actor_tb("material_passive_boost") > 0.0:
 				wood_chance *= STONE_AMULET_MATERIAL_BOOST_MULT
 			double_hit_chance += wood_chance
 		double_hit_chance = _proc(double_hit_chance)
 		var multihit_capable: bool = effect == "double_hit" or effect == "piercing_thrust" \
 			or (action.get("is_regular_attack", false) and weapon.get("double_strike", false)) \
 			or double_hit_chance > 0.0 \
-			or (effect == "" and player.pichaku_active) \
+			or (effect == "" and _actor_pichaku()) \
 			or weapon.get("passive_cleave_pct", 0.0) > 0.0 \
 			or whirlwind_melee
-		_apply_single_hit(idx, dmg_mult, effect, weapon, "You", Vector2i(-1, -1), -1, multihit_capable)
+		_hit(idx, dmg_mult, effect, weapon, -1, multihit_capable)
 		# Knife Throw only leaves you disarmed if it actually kills the target
 		# (2026-09-29 -- used to disarm unconditionally, every time).
 		if effect == "knife_throw" and not still_primary_target.call():
-			player.disarmed_tile = _pick_disarm_tile()
+			_actor_disarm()
 			hud.battle_log("The killing throw leaves you weaponless -- it lands on a random tile!")
 		if effect == "double_hit" and still_primary_target.call():
-			_apply_single_hit(idx, dmg_mult, effect, weapon, "You", Vector2i(-1, -1), -1, multihit_capable)
+			_hit(idx, dmg_mult, effect, weapon, -1, multihit_capable)
 		# Knuckle Gloves' innate double_strike (plain Attack only, not
 		# specials -- those already carry their own explicit effect), any
 		# weapon's passive_double_hit_chance (Nightwhisper/Thunderclap), and
 		# Whirlwind Charm's talisman-driven double hit on any melee weapon.
 		if action.get("is_regular_attack", false) and still_primary_target.call():
 			if weapon.get("double_strike", false) or whirlwind_melee:
-				_apply_single_hit(idx, dmg_mult, effect, weapon, "You", Vector2i(-1, -1), -1, multihit_capable)
+				_hit(idx, dmg_mult, effect, weapon, -1, multihit_capable)
 		if still_primary_target.call():
 			if double_hit_chance > 0.0 and randf() < double_hit_chance:
-				_apply_single_hit(idx, dmg_mult, effect, weapon, "You", Vector2i(-1, -1), -1, multihit_capable)
+				_hit(idx, dmg_mult, effect, weapon, -1, multihit_capable)
 		# Pichaku (Hand Picks): while active, every regular/heavy attack gets
 		# an independent chance to hit a second time, stacking with any
 		# weapon's own passive_double_hit_chance rather than replacing it.
-		if effect == "" and player.pichaku_active and still_primary_target.call():
+		if effect == "" and _actor_pichaku() and still_primary_target.call():
 			if randf() < _proc(PICHAKU_DOUBLE_HIT_CHANCE):
-				_apply_single_hit(idx, dmg_mult, effect, weapon, "You", Vector2i(-1, -1), -1, multihit_capable)
+				_hit(idx, dmg_mult, effect, weapon, -1, multihit_capable)
 		# Duskrender's passive_cleave_pct -- every hit also splashes onto
 		# whoever else is targetable, at a reduced fraction of this hit's
 		# damage multiplier.
 		var cleave_pct: float = weapon.get("passive_cleave_pct", 0.0)
 		if cleave_pct > 0.0:
-			var splash_targets: Array = _targetable_indices()
+			var splash_targets: Array = _actor_targetable()
 			splash_targets.sort()
 			splash_targets.reverse()
 			for splash_idx in splash_targets:
 				if splash_idx < battle_units.size() and battle_units[splash_idx].ref != primary_ref:
-					_apply_single_hit(splash_idx, dmg_mult * cleave_pct, effect, weapon, "You", Vector2i(-1, -1), -1, multihit_capable)
+					_hit(splash_idx, dmg_mult * cleave_pct, effect, weapon, -1, multihit_capable)
 		# Piercing Thrust: the same hit also lands on whoever's standing one
 		# more step beyond the primary target, in the same line -- a
 		# diagonal line if the primary was diagonal, since the Spear now
 		# targets diagonally too.
 		if effect == "piercing_thrust" and primary_tile != Vector2i(-999, -999):
-			var pierce_dir: Vector2i = _knockback_dir(battle_player_tile, primary_tile)
+			var pierce_dir: Vector2i = _knockback_dir(_actor_tile(), primary_tile)
 			var pierce_tile: Vector2i = primary_tile + pierce_dir
 			for j in battle_units.size():
 				if battle_units[j].tile == pierce_tile:
-					_apply_single_hit(j, dmg_mult, effect, weapon, "You", Vector2i(-1, -1), -1, multihit_capable)
+					_hit(j, dmg_mult, effect, weapon, -1, multihit_capable)
 					break
 
 	if effect == "self_heal":
-		var heal_amt := int(round(player.max_health * SELF_HEAL_PCT))
-		player.heal(heal_amt)
+		var heal_amt := int(round(_actor_max_hp() * SELF_HEAL_PCT))
+		_actor_heal(heal_amt)
 		hud.battle_log("You feel invigorated! Healed %d HP." % heal_amt)
 	if effect == "devastating_slash":
-		battle_player_turns_to_skip += 1
+		_actor_skip_next_turn()
 		hud.battle_log("The devastating blow leaves you reeling!")
 
 	# Only the real plain Attack regens stamina this way -- Gravedigger's
 	# passive_free_specials also zeroes cost for a special, but a special
 	# forced to cost 0 shouldn't ALSO refund stamina like a genuine free hit.
 	if action.get("is_regular_attack", false):
-		player.regen_stamina(STAMINA_REGEN_ON_ATTACK)
+		_actor_gain_stamina(STAMINA_REGEN_ON_ATTACK)
 	if timing_result == AttackTimingsScript.PERFECT:
-		player.regen_stamina(ATTACK_TIMING_PERFECT_STAMINA)
+		_actor_gain_stamina(ATTACK_TIMING_PERFECT_STAMINA)
 
-	if battle_units.is_empty():
-		_battle_victory()
-		return
-	_end_player_turn()
+	_actor_finish_action()
 
 # Spear's Target Practice: a straight coin-flip against the current target
 # (lower odds vs. a boss), bypassing the normal damage pipeline entirely --
@@ -5298,13 +5563,13 @@ func _battle_perform_attack(action: Dictionary) -> void:
 # player. Only called once _battle_perform_attack has already confirmed a
 # target is in range.
 func _resolve_target_practice() -> void:
-	var idx := _effective_target_index()
+	var idx := _actor_effective_target()
 	var u = battle_units[idx]
 	var is_boss: bool = ENEMY_TRAITS.get(u.name, {}).get("is_boss_tier", false)
 	var chance: float = TARGET_PRACTICE_BOSS_CHANCE if is_boss else TARGET_PRACTICE_CHANCE
 	if randf() < chance:
 		hud.battle_log("Target Practice finds its mark -- the %s drops instantly!" % u.name)
-		_spawn_battle_attack_lunge(battle_player_tile, u.tile, ATTACK_LUNGE_PLAYER_COLOR, false)
+		_spawn_battle_attack_lunge(_actor_tile(), u.tile, ATTACK_LUNGE_PLAYER_COLOR, false)
 		_spawn_battle_death_burst(u.tile, u.get("size", 1))
 		if is_instance_valid(u.ref):
 			u.ref.take_damage(9999)
@@ -5312,18 +5577,18 @@ func _resolve_target_practice() -> void:
 		if battle_target_index >= battle_units.size():
 			battle_target_index = 0
 	else:
-		player.disarmed_tile = _pick_disarm_tile()
+		_actor_disarm()
 		hud.battle_log("Target Practice misses -- your spear flies out of reach!")
 
 # Battle Axe's Execution: instant kill against an armorless target, no
 # damage at all against an armored one -- a hard condition on the target's
 # "armored" flag rather than a random roll like Target Practice.
 func _resolve_execution() -> void:
-	var idx := _effective_target_index()
+	var idx := _actor_effective_target()
 	var u = battle_units[idx]
 	if not u.get("armored", false):
 		hud.battle_log("Execution finds no armor to stop it -- the %s falls!" % u.name)
-		_spawn_battle_attack_lunge(battle_player_tile, u.tile, ATTACK_LUNGE_PLAYER_COLOR, false)
+		_spawn_battle_attack_lunge(_actor_tile(), u.tile, ATTACK_LUNGE_PLAYER_COLOR, false)
 		_spawn_battle_death_burst(u.tile, u.get("size", 1))
 		if is_instance_valid(u.ref):
 			u.ref.take_damage(9999)
@@ -5345,16 +5610,16 @@ func _resolve_diamonds(weapon: Dictionary, dmg_mult: float) -> void:
 	# A 20% chance to miss the jump entirely (2026-09-29): no hit lands, no
 	# repositioning -- just a hard landing back where you started.
 	if randf() < DIAMONDS_MISS_CHANCE:
-		var self_dmg: int = max(1, int(round(player.max_health * DIAMONDS_MISS_SELF_DAMAGE_PCT)))
-		player.take_battle_damage(self_dmg)
+		var self_dmg: int = max(1, int(round(_actor_max_hp() * DIAMONDS_MISS_SELF_DAMAGE_PCT)))
+		_actor_take_damage(self_dmg)
 		hud.battle_log("You misjudge the jump and crash down hard, taking %d damage!" % self_dmg)
 		return
-	_spawn_battle_attack_lunge(battle_player_tile, target_tile, ATTACK_LUNGE_PLAYER_COLOR, false)
-	_apply_single_hit(idx, dmg_mult, "diamonds", weapon)
+	_spawn_battle_attack_lunge(_actor_tile(), target_tile, ATTACK_LUNGE_PLAYER_COLOR, false)
+	_hit(idx, dmg_mult, "diamonds", weapon)
 	# The default knockback (see _apply_single_hit) already shoved the target
 	# back if it survived -- landing on its PRE-hit tile is what reads as
 	# "you jump onto their tile, they get knocked back".
-	battle_player_tile = target_tile
+	_actor_set_tile(target_tile)
 
 func _unit_index_at_tile(t: Vector2i) -> int:
 	for i in battle_units.size():
@@ -5370,9 +5635,9 @@ func _unit_index_at_tile(t: Vector2i) -> int:
 # normal cover check elsewhere, this is a hard precondition, not a damage
 # reduction. Returns false when blocked, true otherwise.
 func _resolve_wide_cleave(weapon: Dictionary, dmg_mult: float) -> bool:
-	var target_idx := _effective_target_index()
-	var dir: Vector2i = _knockback_dir(battle_player_tile, battle_units[target_idx].tile)
-	var line_tiles: Array = [battle_player_tile + dir, battle_player_tile + dir * 2, battle_player_tile + dir * 3]
+	var target_idx := _actor_effective_target()
+	var dir: Vector2i = _knockback_dir(_actor_tile(), battle_units[target_idx].tile)
+	var line_tiles: Array = [_actor_tile() + dir, _actor_tile() + dir * 2, _actor_tile() + dir * 3]
 	for t in line_tiles:
 		if _has_adjacent_rock(t):
 			hud.battle_log("Cover blocks your Wide Cleave!")
@@ -5380,7 +5645,7 @@ func _resolve_wide_cleave(weapon: Dictionary, dmg_mult: float) -> bool:
 	for t in line_tiles:
 		var idx := _unit_index_at_tile(t)
 		if idx >= 0:
-			_apply_single_hit(idx, dmg_mult, "wide_cleave", weapon)
+			_hit(idx, dmg_mult, "wide_cleave", weapon)
 	return true
 
 func _battle_player_fight() -> void:
@@ -5531,7 +5796,7 @@ func _ignite_with_ember(u: Dictionary) -> void:
 
 # Lucky Clover (talisman): doubles an on-hit proc chance, capped at 100%.
 func _proc(chance: float) -> float:
-	return minf(1.0, chance * player.secondary_chance_mult())
+	return minf(1.0, chance * (2.0 if _actor_tb("double_secondary_chance") > 0.0 else 1.0))
 
 func _trigger_wildfire_explosion(center_tile: Vector2i, fire_tick_dmg: int) -> void:
 	var blast_dmg: int = max(1, fire_tick_dmg * WILDFIRE_EXPLOSION_FIRE_MULT)
@@ -5731,9 +5996,18 @@ func _advance_ally_queue() -> void:
 		var next = battle_ally_queue.pop_front()
 		if next.hp <= 0:
 			continue
+		# A staggered ally (Devastating Slash...) loses its command.
+		if int(next.get("skip_turns", 0)) > 0:
+			next["skip_turns"] = int(next.skip_turns) - 1
+			hud.battle_log("Your %s is recovering and can't act." % next.name)
+			continue
+		_ally_start_of_turn(next)
 		battle_commanding_ally = next
 		battle_ally_moves_left = int(next.move_range)
 		next.defending = false
+		battle_ally_pending_action = {}
+		battle_ally_pick_candidates = []
+		battle_actor = {}
 		battle_menu_state = "main"
 		battle_move_trail = []
 		_focus_battle_ally_menu()
@@ -5749,6 +6023,24 @@ func _advance_ally_queue() -> void:
 func _focus_battle_ally_menu() -> void:
 	hud.battle_ally_buttons["move"].grab_focus()
 
+# What a member regains at the start of its own command: stamina per turn (the Astral Full Breath
+# plus its talismans) and HP from regeneration talismans (Moss Charm).
+func _ally_start_of_turn(u: Dictionary) -> void:
+	var mods: Dictionary = u.get("mods", {})
+	var stamina_gain: int = player.meta_stamina_regen_per_turn + int(mods.get("stamina_regen", 0.0))
+	if stamina_gain > 0 and int(u.get("max_stamina", 0)) > 0:
+		u["stamina"] = mini(int(u.max_stamina), int(u.stamina) + stamina_gain)
+	var hp_gain: int = int(mods.get("hp_regen_turn", 0.0)) + int(floor(float(u.max_hp) / 20.0) * float(mods.get("hp_regen_per_20_max_hp", 0.0)))
+	if hp_gain > 0 and u.hp < u.max_hp:
+		u.hp = mini(int(u.max_hp), int(u.hp) + hp_gain)
+	# The weapon it dropped (Wrist Strike, Knife Throw...) is reclaimed by walking onto it.
+	_check_ally_disarm_reclaimed(u)
+
+func _check_ally_disarm_reclaimed(u: Dictionary) -> void:
+	if u.get("disarmed_tile", Vector2i(-1, -1)) != Vector2i(-1, -1) and u.tile == u.disarmed_tile:
+		u["disarmed_tile"] = Vector2i(-1, -1)
+		hud.battle_log("Your %s reclaims its weapon!" % u.name)
+
 func _on_battle_ally_action(action: String) -> void:
 	if battle_turn != "player" or battle_commanding_ally == null:
 		return
@@ -5758,6 +6050,9 @@ func _on_battle_ally_action(action: String) -> void:
 			if battle_ally_moves_left <= 0:
 				hud.battle_log("Your %s has no moves left." % u.name)
 				return
+			if not u.get("charging", {}).is_empty():
+				hud.battle_log("Your %s can't move while charging!" % u.name)
+				return
 			battle_menu_state = "move"
 			battle_ally_move_undo_tile = u.tile
 			battle_ally_move_undo_moves_left = battle_ally_moves_left
@@ -5766,14 +6061,270 @@ func _on_battle_ally_action(action: String) -> void:
 			get_viewport().gui_release_focus()
 			_refresh_battle_display()
 		"attack":
-			_battle_ally_attack()
+			var info: Dictionary = _ally_menu_info()
+			if info.attack_disabled:
+				hud.battle_log("Your %s can't attack right now." % u.name)
+				return
+			_ally_perform(_ally_regular_action(u))
+		"special":
+			if _ally_specials(u).is_empty():
+				hud.battle_log("Your %s has no special moves." % u.name)
+				return
+			battle_menu_state = "ally_special"
+			_refresh_battle_display()
+			hud.focus_ally_submenu()
+		"back":
+			# Out of the target picker back to the special list, out of that to the main menu.
+			battle_menu_state = "ally_special" if battle_menu_state == "ally_pick" else "main"
+			battle_ally_pending_action = {}
+			battle_ally_pick_candidates = []
+			_refresh_battle_display()
+			hud.focus_ally_submenu()
 		"guard":
 			u.defending = true
+			# Bracing steadies you: stamina back, or mana for a caster (mirrors the hero's Defend).
+			if int(u.get("max_mana", 0)) > 0:
+				u.mana = mini(int(u.max_mana), int(u.mana) + ALLY_GUARD_MANA)
+			elif int(u.get("max_stamina", 0)) > 0:
+				u.stamina = mini(int(u.max_stamina), int(u.stamina) + STAMINA_REGEN_ON_DEFEND)
 			hud.battle_log("Your %s braces for impact." % u.name)
 			_end_ally_command()
 		"skip":
 			hud.battle_log("Your %s does nothing this turn." % u.name)
 			_end_ally_command()
+		_:
+			if action.begins_with("special_"):
+				_ally_choose_special(int(action.substr(8)))
+			elif action.begins_with("pick_"):
+				_ally_pick_target(int(action.substr(5)))
+
+# --- Ally actions: the plain attack, weapon specials, and the friendly-target picker ---------
+
+# Mana a caster regains from Guarding (the hero's Defend gives STAMINA_REGEN_ON_DEFEND stamina).
+const ALLY_GUARD_MANA := 15
+# Channel restores this share of the target's maximum mana (stamina for anyone without mana).
+const CHANNEL_RESTORE_PCT := 0.2
+
+# The regular attack as an action dictionary -- free for everything but a Bow, which costs stamina
+# exactly as it does for the hero. Members have no Heavy Attack.
+func _ally_regular_action(u: Dictionary) -> Dictionary:
+	return {"stamina_cost": int(u.get("weapon", {}).get("regular_attack_stamina_cost", 0)), "dmg_mult": 1.0, "effect": "", "name": "Attack", "is_regular_attack": true}
+
+# The special moves in a member's menu: its weapon's three -- or, mid-charge, just the release.
+func _ally_specials(u: Dictionary) -> Array:
+	var charging: Dictionary = u.get("charging", {})
+	if not charging.is_empty():
+		return [{
+			"id": str(charging.get("id", "")), "name": "Release: %s" % str(charging.get("name", "")), "stamina_cost": 0,
+			"dmg_mult": float(charging.get("dmg_mult", 1.0)), "effect": str(charging.get("effect", "")), "release": true,
+			"description": "Let it fly at your selected target -- it can be anyone on the field.",
+		}]
+	var out: Array = []
+	for special in u.get("weapon", {}).get("specials", []):
+		out.append(special)
+	return out
+
+# Which side an effect needs the player to pick from before it resolves ("" = no pick needed).
+func _special_target_kind(effect: String) -> String:
+	match effect:
+		"channel": return "ally"
+		"revive": return "downed"
+	return ""
+
+func _ally_cost_text(u: Dictionary, cost: int) -> String:
+	if cost <= 0:
+		return ""
+	match _unit_pool_name(u):
+		"HP": return " (%d HP)" % _unit_cost_amount(u, cost)
+		"mana": return " (%d MP)" % cost
+	return " (%d STA)" % cost
+
+func _ally_choose_special(i: int) -> void:
+	var u = battle_commanding_ally
+	var specials: Array = _ally_specials(u)
+	if i < 0 or i >= specials.size():
+		return
+	var action: Dictionary = specials[i].duplicate(true)
+	var cost: int = int(action.get("stamina_cost", 0))
+	if not _unit_can_pay(u, cost):
+		hud.battle_log("Not enough %s for %s!" % [_unit_pool_name(u), action.name])
+		return
+	if u.get("disarmed_tile", Vector2i(-1, -1)) != Vector2i(-1, -1):
+		hud.battle_log("Your %s has lost its weapon!" % u.name)
+		return
+	var kind: String = _special_target_kind(str(action.get("effect", "")))
+	if kind == "":
+		_ally_perform(action)
+		return
+	var picks: Array = _ally_pick_candidates(u, kind)
+	if picks.is_empty():
+		hud.battle_log("There is no one to use %s on." % action.name)
+		return
+	battle_ally_pending_action = action
+	battle_ally_pick_candidates = picks
+	battle_menu_state = "ally_pick"
+	_refresh_battle_display()
+	hud.focus_ally_submenu()
+
+# Who a friendly special can be aimed at: "ally" = the hero and every other living ally,
+# "downed" = every downed ally. Each entry {"label", "target"} (target "hero" or a unit dict).
+func _ally_pick_candidates(u: Dictionary, kind: String) -> Array:
+	var out: Array = []
+	if kind == "ally":
+		out.append({"label": "You  (%d/%d HP, %d/%d STA)" % [player.health, player.max_health, player.stamina, player.max_stamina], "target": "hero"})
+		for a in battle_allies:
+			if a != u and a.hp > 0:
+				var pool: String = "%d/%d MP" % [int(a.get("mana", 0)), int(a.get("max_mana", 0))] if int(a.get("max_mana", 0)) > 0 else "%d/%d STA" % [int(a.get("stamina", 0)), int(a.get("max_stamina", 0))]
+				out.append({"label": "%s  (%d/%d HP, %s)" % [a.name, a.hp, a.max_hp, pool], "target": a})
+	elif kind == "downed":
+		for d in battle_downed_allies:
+			out.append({"label": "%s  (downed)" % d.name, "target": d})
+	return out
+
+func _ally_pick_target(j: int) -> void:
+	if j < 0 or j >= battle_ally_pick_candidates.size():
+		return
+	var action: Dictionary = battle_ally_pending_action
+	battle_ally_target = battle_ally_pick_candidates[j].target
+	battle_ally_pending_action = {}
+	battle_ally_pick_candidates = []
+	_ally_perform(action)
+
+# Runs one action as the ally being commanded: the shared attack dispatcher with that ally as
+# the actor. It ends the ally's command itself when the action completes; a refused action (not
+# enough mana, nothing in range) leaves the menu open.
+func _ally_perform(action: Dictionary) -> void:
+	battle_actor = battle_commanding_ally
+	battle_menu_state = "main"
+	await _battle_perform_attack(action)
+	battle_actor = {}
+	battle_ally_target = null
+	if in_battle and battle_commanding_ally != null:
+		_refresh_battle_display()
+
+# Kept for tests and older call sites: the commanded ally's plain attack.
+func _battle_ally_attack() -> void:
+	if battle_commanding_ally == null:
+		return
+	_ally_perform(_ally_regular_action(battle_commanding_ally))
+
+# What the HUD's ally menu shows this frame: button labels, which are disabled, and the picker.
+func _ally_menu_info() -> Dictionary:
+	var info := {"specials": [], "picks": [], "attack_disabled": false, "move_disabled": false, "has_specials": false, "attack_label": "Attack"}
+	var u = battle_commanding_ally
+	if u == null:
+		return info
+	var charging: bool = not u.get("charging", {}).is_empty()
+	var disarmed: bool = u.get("disarmed_tile", Vector2i(-1, -1)) != Vector2i(-1, -1)
+	var regular: Dictionary = _ally_regular_action(u)
+	info.attack_label = "Attack" + _ally_cost_text(u, int(regular.stamina_cost))
+	info.attack_disabled = charging or disarmed or not _unit_can_pay(u, int(regular.stamina_cost))
+	info.move_disabled = battle_ally_moves_left <= 0 or charging
+	var specials: Array = _ally_specials(u)
+	info.has_specials = not specials.is_empty()
+	for special in specials:
+		var cost: int = int(special.get("stamina_cost", 0))
+		info.specials.append({
+			"label": str(special.name) + _ally_cost_text(u, cost),
+			"disabled": disarmed or not _unit_can_pay(u, cost),
+			"tip": str(special.get("description", "")),
+		})
+	for c in battle_ally_pick_candidates:
+		info.picks.append({"label": str(c.label)})
+	return info
+
+# --- The Staff's effects (and Revival, ready for the Necromancer) -----------------------------
+
+# I CAST FIREBALL: the first use charges (the member can't move; the charge is lost if it is
+# downed); the next turn the release sends the fireball to the SELECTED target -- any enemy on the
+# field -- which flies, sets it alight, then explodes over the 3x3 around it for (magic x 1.2) minus
+# 5 per tile from the centre. Damage reaches enemies only.
+func _resolve_fireball(action: Dictionary, weapon: Dictionary) -> void:
+	var u = battle_actor
+	if not action.get("release", false):
+		u["charging"] = {"id": str(action.get("id", "")), "name": str(action.get("name", "Fireball")), "dmg_mult": float(action.get("dmg_mult", 1.2)), "effect": "fireball"}
+		hud.battle_log("%s gathers a fireball... (can't move while charging)" % _actor_label())
+		return
+	u["charging"] = {}
+	var center_idx: int = battle_target_index if battle_target_index >= 0 and battle_target_index < battle_units.size() else 0
+	var center: Dictionary = battle_units[center_idx]
+	var center_tile: Vector2i = center.tile
+	hud.battle_log("%s sends the fireball flying at the %s!" % [_actor_label(), center.name])
+	_spawn_battle_attack_lunge(_actor_tile(), center_tile, ATTACK_LUNGE_ALLY_COLOR, true)
+	# 1) it flies, 2) it lights the target, 3) it explodes -- in that order.
+	center["burning"] = true
+	hud.battle_log("The %s catches fire!" % center.name)
+	var base: float = _actor_attack_stat() * float(weapon.get("damage_mult", 1.0)) * float(action.get("dmg_mult", 1.2))
+	var victims: Array = []
+	for e in battle_units:
+		# The blast covers the 3x3 around the centre (a diagonal neighbour is in it); a big unit
+		# is hit if any of its cells is, and counts from its nearest cell.
+		var in_blast := false
+		var dist: int = 99
+		for cell in _footprint(e.tile, e.get("size", 1)):
+			if abs(cell.x - center_tile.x) <= 1 and abs(cell.y - center_tile.y) <= 1:
+				in_blast = true
+			dist = mini(dist, abs(cell.x - center_tile.x) + abs(cell.y - center_tile.y))
+		if in_blast:
+			victims.append({"unit": e, "dist": dist})
+	for v in victims:
+		var idx: int = battle_units.find(v.unit)
+		if idx < 0:
+			continue
+		var flat: int = maxi(1, int(round((base - FIREBALL_FALLOFF_PER_TILE * int(v.dist)) * float(battle_actor.get("dmg_mult", 1.0)))))
+		_flash_battle_tile(v.unit.tile, v.unit.get("size", 1))
+		_hit(idx, 1.0, "fireball", weapon, flat, true)
+
+# Landfall: every enemy on the field takes (attack x 3) + (magic / 2), each with a 25% stun chance.
+func _resolve_landfall(weapon: Dictionary) -> void:
+	var u = battle_actor
+	var flat: int = maxi(1, int(round((float(u.get("attack", 0.0)) * 3.0 + float(u.get("magic", 0.0)) / 2.0) * float(u.get("dmg_mult", 1.0)))))
+	hud.battle_log("%s calls the sky down!" % _actor_label())
+	for e in battle_units.duplicate():
+		var idx: int = battle_units.find(e)
+		if idx >= 0:
+			_hit(idx, 1.0, "landfall", weapon, flat, true)
+
+# Channel: restores a share of an ally's maximum mana (stamina, for someone without a mana pool).
+func _resolve_channel() -> void:
+	var target = battle_ally_target
+	if target == null:
+		return
+	if typeof(target) == TYPE_STRING:
+		var gain: int = int(round(player.max_stamina * CHANNEL_RESTORE_PCT))
+		player.regen_stamina(gain)
+		hud.battle_log("%s channels %d stamina into you." % [_actor_label(), gain])
+		return
+	if int(target.get("max_mana", 0)) > 0:
+		var gain_mana: int = int(round(int(target.max_mana) * CHANNEL_RESTORE_PCT))
+		target.mana = mini(int(target.max_mana), int(target.mana) + gain_mana)
+		hud.battle_log("%s channels %d mana into %s." % [_actor_label(), gain_mana, target.name])
+	else:
+		var gain_sta: int = int(round(int(target.get("max_stamina", 0)) * CHANNEL_RESTORE_PCT))
+		target["stamina"] = mini(int(target.get("max_stamina", 0)), int(target.get("stamina", 0)) + gain_sta)
+		hud.battle_log("%s channels %d stamina into %s." % [_actor_label(), gain_sta, target.name])
+
+# Revival (the Necromancer's Revival Blessing): stands a downed ally back up at full HP.
+func _resolve_revive() -> void:
+	var target = battle_ally_target
+	if target == null or typeof(target) == TYPE_STRING or not battle_downed_allies.has(target):
+		return
+	_revive_downed(target, 1.0)
+
+# Puts a downed ally back on the grid (on its own tile, or the nearest free one) at hp_frac of max
+# HP. A member brought back this way has not "fainted" after all (no wolf faint is counted).
+func _revive_downed(unit: Dictionary, hp_frac: float) -> void:
+	battle_downed_allies.erase(unit)
+	unit["downed"] = false
+	unit["hp"] = maxi(1, int(round(float(unit.max_hp) * hp_frac)))
+	if _battle_tile_occupied(unit.tile) or battle_terrain.get(unit.tile, {}).get("type", "") in ["rock", "rubble"]:
+		var free_tile: Vector2i = _find_empty_tile_near(unit.tile)
+		if free_tile != Vector2i(-1, -1):
+			unit["tile"] = free_tile
+	battle_allies.append(unit)
+	if unit.has("member"):
+		battle_fainted_members.erase(unit.member)
+	hud.battle_log("%s is back on their feet!" % unit.name)
 
 func _end_ally_command() -> void:
 	# Same end-of-turn terrain handling _end_player_turn gives the hero (water
@@ -5787,32 +6338,19 @@ func _end_ally_command() -> void:
 	battle_move_trail = []
 	_advance_ally_queue()
 
-# Attacks whatever the player currently has targeted (battle_target_index, same
-# preferred-target the hero's own Fight button reads), falling back to the nearest
-# in-range enemy if that one's out of this ally's own reach or already dead. Reuses
-# _apply_single_hit -- the ally's own attack stat, not the hero's -- for the
-# enemy-side hit/death handling untouched. Doesn't end the ally's turn by itself
-# (see _on_battle_ally_action) so a kill can hand off to victory immediately instead
-# of waiting on however many allies are still queued behind it.
-func _battle_ally_attack() -> void:
-	var u = battle_commanding_ally
-	var idx := _ally_effective_target_index(u)
-	if idx < 0:
-		hud.battle_log("No enemy in range.")
-		return
-	_apply_single_hit(idx, u.dmg_mult, "", {"damage_mult": 1.0}, "Your " + u.name, u.tile, -1, false, float(u.get("attack", -1.0)))
-	if battle_units.is_empty():
-		battle_commanding_ally = null
-		battle_ally_queue.clear()
-		_remove_fallen_allies()
-		_battle_victory()
-		return
-	_end_ally_command()
-
 # _targetable_indices' equivalent for an arbitrary ally's own tile/attack_range,
 # rather than the hero's battle_player_tile.
 func _ally_targetable_indices(u: Dictionary) -> Array:
+	var weapon: Dictionary = u.get("weapon", {})
 	var result := []
+	# Aimbot: every enemy on the field is in reach.
+	if weapon.get("passive_unlimited_range", false):
+		for i in battle_units.size():
+			result.append(i)
+		return result
+	# A spear thrusts along diagonals too; Cliffwalker's Bead lets any weapon swing up a ledge.
+	var ignore_line: bool = str(WeaponsScript.get_base_type(weapon).get("id", "")) == "spear"
+	var ignore_ledge: bool = float(u.get("mods", {}).get("ignore_ledge_attack", 0.0)) > 0.0
 	for i in battle_units.size():
 		var e: Dictionary = battle_units[i]
 		var size: int = e.get("size", 1)
@@ -5820,7 +6358,7 @@ func _ally_targetable_indices(u: Dictionary) -> Array:
 		if size > 1:
 			in_range = _footprint_dist(_footprint(e.tile, size), u.tile) <= int(u.attack_range)
 		else:
-			in_range = _can_battle_attack(u.tile, e.tile, int(u.attack_range))
+			in_range = _can_battle_attack(u.tile, e.tile, int(u.attack_range), ignore_line, ignore_ledge)
 		if in_range:
 			result.append(i)
 	return result
@@ -5848,6 +6386,7 @@ func _try_battle_ally_move(dir: Vector2i) -> void:
 	if not result.moved:
 		return
 	u.tile = result.tile
+	_check_ally_disarm_reclaimed(u)
 	battle_ally_moves_left -= 2 if result.get("extra_cost", false) else 1
 	battle_move_trail.append({"tile": u.tile, "dir": dir})
 	if result.fell:
@@ -5872,6 +6411,12 @@ func _remove_fallen_allies() -> void:
 			if fallen.has("member") and not battle_fainted_members.has(fallen.member):
 				battle_fainted_members.append(fallen.member)
 			battle_allies.remove_at(ally_i)
+			# Downed, not gone: it keeps its tile (no collision) as a body allies can still target.
+			fallen["hp"] = 0
+			fallen["downed"] = true
+			fallen["charging"] = {}
+			fallen["acting"] = false
+			battle_downed_allies.append(fallen)
 		ally_i -= 1
 
 # Every roster member gets the XP the hero does, straight from the kill (no
@@ -6242,9 +6787,17 @@ func _enemy_apply_damage(u: Dictionary, target_tile: Vector2i, raw_dmg: int, tra
 			dmg = maxi(1, int(round(dmg * (1.0 - minf(ally_defense / 100.0, 0.9)))))
 		# Guard (this ally's own commanded action, see _on_battle_ally_action):
 		# same flat reduction Defend gives the hero, cleared at the start of
-		# its next commanded turn.
+		# its next commanded turn. Parry Master (Astral) lets a guarding ally shrug a hit off.
 		if target_ally.get("defending", false):
-			dmg = maxi(1, int(round(dmg * (1.0 - DEFEND_DAMAGE_REDUCTION))))
+			if player.meta_block_negate_chance > 0.0 and randf() < player.meta_block_negate_chance:
+				dmg = 0
+			else:
+				dmg = maxi(1, int(round(dmg * (1.0 - DEFEND_DAMAGE_REDUCTION))))
+		# Last Stand (Astral): the more of its HP an ally has lost, the less damage it takes.
+		if player.meta_last_stand_pct_per_10 > 0.0 and dmg > 0:
+			var ally_missing: float = 1.0 - float(target_ally.hp) / float(maxi(1, int(target_ally.max_hp)))
+			var ally_last_stand: float = clampf(player.meta_last_stand_pct_per_10 * floor(ally_missing * 10.0), 0.0, 0.9)
+			dmg = maxi(1, int(round(dmg * (1.0 - ally_last_stand))))
 		target_ally.hp -= dmg
 		target_name = target_ally.name
 		battle_had_combat_action_this_cycle = true
@@ -6268,7 +6821,8 @@ func _enemy_apply_damage(u: Dictionary, target_tile: Vector2i, raw_dmg: int, tra
 # Weapon attack timing minigame (see the ATTACK_TIMING_* constants).
 # ---------------------------------------------------------------------------
 func _attack_minigame_on(action: Dictionary) -> bool:
-	if settings == null or not settings.attack_minigame_enabled or tutorial_active:
+	# The timing popup is the hero's own; party members swing without it.
+	if _actor_is_ally() or settings == null or not settings.attack_minigame_enabled or tutorial_active:
 		return false
 	return float(action.get("dmg_mult", 1.0)) > 0.0
 
@@ -6533,6 +7087,11 @@ func _process_enemy_turn() -> void:
 		if u.get("concussed_turns", 0) > 0:
 			u.concussed_turns -= 1
 			self_hit_this_turn = randf() < 0.33
+		# Blinded (the Staff): for a couple of turns its attack may simply whiff.
+		var blind_whiff_this_turn := false
+		if u.get("blind_turns", 0) > 0:
+			u.blind_turns -= 1
+			blind_whiff_this_turn = randf() < BLINDNESS_MISS_CHANCE
 
 		# Vulnerable: ticks down on the unit's own turn, same shape as
 		# Concussion above. The +25% damage-taken multiplier itself lives in
@@ -6713,6 +7272,9 @@ func _process_enemy_turn() -> void:
 			_spawn_battle_damage_number(u.tile, self_dmg, u.get("size", 1))
 			_flash_battle_tile(u.tile, u.get("size", 1))
 			hud.battle_log("The %s, concussed, strikes itself for %d damage!" % [u.name, self_dmg])
+			u["winding_up"] = false
+		elif can_attack and blind_whiff_this_turn:
+			hud.battle_log("The %s, blinded, swings wildly and misses!" % u.name)
 			u["winding_up"] = false
 		elif can_attack:
 			var already_winding_up: bool = u.get("winding_up", false)
@@ -7183,6 +7745,7 @@ func _end_battle() -> void:
 	_settle_party_after_battle()
 	battle_units.clear()
 	battle_allies.clear()
+	battle_downed_allies.clear()
 	hud.hide_battle()
 	if not choosing_stat and not shop_open:
 		get_tree().paused = false
@@ -7216,12 +7779,18 @@ func _refresh_battle_display() -> void:
 	# clears it.
 	for a in battle_allies:
 		a["acting"] = a == battle_commanding_ally
+	# Downed allies are drawn too (dimmed), on top of the living ones.
+	var display_allies: Array = battle_allies.duplicate()
+	for d in battle_downed_allies:
+		d["downed"] = true
+		display_allies.append(d)
+	hud.battle_ally_menu_info = _ally_menu_info()
 	var display_hp: int = battle_commanding_ally.hp if battle_commanding_ally != null else player.health
 	var display_max_hp: int = battle_commanding_ally.max_hp if battle_commanding_ally != null else player.max_health
 	var display_moves_left: int = battle_ally_moves_left if battle_commanding_ally != null else battle_player_moves_left
 	var display_target_index: int = _ally_effective_target_index(battle_commanding_ally) if battle_commanding_ally != null else _effective_target_index()
 	var commanding_ally_name: String = battle_commanding_ally.name if battle_commanding_ally != null else ""
-	hud.update_battle_grid(BATTLE_GRID_W, BATTLE_GRID_H, battle_terrain, battle_player_tile, battle_units, display_hp, display_max_hp, player.level, battle_turn, display_target_index, display_moves_left, player.stamina, player.max_stamina, player.current_weapon, battle_menu_state, player.healing_items, battle_move_trail, battle_allies, player.has_guardian_skill, battle_skill_cooldown, player.disarmed_tile != Vector2i(-1, -1), player.owned_arrows, battle_awaiting_evasion, can_mine, player.equipped_shield.get("name", ""), player.shield_block_chance(), player.berserk_turns_remaining, player.stealth_turns_remaining, STEALTH_STAMINA_COST, battle_evasion_options, battle_feared_unreachable, battle_awaiting_water_confirm, commanding_ally_name)
+	hud.update_battle_grid(BATTLE_GRID_W, BATTLE_GRID_H, battle_terrain, battle_player_tile, battle_units, display_hp, display_max_hp, player.level, battle_turn, display_target_index, display_moves_left, player.stamina, player.max_stamina, player.current_weapon, battle_menu_state, player.healing_items, battle_move_trail, display_allies, player.has_guardian_skill, battle_skill_cooldown, player.disarmed_tile != Vector2i(-1, -1), player.owned_arrows, battle_awaiting_evasion, can_mine, player.equipped_shield.get("name", ""), player.shield_block_chance(), player.berserk_turns_remaining, player.stealth_turns_remaining, STEALTH_STAMINA_COST, battle_evasion_options, battle_feared_unreachable, battle_awaiting_water_confirm, commanding_ally_name)
 	if tutorial_active and battle_turn == "player":
 		hud.show_battle_hint(_tutorial_hint_text(), _tutorial_hint_target_button())
 	else:

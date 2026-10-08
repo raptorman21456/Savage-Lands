@@ -297,6 +297,16 @@ static func _with_icon(item: Dictionary) -> Dictionary:
 	copy.icon = "talisman_%s" % item.rarity
 	return copy
 
+# The summed effect values of a set of talisman ids -- the same sum Player's own cache holds,
+# so a party member wearing talismans gets exactly the numbers the hero would.
+static func sum_effects(ids: Array) -> Dictionary:
+	var total := {}
+	for id in ids:
+		var effects: Dictionary = get_talisman(str(id)).get("effects", {})
+		for key in effects:
+			total[key] = float(total.get(key, 0.0)) + float(effects[key])
+	return total
+
 # How many talismans a player of this level can have equipped at once.
 static func slots_for_level(level: int) -> int:
 	var slots := 1

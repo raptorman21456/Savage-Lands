@@ -53,7 +53,7 @@ func _init() -> void:
 	var g3: RefCounted = _levelled("guardian", 3, "hp")
 	print("Guardian HP grows at x1.25: 25 + (3 passive + 3 chosen) x 1.25 = %.1f (expected 32.5)" % [g3.stat("hp")])
 	var g_def: RefCounted = _levelled("guardian", 2, "defense")
-	print("Guardian defense grows at x1.5: 5 + (2 + 2) x 1.5 = %.1f (expected 11.0)" % [g_def.defense_pct()])
+	print("Guardian defense grows at x2: 5 + (2 + 2) x 2 = %.1f (expected 13.0)" % [g_def.defense_pct()])
 	var m3: RefCounted = _levelled("marksman", 4, "hp")
 	print("Marksman HP grows 75%% slower: 10 + (4 + 4) x 0.25 = %.1f (expected 12.0)" % [m3.stat("hp")])
 	print("...and its defense is always 0, so it can't even be picked: %.1f, pickable=%s (expected 0.0, no defense)" % [m3.defense_pct(), m3.pickable_stats()])

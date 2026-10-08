@@ -329,6 +329,16 @@ var battle_move_submenu_box: HBoxContainer
 var battle_arrow_submenu_box: HBoxContainer
 var battle_ally_menu_box: HBoxContainer
 var battle_ally_buttons := {}
+# The ally's special-move list and the friendly-target picker: a fixed pool of buttons relabelled
+# every refresh from battle_ally_menu_info (set by Main.gd:_refresh_battle_display each frame).
+const ALLY_SPECIAL_SLOTS := 6
+var battle_ally_special_box: HBoxContainer
+var battle_ally_special_buttons := []
+var battle_ally_special_back: Button
+var battle_ally_pick_box: HBoxContainer
+var battle_ally_pick_buttons := []
+var battle_ally_pick_back: Button
+var battle_ally_menu_info: Dictionary = {}
 var battle_tactics_submenu_box: HBoxContainer
 var battle_evasion_submenu_box: HBoxContainer
 var battle_confirm_box: HBoxContainer
@@ -371,6 +381,8 @@ static var UI_TEXT := {
 	"battle.arrow.back": "Return to the main menu.",
 	"battle.ally.move": "Move this ally on the grid. Doesn't end its turn.",
 	"battle.ally.attack": "This ally attacks with its own weapon and stats.",
+	"battle.ally.special": "Open this ally's special moves (its weapon's, and its own).",
+	"battle.ally.back": "Back to this ally's main menu.",
 	"battle.ally.guard": "This ally braces for impact, taking less damage until its next turn.",
 	"battle.ally.skip": "This ally does nothing this turn.",
 	"shop.reroll": "Reroll the shop's offering. Costs more each time you use it this visit.",
@@ -1490,6 +1502,7 @@ func _build_battle_ui() -> void:
 	for action in [
 		["Move", "move", UI_TEXT["battle.ally.move"]],
 		["Attack", "attack", UI_TEXT["battle.ally.attack"]],
+		["Special", "special", UI_TEXT["battle.ally.special"]],
 		["Guard", "guard", UI_TEXT["battle.ally.guard"]],
 		["Skip", "skip", UI_TEXT["battle.ally.skip"]],
 	]:
@@ -1500,6 +1513,45 @@ func _build_battle_ui() -> void:
 		_style_standard_button(button)
 		battle_ally_menu_box.add_child(button)
 		battle_ally_buttons[action[1]] = button
+
+	# The ally's special-move list: one button per special (relabelled live with its mana/stamina
+	# cost), plus Back. Emits "special_<n>" / "back" through the same battle_ally_action signal.
+	battle_ally_special_box = HBoxContainer.new()
+	battle_ally_special_box.position = Vector2(20, 425)
+	battle_ally_special_box.add_theme_constant_override("separation", 8)
+	battle_ally_special_box.visible = false
+	battle_content_root.add_child(battle_ally_special_box)
+	for i in ALLY_SPECIAL_SLOTS:
+		var special_button := Button.new()
+		special_button.pressed.connect(func(): battle_ally_action.emit("special_%d" % i))
+		_setup_hover_button(special_button, "", battle_description_label)
+		_style_standard_button(special_button)
+		battle_ally_special_box.add_child(special_button)
+		battle_ally_special_buttons.append(special_button)
+	battle_ally_special_back = Button.new()
+	battle_ally_special_back.text = "Back"
+	battle_ally_special_back.pressed.connect(func(): battle_ally_action.emit("back"))
+	_setup_hover_button(battle_ally_special_back, UI_TEXT["battle.ally.back"], battle_description_label)
+	_style_standard_button(battle_ally_special_back)
+	battle_ally_special_box.add_child(battle_ally_special_back)
+
+	# The friendly-target picker (Channel: who gets the mana; Revival Blessing: who stands up).
+	battle_ally_pick_box = HBoxContainer.new()
+	battle_ally_pick_box.position = Vector2(20, 425)
+	battle_ally_pick_box.add_theme_constant_override("separation", 8)
+	battle_ally_pick_box.visible = false
+	battle_content_root.add_child(battle_ally_pick_box)
+	for i in ALLY_SPECIAL_SLOTS:
+		var pick_button := Button.new()
+		pick_button.pressed.connect(func(): battle_ally_action.emit("pick_%d" % i))
+		_style_standard_button(pick_button)
+		battle_ally_pick_box.add_child(pick_button)
+		battle_ally_pick_buttons.append(pick_button)
+	battle_ally_pick_back = Button.new()
+	battle_ally_pick_back.text = "Back"
+	battle_ally_pick_back.pressed.connect(func(): battle_ally_action.emit("back"))
+	_style_standard_button(battle_ally_pick_back)
+	battle_ally_pick_box.add_child(battle_ally_pick_back)
 
 	# First-ever-battle tutorial hint bubble + its Skip control -- see
 	# Main.gd's tutorial_active/tutorial_step for the sequencing logic that
@@ -2023,6 +2075,37 @@ func show_settings() -> void:
 	settings_panel.visible = true
 	_refresh_settings_display()
 
+# Relabels the ally special / picker buttons from the info Main.gd handed over this refresh.
+func _refresh_ally_submenus() -> void:
+	var specials: Array = battle_ally_menu_info.get("specials", [])
+	for i in battle_ally_special_buttons.size():
+		var button: Button = battle_ally_special_buttons[i]
+		button.visible = i < specials.size()
+		if i < specials.size():
+			button.text = str(specials[i].label)
+			button.disabled = bool(specials[i].disabled)
+			button.set_meta("description", str(specials[i].tip))
+	var picks: Array = battle_ally_menu_info.get("picks", [])
+	for i in battle_ally_pick_buttons.size():
+		var pick_button: Button = battle_ally_pick_buttons[i]
+		pick_button.visible = i < picks.size()
+		if i < picks.size():
+			pick_button.text = str(picks[i].label)
+
+# Puts keyboard focus on the first usable button of whichever ally submenu is showing.
+func focus_ally_submenu() -> void:
+	var group: Array = []
+	if battle_ally_pick_box != null and battle_ally_pick_box.visible:
+		group = battle_ally_pick_buttons + [battle_ally_pick_back]
+	elif battle_ally_special_box != null and battle_ally_special_box.visible:
+		group = battle_ally_special_buttons + [battle_ally_special_back]
+	elif battle_ally_menu_box != null and battle_ally_menu_box.visible:
+		group = [battle_ally_buttons["move"], battle_ally_buttons["attack"], battle_ally_buttons["guard"]]
+	for b in group:
+		if b.visible and not b.disabled:
+			b.grab_focus()
+			return
+
 func hide_settings() -> void:
 	_cancel_rebind()
 	settings_panel.visible = false
@@ -2101,7 +2184,7 @@ func show_shop(coins: int, runic_shards: int, offering: Array, prices: Array, cu
 		button.icon = WeaponIconsScript.texture_for(item) if item.category == "weapon" else load("res://assets/%s.png" % item.icon)
 		button.expand_icon = true
 		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		button.text = "[%d] %s%s%s" % [i + 1, "🔒 " if is_locked else "", "★ " if is_mythic else "", item.name]
+		button.text = "[%d] %s%s%s%s" % [i + 1, "🔒 " if is_locked else "", "★ " if is_mythic else "", item.name, "  (for your party)" if item.get("ally_only", false) else ""]
 		button.disabled = (not already_owned and coins < prices[i]) or stat_locked
 		button.pressed.connect(func(): shop_buy_pressed.emit(i))
 		# Stat descriptions live in the Inventory screen now, not here --
@@ -2455,17 +2538,20 @@ func update_battle_grid(grid_w: int, grid_h: int, terrain: Dictionary, player_ti
 			ally_icon.position = a_tile_origin + Vector2(a_padding, a_padding)
 			ally_icon.size = Vector2(battle_tile_size - a_padding * 2, battle_tile_size - a_padding * 2)
 			ally_icon.visible = ally_icon.texture != null
+			# A downed ally lies dimmed on its tile; its health bar is hidden.
+			if a.get("downed", false):
+				ally_icon.modulate = ally_icon.modulate * Color(0.45, 0.45, 0.5, 0.7)
 
 			var bar_width: float = battle_tile_size - a_padding * 2
 			var bar_height := 5.0
 			var bar_pos: Vector2 = a_tile_origin + Vector2(a_padding, battle_tile_size - a_padding - bar_height)
 			hp_bg.position = bar_pos
 			hp_bg.size = Vector2(bar_width, bar_height)
-			hp_bg.visible = true
+			hp_bg.visible = not a.get("downed", false)
 			var hp_ratio: float = clampf(float(a.hp) / float(max(1, a.max_hp)), 0.0, 1.0)
 			hp_fill.position = bar_pos
 			hp_fill.size = Vector2(bar_width * hp_ratio, bar_height)
-			hp_fill.visible = true
+			hp_fill.visible = not a.get("downed", false)
 		else:
 			ally_icon.visible = false
 			hp_bg.visible = false
@@ -2602,6 +2688,9 @@ func update_battle_grid(grid_w: int, grid_h: int, terrain: Dictionary, player_ti
 	var is_player_turn: bool = turn == "player" and not in_ally_turn
 	battle_main_menu_box.visible = is_player_turn and menu_state == "main" and not is_evasion_prompt and not is_confirm_prompt
 	battle_ally_menu_box.visible = in_ally_turn and menu_state == "main" and not is_evasion_prompt and not is_confirm_prompt
+	battle_ally_special_box.visible = in_ally_turn and menu_state == "ally_special" and not is_evasion_prompt and not is_confirm_prompt
+	battle_ally_pick_box.visible = in_ally_turn and menu_state == "ally_pick" and not is_evasion_prompt and not is_confirm_prompt
+	_refresh_ally_submenus()
 	battle_fight_submenu_box.visible = is_player_turn and menu_state == "fight" and not is_evasion_prompt and not is_confirm_prompt
 	# Move is the one submenu shared by both -- Confirm/Cancel behave the same
 	# shape for an ally as for the hero (see Main.gd's _on_battle_move_action).
@@ -2622,7 +2711,10 @@ func update_battle_grid(grid_w: int, grid_h: int, terrain: Dictionary, player_ti
 
 	battle_main_buttons["item"].disabled = healing_items <= 0 or feared_unreachable
 	battle_main_buttons["move"].disabled = moves_left <= 0
-	battle_ally_buttons["move"].disabled = moves_left <= 0
+	battle_ally_buttons["move"].disabled = moves_left <= 0 or bool(battle_ally_menu_info.get("move_disabled", false))
+	battle_ally_buttons["attack"].text = str(battle_ally_menu_info.get("attack_label", "Attack"))
+	battle_ally_buttons["attack"].disabled = bool(battle_ally_menu_info.get("attack_disabled", false))
+	battle_ally_buttons["special"].visible = bool(battle_ally_menu_info.get("has_specials", false))
 	# Disarmed (Spear's Target Practice miss, Dagger's Knife Throw): Fight is
 	# off-limits until you're standing back on the tile your weapon landed on
 	# -- everything else (Move/Item/Defend/Flee/Skill/Arrow) stays available.

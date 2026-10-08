@@ -58,7 +58,7 @@ func _init() -> void:
 	var bases := {
 		"club": _club, "spear": _spear, "greatsword": _greatsword, "hammer": _hammer,
 		"battle_axe": _battle_axe, "dagger": _dagger, "bow": _bow,
-		"knuckle_gloves": _knuckle_gloves, "hand_picks": _hand_picks,
+		"knuckle_gloves": _knuckle_gloves, "hand_picks": _hand_picks, "staff": _staff,
 	}
 	var only := OS.get_cmdline_user_args()
 	var written := 0
@@ -197,6 +197,18 @@ func _hammer() -> void:
 	_poly([[20.5, -6.8], [31, -6.8], [31, 6.8], [20.5, 6.8]], METAL)
 	_poly([[20.5, -6.8], [23, -6.8], [23, 6.8], [20.5, 6.8]], METAL_DK)
 	_poly([[29, -6.8], [31, -6.8], [31, 6.8], [29, 6.8]], METAL_DK)
+
+func _staff() -> void:
+	# A caster's staff (party members only): a long wooden shaft with a wrapped grip, a forked
+	# metal cradle at the top and a bright gem set in it.
+	_capsule(0, 0, 33, 0, 1.3, 1.3, WOOD)
+	_capsule(9, 0, 17, 0, 1.7, 1.7, WRAP)
+	_disc(0.6, 0, 1.9, METAL_DK)
+	_capsule(30, 0, 36.5, -4.3, 1.1, 0.9, METAL)
+	_capsule(30, 0, 36.5, 4.3, 1.1, 0.9, METAL)
+	_capsule(33, -2.6, 33, 2.6, 1.0, 1.0, METAL_DK)
+	_disc(36.5, 0, 2.5, EDGE)
+	_disc(38.5, 0, 0.9, METAL_DK)
 
 func _bow() -> void:
 	# Drawn in canvas coordinates: a D-shaped bow, string on the right.

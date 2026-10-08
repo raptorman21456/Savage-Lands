@@ -640,7 +640,9 @@ func _build_party(box: VBoxContainer) -> void:
 			for stat in picks:
 				for n in int(picks[stat]):
 					pm.spend_pick(str(stat))
-		card.add_child(_make_label("HP %d | ATK %.1f | DEF %.1f%% | move %d | range %d" % [pm.max_hp(), pm.attack(), pm.defense_pct(), pm.move_tiles(), int(rules.get("attack_range", 1))], 12, Color(0.7, 0.75, 0.8)))
+		card.add_child(_make_label("HP %d | ATK %.1f | DEF %.1f%% | MAG %.1f | move %d | range %d" % [pm.max_hp(), pm.attack(), pm.defense_pct(), pm.magic(), pm.move_tiles(), int(rules.get("attack_range", 1))], 12, Color(0.7, 0.75, 0.8)))
+		if PartyRulesScript.can_carry_gear(str(entry.kind)):
+			_party_gear_rows(card, index)
 		if rules.get("levels", true):
 			var pick_row := HBoxContainer.new()
 			pick_row.add_theme_constant_override("separation", 12)
@@ -663,7 +665,61 @@ func _build_party(box: VBoxContainer) -> void:
 	_button(add_row, "Add member", func():
 		cfg.party.append({"kind": kind_pick.get_item_metadata(kind_pick.selected), "level": 1, "picks": {}})
 		_changed(["Party"]))
-	_note(box, "Ally weapons and talismans are not equippable yet.")
+	_note(box, "Members can carry any weapon (the Staff is for party members only) and talismans from their own slots (1/2/3/4 at levels 1/4/8/12). Each item goes to one unit at a time.")
+
+# A member's weapon (base, quality, material) and talismans, kept in cfg.party[index].
+func _party_gear_rows(card: VBoxContainer, index: int) -> void:
+	var entry: Dictionary = cfg.party[index]
+	var wsel: Dictionary = entry.get("weapon", {"base": "", "tier": "Fine", "material": "steel"})
+	var base_id: String = str(wsel.get("base", ""))
+	var weapon_row := HBoxContainer.new()
+	weapon_row.add_theme_constant_override("separation", 8)
+	card.add_child(weapon_row)
+	weapon_row.add_child(_inline("Weapon", 12))
+	var base_items := [["", "(bare hands)"]]
+	for b in SandboxScript.party_weapon_bases():
+		base_items.append([b.id, b.name])
+	_option(weapon_row, base_items, base_id, func(v):
+		cfg.party[index]["weapon"] = {"base": v, "tier": wsel.get("tier", "Fine"), "material": wsel.get("material", "steel")}
+		_changed(["Party"]))
+	if base_id != "" and base_id != "club":
+		var tier_items := []
+		for t in WeaponsScript.TIERS:
+			tier_items.append([t.tier_name, t.tier_name])
+		_option(weapon_row, tier_items, str(wsel.get("tier", "Fine")), func(v):
+			cfg.party[index].weapon["tier"] = v
+			_changed(["Party"]))
+		if str(wsel.get("tier", "Fine")) != "Mythic":
+			var mat_items := []
+			for m in WeaponsScript.MATERIALS:
+				mat_items.append([m.id, m.name])
+			_option(weapon_row, mat_items, str(wsel.get("material", "steel")), func(v):
+				cfg.party[index].weapon["material"] = v
+				_changed(["Party"]))
+	var slots: int = PartyRulesScript.talisman_slots(str(entry.kind), int(entry.level))
+	var worn: Array = entry.get("talismans", [])
+	var talisman_row := HBoxContainer.new()
+	talisman_row.add_theme_constant_override("separation", 6)
+	card.add_child(talisman_row)
+	talisman_row.add_child(_inline("Talismans %d/%d" % [mini(worn.size(), slots), slots], 12))
+	for id in worn:
+		var t: Dictionary = TalismansScript.get_talisman(str(id))
+		var talisman_id: String = str(id)
+		_button(talisman_row, "%s ✕" % t.get("name", talisman_id), func():
+			cfg.party[index].talismans.erase(talisman_id)
+			_changed(["Party"]))
+	if worn.size() < slots:
+		var tal_items := [["", "+ add a talisman"]]
+		for item in TalismansScript.ITEMS:
+			if not worn.has(item.id):
+				tal_items.append([item.id, item.name])
+		_option(talisman_row, tal_items, "", func(v):
+			if str(v) == "":
+				return
+			if not cfg.party[index].has("talismans"):
+				cfg.party[index]["talismans"] = []
+			cfg.party[index].talismans.append(str(v))
+			_changed(["Party"]))
 
 func _party_picks_used(index: int) -> int:
 	var rules: Dictionary = PartyRulesScript.rules(str(cfg.party[index].kind))

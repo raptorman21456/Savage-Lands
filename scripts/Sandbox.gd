@@ -113,10 +113,16 @@ static func weapon_bases() -> Array:
 	out.append_array(WeaponsScript.UPGRADABLE_TYPES)
 	return out
 
+# What a party member can be handed: everything you can use, plus the party-only weapons.
+static func party_weapon_bases() -> Array:
+	var out := [WeaponsScript.CLUB]
+	out.append_array(WeaponsScript.all_base_types())
+	return out
+
 static func build_weapon(sel: Dictionary) -> Dictionary:
 	if sel.get("base", "club") == "club":
 		return WeaponsScript.CLUB.duplicate(true)
-	var base: Dictionary = find_in(WeaponsScript.UPGRADABLE_TYPES, "id", sel.base)
+	var base: Dictionary = find_in(WeaponsScript.all_base_types(), "id", sel.base)
 	var tier: Dictionary = find_in(WeaponsScript.TIERS, "tier_name", sel.get("tier", "Fine"))
 	if sel.get("tier", "") == "Mythic" and WeaponsScript.MYTHIC_WEAPONS.has(base.id):
 		return WeaponsScript._build_mythic_variant(base, tier)
@@ -288,6 +294,7 @@ static func apply_build(main, cfg: Dictionary) -> void:
 		for stat in picks:
 			for n in int(picks[stat]):
 				member.spend_pick(str(stat))
+		_apply_party_gear(p, member, entry)
 
 	# fresh battle-scoped state
 	p.berserk_turns_remaining = 0
@@ -300,6 +307,26 @@ static func apply_build(main, cfg: Dictionary) -> void:
 	p.shield_vengeance_active = false
 	p.bloodmoon_stacks = 0
 	p.bloodmoon_debuffed = false
+
+# A member's sandbox gear: any weapon (the Staff included) and talismans, free of the ownership
+# rules -- but still one holder per item, so a talisman you or an earlier member wears is skipped.
+static func _apply_party_gear(p, member, entry: Dictionary) -> void:
+	if not member.can_carry_gear():
+		return
+	var wsel: Dictionary = entry.get("weapon", {})
+	if str(wsel.get("base", "")) != "":
+		var weapon: Dictionary = build_weapon(wsel)
+		if not weapon.is_empty():
+			p.owned_weapons[weapon.id] = true
+			if weapon.id == "club" or (p.weapon_holder(weapon.id) == null and p.current_weapon_base.get("id", "") != weapon.id):
+				member.gear.weapon = weapon.id
+	member.gear.talismans = []
+	for id in entry.get("talismans", []):
+		if member.gear.talismans.size() >= member.talisman_slot_count():
+			break
+		if p.equipped_talismans.has(id) or p.talisman_holder(str(id)) != null:
+			continue
+		member.gear.talismans.append(str(id))
 
 # ---------------------------------------------------------------- the squad
 static func world_index(main, world_id: String) -> int:
