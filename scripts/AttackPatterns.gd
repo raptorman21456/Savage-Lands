@@ -40,6 +40,8 @@ const PLAIN := {
 	"Centaur Archer": {"normal": {"name": "Arrow Shot", "style": "bar", "impacts": [{"ms": 600, "mult": 1.0}], "dodge_ms": 175, "weight": 1.0}},
 	"Gnome": {"normal": {"name": "Pointy Stick", "style": "flash", "impacts": [{"ms": 480, "mult": 1.0}], "dodge_ms": 185, "weight": 1.0}},
 	"Fae": {"normal": {"name": "Sting", "style": "flash", "impacts": [{"ms": 450, "mult": 1.0}], "dodge_ms": 185, "weight": 1.0}},
+	# Not an enemy: the Guardian's Earbursting Bellow, which the hero has to avoid (Main.gd:_resolve_bellow).
+	"Guardian": {"normal": {"name": "Earbursting Bellow", "style": "ring", "impacts": [{"ms": 950, "mult": 1.0}], "dodge_ms": 175, "weight": 1.0}},
 }
 
 # Bosses and mini-bosses: up to three attacks each. The first is their heavy blow (what they land after

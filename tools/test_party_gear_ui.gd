@@ -97,7 +97,7 @@ func _init() -> void:
 	var member = player.party[0]
 	print("A sandbox member gets the Staff on request: %s (expected staff_fine_steel), owned=%s" % [member.weapon_id(), player.owned_weapons.has("staff_fine_steel")])
 	print("...your own weapon is not the Staff: %s (expected club)" % [player.current_weapon_base.get("id", "")])
-	print("...talismans respect her 2 slots (level 4) and skip the one YOU wear: %s (expected [wolf_fang, ember_charm])" % [member.talisman_ids()])
+	print("...talismans respect her 2 slots (any level) and skip the one YOU wear: %s (expected [wolf_fang, ember_charm])" % [member.talisman_ids()])
 	var unit: Dictionary = main._make_member_battle_unit(member, Vector2i(1, 4), 1.0)
 	print("...and she takes the field armed: %s, mana=%d range=%d (expected Staff, a positive mana pool, 3)" % [unit.weapon.get("name", "?"), unit.max_mana, unit.attack_range])
 	cfg.party[0].weapon = {"base": "", "tier": "Fine", "material": "steel"}

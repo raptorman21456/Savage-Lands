@@ -54,6 +54,7 @@ const DefenseMinigameScript := preload("res://scripts/DefenseMinigame.gd")
 const AttackTimingsScript := preload("res://scripts/AttackTimings.gd")
 const AttackMinigameScript := preload("res://scripts/AttackMinigame.gd")
 const PartyRulesScript := preload("res://scripts/PartyRules.gd")
+const PartyKitsScript := preload("res://scripts/PartyKits.gd")
 
 # Phantom Guard's "evasive" special: fired the instant the player picks one
 # of the offered dodge-roll directions -- see _prompt_evasion_reposition.
@@ -944,6 +945,15 @@ var battle_ally_pick_candidates: Array = []
 var battle_ally_target = null
 # PartyMembers knocked out this battle, for the faint/harvest rules at battle end.
 var battle_fainted_members: Array = []
+# The Knight's Rallying Cry: while above 0, every enemy takes extra damage from every source. It
+# counts down once per round (see _begin_player_turn_ticks).
+var battle_rally_turns := 0
+# The Druid's Empower on the hero: while above 0 the hero deals extra damage (a member's own timer is its
+# "buff_turns"). Counts down once per round with the other kit timers.
+var battle_hero_buff_turns := 0
+# While >= 0, the stat a swing is built on instead of the acting member's attack (Body Slam hits with
+# its DEFENSE). Set and cleared around that one hit.
+var battle_stat_override := -1.0
 # Commanded ally turns: "you control allies, they get their own turns during your
 # turn" -- after the hero's own turn, every living fielded ally gets its own command
 # phase (Move/Attack/Guard/Skip for now; a kit's own specials/spells come later).
@@ -3419,6 +3429,11 @@ func _setup_battle_grid(squad: Array) -> void:
 	battle_downed_allies.clear()
 	battle_actor = {}
 	battle_fainted_members.clear()
+	battle_rally_turns = 0
+	battle_hero_buff_turns = 0
+	battle_stat_override = -1.0
+	# A Shaman's talismans reach the hero too while she stands close (cleared when the battle ends).
+	player.shared_talisman_provider = Callable(self, "_hero_shared_effect")
 	battle_commanding_ally = null
 	battle_ally_queue = []
 	battle_ally_moves_left = 0
@@ -3657,6 +3672,10 @@ func _make_member_battle_unit(member, tile: Vector2i, might_mult: float) -> Dict
 	var base_id: String = str(WeaponsScript.get_base_type(weapon).get("id", ""))
 	var favour: Dictionary = PartyRulesScript.favour_for(member.kind, base_id)
 	var mods: Dictionary = member.effect_mods(base_id)
+	# The Brawler's perk: a chance to hit twice, on top of anything the weapon already gives.
+	if float(mods.get("double_hit_chance", 0.0)) > 0.0:
+		weapon = weapon.duplicate(true)
+		weapon["passive_double_hit_chance"] = float(weapon.get("passive_double_hit_chance", 0.0)) + float(mods.double_hit_chance)
 	# Magic: the member's own (a Moonstick doubles what levelling GAINED), plus what the weapon
 	# adds, times the kind's favour for it (the Druid's staff).
 	var magic_gain_mult: float = float(weapon.get("passive_magic_gain_mult", 1.0))
@@ -3700,6 +3719,14 @@ func _make_member_battle_unit(member, tile: Vector2i, might_mult: float) -> Dict
 		"disarmed_tile": Vector2i(-1, -1),
 		"pichaku_active": false,
 		"survive_used": false,
+		# Kind traits: the Knight cannot dodge (nothing dodges for members yet), and the Necromancer
+		# grows with every kill.
+		"cannot_dodge": bool(rules.get("cannot_dodge", false)),
+		"unlimited_range": bool(rules.get("unlimited_range", false)),
+		"ignore_cover": bool(rules.get("ignore_cover", false)),
+		"steal_chance": float(rules.get("steal_chance", 0.0)),
+		"moves_after_attack": bool(rules.get("moves_after_attack", false)),
+		"kill_max_hp": float(rules.get("kill_max_hp", 0.0)),
 	}
 
 # Rock is the only terrain type that actually blocks movement outright (water
@@ -4637,7 +4664,8 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 	# effects. Rolled here, per hit, so every hit of a multi-hit move gets its own
 	# roll. Sits before stealth/blind bookkeeping so a whiff doesn't spend them, and
 	# skips a shield's passive thorns reflection, which isn't an attack being made.
-	if effect != "thorns":
+	# (London's Welcome rolls its miss once for the whole flurry, in its own resolver.)
+	if effect != "thorns" and effect != "londons_welcome":
 		var miss_chance: float = player.miss_chance_for(weapon) if attacker_label == "You" else player.ally_miss_chance()
 		if miss_chance > 0.0 and randf() < miss_chance:
 			hud.battle_log("%s missed the %s!" % ["You" if attacker_label == "You" else attacker_label, u.name])
@@ -4671,6 +4699,8 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 	# hit to land as a crit (here), one to cause Bleeding (after damage is
 	# dealt, alongside the other on-hit effects below).
 	var bleeding_cut_forced_crit := effect == "bleed_or_crit" and randf() < 0.5
+	# Sucker Punch: always a crit against an enemy still at full HP.
+	var sucker_forced_crit: bool = effect == "sucker_punch" and u.hp >= u.max_hp
 	# attack_stat >= 0 is a PartyMember ally swinging on its OWN attack stat (see
 	# _make_member_battle_unit); everyone else builds on the hero's attack_damage.
 	var base_attack: float = attack_stat if attack_stat >= 0.0 else float(player.attack_damage)
@@ -4780,6 +4810,9 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 	# opposite condition): +50% damage against a target still at full HP.
 	if effect == "full_hp_bonus" and u.hp >= u.max_hp:
 		dmg = int(round(dmg * 1.5))
+	# The Wolf's Feed: bites harder into an enemy under 20% HP.
+	if effect == "feed" and float(u.hp) < float(u.max_hp) * PartyKitsScript.FEED_HP_THRESHOLD:
+		dmg = int(round(dmg * PartyKitsScript.FEED_MULT))
 	# War Hammer's Maracas: extra damage specifically against an armored
 	# target -- the mirror image of Execution's "does nothing without armor."
 	if effect == "maracas" and u.get("armored", false):
@@ -4807,9 +4840,12 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 	# player's stat) -- doubles damage and ignores the rock-cover reduction
 	# below entirely ("ignores defense"), same as Blindness's guaranteed
 	# crit-on-hit reuses.
-	var is_crit := blind_forced_crit or stealth_forced_crit or bleeding_cut_forced_crit
+	var is_crit := blind_forced_crit or stealth_forced_crit or bleeding_cut_forced_crit or sucker_forced_crit or effect == "jugular"
 	# A member crits off its own crit chance (talismans, favours) -- never the hero's stat.
 	var actor_crit_chance: float = _actor_tb("crit_chance") if _actor_is_ally() else (player.crit_chance_total() if attacker_label == "You" else 0.0)
+	# The Marksman's bow favour multiplies whatever crit chance it has.
+	if _actor_is_ally() and _actor_tb("crit_chance_mult") > 0.0:
+		actor_crit_chance *= _actor_tb("crit_chance_mult")
 	if not is_crit and actor_crit_chance > 0.0 and randf() < actor_crit_chance:
 		is_crit = true
 	if is_crit:
@@ -4821,6 +4857,11 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 	# function) never picks it up.
 	if attacker_label == "You" and player.potion_attack_turns > 0:
 		dmg = int(round(dmg * (1.0 + ATTACK_POTION_DAMAGE_BONUS_PCT)))
+	# The Druid's Empower: x1.5 damage for a few rounds, on the hero or on a member.
+	if attacker_label == "You" and battle_hero_buff_turns > 0:
+		dmg = int(round(dmg * PartyKitsScript.DRUID_BUFF_MULT))
+	elif _actor_is_ally() and int(battle_actor.get("buff_turns", 0)) > 0:
+		dmg = int(round(dmg * PartyKitsScript.DRUID_BUFF_MULT))
 	# The Looongblade/Aimbot's passive_damage_per_tile_distance: damage scales
 	# with the Manhattan distance between attacker and target -- positive for
 	# the Looongblade (hits harder at range), negative for Aimbot (falls off
@@ -4830,7 +4871,7 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 		var origin: Vector2i = attacker_tile if attacker_tile.x >= 0 else battle_player_tile
 		var distance: int = abs(u.tile.x - origin.x) + abs(u.tile.y - origin.y)
 		dmg = maxi(1, int(round(dmg * (1.0 + distance_pct * distance))))
-	var ignores_cover: bool = is_crit or effect in ["ignore_cover", "leg_blow", "piercing_thrust", "fireball", "landfall"] or weapon.get("passive_ignore_cover", false)
+	var ignores_cover: bool = is_crit or effect in ["ignore_cover", "leg_blow", "piercing_thrust", "fireball", "landfall"] or weapon.get("passive_ignore_cover", false) or (_actor_is_ally() and bool(battle_actor.get("ignore_cover", false)))
 	if not ignores_cover and _has_adjacent_rock(u.tile):
 		dmg = int(round(dmg * (1.0 - ROCK_COVER_REDUCTION)))
 	# Frozen (Freeze Arrow): +20% damage taken from every hit while the
@@ -4850,6 +4891,9 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 	# retroactively benefit from its own mark.
 	if u.get("vulnerable_turns", 0) > 0:
 		dmg = int(round(dmg * (1.0 + VULNERABLE_DAMAGE_TAKEN_BONUS_PCT)))
+	# Rallying Cry (the Knight): every enemy takes more from every source while it lasts.
+	if battle_rally_turns > 0:
+		dmg = int(round(dmg * (1.0 + PartyKitsScript.RALLY_DAMAGE_BONUS)))
 	# Dagger's sneak-crit bonus: a crit landed on an enemy that hadn't
 	# noticed the player yet (was_unaware, resolved above before Stealth
 	# could be consumed) deals extra flat damage.
@@ -4942,6 +4986,10 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 		player.weapon_upgrade_levels.erase(broken_id)
 		player.try_buy_weapon(WeaponsScript.CLUB)
 		hud.battle_log("Your %s shatters! You're back to bare fists." % broken_name)
+	if effect == "drain_punch" and dmg > 0:
+		var drained: int = max(1, int(round(dmg * PartyKitsScript.DRAIN_PUNCH_HEAL_PCT)))
+		_actor_heal(drained)
+		hud.battle_log("%s drains %d HP from the blow." % [_actor_label(), drained])
 	if effect == "lifesteal":
 		var heal_amt: int = max(1, int(round(dmg * LIFESTEAL_PCT)))
 		_actor_heal(heal_amt)
@@ -4952,6 +5000,17 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 	if effect == "low_sweep" and u.hp > 0 and randf() < _proc(LOW_SWEEP_CHANCE):
 		u.move_range = max(1, int(u.move_range / 2))
 		hud.battle_log("The %s is swept off its feet, slowed dramatically!" % u.name)
+	# The Wolf's Nipper: a chance to halve the enemy's speed.
+	if effect == "nipper" and u.hp > 0 and randf() < _proc(PartyKitsScript.NIPPER_SLOW_CHANCE):
+		u.move_range = max(1, int(u.move_range / 2))
+		hud.battle_log("The %s is nipped and slows to a limp!" % u.name)
+	# The Guardian's Body Slam stuns now and then; the Haymaker always does.
+	if effect == "body_slam" and u.hp > 0 and randf() < _proc(PartyKitsScript.BODY_SLAM_STUN_CHANCE):
+		u["stunned"] = true
+		hud.battle_log("The %s is stunned!" % u.name)
+	if effect == "haymaker" and u.hp > 0:
+		u["stunned"] = true
+		hud.battle_log("The %s is stunned by the haymaker!" % u.name)
 	if effect == "crushing_collision" and u.hp > 0 and u.get("armored", false):
 		u.armored = false
 		hud.battle_log("The %s's armor is shattered!" % u.name)
@@ -5011,6 +5070,10 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 	if effect == "bleed_or_crit" and u.hp > 0 and u.get("bleed_turns", 0) <= 0 and randf() < _proc(0.5):
 		u.bleed_turns = BLEED_BASE_TURNS
 		hud.battle_log("The cut leaves the %s bleeding!" % u.name)
+	# The Rogue's Aim for the Jugular! (always a crit, see is_crit) leaves a bleeding wound.
+	if effect == "jugular" and u.hp > 0 and u.get("bleed_turns", 0) <= 0:
+		u.bleed_turns = PartyKitsScript.JUGULAR_BLEED_TURNS
+		hud.battle_log("The cut opens an artery -- the %s is bleeding!" % u.name)
 	# Clothesliner: pulls the target to the tile directly behind the player
 	# (opposite the direction they were just struck from) instead of the
 	# usual push-away knockback -- silently skipped if that tile is out of
@@ -5067,7 +5130,7 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 		var dir := _knockback_dir(origin_tile, u.tile)
 		if effect == "guaranteed_knockback" or weapon.get("passive_guaranteed_knockback", false):
 			_apply_knockback(u, dir, true, true)
-		elif effect != "whirlwind_strike" and effect != "clotheslined" and not effect.begins_with("arrow_"):
+		elif effect != "whirlwind_strike" and effect != "clotheslined" and effect != "drive_by" and not effect.begins_with("arrow_"):
 			# Whirlwind Strike re-queries who's targetable before each of its
 			# 2-5 passes -- the default knockback below would shove a
 			# non-resistant target out of melee range after pass 1, silently
@@ -5097,6 +5160,7 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 			_trigger_wildfire_explosion(u.tile, _burn_tick_damage(u))
 		if is_instance_valid(u.ref):
 			u.ref.take_damage(9999)
+		_note_enemy_death(u, battle_actor)
 		battle_units.remove_at(idx)
 		if battle_target_index >= battle_units.size():
 			battle_target_index = 0
@@ -5138,9 +5202,9 @@ func _try_cleanse_one_player_status() -> void:
 # ---------------------------------------------------------------------------
 var battle_actor: Dictionary = {}
 
-# 1 HP of the Necromancer-style "HP as mana" casters buys this much mana worth of spell (the user's
-# ruling: a spell costs 1 HP per 5 mana).
-const HP_PER_MANA := 0.2
+# An "HP as mana" caster (the Necromancer) pays 1 HP for every 5 mana a spell is worth (the user's
+# ruling). It is a division, never a 0.2 multiplier: 35 * 0.2 is 7.000000000000001, which would round up.
+const MANA_PER_HP := 5
 
 func _actor_is_ally() -> bool:
 	return not battle_actor.is_empty()
@@ -5168,6 +5232,8 @@ func _actor_weapon() -> Dictionary:
 func _actor_attack_stat() -> float:
 	if not _actor_is_ally():
 		return -1.0
+	if battle_stat_override >= 0.0:
+		return battle_stat_override
 	if bool(battle_actor.get("weapon", {}).get("uses_magic", false)):
 		return float(battle_actor.get("magic", 0.0))
 	return float(battle_actor.get("attack", -1.0))
@@ -5184,7 +5250,34 @@ func _actor_effective_target() -> int:
 func _actor_tb(key: String) -> float:
 	if not _actor_is_ally():
 		return player.talisman_bonus(key)
-	return float(battle_actor.get("mods", {}).get(key, 0.0))
+	return _unit_effect(battle_actor, key)
+
+# One talisman/favour effect on a battle unit: what it wears itself, plus the share a nearby Shaman
+# (staff in hand) is passing on -- 50% of hers within 2 tiles, or 4 while How Charming is up.
+func _unit_effect(u: Dictionary, key: String) -> float:
+	return float(u.get("mods", {}).get(key, 0.0)) + _shared_effect_at(u.tile, key, u)
+
+func _hero_shared_effect(key: String) -> float:
+	return _shared_effect_at(battle_player_tile, key, null)
+
+# The combat effects a Shaman can share: only ones that are read live during a fight.
+const SHARED_TALISMAN_KEYS := ["damage_pct", "crit_chance", "crit_damage_mult_bonus", "low_hp_damage_pct", "burn_chance", "burn_chance_multihit", "first_attack_damage_pct", "lifesteal_pct", "heal_on_kill", "hp_regen_turn", "hp_regen_per_20_max_hp", "stamina_regen", "double_secondary_chance"]
+
+func _shared_effect_at(tile: Vector2i, key: String, exclude) -> float:
+	if battle_allies.is_empty() or not SHARED_TALISMAN_KEYS.has(key):
+		return 0.0
+	var total := 0.0
+	for s in battle_allies:
+		if s == exclude or int(s.hp) <= 0 or str(s.get("kind", "")) != "shaman":
+			continue
+		var share: float = float(s.get("mods", {}).get("talisman_share", 0.0))
+		if share <= 0.0:
+			continue
+		var radius: int = PartyKitsScript.CHARM_RADIUS if int(s.get("charm_turns", 0)) > 0 else PartyKitsScript.AURA_RADIUS
+		if abs(s.tile.x - tile.x) + abs(s.tile.y - tile.y) > radius:
+			continue
+		total += share * float(s.get("mods", {}).get(key, 0.0))
+	return total
 
 func _actor_luck() -> float:
 	return _actor_tb("luck") if _actor_is_ally() else player.total_luck()
@@ -5244,7 +5337,7 @@ func _unit_pool_name(u: Dictionary) -> String:
 # What a unit would have to pay for a cost (HP casters pay in HP) and whether it can right now.
 func _unit_cost_amount(u: Dictionary, cost: int) -> int:
 	if bool(u.get("hp_as_mana", false)):
-		return int(ceil(float(cost) * HP_PER_MANA))
+		return int(ceil(float(cost) / float(MANA_PER_HP)))
 	return cost
 
 func _unit_can_pay(u: Dictionary, cost: int) -> bool:
@@ -5290,6 +5383,9 @@ func _hit(idx: int, mult: float, effect: String, weapon: Dictionary, flat: int =
 	if not _actor_is_ally():
 		_apply_single_hit(idx, mult, effect, weapon, "You", Vector2i(-1, -1), flat, multihit)
 		return
+	# A Druid under her movement spell swings for a flat (attack / 2) + 5 whatever she holds.
+	if battle_actor.get("sprint", false) and effect == "" and flat < 0:
+		flat = maxi(1, int(round((float(battle_actor.get("attack", 0.0)) / PartyKitsScript.DRUID_SPRINT_ATTACK_DIV + PartyKitsScript.DRUID_SPRINT_FLAT_BONUS) * float(battle_actor.get("dmg_mult", 1.0)))))
 	_apply_single_hit(idx, mult * float(battle_actor.get("dmg_mult", 1.0)), effect, weapon, _actor_label(), battle_actor.tile, flat, multihit, _actor_attack_stat())
 
 # The end of an attack action: the hero ends its turn; a member ends its command, and a kill
@@ -5325,9 +5421,9 @@ func _battle_perform_attack(action: Dictionary) -> void:
 	# Some actions do not need an enemy in melee reach: DIAMONDS and the Staff's fireball/landfall
 	# strike anywhere on the field, and Channel / Revival target your own side (picked beforehand).
 	var no_target: bool
-	if effect == "channel" or effect == "revive":
+	if effect in PartyKitsScript.NO_ENEMY_NEEDED:
 		no_target = false
-	elif effect == "diamonds" or effect == "fireball" or effect == "landfall":
+	elif effect == "diamonds" or effect == "fireball" or effect == "landfall" or effect == "bellow":
 		no_target = battle_units.is_empty()
 	else:
 		no_target = targetable.is_empty()
@@ -5352,10 +5448,18 @@ func _battle_perform_attack(action: Dictionary) -> void:
 		timing_result = await _run_attack_minigame(weapon)
 		dmg_mult *= _attack_timing_mult(timing_result)
 
+	# The Rogue's regular attack sometimes picks a pocket instead of dealing damage.
+	var stole := false
+	if action.get("is_regular_attack", false) and _actor_is_ally() and float(battle_actor.get("steal_chance", 0.0)) > 0.0 and randf() < float(battle_actor.get("steal_chance", 0.0)):
+		stole = true
+		player.add_coins(1)
+		hud.battle_log("%s lifts a coin instead of striking!" % _actor_label())
 	# Spear's Target Practice is a coin-flip instakill, not a normal
 	# damage-dealing hit -- resolved entirely separately from the dmg_mult
 	# pipeline every other special/attack below goes through.
-	if effect == "target_practice":
+	if stole:
+		pass
+	elif effect == "target_practice":
 		_resolve_target_practice()
 	# Greatsword's (new) Wide Cleave -- an area hit on 3 tiles in a line
 	# toward the current target, not the targetable-enemies list at all, so
@@ -5383,7 +5487,50 @@ func _battle_perform_attack(action: Dictionary) -> void:
 		_resolve_channel()
 	elif effect == "revive":
 		_resolve_revive()
-		hud.battle_log("You get in the zone -- lighter, faster strikes for the rest of the fight!")
+	# The party kits (PartyKits.gd). Sucker Punch and Drain Punch are plain hits with a rider in
+	# _apply_single_hit, so they take the default path below.
+	elif effect == "rallying_cry":
+		_resolve_rallying_cry()
+	elif effect == "charge":
+		_resolve_charge(weapon)
+	elif effect == "stalwart":
+		_resolve_stalwart()
+	elif effect == "dodge_and_weave":
+		_resolve_dodge_and_weave(dmg_mult, weapon)
+	elif effect == "curse_of_rot":
+		_resolve_curse_of_rot()
+	elif effect == "summon_dead":
+		_resolve_summon_dead(action)
+	elif effect == "how_charming":
+		_resolve_how_charming()
+	elif effect == "soothing_rain":
+		_resolve_soothing_rain()
+	elif effect == "cleansing_chant":
+		_resolve_cleansing_chant()
+	# The older kits.
+	elif effect == "drive_by":
+		_resolve_drive_by(dmg_mult, weapon)
+	elif effect == "body_slam":
+		var slam_idx: int = _actor_effective_target()
+		battle_stat_override = float(battle_actor.get("defense_pct", 0.0)) if _actor_is_ally() else -1.0
+		_hit(slam_idx, dmg_mult, effect, weapon, -1, false)
+		battle_stat_override = -1.0
+	elif effect == "bellow":
+		await _resolve_bellow(weapon)
+	elif effect == "taunt":
+		_resolve_ally_taunt()
+	elif effect == "sprint":
+		_resolve_sprint()
+	elif effect == "druid_heal":
+		_resolve_druid_heal()
+	elif effect == "druid_buff":
+		_resolve_druid_buff()
+	elif effect == "pickpocket":
+		_resolve_pickpocket()
+	elif effect == "londons_welcome":
+		_resolve_londons_welcome(dmg_mult, weapon)
+	elif effect.begins_with("ally_arrow_"):
+		_resolve_ally_arrow(effect.substr(11), weapon)
 	# Hand Picks' DIAMONDS: teleport-strike, resolved separately since it
 	# targets by grid position rather than the range-limited targetable list.
 	elif effect == "diamonds":
@@ -5493,6 +5640,11 @@ func _battle_perform_attack(action: Dictionary) -> void:
 			or weapon.get("passive_cleave_pct", 0.0) > 0.0 \
 			or whirlwind_melee
 		_hit(idx, dmg_mult, effect, weapon, -1, multihit_capable)
+		# The Wolf's Feed: a kill heals it and gives most of the stamina back.
+		if effect == "feed" and not still_primary_target.call():
+			_actor_heal(PartyKitsScript.FEED_KILL_HEAL)
+			_actor_refund(PartyKitsScript.FEED_KILL_STAMINA)
+			hud.battle_log("%s feeds on the kill!" % _actor_label())
 		# Knife Throw only leaves you disarmed if it actually kills the target
 		# (2026-09-29 -- used to disarm unconditionally, every time).
 		if effect == "knife_throw" and not still_primary_target.call():
@@ -5539,6 +5691,9 @@ func _battle_perform_attack(action: Dictionary) -> void:
 					_hit(j, dmg_mult, effect, weapon, -1, multihit_capable)
 					break
 
+	# The hero can fall to a Guardian's bellow (or a Marksman's bomb): nothing more happens to a dead hero.
+	if _actor_is_ally() and player.health <= 0:
+		return
 	if effect == "self_heal":
 		var heal_amt := int(round(_actor_max_hp() * SELF_HEAL_PCT))
 		_actor_heal(heal_amt)
@@ -5555,6 +5710,21 @@ func _battle_perform_attack(action: Dictionary) -> void:
 	if timing_result == AttackTimingsScript.PERFECT:
 		_actor_gain_stamina(ATTACK_TIMING_PERFECT_STAMINA)
 
+	# Some actions leave a member's command open: a free action (Taunt, the Druid's movement spell,
+	# Drive-By), or -- for the Rogue -- the first attack of the turn, after which it can run.
+	if _actor_is_ally() and not battle_units.is_empty():
+		var unit = battle_actor
+		if action.get("keeps_turn", false):
+			battle_actor = {}
+			return
+		if unit.get("moves_after_attack", false) and not unit.get("attacked", false) and float(action.get("dmg_mult", 1.0)) > 0.0:
+			unit["attacked"] = true
+			battle_ally_moves_left = int(unit.move_range)
+			battle_actor = {}
+			hud.battle_log("%s strikes and can slip away -- it may move again." % unit.name)
+			return
+		if unit.get("bonus_attack", false) and action.get("is_regular_attack", false):
+			unit["bonus_attack"] = false
 	_actor_finish_action()
 
 # Spear's Target Practice: a straight coin-flip against the current target
@@ -5747,7 +5917,7 @@ func _resolve_bomb_arrow(center_tile: Vector2i) -> void:
 	enemy_targets.sort()
 	enemy_targets.reverse()
 	for idx in enemy_targets:
-		_apply_single_hit(idx, 1.0, "arrow_bomb", player.current_weapon, "You", Vector2i(-1, -1), ARROW_BOMB_FLAT_DMG)
+		_hit(idx, 1.0, "arrow_bomb", _actor_weapon(), ARROW_BOMB_FLAT_DMG)
 
 	for a in battle_allies:
 		if a.hp > 0 and _in_blast_radius(a.tile, center_tile, ARROW_BOMB_RADIUS):
@@ -5996,6 +6166,16 @@ func _advance_ally_queue() -> void:
 		var next = battle_ally_queue.pop_front()
 		if next.hp <= 0:
 			continue
+		# A summoned skeleton needs no orders: it walks at the nearest enemy and hits it.
+		if next.get("auto", false):
+			_auto_ally_act(next)
+			if battle_units.is_empty():
+				battle_commanding_ally = null
+				battle_ally_queue.clear()
+				_remove_fallen_allies()
+				_battle_victory()
+				return
+			continue
 		# A staggered ally (Devastating Slash...) loses its command.
 		if int(next.get("skip_turns", 0)) > 0:
 			next["skip_turns"] = int(next.skip_turns) - 1
@@ -6005,6 +6185,14 @@ func _advance_ally_queue() -> void:
 		battle_commanding_ally = next
 		battle_ally_moves_left = int(next.move_range)
 		next.defending = false
+		next["stalwart"] = false
+		next["taunting"] = false
+		next["sprint"] = false
+		next["attacked"] = false
+		next["bonus_attack"] = false
+		# The Rogue's Pickpocket buys it a tile on its next turn.
+		battle_ally_moves_left += int(next.get("bonus_move_next", 0))
+		next["bonus_move_next"] = 0
 		battle_ally_pending_action = {}
 		battle_ally_pick_candidates = []
 		battle_actor = {}
@@ -6027,10 +6215,10 @@ func _focus_battle_ally_menu() -> void:
 # plus its talismans) and HP from regeneration talismans (Moss Charm).
 func _ally_start_of_turn(u: Dictionary) -> void:
 	var mods: Dictionary = u.get("mods", {})
-	var stamina_gain: int = player.meta_stamina_regen_per_turn + int(mods.get("stamina_regen", 0.0))
+	var stamina_gain: int = player.meta_stamina_regen_per_turn + int(_unit_effect(u, "stamina_regen"))
 	if stamina_gain > 0 and int(u.get("max_stamina", 0)) > 0:
 		u["stamina"] = mini(int(u.max_stamina), int(u.stamina) + stamina_gain)
-	var hp_gain: int = int(mods.get("hp_regen_turn", 0.0)) + int(floor(float(u.max_hp) / 20.0) * float(mods.get("hp_regen_per_20_max_hp", 0.0)))
+	var hp_gain: int = int(_unit_effect(u, "hp_regen_turn")) + int(floor(float(u.max_hp) / 20.0) * _unit_effect(u, "hp_regen_per_20_max_hp"))
 	if hp_gain > 0 and u.hp < u.max_hp:
 		u.hp = mini(int(u.max_hp), int(u.hp) + hp_gain)
 	# The weapon it dropped (Wrist Strike, Knife Throw...) is reclaimed by walking onto it.
@@ -6083,7 +6271,10 @@ func _on_battle_ally_action(action: String) -> void:
 		"guard":
 			u.defending = true
 			# Bracing steadies you: stamina back, or mana for a caster (mirrors the hero's Defend).
-			if int(u.get("max_mana", 0)) > 0:
+			# An HP-caster's mana is its HP: 15 mana is 3 HP.
+			if bool(u.get("hp_as_mana", false)):
+				u.hp = mini(int(u.max_hp), int(u.hp) + int(ceil(float(ALLY_GUARD_MANA) / float(MANA_PER_HP))))
+			elif int(u.get("max_mana", 0)) > 0:
 				u.mana = mini(int(u.max_mana), int(u.mana) + ALLY_GUARD_MANA)
 			elif int(u.get("max_stamina", 0)) > 0:
 				u.stamina = mini(int(u.max_stamina), int(u.stamina) + STAMINA_REGEN_ON_DEFEND)
@@ -6120,15 +6311,68 @@ func _ally_specials(u: Dictionary) -> Array:
 			"description": "Let it fly at your selected target -- it can be anyone on the field.",
 		}]
 	var out: Array = []
+	# The kind's own specials first (Rallying Cry, Curse of Rot...), then the weapon's three.
+	for kit in PartyKitsScript.specials_for(str(u.get("kind", ""))):
+		out.append(_kit_special_for(u, kit))
 	for special in u.get("weapon", {}).get("specials", []):
 		out.append(special)
 	return out
+
+# A kit special as this unit would use it right now: its talismans' / favour's cost changes (the
+# Knight's greatsword discount) applied, and the two costs that depend on the moment worked out --
+# Revival Blessing takes every HP but one; Summon the Dead costs 5 HP a skeleton, one per enemy
+# slain in the last battle. Marked "kit" so being disarmed does not lock it.
+func _kit_special_for(u: Dictionary, kit: Dictionary) -> Dictionary:
+	var s: Dictionary = kit.duplicate(true)
+	s["kit"] = true
+	var mods: Dictionary = u.get("mods", {})
+	var cost: int = int(s.get("stamina_cost", 0))
+	if s.get("cost_all", false):
+		# Every HP but one, in mana-worth; at 1 HP the cost cannot be paid at all.
+		cost = maxi(1, int(u.hp) - 1) * MANA_PER_HP
+	elif s.has("hp_cost_flat"):
+		# A flat HP cost plus a share of max HP (Curse of Rot: 10 HP + 15% of max HP).
+		cost = (int(s.hp_cost_flat) + int(round(float(u.max_hp) * float(s.get("hp_cost_pct", 0.0))))) * MANA_PER_HP
+	elif s.get("per_skeleton", false):
+		var member = u.get("member", null)
+		var kills: int = int(member.kills_last_battle) if member != null else 0
+		var count: int = mini(kills, maxi(0, (int(u.hp) - 1) / PartyKitsScript.SKELETON_HP_COST))
+		# It can only be cast with enough HP in hand (5 HP + 40% of max HP), on top of paying per skeleton.
+		var needed: int = int(s.get("require_hp_flat", 0)) + int(round(float(u.max_hp) * float(s.get("require_hp_pct", 0.0))))
+		s["summon_count"] = count
+		cost = maxi(1, count) * PartyKitsScript.SKELETON_HP_COST * MANA_PER_HP
+		if kills <= 0:
+			s["disabled_reason"] = "no enemy was slain in the last battle"
+		elif int(u.hp) < needed:
+			s["disabled_reason"] = "needs %d HP to cast" % needed
+		elif count <= 0:
+			s["disabled_reason"] = "not enough HP to raise even one"
+	elif cost > 0:
+		var discount: float = float(mods.get("special_stamina_discount", 0.0))
+		var flat_cut: int = int(mods.get("special_stamina_flat_reduction", 0.0))
+		var markup: float = float(mods.get("special_stamina_pct_increase", 0.0))
+		if discount > 0.0:
+			cost = int(round(cost * (1.0 - discount)))
+		cost -= flat_cut
+		if markup > 0.0:
+			cost = int(round(cost * (1.0 + markup)))
+		cost = maxi(1, cost)
+	# The Marksman's arrow specials draw on the shared quiver.
+	if str(s.get("effect", "")).begins_with("ally_arrow_"):
+		var arrow_kind: String = str(s.effect).substr(11)
+		if int(player.owned_arrows.get(arrow_kind, 0)) <= 0:
+			s["disabled_reason"] = "out of %s arrows" % arrow_kind
+	s["stamina_cost"] = cost
+	return s
 
 # Which side an effect needs the player to pick from before it resolves ("" = no pick needed).
 func _special_target_kind(effect: String) -> String:
 	match effect:
 		"channel": return "ally"
 		"revive": return "downed"
+		"charge", "dodge_and_weave": return "direction"
+		"cleansing_chant": return "chant"
+		"druid_heal", "druid_buff": return "ally_self"
 	return ""
 
 func _ally_cost_text(u: Dictionary, cost: int) -> String:
@@ -6149,14 +6393,17 @@ func _ally_choose_special(i: int) -> void:
 	if not _unit_can_pay(u, cost):
 		hud.battle_log("Not enough %s for %s!" % [_unit_pool_name(u), action.name])
 		return
-	if u.get("disarmed_tile", Vector2i(-1, -1)) != Vector2i(-1, -1):
+	if str(action.get("disabled_reason", "")) != "":
+		hud.battle_log("%s can't be used: %s." % [action.name, action.disabled_reason])
+		return
+	if u.get("disarmed_tile", Vector2i(-1, -1)) != Vector2i(-1, -1) and not action.get("kit", false):
 		hud.battle_log("Your %s has lost its weapon!" % u.name)
 		return
 	var kind: String = _special_target_kind(str(action.get("effect", "")))
 	if kind == "":
 		_ally_perform(action)
 		return
-	var picks: Array = _ally_pick_candidates(u, kind)
+	var picks: Array = _ally_pick_candidates(u, kind, action)
 	if picks.is_empty():
 		hud.battle_log("There is no one to use %s on." % action.name)
 		return
@@ -6168,12 +6415,35 @@ func _ally_choose_special(i: int) -> void:
 
 # Who a friendly special can be aimed at: "ally" = the hero and every other living ally,
 # "downed" = every downed ally. Each entry {"label", "target"} (target "hero" or a unit dict).
-func _ally_pick_candidates(u: Dictionary, kind: String) -> Array:
+func _ally_pick_candidates(u: Dictionary, kind: String, action: Dictionary = {}) -> Array:
 	var out: Array = []
-	if kind == "ally":
+	if kind == "chant":
+		# Cleansing Chant: the whole circle at once (one status each), or one ally freed of everything.
+		out.append({"label": "Everyone within %d tiles (one each)" % PartyKitsScript.AURA_RADIUS, "target": "area"})
+		var hero_found: Array = _hero_afflictions()
+		out.append({"label": "You: purge all (%s)" % (", ".join(hero_found) if not hero_found.is_empty() else "clean"), "target": "hero"})
+		for a in battle_allies:
+			if int(a.hp) > 0:
+				var found: Array = _ally_afflictions(a)
+				out.append({"label": "%s: purge all (%s)" % [a.name, ", ".join(found) if not found.is_empty() else "clean"], "target": a})
+		return out
+	if kind == "direction":
+		# CHARGE!! runs any way it can; Dodge and Weave rolls only where there is room (or stays put).
+		var weave: bool = str(action.get("effect", "")) == "dodge_and_weave"
+		for entry in [["up", Vector2i(0, -1)], ["down", Vector2i(0, 1)], ["left", Vector2i(-1, 0)], ["right", Vector2i(1, 0)]]:
+			var step: Vector2i = u.tile + entry[1]
+			if not _in_battle_bounds(step):
+				continue
+			if weave and not _tile_open_for_roll(step):
+				continue
+			out.append({"label": ("Roll " if weave else "Charge ") + str(entry[0]), "target": entry[1]})
+		if weave:
+			out.append({"label": "Stay put", "target": Vector2i.ZERO})
+		return out
+	if kind == "ally" or kind == "ally_self":
 		out.append({"label": "You  (%d/%d HP, %d/%d STA)" % [player.health, player.max_health, player.stamina, player.max_stamina], "target": "hero"})
 		for a in battle_allies:
-			if a != u and a.hp > 0:
+			if (a != u or kind == "ally_self") and a.hp > 0:
 				var pool: String = "%d/%d MP" % [int(a.get("mana", 0)), int(a.get("max_mana", 0))] if int(a.get("max_mana", 0)) > 0 else "%d/%d STA" % [int(a.get("stamina", 0)), int(a.get("max_stamina", 0))]
 				out.append({"label": "%s  (%d/%d HP, %s)" % [a.name, a.hp, a.max_hp, pool], "target": a})
 	elif kind == "downed":
@@ -6218,16 +6488,18 @@ func _ally_menu_info() -> Dictionary:
 	var disarmed: bool = u.get("disarmed_tile", Vector2i(-1, -1)) != Vector2i(-1, -1)
 	var regular: Dictionary = _ally_regular_action(u)
 	info.attack_label = "Attack" + _ally_cost_text(u, int(regular.stamina_cost))
-	info.attack_disabled = charging or disarmed or not _unit_can_pay(u, int(regular.stamina_cost))
+	info.attack_disabled = charging or disarmed or bool(u.get("attacked", false)) or not _unit_can_pay(u, int(regular.stamina_cost))
 	info.move_disabled = battle_ally_moves_left <= 0 or charging
 	var specials: Array = _ally_specials(u)
-	info.has_specials = not specials.is_empty()
+	# After Drive-By only a plain attack is left; after the Rogue's strike only moving is.
+	info.has_specials = not specials.is_empty() and not bool(u.get("attacked", false)) and not bool(u.get("bonus_attack", false))
 	for special in specials:
 		var cost: int = int(special.get("stamina_cost", 0))
+		var reason: String = str(special.get("disabled_reason", ""))
 		info.specials.append({
 			"label": str(special.name) + _ally_cost_text(u, cost),
-			"disabled": disarmed or not _unit_can_pay(u, cost),
-			"tip": str(special.get("description", "")),
+			"disabled": (disarmed and not special.get("kit", false)) or reason != "" or not _unit_can_pay(u, cost),
+			"tip": str(special.get("description", "")) + ((" (" + reason + ")") if reason != "" else ""),
 		})
 	for c in battle_ally_pick_candidates:
 		info.picks.append({"label": str(c.label)})
@@ -6326,6 +6598,436 @@ func _revive_downed(unit: Dictionary, hp_frac: float) -> void:
 		battle_fainted_members.erase(unit.member)
 	hud.battle_log("%s is back on their feet!" % unit.name)
 
+# --- The party kits: Knight, Brawler, Necromancer, Shaman (numbers in PartyKits.gd) -------------
+
+# A tile a roll, a charge or a summoned skeleton can end on: on the grid, empty, and not solid rock.
+func _tile_open_for_roll(t: Vector2i) -> bool:
+	if not _in_battle_bounds(t) or _battle_tile_occupied(t):
+		return false
+	return not (battle_terrain.get(t, {}).get("type", "") in ["rock", "rubble"])
+
+# The nearest open tile to `origin`, searched outward ring by ring ((-1, -1) if there is none).
+func _open_tile_near(origin: Vector2i) -> Vector2i:
+	for radius in range(1, BATTLE_GRID_W + BATTLE_GRID_H):
+		var ring: Array = []
+		for dx in range(-radius, radius + 1):
+			var dy: int = radius - abs(dx)
+			ring.append(origin + Vector2i(dx, dy))
+			if dy != 0:
+				ring.append(origin + Vector2i(dx, -dy))
+		ring.shuffle()
+		for t in ring:
+			if _tile_open_for_roll(t):
+				return t
+	return Vector2i(-1, -1)
+
+# Rallying Cry: every enemy takes extra damage from every source for a few rounds (the bonus is
+# applied in _apply_single_hit; the countdown ticks with the other turn counters).
+func _resolve_rallying_cry() -> void:
+	battle_rally_turns = PartyKitsScript.RALLY_TURNS
+	hud.battle_log("%s lets out a rallying cry -- every enemy takes +%d%% damage for %d turns!" % [_actor_label(), int(round(PartyKitsScript.RALLY_DAMAGE_BONUS * 100.0)), PartyKitsScript.RALLY_TURNS])
+
+# CHARGE!!: runs up to 3 tiles in the chosen direction over any terrain, hitting every enemy in the
+# way for 2 x defense + 2/3 x attack, and ends on the farthest free tile of the run.
+func _resolve_charge(weapon: Dictionary) -> void:
+	var u = battle_actor
+	var dir: Vector2i = battle_ally_target if typeof(battle_ally_target) == TYPE_VECTOR2I else Vector2i.ZERO
+	if dir == Vector2i.ZERO:
+		return
+	var path: Array = []
+	var cursor: Vector2i = u.tile
+	for step in PartyKitsScript.CHARGE_TILES:
+		cursor += dir
+		if not _in_battle_bounds(cursor):
+			break
+		path.append(cursor)
+	var flat: int = maxi(1, int(round((float(u.defense_pct) * PartyKitsScript.CHARGE_DEFENSE_MULT + float(u.attack) * PartyKitsScript.CHARGE_ATTACK_MULT) * float(u.get("dmg_mult", 1.0)))))
+	hud.battle_log("%s CHARGES!" % _actor_label())
+	if not path.is_empty():
+		_spawn_battle_attack_lunge(u.tile, path[path.size() - 1], ATTACK_LUNGE_ALLY_COLOR, true)
+	var victims: Array = []
+	for e in battle_units:
+		for cell in _footprint(e.tile, e.get("size", 1)):
+			if path.has(cell):
+				victims.append(e)
+				break
+	for e in victims:
+		var idx: int = battle_units.find(e)
+		if idx >= 0:
+			_hit(idx, 1.0, "charge", weapon, flat, true)
+	for i in range(path.size() - 1, -1, -1):
+		if _tile_open_for_roll(path[i]):
+			_actor_set_tile(path[i])
+			break
+
+# Stalwart: half damage until its next turn (see _enemy_apply_damage), stamina from every hit taken.
+func _resolve_stalwart() -> void:
+	battle_actor["stalwart"] = true
+	hud.battle_log("%s plants its feet -- half damage until its next turn, and nothing will move it." % _actor_label())
+
+# Dodge and Weave: two strikes at 80%, then a roll of up to 2 tiles in the chosen direction.
+func _resolve_dodge_and_weave(dmg_mult: float, weapon: Dictionary) -> void:
+	var idx: int = _actor_effective_target()
+	var target_ref = battle_units[idx].ref if idx >= 0 and idx < battle_units.size() else null
+	for strike in 2:
+		var j := -1
+		for k in battle_units.size():
+			if battle_units[k].ref == target_ref:
+				j = k
+				break
+		if j < 0:
+			break
+		_hit(j, dmg_mult, "dodge_and_weave", weapon, -1, true)
+	var dir: Vector2i = battle_ally_target if typeof(battle_ally_target) == TYPE_VECTOR2I else Vector2i.ZERO
+	if dir == Vector2i.ZERO:
+		return
+	var tile: Vector2i = _actor_tile()
+	for step in PartyKitsScript.WEAVE_ROLL_TILES:
+		if not _tile_open_for_roll(tile + dir):
+			break
+		tile += dir
+	if tile != _actor_tile():
+		_actor_set_tile(tile)
+		hud.battle_log("%s rolls clear!" % _actor_label())
+
+# Curse of Rot: the selected enemy rots for 10% of its max HP a turn (ticked in _process_enemy_turn),
+# and its death is the Necromancer's whoever lands it (see _note_enemy_death).
+func _resolve_curse_of_rot() -> void:
+	var idx: int = _actor_effective_target()
+	if idx < 0 or idx >= battle_units.size():
+		return
+	var e: Dictionary = battle_units[idx]
+	e["rot_turns"] = PartyKitsScript.ROT_TURNS
+	e["rot_by"] = battle_actor
+	hud.battle_log("%s curses the %s -- it begins to rot!" % [_actor_label(), e.name])
+
+# Every enemy death passes through here. A cursed enemy's kill is its Necromancer's whoever dealt
+# the blow, and a Necromancer's own kill counts too. Each kill is +1 max HP kept for good, and a
+# heal on top when it carries a staff (the "kill_heal" favour).
+func _note_enemy_death(enemy: Dictionary, killer) -> void:
+	var credited = enemy.get("rot_by", null)
+	if (credited == null or typeof(credited) != TYPE_DICTIONARY) and typeof(killer) == TYPE_DICTIONARY:
+		credited = killer
+	if credited == null or typeof(credited) != TYPE_DICTIONARY or str(credited.get("kind", "")) != "necromancer":
+		return
+	var gain: int = int(credited.get("kill_max_hp", 0.0))
+	var member = credited.get("member", null)
+	if member != null:
+		member.kills_this_battle += 1
+		member.bonus["hp"] = float(member.bonus.get("hp", 0.0)) + gain
+	credited["max_hp"] = int(credited.max_hp) + gain
+	if int(credited.hp) > 0:
+		var heal: int = gain + int(credited.get("mods", {}).get("kill_heal", 0.0))
+		credited["hp"] = mini(int(credited.max_hp), int(credited.hp) + heal)
+		hud.battle_log("%s feeds on the kill (+%d max HP%s)." % [credited.name, gain, (", +%d HP" % int(credited.get("mods", {}).get("kill_heal", 0.0))) if int(credited.get("mods", {}).get("kill_heal", 0.0)) > 0 else ""])
+
+# Summon the Dead: raises the skeletons the menu worked out (one per enemy slain last battle, 5 HP
+# each, already paid) on the open tiles nearest the Necromancer.
+func _resolve_summon_dead(action: Dictionary) -> void:
+	var u = battle_actor
+	var raised := 0
+	for i in int(action.get("summon_count", 0)):
+		var tile: Vector2i = _open_tile_near(u.tile)
+		if tile == Vector2i(-1, -1):
+			break
+		battle_allies.append(_make_skeleton(tile))
+		raised += 1
+	hud.battle_log("%s raises %d skeleton%s from the dead!" % [_actor_label(), raised, "" if raised == 1 else "s"])
+
+func _make_skeleton(tile: Vector2i) -> Dictionary:
+	return {
+		"tile": tile, "hp": PartyKitsScript.SKELETON_HP, "max_hp": PartyKitsScript.SKELETON_HP,
+		"name": "Skeleton", "kind": "skeleton", "attack": PartyKitsScript.SKELETON_DAMAGE, "magic": 0.0,
+		"dmg_mult": 1.0, "defense_pct": 0.0, "move_range": PartyKitsScript.SKELETON_MOVE, "attack_range": 1,
+		"stamina": 0, "max_stamina": 0, "mana": 0, "max_mana": 0, "hp_as_mana": false,
+		"weapon": {"damage_mult": 1.0}, "mods": {}, "fainted": false, "skip_turns": 0, "charging": {},
+		"disarmed_tile": Vector2i(-1, -1), "pichaku_active": false, "survive_used": false,
+		"summoned": true, "auto": true,
+	}
+
+# A summoned unit's own turn: close on the nearest enemy, then hit it if it can reach.
+func _auto_ally_act(a: Dictionary) -> void:
+	if battle_units.is_empty() or int(a.hp) <= 0:
+		return
+	battle_actor = a
+	var nearest := -1
+	var nearest_dist := 9999
+	for i in battle_units.size():
+		var e: Dictionary = battle_units[i]
+		var d: int = _footprint_dist(_footprint(e.tile, e.get("size", 1)), a.tile)
+		if d < nearest_dist:
+			nearest_dist = d
+			nearest = i
+	var steps: int = int(a.move_range)
+	while steps > 0 and nearest >= 0 and not (nearest in _ally_targetable_indices(a)):
+		var prey: Dictionary = battle_units[nearest]
+		var here: int = _footprint_dist(_footprint(prey.tile, prey.get("size", 1)), a.tile)
+		var step_dir := Vector2i.ZERO
+		var step_dist: int = here
+		for dir in CARDINAL_DIRS:
+			var nxt: Vector2i = a.tile + dir
+			if not _in_battle_bounds(nxt):
+				continue
+			var d2: int = _footprint_dist(_footprint(prey.tile, prey.get("size", 1)), nxt)
+			if d2 < step_dist:
+				step_dist = d2
+				step_dir = dir
+		if step_dir == Vector2i.ZERO:
+			break
+		var result := _resolve_battle_step(a.tile, step_dir, a.tile)
+		if not result.moved:
+			break
+		a.tile = result.tile
+		steps -= 2 if result.get("extra_cost", false) else 1
+	var reachable: Array = _ally_targetable_indices(a)
+	if not reachable.is_empty():
+		_hit(nearest if nearest in reachable else reachable[0], 1.0, "", a.weapon)
+	battle_actor = {}
+	a.tile = _apply_water_push(a.tile, a)
+	_apply_terrain_tick(a.tile, a)
+
+# How Charming: the Shaman's talisman sharing reaches 4 tiles for 2 turns.
+func _resolve_how_charming() -> void:
+	battle_actor["charm_turns"] = PartyKitsScript.CHARM_TURNS
+	hud.battle_log("%s's charms glow -- her talismans now reach allies up to %d tiles away for %d turns!" % [_actor_label(), PartyKitsScript.CHARM_RADIUS, PartyKitsScript.CHARM_TURNS])
+
+# The hero ("hero") and every living ally unit within `radius` tiles of `center`.
+func _friends_within(center: Vector2i, radius: int) -> Array:
+	var out: Array = []
+	if abs(battle_player_tile.x - center.x) + abs(battle_player_tile.y - center.y) <= radius:
+		out.append("hero")
+	for a in battle_allies:
+		if int(a.hp) > 0 and abs(a.tile.x - center.x) + abs(a.tile.y - center.y) <= radius:
+			out.append(a)
+	return out
+
+# Soothing Rain: heals everyone within 2 tiles (the Shaman too) for 20% of their max HP.
+func _resolve_soothing_rain() -> void:
+	hud.battle_log("%s calls down a soothing rain." % _actor_label())
+	for f in _friends_within(_actor_tile(), PartyKitsScript.AURA_RADIUS):
+		if typeof(f) == TYPE_STRING:
+			var healed: int = int(round(player.max_health * PartyKitsScript.SOOTHING_RAIN_PCT))
+			player.heal(healed)
+			hud.battle_log("The rain heals you for %d." % healed)
+		else:
+			var amount: int = int(round(int(f.max_hp) * PartyKitsScript.SOOTHING_RAIN_PCT))
+			f["hp"] = mini(int(f.max_hp), int(f.hp) + amount)
+			hud.battle_log("The rain heals %s for %d." % [f.name, amount])
+
+# Cleansing Chant: either one negative status off everyone within 2 tiles ("area"), or every
+# affliction off a single ally you choose.
+func _resolve_cleansing_chant() -> void:
+	var target = battle_ally_target
+	hud.battle_log("%s sings a cleansing chant." % _actor_label())
+	if target == null or (typeof(target) == TYPE_STRING and target == "area"):
+		for f in _friends_within(_actor_tile(), PartyKitsScript.AURA_RADIUS):
+			var cleared: String = _cleanse_one_hero_status() if typeof(f) == TYPE_STRING else _cleanse_one_ally_status(f)
+			if cleared != "":
+				hud.battle_log("%s is cleansed of %s." % ["You are" if typeof(f) == TYPE_STRING else str(f.name), cleared])
+		return
+	var removed: Array = _cleanse_all_hero_statuses() if typeof(target) == TYPE_STRING else _cleanse_all_ally_statuses(target)
+	var who: String = "You are" if typeof(target) == TYPE_STRING else str(target.name) + " is"
+	if removed.is_empty():
+		hud.battle_log("%s already free of afflictions." % who)
+	else:
+		hud.battle_log("%s purged of %s." % [who, ", ".join(removed)])
+
+# What the hero is suffering from, worst first.
+func _hero_afflictions() -> Array:
+	var out: Array = []
+	if player_burning:
+		out.append("burning")
+	if player_poison_turns > 0:
+		out.append("poison")
+	if player_bleed_turns > 0:
+		out.append("bleeding")
+	if player_concussed_turns > 0:
+		out.append("concussion")
+	if player_blind_turns > 0:
+		out.append("blindness")
+	if player.disarmed_tile != Vector2i(-1, -1):
+		out.append("disarmament")
+	return out
+
+func _clear_hero_affliction(affliction: String) -> void:
+	match affliction:
+		"burning": player_burning = false
+		"poison": player_poison_turns = 0
+		"bleeding": player_bleed_turns = 0
+		"concussion": player_concussed_turns = 0
+		"blindness": player_blind_turns = 0
+		"disarmament": player.disarmed_tile = Vector2i(-1, -1)
+
+# Clears the worst affliction the hero has and names it ("" if clean).
+func _cleanse_one_hero_status() -> String:
+	var found: Array = _hero_afflictions()
+	if found.is_empty():
+		return ""
+	_clear_hero_affliction(found[0])
+	return found[0]
+
+func _cleanse_all_hero_statuses() -> Array:
+	var found: Array = _hero_afflictions()
+	for affliction in found:
+		_clear_hero_affliction(affliction)
+	return found
+
+# Members carry no statuses from enemies yet; what they can have is a dropped weapon or a stagger.
+func _ally_afflictions(a: Dictionary) -> Array:
+	var out: Array = []
+	if a.get("disarmed_tile", Vector2i(-1, -1)) != Vector2i(-1, -1):
+		out.append("disarmament")
+	if int(a.get("skip_turns", 0)) > 0:
+		out.append("a stagger")
+	return out
+
+func _clear_ally_affliction(a: Dictionary, affliction: String) -> void:
+	match affliction:
+		"disarmament": a["disarmed_tile"] = Vector2i(-1, -1)
+		"a stagger": a["skip_turns"] = 0
+
+func _cleanse_one_ally_status(a: Dictionary) -> String:
+	var found: Array = _ally_afflictions(a)
+	if found.is_empty():
+		return ""
+	_clear_ally_affliction(a, found[0])
+	return found[0]
+
+func _cleanse_all_ally_statuses(a: Dictionary) -> Array:
+	var found: Array = _ally_afflictions(a)
+	for affliction in found:
+		_clear_ally_affliction(a, affliction)
+	return found
+
+# --- The older kits: Wolf, Druid, Guardian, Marksman, Rogue (numbers in PartyKits.gd) -------------
+
+# Drive-By: hit the target, dash to the tile just past it, and keep the command open for ONE more
+# regular attack. (No knockback, or the target would be shoved into the very tile it dashes to.)
+func _resolve_drive_by(dmg_mult: float, weapon: Dictionary) -> void:
+	var u = battle_actor
+	var idx: int = _actor_effective_target()
+	if idx < 0 or idx >= battle_units.size():
+		return
+	var prey: Dictionary = battle_units[idx]
+	var dir: Vector2i = _knockback_dir(u.tile, prey.tile)
+	var prey_cells: Array = _footprint(prey.tile, prey.get("size", 1))
+	var beyond: Vector2i = prey.tile + dir
+	while prey_cells.has(beyond):
+		beyond += dir
+	_hit(idx, dmg_mult, "drive_by", weapon, -1, false)
+	if _tile_open_for_roll(beyond):
+		_actor_set_tile(beyond)
+		hud.battle_log("%s darts past!" % _actor_label())
+	u["bonus_attack"] = true
+
+# Taunt (the Guardian): half damage like Guard, every enemy comes for it -- and the turn goes on.
+func _resolve_ally_taunt() -> void:
+	var u = battle_actor
+	u["defending"] = true
+	u["taunting"] = true
+	if int(u.get("max_stamina", 0)) > 0:
+		u["stamina"] = mini(int(u.max_stamina), int(u.get("stamina", 0)) + STAMINA_REGEN_ON_DEFEND)
+	hud.battle_log("%s taunts the enemy, daring them to attack!" % _actor_label())
+
+func _taunting_ally():
+	for a in battle_allies:
+		if int(a.hp) > 0 and a.get("taunting", false):
+			return a
+	return null
+
+# Earbursting Bellow: 20 + 0.67 x the Guardian's max HP to every enemy -- and the hero has to avoid
+# the same blow (the dodge / block popup when those are on, the usual defences otherwise).
+func _resolve_bellow(weapon: Dictionary) -> void:
+	var u = battle_actor
+	var flat: int = maxi(1, int(round((PartyKitsScript.BELLOW_FLAT + PartyKitsScript.BELLOW_HP_MULT * float(u.max_hp)) * float(u.get("dmg_mult", 1.0)))))
+	hud.battle_log("%s lets out an EARBURSTING BELLOW!" % _actor_label())
+	for i in range(battle_units.size() - 1, -1, -1):
+		if i < battle_units.size():
+			_hit(i, 1.0, "bellow", weapon, flat, true)
+	if player.health > 0 and in_battle:
+		var source := {"name": "Guardian", "tile": u.tile, "burning": false, "hp": u.hp, "max_hp": u.max_hp}
+		hud.battle_log("The roar rattles you too -- avoid the same %d damage!" % flat)
+		await _enemy_apply_damage(source, battle_player_tile, flat, {}, "bellow")
+
+# The Druid's movement spell: her allowance doubles for the turn, but her attacks become flat
+# (attack / 2) + 5. Free -- the turn goes on.
+func _resolve_sprint() -> void:
+	var u = battle_actor
+	u["sprint"] = true
+	battle_ally_moves_left += int(u.move_range)
+	hud.battle_log("%s's feet barely touch the ground -- double the movement this turn." % _actor_label())
+
+# The Druid's heal: 25% of the target's max HP plus a third of her magic (a half once upgraded).
+func _resolve_druid_heal() -> void:
+	var u = battle_actor
+	var target = battle_ally_target
+	if target == null:
+		return
+	var upgraded: bool = u.has("member") and bool(u.member.upgraded_spells.get("druid_heal", false))
+	var magic_part: float = float(u.get("magic", 0.0)) / (PartyKitsScript.DRUID_HEAL_MAGIC_DIV_UPGRADED if upgraded else PartyKitsScript.DRUID_HEAL_MAGIC_DIV)
+	if typeof(target) == TYPE_STRING:
+		var healed: int = int(round(player.max_health * PartyKitsScript.DRUID_HEAL_PCT + magic_part))
+		player.heal(healed)
+		hud.battle_log("%s heals you for %d." % [_actor_label(), healed])
+	else:
+		var amount: int = int(round(int(target.max_hp) * PartyKitsScript.DRUID_HEAL_PCT + magic_part))
+		target["hp"] = mini(int(target.max_hp), int(target.hp) + amount)
+		hud.battle_log("%s heals %s for %d." % [_actor_label(), target.name, amount])
+
+# The Druid's buff: the target deals 1.5x damage for 3 rounds.
+func _resolve_druid_buff() -> void:
+	var target = battle_actor if battle_ally_target == null else battle_ally_target
+	if typeof(target) == TYPE_STRING:
+		battle_hero_buff_turns = PartyKitsScript.DRUID_BUFF_TURNS
+		hud.battle_log("%s empowers you -- x1.5 damage for %d turns!" % [_actor_label(), PartyKitsScript.DRUID_BUFF_TURNS])
+	else:
+		target["buff_turns"] = PartyKitsScript.DRUID_BUFF_TURNS
+		hud.battle_log("%s empowers %s -- x1.5 damage for %d turns!" % [_actor_label(), target.name, PartyKitsScript.DRUID_BUFF_TURNS])
+
+# Pickpocket: no damage, 3 coins, and a tile of extra movement next turn.
+func _resolve_pickpocket() -> void:
+	player.add_coins(PartyKitsScript.PICKPOCKET_COINS)
+	battle_actor["bonus_move_next"] = 1
+	hud.battle_log("%s picks the enemy's pocket: +%d coins." % [_actor_label(), PartyKitsScript.PICKPOCKET_COINS])
+
+# London's Welcome: 3-7 slashes at 60% -- one roll decides whether the whole flurry lands or misses.
+func _resolve_londons_welcome(dmg_mult: float, weapon: Dictionary) -> void:
+	var idx: int = _actor_effective_target()
+	if idx < 0 or idx >= battle_units.size():
+		return
+	var target_ref = battle_units[idx].ref
+	var slashes: int = randi_range(PartyKitsScript.LONDON_SLASHES_MIN, PartyKitsScript.LONDON_SLASHES_MAX)
+	if randf() < player.ally_miss_chance():
+		hud.battle_log("%s's whole flurry misses!" % _actor_label())
+		return
+	for i in slashes:
+		var j := -1
+		for k in battle_units.size():
+			if battle_units[k].ref == target_ref:
+				j = k
+				break
+		if j < 0:
+			break
+		_hit(j, dmg_mult, "londons_welcome", weapon, -1, true)
+
+# The Marksman's special arrows, drawn from the quiver you share with it.
+func _resolve_ally_arrow(kind: String, weapon: Dictionary) -> void:
+	var u = battle_actor
+	if int(player.owned_arrows.get(kind, 0)) <= 0:
+		hud.battle_log("Out of %s arrows!" % kind)
+		return
+	var idx: int = _actor_effective_target()
+	if idx < 0 or idx >= battle_units.size():
+		return
+	match kind:
+		"bomb":
+			_resolve_bomb_arrow(battle_units[idx].tile)
+		"flame":
+			_hit(idx, 1.0, "arrow_flame", weapon, ARROW_FLAME_FLAT_DMG + int(round(float(u.get("attack", 0.0)) * ARROW_FLAME_DMG_STAT_PCT)), false)
+		"freeze":
+			_hit(idx, 1.0, "arrow_freeze", weapon, ARROW_FREEZE_FLAT_DMG, false)
+	player.owned_arrows[kind] = int(player.owned_arrows[kind]) - 1
+
 func _end_ally_command() -> void:
 	# Same end-of-turn terrain handling _end_player_turn gives the hero (water
 	# current, embers/spring/etc.) -- no Turtle Shell prompt, that's the
@@ -6343,8 +7045,8 @@ func _end_ally_command() -> void:
 func _ally_targetable_indices(u: Dictionary) -> Array:
 	var weapon: Dictionary = u.get("weapon", {})
 	var result := []
-	# Aimbot: every enemy on the field is in reach.
-	if weapon.get("passive_unlimited_range", false):
+	# Aimbot (and the Marksman, who hits regardless of range): every enemy on the field is in reach.
+	if weapon.get("passive_unlimited_range", false) or u.get("unlimited_range", false):
 		for i in battle_units.size():
 			result.append(i)
 		return result
@@ -6405,7 +7107,12 @@ func _remove_fallen_allies() -> void:
 	var ally_i := battle_allies.size() - 1
 	while ally_i >= 0:
 		var fallen: Dictionary = battle_allies[ally_i]
-		if fallen.hp <= 0:
+		if fallen.hp <= 0 and fallen.get("summoned", false):
+			# A skeleton just crumbles: no body to revive, nothing to count.
+			hud.battle_log("Your %s crumbles to dust." % fallen.name)
+			_spawn_battle_death_burst(fallen.tile)
+			battle_allies.remove_at(ally_i)
+		elif fallen.hp <= 0:
 			hud.battle_log("Your %s is knocked out!" % fallen.name)
 			_spawn_battle_death_burst(fallen.tile)
 			if fallen.has("member") and not battle_fainted_members.has(fallen.member):
@@ -6439,6 +7146,10 @@ func _settle_party_after_battle() -> void:
 		if member.record_faint():
 			_wolf_dies(member)
 	battle_fainted_members.clear()
+	# This battle's kills become "the last battle" (the Necromancer's skeleton count).
+	for member in player.party:
+		member.kills_last_battle = member.kills_this_battle
+		member.kills_this_battle = 0
 	for member in player.party.duplicate():
 		if member.is_wolf() and member.spend_loyalty_battle():
 			player.dismiss_party_member(member.id)
@@ -6793,6 +7504,13 @@ func _enemy_apply_damage(u: Dictionary, target_tile: Vector2i, raw_dmg: int, tra
 				dmg = 0
 			else:
 				dmg = maxi(1, int(round(dmg * (1.0 - DEFEND_DAMAGE_REDUCTION))))
+		# Stalwart (the Knight): half damage until its next turn, and every hit it takes feeds its
+		# stamina. (It also cannot be knocked back -- nothing knocks an ally back today.)
+		if target_ally.get("stalwart", false):
+			dmg = maxi(1, int(round(dmg * (1.0 - PartyKitsScript.STALWART_DAMAGE_CUT))))
+			if int(target_ally.get("max_stamina", 0)) > 0:
+				var regained: int = int(round(int(target_ally.max_stamina) * PartyKitsScript.STALWART_STAMINA_PCT))
+				target_ally["stamina"] = mini(int(target_ally.max_stamina), int(target_ally.get("stamina", 0)) + regained)
 		# Last Stand (Astral): the more of its HP an ally has lost, the less damage it takes.
 		if player.meta_last_stand_pct_per_10 > 0.0 and dmg > 0:
 			var ally_missing: float = 1.0 - float(target_ally.hp) / float(maxi(1, int(target_ally.max_hp)))
@@ -7046,6 +7764,16 @@ func _process_enemy_turn() -> void:
 			if u.hp <= 0:
 				continue
 
+		# Curse of Rot (the Necromancer): a share of max HP every turn while it lasts.
+		if u.get("rot_turns", 0) > 0:
+			u.rot_turns -= 1
+			var rot_dmg: int = max(1, int(round(float(u.max_hp) * PartyKitsScript.ROT_DAMAGE_PCT)))
+			u.hp -= rot_dmg
+			_spawn_battle_damage_number(u.tile, rot_dmg, u.get("size", 1))
+			hud.battle_log("The %s rots for %d damage!" % [u.name, rot_dmg])
+			if u.hp <= 0:
+				continue
+
 		# Bleeding: ticks the same way Poison does -- own counter, decremented
 		# here, every tile this unit actually moves (below) lengthens it by a
 		# turn instead of dealing damage on the spot.
@@ -7159,6 +7887,9 @@ func _process_enemy_turn() -> void:
 				target_tile = _pick_confused_target_tile(u)
 			else:
 				target_tile = battle_player_tile
+		elif _taunting_ally() != null:
+			# A taunting Guardian draws every enemy onto itself.
+			target_tile = _taunting_ally().tile
 
 		if target_tile == Vector2i(-1, -1):
 			# Unaware, nothing to target (see _pick_enemy_target_tile) --
@@ -7373,6 +8104,7 @@ func _process_enemy_turn() -> void:
 			_spawn_battle_death_burst(battle_units[i].tile, battle_units[i].get("size", 1))
 			if is_instance_valid(battle_units[i].ref):
 				battle_units[i].ref.take_damage(9999)
+			_note_enemy_death(battle_units[i], {})
 			battle_units.remove_at(i)
 		i -= 1
 	if battle_target_index >= battle_units.size():
@@ -7484,6 +8216,18 @@ func _process_enemy_turn() -> void:
 		player.potion_resilience_turns -= 1
 	if player.potion_energy_turns > 0:
 		player.potion_energy_turns -= 1
+
+	# The party kits' timers count down once per round: the Knight's Rallying Cry and a Shaman's
+	# How Charming.
+	if battle_rally_turns > 0:
+		battle_rally_turns -= 1
+	if battle_hero_buff_turns > 0:
+		battle_hero_buff_turns -= 1
+	for ally_unit in battle_allies:
+		if int(ally_unit.get("charm_turns", 0)) > 0:
+			ally_unit["charm_turns"] = int(ally_unit.charm_turns) - 1
+		if int(ally_unit.get("buff_turns", 0)) > 0:
+			ally_unit["buff_turns"] = int(ally_unit.buff_turns) - 1
 
 	if battle_player_turns_to_skip > 0:
 		battle_player_turns_to_skip -= 1
@@ -7742,6 +8486,7 @@ func _battle_flee() -> void:
 
 func _end_battle() -> void:
 	in_battle = false
+	player.shared_talisman_provider = Callable()
 	_settle_party_after_battle()
 	battle_units.clear()
 	battle_allies.clear()

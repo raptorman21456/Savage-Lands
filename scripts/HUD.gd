@@ -14,8 +14,9 @@ const SHOP_LOCK_COST := 5
 # a generic letter, keyed by the same display name battle_units already
 # carries.
 const BLADE_ALLY_ICON := preload("res://assets/blade_ally.png")
-# The most allies a battle can hold: a full party of 4 plus the wolf-only slot.
-const MAX_BATTLE_ALLIES := 5
+# The most ally icons a battle can show: a full party of 4 plus the wolf-only slot, the fallen who
+# still lie on the field, and the Necromancer's summoned skeletons.
+const MAX_BATTLE_ALLIES := 16
 const TOGGLE_OFF_ICON := preload("res://assets/toggle_off.png")
 const TOGGLE_ON_ICON := preload("res://assets/toggle_on.png")
 
@@ -331,11 +332,11 @@ var battle_ally_menu_box: HBoxContainer
 var battle_ally_buttons := {}
 # The ally's special-move list and the friendly-target picker: a fixed pool of buttons relabelled
 # every refresh from battle_ally_menu_info (set by Main.gd:_refresh_battle_display each frame).
-const ALLY_SPECIAL_SLOTS := 6
-var battle_ally_special_box: HBoxContainer
+const ALLY_SPECIAL_SLOTS := 12
+var battle_ally_special_box: HFlowContainer
 var battle_ally_special_buttons := []
 var battle_ally_special_back: Button
-var battle_ally_pick_box: HBoxContainer
+var battle_ally_pick_box: HFlowContainer
 var battle_ally_pick_buttons := []
 var battle_ally_pick_back: Button
 var battle_ally_menu_info: Dictionary = {}
@@ -1516,9 +1517,12 @@ func _build_battle_ui() -> void:
 
 	# The ally's special-move list: one button per special (relabelled live with its mana/stamina
 	# cost), plus Back. Emits "special_<n>" / "back" through the same battle_ally_action signal.
-	battle_ally_special_box = HBoxContainer.new()
+	battle_ally_special_box = HFlowContainer.new()
 	battle_ally_special_box.position = Vector2(20, 425)
-	battle_ally_special_box.add_theme_constant_override("separation", 8)
+	# A kit (3) plus a weapon (3) can be six long labels: wrap onto a second row rather than run off screen.
+	battle_ally_special_box.custom_minimum_size = Vector2(1090, 0)
+	battle_ally_special_box.add_theme_constant_override("h_separation", 8)
+	battle_ally_special_box.add_theme_constant_override("v_separation", 4)
 	battle_ally_special_box.visible = false
 	battle_content_root.add_child(battle_ally_special_box)
 	for i in ALLY_SPECIAL_SLOTS:
@@ -1536,9 +1540,11 @@ func _build_battle_ui() -> void:
 	battle_ally_special_box.add_child(battle_ally_special_back)
 
 	# The friendly-target picker (Channel: who gets the mana; Revival Blessing: who stands up).
-	battle_ally_pick_box = HBoxContainer.new()
+	battle_ally_pick_box = HFlowContainer.new()
 	battle_ally_pick_box.position = Vector2(20, 425)
-	battle_ally_pick_box.add_theme_constant_override("separation", 8)
+	battle_ally_pick_box.custom_minimum_size = Vector2(1090, 0)
+	battle_ally_pick_box.add_theme_constant_override("h_separation", 8)
+	battle_ally_pick_box.add_theme_constant_override("v_separation", 4)
 	battle_ally_pick_box.visible = false
 	battle_content_root.add_child(battle_ally_pick_box)
 	for i in ALLY_SPECIAL_SLOTS:
@@ -2531,7 +2537,7 @@ func update_battle_grid(grid_w: int, grid_h: int, terrain: Dictionary, player_ti
 			var is_wolf_ally: bool = a.get("kind", "") == "wolf"
 			ally_icon.texture = ENEMY_ICONS.get("Wolf", null) if is_wolf_ally else BLADE_ALLY_ICON
 			# Roster members wear their kind's colour on the shared companion icon.
-			ally_icon.modulate = a.member.rules().get("tint", Color(1, 1, 1)) if (a.has("member") and not is_wolf_ally) else Color(1, 1, 1)
+			ally_icon.modulate = a.member.rules().get("tint", Color(1, 1, 1)) if (a.has("member") and not is_wolf_ally) else (Color(0.82, 0.88, 0.8) if a.get("kind", "") == "skeleton" else Color(1, 1, 1))
 			# Whoever the player is commanding right now glows, like the current target.
 			if a.get("acting", false):
 				ally_icon.modulate = ally_icon.modulate * Color(1.4, 1.4, 0.75)

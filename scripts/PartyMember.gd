@@ -19,7 +19,7 @@ var xp := 0
 # Bonus picks earned by levelling and not yet spent (spent in the Party screen).
 var picks := 0
 # Everything gained on top of the starting stats, already scaled by the kind's growth.
-var bonus := {"hp": 0.0, "attack": 0.0, "defense": 0.0, "speed": 0.0, "magic": 0.0}
+var bonus := {"hp": 0.0, "attack": 0.0, "defense": 0.0, "speed": 0.0, "magic": 0.0, "fortitude": 0.0}
 # Wolves: times it has fainted this run (it dies for good at PartyRulesScript.WOLF_MAX_FAINTS),
 # and how many battles of loyalty remain (-1 = no limit).
 var faints := 0
@@ -28,6 +28,11 @@ var battles_left := -1
 var gear := {"weapon": "", "armor": "", "shield": "", "talismans": []}
 # Druid spells the Wizard's Tower has upgraded ({spell_id: true}).
 var upgraded_spells := {}
+# Kills it has made: this battle's tally, and the last battle's (the Necromancer's Summon the Dead
+# raises one skeleton per kill of the LAST battle). Main.gd:_make_member_battle_unit rolls the
+# tally over at the start of each battle.
+var kills_this_battle := 0
+var kills_last_battle := 0
 
 # --- Gear ---------------------------------------------------------------------------
 # Item rules (who may hold what) live in Player.gd, which knows the whole collection; this just
@@ -57,9 +62,13 @@ func effect_mods(weapon_base_id: String) -> Dictionary:
 	var mods := talisman_effects()
 	var favour: Dictionary = PartyRulesScript.favour_for(kind, weapon_base_id)
 	for key in favour:
-		if key == "weapon" or key == "magic_mult":
+		if key == "weapon" or key == "weapons" or key == "magic_mult":
 			continue
 		mods[key] = float(mods.get(key, 0.0)) + float(favour[key])
+	# A kind's perks apply whatever it is holding (the Brawler's double-hit and crit chance).
+	var perks: Dictionary = PartyRulesScript.perks_for(kind)
+	for key in perks:
+		mods[key] = float(mods.get(key, 0.0)) + float(perks[key])
 	return mods
 
 static func create(member_id: int, member_kind: String) -> PartyMember:
@@ -111,6 +120,11 @@ func speed() -> float:
 func magic() -> float:
 	return stat("magic")
 
+# Protection against magical harm: a starting value and growth multiplier per kind (PartyRules), grown by
+# levelling and by bonus picks like any other stat. No damage reads it until the armour rework lands.
+func fortitude() -> float:
+	return stat("fortitude")
+
 func is_caster() -> bool:
 	return bool(rules().get("caster", false))
 
@@ -132,7 +146,7 @@ func move_tiles() -> int:
 	else:
 		tiles = float(PartyRulesScript.BASE_MOVE_TILES) + floorf((rating - PartyRulesScript.SPEED_START) / PartyRulesScript.SPEED_PER_EXTRA_TILE)
 	tiles *= float(move.get("tile_mult", 1.0))
-	return maxi(1, int(floorf(tiles + 0.0001)))
+	return maxi(int(move.get("min", 1)), int(floorf(tiles + 0.0001)))
 
 # --- Levelling ----------------------------------------------------------------------
 

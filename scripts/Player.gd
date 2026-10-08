@@ -390,6 +390,10 @@ func ally_weapon_block_reason(member: RefCounted, weapon_id: String) -> String:
 		return "This member can't carry gear."
 	if not owned_weapons.has(weapon_id):
 		return "You don't own that weapon."
+	# The Marksman can ONLY use a bow.
+	var only: String = str(member.rules().get("weapon_only", ""))
+	if only != "" and str(WeaponsScript.get_base_type(WeaponsScript.get_owned_variant(weapon_id)).get("id", "")) != only:
+		return "%s can only use a %s." % [member.name, only]
 	if weapon_id == "club":
 		return ""
 	if current_weapon_base.get("id", "") == weapon_id:
@@ -1124,7 +1128,15 @@ func talisman_slots() -> int:
 # The summed value of one effect key (see Talismans.gd's key list) across every
 # equipped talisman, or 0.0 if none carries it.
 func talisman_bonus(key: String) -> float:
-	return _talisman_cache.get(key, 0.0)
+	var value: float = _talisman_cache.get(key, 0.0)
+	# In a battle, a Shaman standing close shares some of her talismans' effects with you
+	# (Main.gd:_hero_shared_effect); no provider outside a fight.
+	if shared_talisman_provider.is_valid():
+		value += float(shared_talisman_provider.call(key))
+	return value
+
+# Set by Main.gd for the length of a battle; see talisman_bonus.
+var shared_talisman_provider: Callable = Callable()
 
 func _rebuild_talisman_cache() -> void:
 	_talisman_cache = {}
@@ -1290,7 +1302,18 @@ func _shop_discount() -> float:
 	return min(0.75, stat_intimidation * 0.01 + talisman_bonus("shop_discount"))
 
 func get_weapon_price(weapon: Dictionary) -> int:
-	return int(round(weapon.price * (1.0 - _shop_discount())))
+	# A Marksman in the party makes every weapon but a bow dearer.
+	var markup := 1.0
+	if str(WeaponsScript.get_base_type(weapon).get("id", "")) != "bow":
+		markup = _party_price_mult("weapon_price_mult")
+	return int(round(weapon.price * (1.0 - _shop_discount()) * markup))
+
+# The product of a price multiplier (PartyRules key) across the party -- a Marksman: arrows x0.4, weapons x1.25.
+func _party_price_mult(key: String) -> float:
+	var mult := 1.0
+	for m in party:
+		mult *= float(m.rules().get(key, 1.0))
+	return mult
 
 func get_owned_tier_rank(base_id: String) -> int:
 	var best := -1
@@ -1582,6 +1605,7 @@ func get_arrow_price(kind: String) -> int:
 	var held: int = owned_arrows.get(kind, 0)
 	var scaled: float = base_price * pow(WeaponsScript.ARROW_PRICE_GROWTH, held)
 	scaled *= 1.0 + talisman_bonus("arrow_price_pct")
+	scaled *= _party_price_mult("arrow_price_mult")
 	return int(round(scaled * (1.0 - _shop_discount()) * (1.0 - meta_arrow_discount_pct)))
 
 func try_buy_arrow(kind: String) -> bool:

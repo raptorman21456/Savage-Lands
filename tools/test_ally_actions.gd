@@ -106,7 +106,7 @@ func _init() -> void:
 	var labels := []
 	for s in info.specials:
 		labels.append(s.label)
-	print("Her special list shows each cost in her own currency: %s (expected [I CAST FIREBALL (40 MP), Landfall (60 MP), Channel (20 MP)])" % [labels])
+	print("Her special list shows each cost in her own currency -- her three spells, then the Staff's: %s (expected [Heal (30 MP), Empower (30 MP), Hasten (40 MP), I CAST FIREBALL (40 MP), Landfall (60 MP), Channel (20 MP)])" % [labels])
 	print("The Special button is available, Attack reads plain: has_specials=%s attack_label=%s (expected true, Attack)" % [info.has_specials, info.attack_label])
 	main._on_battle_ally_action("special")
 	print("Special opens the list: state=%s (expected ally_special)" % [main.battle_menu_state])
@@ -130,10 +130,10 @@ func _init() -> void:
 	_start(main, u2)
 	u2.mana = 10
 	main._on_battle_ally_action("special")
-	main._on_battle_ally_action("special_1")
+	main._on_battle_ally_action("special_4")
 	print("Landfall refused without the mana: mana still %d (expected 10), nobody hurt=%s (expected true), still her turn=%s (expected true)" % [u2.mana, ga.hp == 999 and gb.hp == 999, main.battle_commanding_ally == u2])
 	u2.mana = 92
-	main._on_battle_ally_action("special_1")
+	main._on_battle_ally_action("special_4")
 	print("Landfall costs 60 mana: %d left (expected 32)" % [u2.mana])
 	print("...and hits EVERY enemy anywhere for attack x3 + magic/2 = 3 + 9.2 = 12: dealt=%s (expected [12, 12, 12])" % [[999 - ga.hp, 999 - gb.hp, 999 - gc.hp]])
 
@@ -150,7 +150,7 @@ func _init() -> void:
 	main.battle_target_index = 0
 	_start(main, u3)
 	main._on_battle_ally_action("special")
-	main._on_battle_ally_action("special_0")
+	main._on_battle_ally_action("special_3")
 	var filler3 := _filler()
 	print("Turn 1: the fireball is only CHARGED: charging=%s, mana %d (expected true, 52), nobody hurt=%s (expected true)" % [not u3.charging.is_empty(), u3.mana, center.hp == 999 and adjacent.hp == 999])
 	# the ally phase ended with a single ally; start a fresh ally phase for the release
@@ -192,7 +192,7 @@ func _init() -> void:
 	main.battle_allies = [caster, friend, other_caster]
 	main._start_ally_turn()
 	main._on_battle_ally_action("special")
-	main._on_battle_ally_action("special_2")
+	main._on_battle_ally_action("special_5")
 	var pick_labels := []
 	for p in main._ally_menu_info().picks:
 		pick_labels.append(p.label.split("  ")[0])
@@ -210,7 +210,7 @@ func _init() -> void:
 	main.battle_allies = [caster, friend, other_caster]
 	main._start_ally_turn()
 	main._on_battle_ally_action("special")
-	main._on_battle_ally_action("special_2")
+	main._on_battle_ally_action("special_5")
 	main._on_battle_ally_action("pick_1")
 	print("Channel into a stamina ally: +20%% of 100 = %d (expected 20)" % [friend.stamina])
 	main.battle_allies = [caster, friend, other_caster]
@@ -220,7 +220,7 @@ func _init() -> void:
 	caster.mana = 92
 	main._start_ally_turn()
 	main._on_battle_ally_action("special")
-	main._on_battle_ally_action("special_2")
+	main._on_battle_ally_action("special_5")
 	main._on_battle_ally_action("pick_2")
 	print("Channel into a caster ally: +20%% of %d mana = %d now (expected 20 + 10 = 30)" % [other_caster.max_mana, other_caster.mana])
 	main.battle_turn = "player"
@@ -229,7 +229,7 @@ func _init() -> void:
 	main.battle_allies = [caster]
 	main._start_ally_turn()
 	main._on_battle_ally_action("special")
-	main._on_battle_ally_action("special_2")
+	main._on_battle_ally_action("special_5")
 	main._on_battle_ally_action("back")
 	print("Back out of the picker returns to the special list: state=%s (expected ally_special)" % [main.battle_menu_state])
 

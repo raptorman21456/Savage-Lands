@@ -75,12 +75,11 @@ func _init() -> void:
 	player.owned_talismans["wolf_fang"] = true
 	player.owned_talismans["moss_charm"] = true
 	player.equipped_talismans.clear()
-	print("Slots by level (1/2/3/4 at levels 1/4/8/12): %s (expected [1, 2, 3, 4])" % [[rules.talisman_slots("druid", 1), rules.talisman_slots("druid", 4), rules.talisman_slots("druid", 8), rules.talisman_slots("druid", 12)]])
-	print("A level-1 Druid has one slot: free=%d (expected 1)" % [druid.talisman_slot_count()])
+	print("Members have 2 talisman slots from the start whatever their level (4 for the Shaman): %s (expected [2, 2, 2, 2, 4])" % [[rules.talisman_slots("druid", 1), rules.talisman_slots("druid", 4), rules.talisman_slots("druid", 8), rules.talisman_slots("druid", 12), rules.talisman_slots("shaman", 1)]])
+	print("A level-1 Druid has two slots: %d (expected 2)" % [druid.talisman_slot_count()])
 	print("She wears Ember Charm: %s (expected true)" % [player.equip_ally_talisman(druid, "ember_charm")])
-	print("A second one doesn't fit: %s -- %s (expected false, No free slot.)" % [player.equip_ally_talisman(druid, "wolf_fang"), player.ally_talisman_block_reason(druid, "wolf_fang")])
-	druid.level = 4
-	print("At level 4 a second slot opens: %s (expected true)" % [player.equip_ally_talisman(druid, "wolf_fang")])
+	print("A second one fits: %s (expected true)" % [player.equip_ally_talisman(druid, "wolf_fang")])
+	print("A third doesn't: %s -- %s (expected false, No free slot.)" % [player.equip_ally_talisman(druid, "moss_charm"), player.ally_talisman_block_reason(druid, "moss_charm")])
 	print("The Guardian can't wear what the Druid wears: %s (expected Druid is wearing it.)" % [player.ally_talisman_block_reason(guardian, "ember_charm")])
 	print("She can't wear it twice: %s (expected Already worn.)" % [player.ally_talisman_block_reason(druid, "ember_charm")])
 	player.equipped_talismans.append("moss_charm")
