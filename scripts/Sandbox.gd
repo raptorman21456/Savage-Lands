@@ -308,6 +308,12 @@ static func apply_build(main, cfg: Dictionary) -> void:
 			for n in int(picks[stat]):
 				member.spend_pick(str(stat))
 		_apply_party_gear(p, member, entry)
+		# A chosen loadout (three special ids, "" = empty); without one the member keeps its default.
+		if entry.has("specials"):
+			var pool_ids: Array = main.member_special_pool(member).map(func(e): return str(e.special.get("id", "")))
+			for slot in PartyRulesScript.SPECIAL_SLOTS:
+				var chosen: Array = entry.specials
+				member.set_loadout_slot(slot, str(chosen[slot]) if slot < chosen.size() else "", pool_ids)
 
 	# fresh battle-scoped state
 	p.berserk_turns_remaining = 0

@@ -29,6 +29,11 @@ var faints := 0
 var battles_left := -1
 # What it wears: weapon / armor / shield are item ids ("" = nothing), talismans a list.
 var gear := {"weapon": "", "armor": "", "shield": "", "talismans": []}
+# The specials it brings into a fight, picked on the Party screen from its pool (its kit's specials plus the
+# equipped weapon's): PartyRules.SPECIAL_SLOTS ids, "" = an empty slot. Until the player picks anything
+# (loadout_set), the first slots' worth of the pool are used.
+var special_loadout: Array = []
+var loadout_set := false
 # Druid spells the Wizard's Tower has upgraded ({spell_id: true}).
 var upgraded_spells := {}
 # Kills it has made: this battle's tally, and the last battle's (the Necromancer's Summon the Dead
@@ -49,6 +54,49 @@ func weapon_id() -> String:
 
 func talisman_ids() -> Array:
 	return gear.get("talismans", [])
+
+# --- Special loadout -----------------------------------------------------------------
+# pool_ids = every special id it could use right now, kit first (Main.gd:_ally_special_pool).
+
+# The ids it will actually have in battle, in slot order.
+func resolved_loadout(pool_ids: Array) -> Array:
+	var out: Array = []
+	if not loadout_set:
+		for id in pool_ids:
+			if out.size() < PartyRulesScript.SPECIAL_SLOTS:
+				out.append(str(id))
+		return out
+	for id in special_loadout:
+		if str(id) != "" and pool_ids.has(str(id)) and not out.has(str(id)) and out.size() < PartyRulesScript.SPECIAL_SLOTS:
+			out.append(str(id))
+	return out
+
+# What slot `index` holds ("" when empty) -- the auto-filled default until the player has picked.
+func loadout_slot(index: int, pool_ids: Array) -> String:
+	if not loadout_set:
+		var auto := resolved_loadout(pool_ids)
+		return str(auto[index]) if index < auto.size() else ""
+	return str(special_loadout[index]) if index < special_loadout.size() else ""
+
+# Puts a special (or "" to empty the slot) into a slot. The first change freezes the auto-filled default
+# so the other slots stay as they were. A special already in another slot moves out of it.
+func set_loadout_slot(index: int, id: String, pool_ids: Array) -> void:
+	if index < 0 or index >= PartyRulesScript.SPECIAL_SLOTS:
+		return
+	var slots: Array = []
+	for i in PartyRulesScript.SPECIAL_SLOTS:
+		slots.append(loadout_slot(i, pool_ids))
+	if id != "":
+		for i in slots.size():
+			if slots[i] == id:
+				slots[i] = ""
+	slots[index] = id
+	special_loadout = slots
+	loadout_set = true
+
+func reset_loadout() -> void:
+	special_loadout = []
+	loadout_set = false
 
 func armor_id() -> String:
 	return str(gear.get("armor", ""))

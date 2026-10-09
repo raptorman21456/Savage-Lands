@@ -78,6 +78,7 @@ func _init() -> void:
 	await physics_frame
 	await physics_frame
 	var player = main.player
+	main.enforce_special_loadouts = false  # these tests exercise individual specials, not the loadout
 	player.max_party_slots = 20
 	for id in ["staff_fine_steel", "greatsword_fine_steel", "knuckle_gloves_fine_steel", "club"]:
 		player.owned_weapons[id] = true

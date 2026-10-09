@@ -92,6 +92,15 @@ func _process_all(mode: int) -> void:
 		_field(ar, "armor.%s" % ar.id, "name", mode)
 		_field(ar, "armor.%s" % ar.id, "description", mode)
 		_field(ar, "armor.%s" % ar.id, "shop_description", mode)
+	# Party members' flavour descriptions (the Party screen); names stay put -- a member's name is also how
+	# a few tests and menus find it.
+	for kind in PartyRules.KINDS:
+		var party_key := "party.%s.description" % kind
+		if mode == MODE_APPLY:
+			if _data.has(party_key):
+				PartyRules.description_overrides[kind] = _data[party_key]
+		else:
+			_data[party_key] = str(PartyRules.KINDS[kind].get("description", ""))
 	for id in Shields.SHIELDS:
 		var s: Dictionary = Shields.SHIELDS[id]
 		_field(s, "shield.%s" % id, "name", mode)

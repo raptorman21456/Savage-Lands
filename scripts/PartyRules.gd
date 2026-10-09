@@ -44,6 +44,7 @@ const WOLF_MAX_FAINTS := 3
 const KINDS := {
 	"wolf": {
 		"name": "Fickle Wolf", "wolf": true, "levels": false,
+		"description": "A traitor wolf that turned on its pack. The old magic that made wolves so savage still runs through it, so it fights harder than any hound should. It cannot level, wear gear or carry a weapon, and three faints will be its last.",
 		"base": {"hp": 20.0, "attack": 1.0, "defense": 0.0, "speed": 5.0, "magic": 0.0, "fortitude": -5.0},
 		"final_mult": {"hp": 0.9, "attack": 1.25, "defense": 0.75, "speed": 1.5, "magic": 1.0, "fortitude": 0.8},
 		"stats": [],
@@ -54,6 +55,7 @@ const KINDS := {
 	},
 	"druid": {
 		"name": "Druid", "levels": true,
+		"description": "A wild-woods healer who would rather mend than maim. Her spells restore and embolden her friends, and when she must move, she moves twice as far. Fragile, and worth protecting.",
 		"base": {"hp": 10.0, "attack": 1.0, "defense": 0.0, "speed": 5.0, "magic": 10.0, "fortitude": 5.0},
 		"growth": {"hp": 1.2, "attack": 0.5, "defense": 0.66, "speed": 1.0, "magic": 1.0, "fortitude": 1.2},
 		"stats": ["hp", "attack", "defense", "speed", "magic", "fortitude"],
@@ -69,6 +71,7 @@ const KINDS := {
 	},
 	"guardian": {
 		"name": "Guardian", "levels": true,
+		"description": "A wall that walks. It only ever takes one step, hits twice as hard with a shield in hand, and shouts loud enough to rattle every enemy on the field.",
 		"base": {"hp": 25.0, "attack": 1.0, "defense": 5.0, "speed": 5.0, "magic": 0.0, "fortitude": 0.0},
 		"growth": {"hp": 1.25, "attack": 1.0, "defense": 2.0, "speed": 1.0, "magic": 1.0, "fortitude": 1.3},
 		"stats": ["hp", "attack", "defense", "fortitude"],
@@ -84,6 +87,7 @@ const KINDS := {
 	},
 	"marksman": {
 		"name": "Marksman", "levels": true,
+		"description": "A sharpshooter who ignores range and cover, but will only ever fight with a bow. Arrows are cheap while the Marksman is around, and every other weapon costs more.",
 		"base": {"hp": 10.0, "attack": 1.0, "defense": 0.0, "speed": 5.0, "magic": 0.0, "fortitude": 0.0},
 		# HP upgrades reduced by 75%.
 		"growth": {"hp": 0.25, "attack": 1.0, "defense": 1.0, "speed": 1.0, "magic": 1.0, "fortitude": 1.0},
@@ -102,6 +106,7 @@ const KINDS := {
 	},
 	"rogue": {
 		"name": "Rogue", "levels": true,
+		"description": "Quick hands, quicker feet. Would rather lift an enemy's coin purse than its life, right up until the moment it decides otherwise.",
 		"base": {"hp": 20.0, "attack": 1.0, "defense": 0.0, "speed": 5.0, "magic": 0.0, "fortitude": 0.0},
 		# Armour (defense) -30%, attack +30%, speed +40%, HP as normal.
 		"growth": {"hp": 1.0, "attack": 1.3, "defense": 0.7, "speed": 1.4, "magic": 1.0, "fortitude": 1.0},
@@ -118,6 +123,7 @@ const KINDS := {
 	# --- The four from the design doc (their kits live in PartyKits.gd) ---
 	"knight": {
 		"name": "Knight", "levels": true,
+		"description": "A veteran who holds the line. Strongest with a greatsword, able to keep a shield up even behind a two-handed weapon, and far too proud to dodge.",
 		# Starting stats the user approved: 30 HP / 3 attack / 3 defense / 4 speed / 0 magic.
 		"base": {"hp": 30.0, "attack": 3.0, "defense": 3.0, "speed": 4.0, "magic": 0.0, "fortitude": 10.0},
 		"growth": {"hp": 1.0, "attack": 1.3, "defense": 1.5, "speed": 0.75, "magic": 1.0, "fortitude": 0.9},
@@ -134,6 +140,7 @@ const KINDS := {
 	},
 	"necromancer": {
 		"name": "Necromancer", "levels": true,
+		"description": "Pays for every spell in blood and grows a little stronger with each kill. Rots enemies from within and raises the fallen to fight again.",
 		"base": {"hp": 15.0, "attack": 1.0, "defense": 0.0, "speed": 5.0, "magic": 10.0, "fortitude": 0.0},
 		"growth": {"hp": 1.8, "attack": 0.4, "defense": 0.7, "speed": 0.9, "magic": 3.0, "fortitude": 1.4},
 		"stats": ["hp", "attack", "defense", "speed", "magic", "fortitude"],
@@ -148,6 +155,7 @@ const KINDS := {
 	},
 	"brawler": {
 		"name": "Brawler", "levels": true,
+		"description": "A bare-knuckle fighter whose fists land twice as often as anyone expects. Fists and knuckle gloves reach one tile further in these hands.",
 		"base": {"hp": 20.0, "attack": 2.0, "defense": 2.0, "speed": 4.0, "magic": 0.0, "fortitude": 5.0},
 		"growth": {"hp": 1.5, "attack": 1.4, "defense": 1.3, "speed": 0.6, "magic": 1.0, "fortitude": 1.3},
 		"stats": ["hp", "attack", "defense", "speed", "fortitude"],
@@ -162,6 +170,7 @@ const KINDS := {
 	},
 	"shaman": {
 		"name": "Shaman", "levels": true,
+		"description": "Carries four talismans and shares their power with everyone nearby. Heals, cleanses, and keeps the whole party in tune.",
 		"base": {"hp": 12.0, "attack": 0.0, "defense": 1.0, "speed": 5.0, "magic": 10.0, "fortitude": 10.0},
 		"growth": {"hp": 1.2, "attack": 0.0, "defense": 0.7, "speed": 1.1, "magic": 1.7, "fortitude": 1.5},
 		"stats": ["hp", "defense", "speed", "magic", "fortitude"],
@@ -179,6 +188,18 @@ const KINDS := {
 
 # Mana: a pool for magic-users only, 5 per point of Magic.
 const MANA_PER_MAGIC := 5
+
+# How many specials a member brings into a fight: chosen on the Party screen from its pool (its kit's
+# specials plus the equipped weapon's). The user's ruling, 2026-10-09.
+const SPECIAL_SLOTS := 3
+
+# Descriptions edited in strings.json (GameText applies them here: KINDS is a const, which cannot be written to).
+static var description_overrides := {}
+
+static func description_for(kind: String) -> String:
+	if description_overrides.has(kind):
+		return str(description_overrides[kind])
+	return str(rules(kind).get("description", ""))
 
 # Gear a member can carry: weapon / armor / shield / talismans. A wolf carries nothing.
 # Every member has 2 talisman slots from the start (the user, 2026-10-08), the Shaman 4 -- her own

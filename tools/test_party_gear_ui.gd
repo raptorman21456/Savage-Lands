@@ -65,7 +65,7 @@ func _init() -> void:
 	var weapons_tab_texts: Array = _texts(panel.tab_containers.Weapons)
 	print("The Staff does NOT clutter your own Weapons tab: %s (expected true)" % [not weapons_tab_texts.any(func(t): return str(t).contains("Staff"))])
 	var party_texts: Array = _texts(panel.tab_containers.Party)
-	print("The Party tab lists PARTY GEAR with a weapon picker that offers the Staff: %s / %s (expected true, true)" % [party_texts.has("PARTY GEAR"), party_texts.any(func(t): return str(t).begins_with("Staff") or str(t).contains(" Staff"))])
+	print("The Party tab lists EQUIPMENT with a weapon picker that offers the Staff: %s / %s (expected true, true)" % [party_texts.has("EQUIPMENT"), party_texts.any(func(t): return str(t).begins_with("Staff") or str(t).contains(" Staff"))])
 	panel._on_member_weapon_picked(druid, offer.id)
 	print("Picking it equips it on her: %s (expected %s)" % [druid.weapon_id(), offer.id])
 	await process_frame

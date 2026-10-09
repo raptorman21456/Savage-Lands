@@ -6,6 +6,7 @@ extends TownPanel
 # anything it triggers) is ever saved -- see SaveData.sandbox_active.
 
 const SandboxScript := preload("res://scripts/Sandbox.gd")
+const PartyKitsScript := preload("res://scripts/PartyKits.gd")
 const WeaponsScript := preload("res://scripts/Weapons.gd")
 const ArmorScript := preload("res://scripts/Armor.gd")
 const ClothingScript := preload("res://scripts/Clothing.gd")
@@ -727,6 +728,32 @@ func _party_gear_rows(card: VBoxContainer, index: int) -> void:
 	_option(gear_row, shield_pick_items, str(entry.get("shield", "")), func(v):
 		cfg.party[index]["shield"] = v
 		_changed(["Party"]))
+	# The three specials it brings (from its kit and the weapon above); untouched, it takes the first three.
+	var special_row := HBoxContainer.new()
+	special_row.add_theme_constant_override("separation", 8)
+	card.add_child(special_row)
+	var has_loadout: bool = entry.has("specials")
+	special_row.add_child(_inline("Specials" if has_loadout else "Specials (default)", 12))
+	var special_options := [["", "(empty)"]]
+	for kit in PartyKitsScript.specials_for(str(entry.kind)):
+		special_options.append([str(kit.id), str(kit.name)])
+	var special_weapon: Dictionary = SandboxScript.build_weapon(wsel) if base_id != "" else {}
+	for sp in special_weapon.get("specials", []):
+		special_options.append([str(sp.id), str(sp.name)])
+	var chosen_specials: Array = entry.get("specials", [])
+	for slot in PartyRulesScript.SPECIAL_SLOTS:
+		var current_special: String = str(chosen_specials[slot]) if slot < chosen_specials.size() else ""
+		_option(special_row, special_options, current_special, func(v):
+			var arr: Array = cfg.party[index].get("specials", ["", "", ""]).duplicate()
+			while arr.size() < PartyRulesScript.SPECIAL_SLOTS:
+				arr.append("")
+			arr[slot] = v
+			cfg.party[index]["specials"] = arr
+			_changed(["Party"]))
+	if has_loadout:
+		_button(special_row, "Default", func():
+			cfg.party[index].erase("specials")
+			_changed(["Party"]))
 	var slots: int = PartyRulesScript.talisman_slots(str(entry.kind), int(entry.level))
 	var worn: Array = entry.get("talismans", [])
 	var talisman_row := HBoxContainer.new()

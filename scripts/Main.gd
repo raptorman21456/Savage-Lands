@@ -978,6 +978,9 @@ var battle_shadow_crit := false
 # acts next; off, the old phases run (hero, then allies, then every enemy), which is how the tests that
 # drive a fight by hand still work.
 var battle_use_timeline := false
+# A member brings only the specials in its Party-screen loadout (PartyRules.SPECIAL_SLOTS). Tests of an
+# individual special turn this off to reach the whole pool without arranging a loadout first.
+var enforce_special_loadouts := true
 var battle_timeline: Array = []            # [{tid, kind: "hero" | "ally" | "enemy", time}]
 var battle_timeline_clock := 0.0
 var battle_tid_counter := 0
@@ -3766,6 +3769,12 @@ func _make_member_battle_unit(member, tile: Vector2i, might_mult: float) -> Dict
 	if not (rules.get("move", {}) as Dictionary).has("fixed"):
 		move_tiles = maxi(1, move_tiles + int(armor_params.get("move_bonus", 0)))
 	var cannot_dodge: bool = bool(rules.get("cannot_dodge", false))
+	# Its loadout: the specials it brings, chosen from kit + weapon (PartyMember.resolved_loadout).
+	var pool_ids: Array = []
+	for kit in PartyKitsScript.specials_for(member.kind):
+		pool_ids.append(str(kit.get("id", "")))
+	for special in weapon.get("specials", []):
+		pool_ids.append(str(special.get("id", "")))
 	return {
 		"tile": tile,
 		"hp": hp_value,
@@ -3799,6 +3808,7 @@ func _make_member_battle_unit(member, tile: Vector2i, might_mult: float) -> Dict
 		# grows with every kill.
 		"cannot_dodge": cannot_dodge,
 		"fortitude": fortitude_points,
+		"special_ids": member.resolved_loadout(pool_ids) if enforce_special_loadouts else pool_ids,
 		"speed": member.speed() + float(armor_params.get("speed_bonus", 0)),
 		# Gear state: the armour (and its trait id), the usable shield and what it does, the dodge the
 		# armour grants (Shadowweave), and the in-battle counters its traits use.
@@ -6456,12 +6466,42 @@ func _ally_specials(u: Dictionary) -> Array:
 			"dmg_mult": float(charging.get("dmg_mult", 1.0)), "effect": str(charging.get("effect", "")), "release": true,
 			"description": "Let it fly at your selected target -- it can be anyone on the field.",
 		}]
+	var pool: Array = _ally_special_pool(u)
+	# A member brings only the specials chosen on the Party screen (PartyRules.SPECIAL_SLOTS of them), in
+	# slot order; anyone without a loadout (a mercenary, a skeleton) simply has the whole pool.
+	if not u.has("special_ids"):
+		return pool
 	var out: Array = []
-	# The kind's own specials first (Rallying Cry, Curse of Rot...), then the weapon's three.
+	for id in u.special_ids:
+		for s in pool:
+			if str(s.get("id", "")) == str(id):
+				out.append(s)
+				break
+	return out
+
+# Everything a unit COULD bring: the kind's own specials first (Rallying Cry, Curse of Rot...), then the
+# weapon's three. The Party screen chooses from this.
+func _ally_special_pool(u: Dictionary) -> Array:
+	var out: Array = []
 	for kit in PartyKitsScript.specials_for(str(u.get("kind", ""))):
 		out.append(_kit_special_for(u, kit))
 	for special in u.get("weapon", {}).get("specials", []):
 		out.append(special)
+	return out
+
+# --- What the Party screen shows -----------------------------------------------------------
+# The battle unit a member would field right now (gear, perks, favour and all) -- so the stats sheet and
+# the special pickers can never drift from what the fight actually uses.
+func member_preview(member) -> Dictionary:
+	return _make_member_battle_unit(member, Vector2i(0, 0), 1.0 + player.stat_might * MIGHT_ALLY_DAMAGE_PCT_PER_POINT)
+
+# Every special the member could bring, with its costs worked out, plus how to print that cost.
+# [{special: Dictionary, cost_text: String}]
+func member_special_pool(member) -> Array:
+	var u: Dictionary = member_preview(member)
+	var out: Array = []
+	for s in _ally_special_pool(u):
+		out.append({"special": s, "cost_text": _ally_cost_text(u, int(s.get("stamina_cost", 0)))})
 	return out
 
 # A kit special as this unit would use it right now: its talismans' / favour's cost changes (the
