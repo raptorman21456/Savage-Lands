@@ -53,6 +53,7 @@ func _init() -> void:
 	SaveDataScript.sandbox_active = true
 	SaveDataScript.sandbox_data = {}
 	var main = load("res://Main.tscn").instantiate()
+	main.regional_world = false  # this test drives the old wave-ladder world
 	root.add_child(main)
 	await physics_frame
 	await physics_frame

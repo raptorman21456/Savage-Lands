@@ -88,6 +88,7 @@ func _init() -> void:
 	seed(20261009)
 	var rules = load("res://scripts/PartyRules.gd")
 	var main = load("res://Main.tscn").instantiate()
+	main.regional_world = false  # this test drives the old wave-ladder world
 	root.add_child(main)
 	await physics_frame
 	await physics_frame

@@ -47,6 +47,7 @@ func _init() -> void:
 	var armor_script = load("res://scripts/Armor.gd")
 	var materials_script = load("res://scripts/Materials.gd")
 	var main = load("res://Main.tscn").instantiate()
+	main.regional_world = false  # this test drives the old wave-ladder world
 	root.add_child(main)
 	await physics_frame
 	await physics_frame

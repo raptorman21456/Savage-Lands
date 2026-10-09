@@ -115,6 +115,14 @@ const SHOP_CATEGORY_COLOR := {
 }
 
 var health_label: Label
+var xp_bar_bg: ColorRect
+var xp_bar_fill: ColorRect
+var quiver_row: HBoxContainer
+var danger_caption: Label
+var danger_pips: Array = []
+var minimap: Control
+var message_toast: PanelContainer
+var message_tween: Tween
 var health_bar_bg: ColorRect
 var health_bar_fill: ColorRect
 var health_heart_label: Label
@@ -306,6 +314,12 @@ const BATTLE_CONTENT_WIDTH := 650.0
 # HP bar reaches to x=314) -- see overworld_hud_root's construction in
 # _ready() for why this exists.
 const OVERWORLD_HUD_WIDTH := 340.0
+# The overworld readout's panels are a touch see-through so the world stays visible behind them.
+const HUD_PANEL_BG := Color(0.07, 0.065, 0.09, 0.86)
+const XP_BAR_BG_COLOR := Color(0.09, 0.09, 0.17, 1.0)
+const XP_BAR_FILL_COLOR := Color(0.45, 0.5, 0.95, 1.0)
+const DANGER_PIPS := 8
+const MiniMapScript := preload("res://scripts/MiniMap.gd")
 # Kept in sync by hand with Main.gd:MAX_BATTLE_SQUAD_SIZE_CEILING -- the enemy
 # icon/marker pools below must be at least this big or a heavily-scaled squad
 # (see _squad_size_bonus) would index past the pool.
@@ -447,125 +461,253 @@ func _ready() -> void:
 			grass_animated_texture.set_frame_texture(i, GRASS_FRAME_TEXTURES[i])
 			grass_animated_texture.set_frame_duration(i, 0.6)
 
-	# The whole HP/level/XP/stats/coins/wave/world/enemies/message info block
-	# below was pinned to the literal top-left corner (x=16) -- same "crammed
-	# into one corner instead of using the window" issue the battle screen
-	# had (see battle_content_root). One wrapper, shifted right as a unit,
-	# re-centers the whole block without touching any of these labels' own
-	# relative positions. OVERWORLD_HUD_WIDTH is a hand-measured estimate of
-	# the block's own widest row (the HP bar reaches to x=314).
+	# The overworld readout: a compact card for you in the top-left corner (level, HP and XP bars, stats), a banner
+	# in the top-right (where you are, how dangerous it is, coins, items, and a small map of the continent), the
+	# controls tucked low in the bottom-left, and messages that pop up near the bottom and fade on their own.
+	# Everything hangs off the screen's corners so the middle of the screen stays clear to play in.
 	overworld_hud_root = Control.new()
 	overworld_hud_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	overworld_hud_root.position = Vector2((get_viewport().get_visible_rect().size.x - OVERWORLD_HUD_WIDTH) / 2.0, 0.0)
+	overworld_hud_root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(overworld_hud_root)
 
-	health_label = Label.new()
-	health_label.position = Vector2(16, 16)
-	health_label.add_theme_font_size_override("font_size", 20)
-	overworld_hud_root.add_child(health_label)
+	# --- the player card (top-left) ---
+	var card := PanelContainer.new()
+	card.position = Vector2(14, 14)
+	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_theme_stylebox_override("panel", _make_stylebox(HUD_PANEL_BG, PANEL_BORDER, 2, 0, 9))
+	overworld_hud_root.add_child(card)
+	var card_box := VBoxContainer.new()
+	card_box.add_theme_constant_override("separation", 5)
+	card_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_child(card_box)
 
-	# A red heart-bar next to the "HP: X / Y" text -- the numbers stay
-	# (health_label above is untouched), this is purely a visual read-at-a-
-	# glance addition. Same bg/fill ColorRect-pair idiom the battle ally
-	# health bars already use.
+	var card_top := HBoxContainer.new()
+	card_top.add_theme_constant_override("separation", 9)
+	card_top.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card_box.add_child(card_top)
+
+	var level_badge := PanelContainer.new()
+	level_badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	level_badge.add_theme_stylebox_override("panel", _make_stylebox(Color(0.22, 0.17, 0.05, 1.0), Color(1.0, 0.85, 0.2), 2, 0, 5))
+	card_top.add_child(level_badge)
+	level_label = Label.new()
+	level_label.add_theme_font_size_override("font_size", 18)
+	level_label.add_theme_color_override("font_color", Color(1.0, 0.9, 0.35))
+	level_label.custom_minimum_size = Vector2(44, 0)
+	level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	level_badge.add_child(level_label)
+
+	var bars := VBoxContainer.new()
+	bars.add_theme_constant_override("separation", 3)
+	bars.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card_top.add_child(bars)
+
+	var hp_row := HBoxContainer.new()
+	hp_row.add_theme_constant_override("separation", 6)
+	hp_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bars.add_child(hp_row)
 	health_heart_label = Label.new()
 	health_heart_label.text = "♥"
-	health_heart_label.position = Vector2(180, 12)
-	health_heart_label.add_theme_font_size_override("font_size", 22)
+	health_heart_label.add_theme_font_size_override("font_size", 18)
 	health_heart_label.add_theme_color_override("font_color", HEALTH_BAR_FILL_COLOR)
-	overworld_hud_root.add_child(health_heart_label)
-
+	hp_row.add_child(health_heart_label)
 	health_bar_bg = ColorRect.new()
 	health_bar_bg.color = HEALTH_BAR_BG_COLOR
-	health_bar_bg.position = Vector2(204, 18)
-	health_bar_bg.size = Vector2(110, 16)
-	overworld_hud_root.add_child(health_bar_bg)
-
+	health_bar_bg.custom_minimum_size = Vector2(190, 20)
+	health_bar_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hp_row.add_child(health_bar_bg)
 	health_bar_fill = ColorRect.new()
 	health_bar_fill.color = HEALTH_BAR_FILL_COLOR
-	health_bar_fill.position = Vector2(204, 18)
-	health_bar_fill.size = Vector2(110, 16)
-	overworld_hud_root.add_child(health_bar_fill)
+	health_bar_fill.size = health_bar_bg.custom_minimum_size
+	health_bar_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	health_bar_bg.add_child(health_bar_fill)
+	health_label = Label.new()
+	health_label.set_anchors_preset(Control.PRESET_FULL_RECT)
+	health_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	health_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	health_label.add_theme_font_size_override("font_size", 13)
+	health_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+	health_label.add_theme_constant_override("outline_size", 4)
+	health_bar_bg.add_child(health_label)
 
-	# Quiver: only visible while a Bow is equipped (see update_quiver), one
-	# row below the HP bar so it clears it with a clean gutter. Hovering
-	# shows the live flame/freeze/bomb counts in quiver_tooltip_label, same
-	# "hover reveals detail" idea as every other hover-description in this
-	# game, just a floating label next to the icon instead of a shared
-	# status-line -- there's no natural shared description bar out here on
-	# the overworld HUD the way battle/shop have one.
+	var xp_row := HBoxContainer.new()
+	xp_row.add_theme_constant_override("separation", 6)
+	xp_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bars.add_child(xp_row)
+	var xp_pad := Control.new()
+	xp_pad.custom_minimum_size = Vector2(18, 0)
+	xp_pad.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	xp_row.add_child(xp_pad)
+	xp_bar_bg = ColorRect.new()
+	xp_bar_bg.color = XP_BAR_BG_COLOR
+	xp_bar_bg.custom_minimum_size = Vector2(190, 9)
+	xp_bar_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	xp_row.add_child(xp_bar_bg)
+	xp_bar_fill = ColorRect.new()
+	xp_bar_fill.color = XP_BAR_FILL_COLOR
+	xp_bar_fill.size = Vector2(0, xp_bar_bg.custom_minimum_size.y)
+	xp_bar_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	xp_bar_bg.add_child(xp_bar_fill)
+
+	xp_label = Label.new()
+	xp_label.add_theme_font_size_override("font_size", 11)
+	xp_label.add_theme_color_override("font_color", Color(0.6, 0.62, 0.8))
+	xp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	card_box.add_child(xp_label)
+
+	stats_label = Label.new()
+	stats_label.add_theme_font_size_override("font_size", 12)
+	stats_label.add_theme_color_override("font_color", Color(0.78, 0.76, 0.68))
+	card_box.add_child(stats_label)
+
+	# Quiver: only visible while a Bow is equipped (see update_quiver). Hovering the icon shows the live
+	# flame/freeze/bomb counts beside it.
+	quiver_row = HBoxContainer.new()
+	quiver_row.add_theme_constant_override("separation", 6)
+	quiver_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	quiver_row.visible = false
+	card_box.add_child(quiver_row)
 	quiver_icon = TextureButton.new()
 	quiver_icon.texture_normal = load("res://assets/quiver.png")
+	quiver_icon.ignore_texture_size = true
 	quiver_icon.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
 	quiver_icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	quiver_icon.position = Vector2(180, 40)
-	quiver_icon.size = Vector2(22, 22)
+	quiver_icon.custom_minimum_size = Vector2(22, 22)
 	quiver_icon.focus_mode = Control.FOCUS_NONE
 	quiver_icon.visible = false
 	quiver_icon.mouse_entered.connect(func(): quiver_tooltip_label.text = quiver_icon.get_meta("tooltip", ""))
 	quiver_icon.mouse_exited.connect(func(): quiver_tooltip_label.text = "")
-	overworld_hud_root.add_child(quiver_icon)
-
+	quiver_row.add_child(quiver_icon)
 	quiver_tooltip_label = Label.new()
-	quiver_tooltip_label.position = Vector2(206, 42)
-	quiver_tooltip_label.add_theme_font_size_override("font_size", 14)
+	quiver_tooltip_label.add_theme_font_size_override("font_size", 12)
 	quiver_tooltip_label.add_theme_color_override("font_color", Color(0.85, 0.85, 0.6))
-	overworld_hud_root.add_child(quiver_tooltip_label)
+	quiver_row.add_child(quiver_tooltip_label)
 
-	level_label = Label.new()
-	level_label.position = Vector2(16, 44)
-	level_label.add_theme_font_size_override("font_size", 20)
-	overworld_hud_root.add_child(level_label)
+	# --- the banner (top-right) ---
+	var banner := PanelContainer.new()
+	banner.anchor_left = 1.0
+	banner.anchor_right = 1.0
+	banner.anchor_top = 0.0
+	banner.anchor_bottom = 0.0
+	banner.offset_left = -14.0
+	banner.offset_right = -14.0
+	banner.offset_top = 14.0
+	banner.offset_bottom = 14.0
+	banner.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	banner.add_theme_stylebox_override("panel", _make_stylebox(HUD_PANEL_BG, PANEL_BORDER, 2, 0, 9))
+	overworld_hud_root.add_child(banner)
+	var banner_box := VBoxContainer.new()
+	banner_box.add_theme_constant_override("separation", 4)
+	banner_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	banner.add_child(banner_box)
 
-	xp_label = Label.new()
-	xp_label.position = Vector2(16, 72)
-	xp_label.add_theme_font_size_override("font_size", 18)
-	overworld_hud_root.add_child(xp_label)
-
-	stats_label = Label.new()
-	stats_label.position = Vector2(16, 98)
-	stats_label.add_theme_font_size_override("font_size", 18)
-	overworld_hud_root.add_child(stats_label)
-
-	coins_label = Label.new()
-	coins_label.position = Vector2(16, 126)
-	coins_label.add_theme_font_size_override("font_size", 20)
-	coins_label.add_theme_color_override("font_color", Color(1, 0.85, 0.3))
-	overworld_hud_root.add_child(coins_label)
-
-	items_label = Label.new()
-	items_label.position = Vector2(16, 154)
-	items_label.add_theme_font_size_override("font_size", 20)
-	items_label.add_theme_color_override("font_color", Color(0.6, 1.0, 0.6))
-	overworld_hud_root.add_child(items_label)
-
-	wave_label = Label.new()
-	wave_label.position = Vector2(16, 182)
-	wave_label.add_theme_font_size_override("font_size", 20)
-	overworld_hud_root.add_child(wave_label)
-
-	# Sits beside wave_label rather than stacking a new row -- Main.gd's
-	# WORLDS-driven text (e.g. "World: Beach (3/10)") is short enough to fit.
 	world_label = Label.new()
-	world_label.position = Vector2(140, 182)
-	world_label.add_theme_font_size_override("font_size", 20)
-	world_label.add_theme_color_override("font_color", Color(0.7, 0.85, 1.0))
-	overworld_hud_root.add_child(world_label)
+	world_label.add_theme_font_size_override("font_size", 19)
+	world_label.add_theme_color_override("font_color", Color(1.0, 0.92, 0.62))
+	world_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	world_label.custom_minimum_size = Vector2(MiniMapScript.MAP_PX.x, 0)
+	banner_box.add_child(world_label)
 
+	var danger_row := HBoxContainer.new()
+	danger_row.add_theme_constant_override("separation", 3)
+	danger_row.alignment = BoxContainer.ALIGNMENT_END
+	danger_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	banner_box.add_child(danger_row)
+	danger_caption = Label.new()
+	danger_caption.text = "Danger"
+	danger_caption.add_theme_font_size_override("font_size", 11)
+	danger_caption.add_theme_color_override("font_color", Color(0.65, 0.63, 0.58))
+	danger_row.add_child(danger_caption)
+	danger_pips = []
+	for i in DANGER_PIPS:
+		var pip := ColorRect.new()
+		pip.custom_minimum_size = Vector2(10, 10)
+		pip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		danger_row.add_child(pip)
+		danger_pips.append(pip)
+	set_danger(0)
+
+	var purse_row := HBoxContainer.new()
+	purse_row.add_theme_constant_override("separation", 5)
+	purse_row.alignment = BoxContainer.ALIGNMENT_END
+	purse_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	banner_box.add_child(purse_row)
+	var coin_icon := TextureRect.new()
+	coin_icon.texture = load("res://assets/coin.png")
+	coin_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	coin_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	coin_icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	coin_icon.custom_minimum_size = Vector2(18, 18)
+	purse_row.add_child(coin_icon)
+	coins_label = Label.new()
+	coins_label.add_theme_font_size_override("font_size", 17)
+	coins_label.add_theme_color_override("font_color", Color(1, 0.85, 0.3))
+	purse_row.add_child(coins_label)
+	var purse_gap := Control.new()
+	purse_gap.custom_minimum_size = Vector2(10, 0)
+	purse_row.add_child(purse_gap)
+	var item_icon := TextureRect.new()
+	item_icon.texture = load("res://assets/potion.png")
+	item_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	item_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	item_icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	item_icon.custom_minimum_size = Vector2(18, 18)
+	purse_row.add_child(item_icon)
+	items_label = Label.new()
+	items_label.add_theme_font_size_override("font_size", 17)
+	items_label.add_theme_color_override("font_color", Color(0.6, 1.0, 0.6))
+	purse_row.add_child(items_label)
+
+	var tally_row := HBoxContainer.new()
+	tally_row.add_theme_constant_override("separation", 10)
+	tally_row.alignment = BoxContainer.ALIGNMENT_END
+	tally_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	banner_box.add_child(tally_row)
+	wave_label = Label.new()
+	wave_label.add_theme_font_size_override("font_size", 12)
+	wave_label.add_theme_color_override("font_color", Color(0.75, 0.74, 0.7))
+	tally_row.add_child(wave_label)
 	enemies_label = Label.new()
-	enemies_label.position = Vector2(16, 210)
-	enemies_label.add_theme_font_size_override("font_size", 20)
-	overworld_hud_root.add_child(enemies_label)
+	enemies_label.add_theme_font_size_override("font_size", 12)
+	enemies_label.add_theme_color_override("font_color", Color(0.9, 0.55, 0.5))
+	tally_row.add_child(enemies_label)
 
+	minimap = MiniMapScript.new()
+	minimap.size_flags_horizontal = Control.SIZE_SHRINK_END
+	banner_box.add_child(minimap)
+
+	# --- messages and the controls reminder (bottom) ---
+	message_toast = PanelContainer.new()
+	message_toast.anchor_left = 0.5
+	message_toast.anchor_right = 0.5
+	message_toast.anchor_top = 1.0
+	message_toast.anchor_bottom = 1.0
+	message_toast.offset_top = -86.0
+	message_toast.offset_bottom = -86.0
+	message_toast.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	message_toast.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	message_toast.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	message_toast.add_theme_stylebox_override("panel", _make_stylebox(Color(0.05, 0.045, 0.07, 0.82), PANEL_BORDER, 2, 0, 9))
+	message_toast.visible = false
+	overworld_hud_root.add_child(message_toast)
 	message_label = Label.new()
-	message_label.position = Vector2(16, 242)
-	message_label.add_theme_font_size_override("font_size", 24)
-	message_label.add_theme_color_override("font_color", Color(1, 0.9, 0.2))
-	overworld_hud_root.add_child(message_label)
+	message_label.add_theme_font_size_override("font_size", 20)
+	message_label.add_theme_color_override("font_color", Color(1, 0.9, 0.3))
+	message_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	message_toast.add_child(message_label)
 
 	var help_label := Label.new()
-	help_label.position = Vector2(16, 278)
-	help_label.text = "Arrows to move, WASD to attack, C for menu, I for inventory"
+	help_label.text = "Arrows move   ·   WASD attack   ·   C menu   ·   I inventory"
+	help_label.add_theme_font_size_override("font_size", 12)
+	help_label.add_theme_color_override("font_color", Color(0.85, 0.85, 0.8, 0.5))
+	help_label.anchor_top = 1.0
+	help_label.anchor_bottom = 1.0
+	help_label.offset_left = 16.0
+	help_label.offset_top = -30.0
+	help_label.offset_bottom = -30.0
+	help_label.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	help_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	overworld_hud_root.add_child(help_label)
 
 	menu_panel = ColorRect.new()
@@ -1907,9 +2049,9 @@ func _style_shop_action_button(button: Button, primary: bool) -> void:
 	button.add_theme_stylebox_override("focus", _make_stylebox(Color(0, 0, 0, 0), Color(1.0, 0.9, 0.2), 2, 0, 10))
 
 func update_health(current: int, max_health: int) -> void:
-	health_label.text = "HP: %d / %d" % [current, max_health]
+	health_label.text = "%d / %d" % [current, max_health]
 	var ratio: float = clampf(float(current) / float(max(1, max_health)), 0.0, 1.0)
-	health_bar_fill.size = Vector2(health_bar_bg.size.x * ratio, health_bar_bg.size.y)
+	health_bar_fill.size = Vector2(health_bar_bg.custom_minimum_size.x * ratio, health_bar_bg.custom_minimum_size.y)
 
 # Quiver only shows up while a Bow is equipped -- hovering it reveals the
 # live held count of each arrow type via quiver_tooltip_label. The tooltip
@@ -1920,6 +2062,7 @@ func update_health(current: int, max_health: int) -> void:
 # battle, leaving either back to the overworld).
 func update_quiver(has_bow: bool, owned_arrows: Dictionary) -> void:
 	quiver_icon.visible = has_bow
+	quiver_row.visible = has_bow
 	if not has_bow:
 		quiver_tooltip_label.text = ""
 		return
@@ -1930,22 +2073,43 @@ func update_quiver(has_bow: bool, owned_arrows: Dictionary) -> void:
 	quiver_icon.set_meta("tooltip", "\n".join(lines))
 
 func update_enemies(count: int) -> void:
-	enemies_label.text = "Enemies nearby: %d" % count
+	enemies_label.text = "%d nearby" % count
 
 func update_wave(wave: int) -> void:
-	wave_label.text = "Wave: %d" % wave
+	wave_label.text = "Wave %d" % wave
 
 func update_world(text: String) -> void:
 	world_label.text = text
 
+# How dangerous the ground you stand on is (WorldMap.gd tier, 0 = none, e.g. inside the town): filled pips,
+# green through red.
+func set_danger(tier: int) -> void:
+	for i in danger_pips.size():
+		var pip: ColorRect = danger_pips[i]
+		if i < tier:
+			pip.color = Color(0.45, 0.85, 0.35).lerp(Color(0.95, 0.2, 0.15), float(i) / float(maxi(1, danger_pips.size() - 1)))
+		else:
+			pip.color = Color(0.2, 0.19, 0.22, 0.9)
+	if danger_caption != null:
+		danger_caption.visible = tier > 0
+	for pip in danger_pips:
+		pip.visible = tier > 0
+
+func update_minimap(world_pos: Vector2) -> void:
+	if minimap != null:
+		minimap.set_player(world_pos)
+
 func update_level(level: int) -> void:
-	level_label.text = "Level: %d" % level
+	level_label.text = "LV %d" % level
 
 func update_xp(current: int, needed: int) -> void:
 	if needed <= 0:
-		xp_label.text = "XP: MAX LEVEL"
+		xp_label.text = "XP  MAX LEVEL"
+		xp_bar_fill.size = Vector2(xp_bar_bg.custom_minimum_size.x, xp_bar_bg.custom_minimum_size.y)
 	else:
-		xp_label.text = "XP: %d / %d" % [current, needed]
+		xp_label.text = "XP  %d / %d" % [current, needed]
+		var ratio: float = clampf(float(current) / float(needed), 0.0, 1.0)
+		xp_bar_fill.size = Vector2(xp_bar_bg.custom_minimum_size.x * ratio, xp_bar_bg.custom_minimum_size.y)
 
 func update_stats(intimidation: int, strength: int, vigor: int, agility: int, might: int) -> void:
 	# stat_agility is a real move-speed value in pixels/sec (starts at 180),
@@ -1957,10 +2121,24 @@ func update_stats(intimidation: int, strength: int, vigor: int, agility: int, mi
 	stats_label.text = "INT %d   STR %d   VIG %d   AGI %d   MGT %d" % [intimidation, strength, vigor, speed_display, might]
 
 func update_items(count: int) -> void:
-	items_label.text = "Items: %d" % count
+	items_label.text = "%d" % count
 
+# A message pops up near the bottom of the screen and fades away on its own (it used to sit in a text stack
+# until something replaced it).
 func show_message(text: String) -> void:
 	message_label.text = text
+	if message_tween != null:
+		message_tween.kill()
+	if text == "":
+		message_toast.visible = false
+		return
+	message_toast.visible = true
+	message_toast.modulate.a = 1.0
+	message_tween = create_tween()
+	message_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	message_tween.tween_interval(3.4)
+	message_tween.tween_property(message_toast, "modulate:a", 0.0, 0.9)
+	message_tween.tween_callback(func(): message_toast.visible = false)
 
 func show_game_over(essence_earned: int, total_essence: int, stats: Dictionary = {}) -> void:
 	game_over_label.add_theme_color_override("font_color", Color(1, 0.3, 0.3))
@@ -2162,7 +2340,7 @@ func _input(event: InputEvent) -> void:
 	_refresh_settings_display()
 
 func update_coins(amount: int) -> void:
-	coins_label.text = "Coins: %d" % amount
+	coins_label.text = "%d" % amount
 
 func show_shop(coins: int, runic_shards: int, offering: Array, prices: Array, current_weapon_name: String, owned_weapons: Dictionary, current_armor_name: String, potion_count: int, reroll_cost: int, is_bow_equipped: bool = false, owned_arrows: Dictionary = {}, arrow_prices: Dictionary = {}, arrow_cap: int = WeaponsScript.ARROW_MAX_HELD, current_shield_name: String = "None", owned_shields: Dictionary = {}, player_might: int = 0, shopkeeper_lines: Array = [], unlimited_arrows: bool = false, player_intimidation: int = 0) -> void:
 	for n in shop_row_nodes:

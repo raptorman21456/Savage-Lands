@@ -34,6 +34,7 @@ func _init() -> void:
 	# --- A fresh run's player picks all of this up automatically. ---
 	var main_scene = load("res://Main.tscn")
 	var main = main_scene.instantiate()
+	main.regional_world = false  # this test drives the old wave-ladder world
 	root.add_child(main)
 	await physics_frame
 	await physics_frame

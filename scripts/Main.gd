@@ -1,6 +1,8 @@
 extends Node2D
 
 const PlayerScript := preload("res://scripts/Player.gd")
+const WorldMapScript := preload("res://scripts/WorldMap.gd")
+const OverworldMapScript := preload("res://scripts/OverworldMap.gd")
 const EnemyScript := preload("res://scripts/Enemy.gd")
 const OrcScript := preload("res://scripts/Orc.gd")
 const ArcherScript := preload("res://scripts/Archer.gd")
@@ -70,7 +72,7 @@ const SFX_POOL_SIZE := 6
 # Roughly 25x the old 700x500 box -- big enough that the camera (see
 # _build_camera) actually scrolls instead of the whole arena just sitting
 # fully visible on screen.
-const WORLD_SIZE := Vector2(4800, 3400)
+const WORLD_SIZE := WorldMapScript.SIZE
 # Overworld scatter sprites (and every town building, see TOWN_BUILDING_
 # SCALE) are 1x-native pixel art, drawn well under the player's own 2x --
 # a tree the same height as the player read as a shrub. Trees are trunk-
@@ -194,7 +196,8 @@ static var RACE_TRACK_RECT := Rect2(TOWN_AREA_ORIGIN + Vector2(1900, 40), Vector
 # there too -- placed just outside its south gate instead, so a run starts
 # right at the town's doorstep: walk up to go in, or head out into the
 # wilderness immediately.
-const PLAYER_SPAWN_POSITION := Vector2(WORLD_SIZE.x / 2, TOWN_AREA_ORIGIN.y + TOWN_SIZE.y + 220)
+# You wake on the inner edge of the woods in the top-left, toward the middle of the map (WorldMap.gd).
+const PLAYER_SPAWN_POSITION := WorldMapScript.SPAWN_N * WorldMapScript.SIZE
 # Overworld party followers (_update_party_followers) -- a simple recorded-
 # trail follow, the same shape as a classic JRPG follower train: every
 # physics frame the player's position is appended to player_trail, and
@@ -838,6 +841,17 @@ var town_building_positions := {}
 # enter/leave, not every frame -- see _update_town_label.
 var was_in_town := false
 var ground: TextureRect
+# The regional overworld (WorldMap.gd / OverworldMap.gd): a continent of regions you walk between, each with its
+# own look, enemies and danger tier, instead of one arena whose biome swapped every ten waves. false = the old
+# wave-ladder behaviour, which the tests of that system still drive.
+var regional_world := true
+var overworld_map: Node2D = null
+var current_region_id := ""
+var region_check_timer := 0.0
+var ambient_spawn_timer := 0.0
+var defeated_landmark_bosses: Dictionary = {}   # landmark id -> true, for this run
+var landmark_bosses: Dictionary = {}            # landmark id -> the boss node standing there
+var roaming_minibosses: Dictionary = {}         # miniboss key -> the node roaming now
 var deco_nodes: Array = []
 var deco_collision_nodes: Array = []
 # Matches _build_world()'s always-grass initial setup so the boot-time
@@ -1161,7 +1175,12 @@ func _ready() -> void:
 	_spawn_player()
 	_spawn_wave()
 	_build_hud()
-	ground.texture = hud.grass_animated_texture
+	if ground != null:
+		ground.texture = hud.grass_animated_texture
+	elif overworld_map != null:
+		overworld_map.apply_animated_textures(hud.grass_animated_texture, HUDScript.water_animated_texture)
+		current_region_id = ""
+		_track_player_region()
 	_apply_world_visuals()
 	_build_camera()
 	_build_sfx()
@@ -1281,6 +1300,9 @@ func play_sfx(name: String, pitch_scale: float = 1.0) -> void:
 # built separately here since _build_world() runs before _build_hud() and
 # has no HUD instance yet to borrow one from.
 func _build_world() -> void:
+	if regional_world:
+		_build_regional_world()
+		return
 	# A plain static frame for now -- swapped for HUD's shared
 	# grass_animated_texture once HUD exists (see _ready()). Godot doesn't
 	# animate correctly when two separate AnimatedTexture instances wrap the
@@ -1824,6 +1846,7 @@ func _update_town_label() -> void:
 	was_in_town = now_in_town
 	if now_in_town:
 		hud.update_world("Town")
+		hud.set_danger(0)
 		hud.show_message("You enter the town.")
 	else:
 		_apply_world_visuals()
@@ -1920,6 +1943,11 @@ func _world_index_for_wave(w: int) -> int:
 # refreshes the HUD's world label. Called once at boot and again every time
 # a wave transition changes current_world_index.
 func _apply_world_visuals() -> void:
+	if regional_world:
+		# The ground belongs to the regions now -- only the label follows where you stand.
+		hud.update_world(_world_label_text())
+		hud.set_danger(0 if _in_town_area(player.global_position) else int(WorldMapScript.region_at(player.global_position).tier))
+		return
 	var world: Dictionary = WORLDS[current_world_index]
 	var biome: String = world.get("biome", "grass")
 	if biome != current_biome_built:
@@ -1934,6 +1962,9 @@ func _apply_world_visuals() -> void:
 	hud.update_world(_world_label_text())
 
 func _world_label_text() -> String:
+	if regional_world:
+		var region: Dictionary = WorldMapScript.region_at(player.global_position) if player != null else WorldMapScript.region("woods_edge")
+		return str(region.name)
 	var w: Dictionary = WORLDS[current_world_index]
 	if current_world_index == WORLDS.size() - 1:
 		return "World: %s" % w.name
@@ -1941,6 +1972,9 @@ func _world_label_text() -> String:
 	return "World: %s (%d/%d)" % [w.name, wave_in_world, WAVES_PER_WORLD]
 
 func _spawn_wave() -> void:
+	if regional_world:
+		_spawn_regional_wave()
+		return
 	# Nothingness (the last WORLDS entry) is a fixed 6-fight sequential
 	# gauntlet, not the normal wave-climbing waterfall below -- checked
 	# first and returns early for the 6 rush waves themselves. Once cleared
@@ -2022,38 +2056,61 @@ func _spawn_enemies(enemy_script, count: int, force_elite: bool = false, cluster
 	count = mini(count, maxi(0, MAX_AMBIENT_ENEMIES - enemies_alive))
 	var cluster_origin := Vector2.ZERO
 	for i in count:
-		var enemy = enemy_script.new()
+		var pos: Vector2
 		if cluster_radius > 0.0 and i > 0:
-			enemy.position = cluster_origin + Vector2(randf_range(-cluster_radius, cluster_radius), randf_range(-cluster_radius, cluster_radius))
+			pos = cluster_origin + Vector2(randf_range(-cluster_radius, cluster_radius), randf_range(-cluster_radius, cluster_radius))
 		else:
-			enemy.position = _random_enemy_spawn_position()
-			cluster_origin = enemy.position
-		if (force_elite and i == 0) or randf() < ELITE_CHANCE:
-			enemy.is_elite = true
-			# Tinted on the root node, not the child sprite -- every enemy
-			# script repaints sprite.modulate every frame for its own damage
-			# flash/windup effects, which would otherwise erase this within
-			# a single frame. A parent CanvasItem's modulate multiplies
-			# through to its children's rendering regardless.
-			enemy.modulate = ELITE_TINT
-		# Traitor Wolf: a rarer roll on top of (and independent from) Elite,
-		# only checked for Wolf spawns. The extra died connection is
-		# additional to the normal one below, not instead of it -- only ever
-		# wired up here, when is_traitor is already known true, so
-		# _on_wolf_died firing at all is proof enough of which enemy it was;
-		# no need to identify the instance inside the handler itself.
-		# Wolf Fang (talisman): a relative bump to how often a spawned Wolf
-		# turns out to be a Traitor Wolf -- "25% more often" means x1.25, not
-		# +25 percentage points.
-		var traitor_wolf_chance: float = TRAITOR_WOLF_CHANCE * (1.0 + player.talisman_bonus("traitor_wolf_chance_pct"))
-		if enemy_script == WolfScript and randf() < traitor_wolf_chance:
-			enemy.is_traitor = true
-			enemy.modulate = TRAITOR_WOLF_TINT
-			enemy.died.connect(_on_wolf_died)
-		enemy.died.connect(_on_enemy_died.bind(enemy.get_display_name()))
-		_size_overworld_enemy(enemy)
-		add_child(enemy)
-		enemies_alive += 1
+			pos = _random_enemy_spawn_position()
+			cluster_origin = pos
+		_spawn_one_enemy(enemy_script, pos, force_elite and i == 0)
+
+# One roaming enemy at `pos`: the Elite and Traitor Wolf rolls, its signals, its size -- and, in the regional
+# world, the danger tier of the ground it stands on.
+func _spawn_one_enemy(enemy_script, pos: Vector2, force_elite: bool = false) -> Node:
+	var enemy = enemy_script.new()
+	enemy.position = pos
+	if force_elite or randf() < ELITE_CHANCE:
+		enemy.is_elite = true
+		# Tinted on the root node, not the child sprite -- every enemy
+		# script repaints sprite.modulate every frame for its own damage
+		# flash/windup effects, which would otherwise erase this within
+		# a single frame. A parent CanvasItem's modulate multiplies
+		# through to its children's rendering regardless.
+		enemy.modulate = ELITE_TINT
+	# Traitor Wolf: a rarer roll on top of (and independent from) Elite,
+	# only checked for Wolf spawns. The extra died connection is
+	# additional to the normal one below, not instead of it -- only ever
+	# wired up here, when is_traitor is already known true, so
+	# _on_wolf_died firing at all is proof enough of which enemy it was;
+	# no need to identify the instance inside the handler itself.
+	# Wolf Fang (talisman): a relative bump to how often a spawned Wolf
+	# turns out to be a Traitor Wolf -- "25% more often" means x1.25, not
+	# +25 percentage points.
+	var traitor_wolf_chance: float = TRAITOR_WOLF_CHANCE * (1.0 + player.talisman_bonus("traitor_wolf_chance_pct"))
+	if enemy_script == WolfScript and randf() < traitor_wolf_chance:
+		enemy.is_traitor = true
+		enemy.modulate = TRAITOR_WOLF_TINT
+		enemy.died.connect(_on_wolf_died)
+	_connect_enemy_death(enemy)
+	_size_overworld_enemy(enemy)
+	add_child(enemy)
+	enemies_alive += 1
+	return enemy
+
+# Wires a roaming enemy's death to the usual reward handler. In the regional world the XP is scaled up with the
+# danger tier of the ground it was spawned on (so the harder regions pay), and the tier's hit-point / damage
+# multiplier is stamped on it for the battle to read (_setup_battle_grid).
+func _connect_enemy_death(enemy: Node) -> void:
+	var display_name: String = enemy.get_display_name()
+	if not regional_world:
+		enemy.died.connect(_on_enemy_died.bind(display_name))
+		return
+	var tier: int = int(WorldMapScript.region_at(enemy.position).tier)
+	var power: float = WorldMapScript.tier_power(tier)
+	enemy.set_meta("region_tier", tier)
+	enemy.set_meta("region_tier_power", power)
+	var xp_mult: float = sqrt(power)
+	enemy.died.connect(func(xp: int): _on_enemy_died(int(round(float(xp) * xp_mult)), display_name))
 
 func _size_overworld_enemy(enemy: Node2D) -> void:
 	enemy.scale = Vector2(OVERWORLD_ENEMY_SCALE, OVERWORLD_ENEMY_SCALE)
@@ -2062,6 +2119,10 @@ func _size_overworld_enemy(enemy: Node2D) -> void:
 # player instead of other decorations -- 30 attempts, then place wherever the
 # last roll landed rather than risk a hang on a cramped map.
 func _random_enemy_spawn_position() -> Vector2:
+	if regional_world:
+		var ring: Dictionary = _regional_spawn_spot()
+		if not ring.is_empty():
+			return ring.pos
 	var pos := Vector2.ZERO
 	var attempts := 0
 	while attempts < 30:
@@ -2070,6 +2131,212 @@ func _random_enemy_spawn_position() -> Vector2:
 		if pos.distance_to(player.global_position) >= ENEMY_SPAWN_CLEARANCE and not _in_protected_zone(pos, 150.0):
 			break
 	return pos
+
+# --- The regional overworld -------------------------------------------------------------------
+# What spawns where is the REGION's business (WorldMap.gd): every region has a danger tier and a table of the
+# enemies that live there. Enemies are kept topped up in a ring around the player -- close enough to find, far
+# enough off screen -- and let go once you have left them far behind. The six bosses stand on their landmarks
+# (the HeartWood, the Lizen Encampment...) and the five minibosses roam their own regions now and then.
+
+const AMBIENT_TARGET := 12            # roaming enemies kept near you
+const AMBIENT_RADIUS := 2800.0        # "near you"
+const SPAWN_RING_MIN := 900.0
+const SPAWN_RING_MAX := 1900.0
+const DESPAWN_DISTANCE := 4300.0
+const AMBIENT_SPAWN_INTERVAL := 1.6
+const MINIBOSS_CHANCE := 0.04
+const BOSS_SPAWN_RADIUS := 2600.0     # a landmark's boss appears once you are this close
+const BOSS_WAKE_RADIUS := 750.0       # ...and starts to move once you are this close
+const REGION_ENEMY_SCRIPTS := {
+	"goblin": EnemyScript, "orc": OrcScript, "archer": ArcherScript, "brute": BruteScript, "shade": ShadeScript,
+	"wolf": WolfScript, "centaur_pack": CentaurScript, "fae_hut": FaeHutScript, "gnome_pack": GnomeScript,
+}
+const LANDMARK_BOSS_SCRIPTS := {
+	"elder_oak": ElderOakScript, "lizen_warband": LizenWarbandScript, "leviathan": LeviathanScript,
+	"white_dragon": WhiteDragonScript, "red_wyrm": RedWyrmScript, "archmage": ArchmageScript,
+}
+const MINIBOSS_SCRIPTS := {
+	"treant": TreantScript, "black_dragonlet": BlackDragonletScript, "iron_construct": IronConstructScript,
+	"lava_construct": LavaConstructScript, "voidwing": VoidwingScript,
+}
+
+func _build_regional_world() -> void:
+	overworld_map = OverworldMapScript.new()
+	overworld_map.protected_check = func(p: Vector2) -> bool: return _in_protected_zone(p, 150.0)
+	add_child(overworld_map)
+	overworld_map.build()
+	var thickness := 32.0
+	_add_wall(Vector2(WORLD_SIZE.x / 2, -thickness / 2), Vector2(WORLD_SIZE.x, thickness))
+	_add_wall(Vector2(WORLD_SIZE.x / 2, WORLD_SIZE.y + thickness / 2), Vector2(WORLD_SIZE.x, thickness))
+	_add_wall(Vector2(-thickness / 2, WORLD_SIZE.y / 2), Vector2(thickness, WORLD_SIZE.y))
+	_add_wall(Vector2(WORLD_SIZE.x + thickness / 2, WORLD_SIZE.y / 2), Vector2(thickness, WORLD_SIZE.y))
+	overworld_map.update_chunks(PLAYER_SPAWN_POSITION)
+
+func _world_index_for_world_id(world_id: String) -> int:
+	for i in WORLDS.size():
+		if WORLDS[i].id == world_id:
+			return i
+	return 0
+
+# Which region you are standing in decides the battle's terrain and backdrop (the world it belongs to), the label
+# on screen, and what spawns around you.
+func _track_player_region() -> void:
+	if player == null:
+		return
+	var region: Dictionary = WorldMapScript.region_at(player.global_position)
+	if region.id == current_region_id:
+		return
+	var previous_name := ""
+	if current_region_id != "":
+		previous_name = str(WorldMapScript.region(current_region_id).get("name", ""))
+	current_region_id = region.id
+	current_world_index = _world_index_for_world_id(str(region.world))
+	if hud != null:
+		_apply_world_visuals()
+		if previous_name != "" and previous_name != region.name and not in_battle:
+			hud.show_message("Entering %s" % region.name)
+
+# Called every frame the overworld is live (see _process).
+func _update_regional_world(delta: float) -> void:
+	if not regional_world or player == null or overworld_map == null:
+		return
+	overworld_map.update_chunks(player.global_position)
+	hud.update_minimap(player.global_position)
+	region_check_timer -= delta
+	if region_check_timer <= 0.0:
+		region_check_timer = 0.25
+		_track_player_region()
+	ambient_spawn_timer -= delta
+	if ambient_spawn_timer <= 0.0:
+		ambient_spawn_timer = AMBIENT_SPAWN_INTERVAL
+		_release_far_enemies()
+		_fill_ambient_population(AMBIENT_TARGET)
+	_update_landmark_bosses()
+
+func _enemies_near(center: Vector2, radius: float) -> int:
+	var n := 0
+	for e in get_tree().get_nodes_in_group("enemies"):
+		if is_instance_valid(e) and e.global_position.distance_to(center) <= radius:
+			n += 1
+	return n
+
+# A spot in the ring around the player that is walkable ground in a region with wild enemies, off the town's
+# doorstep. {} when none turned up.
+func _regional_spawn_spot() -> Dictionary:
+	if player == null:
+		return {}
+	for attempt in 18:
+		var angle: float = randf() * TAU
+		var dist: float = randf_range(SPAWN_RING_MIN, SPAWN_RING_MAX)
+		var pos: Vector2 = player.global_position + Vector2(cos(angle), sin(angle)) * dist
+		if pos.x < 80.0 or pos.y < 80.0 or pos.x > WORLD_SIZE.x - 80.0 or pos.y > WORLD_SIZE.y - 80.0:
+			continue
+		var region: Dictionary = WorldMapScript.region_at(pos)
+		if not region.walkable or region.enemies.is_empty() or _in_protected_zone(pos, 150.0):
+			continue
+		return {"pos": pos, "region": region}
+	return {}
+
+func _pick_region_enemy(region: Dictionary) -> String:
+	var total := 0.0
+	for entry in region.enemies:
+		total += float(entry[1])
+	var roll: float = randf() * total
+	for entry in region.enemies:
+		roll -= float(entry[1])
+		if roll <= 0.0:
+			return str(entry[0])
+	return str(region.enemies[0][0])
+
+# Tops the ring up to `target` roaming enemies: each spawn picks a spot, then an enemy that lives there.
+func _fill_ambient_population(target: int, extra_goblins: int = 0, force_elite: bool = false) -> void:
+	if in_battle or game_over:
+		return
+	var needed: int = target - _enemies_near(player.global_position, AMBIENT_RADIUS)
+	var spawned := 0
+	while spawned < needed and enemies_alive < MAX_AMBIENT_ENEMIES:
+		var spot: Dictionary = _regional_spawn_spot()
+		if spot.is_empty():
+			break
+		var region: Dictionary = spot.region
+		if region.miniboss != "" and randf() < MINIBOSS_CHANCE:
+			_spawn_roaming_miniboss(region, spot.pos)
+			spawned += 1
+			continue
+		var key: String = _pick_region_enemy(region)
+		var script = REGION_ENEMY_SCRIPTS[key]
+		var count := 1
+		var cluster := 0.0
+		if key == "centaur_pack":
+			count = CENTAUR_PACK_SIZE
+			cluster = BATTLE_GATHER_RADIUS * 0.4
+		elif key == "gnome_pack":
+			count = randi_range(2, GNOME_PACK_SIZE_MAX)
+			cluster = BATTLE_GATHER_RADIUS * 0.4
+		for i in count:
+			var at: Vector2 = spot.pos if i == 0 else spot.pos + Vector2(randf_range(-cluster, cluster), randf_range(-cluster, cluster))
+			_spawn_one_enemy(script, at, force_elite and spawned == 0 and i == 0)
+		spawned += count
+	# Goblin Swarm (a random event): a few extra goblins rush in on top.
+	for i in extra_goblins:
+		var spot: Dictionary = _regional_spawn_spot()
+		if spot.is_empty():
+			break
+		_spawn_one_enemy(EnemyScript, spot.pos)
+
+# Each wave transition (every KILLS_PER_TIER kills) and the first moment of the run top the ring up straight away.
+func _spawn_regional_wave() -> void:
+	var extra_goblins := event_extra_goblins
+	var force_elite := event_force_elite
+	event_extra_goblins = 0
+	event_force_elite = false
+	_fill_ambient_population(AMBIENT_TARGET, extra_goblins, force_elite)
+
+# Lets go of roaming enemies you have left far behind (never a boss): they are not killed, just gone, and the
+# ring spawns fresh ones where you are now.
+func _release_far_enemies() -> void:
+	for e in get_tree().get_nodes_in_group("enemies"):
+		if not is_instance_valid(e) or e.is_queued_for_deletion():
+			continue
+		if ENEMY_TRAITS.get(e.get_display_name(), {}).get("is_boss_tier", false):
+			continue
+		if e.global_position.distance_to(player.global_position) > DESPAWN_DISTANCE:
+			e.queue_free()
+			enemies_alive = maxi(0, enemies_alive - 1)
+
+func _spawn_roaming_miniboss(region: Dictionary, pos: Vector2) -> void:
+	var key: String = str(region.miniboss)
+	var current = roaming_minibosses.get(key)
+	if current != null and is_instance_valid(current) and not current.is_queued_for_deletion():
+		return
+	var boss = _spawn_one_enemy(MINIBOSS_SCRIPTS[key], pos)
+	roaming_minibosses[key] = boss
+	if hud != null:
+		hud.show_message("Something large stirs nearby...")
+
+# A landmark's boss appears when you come near its landmark, stays put until you are close, and is gone for the
+# run once beaten.
+func _update_landmark_bosses() -> void:
+	for l in WorldMapScript.landmarks:
+		if l.boss == "" or defeated_landmark_bosses.has(l.id):
+			continue
+		var node = landmark_bosses.get(l.id)
+		var dist: float = player.global_position.distance_to(l.pos)
+		if node == null or not is_instance_valid(node):
+			if dist < BOSS_SPAWN_RADIUS and not in_battle:
+				_spawn_landmark_boss(l)
+		elif not node.is_queued_for_deletion():
+			node.set_physics_process(dist < BOSS_WAKE_RADIUS or node.get("has_aggro") == true)
+
+func _spawn_landmark_boss(landmark: Dictionary) -> void:
+	var script = LANDMARK_BOSS_SCRIPTS[landmark.boss]
+	var offset := Vector2(0, 640) if landmark.id == "heartwood" else Vector2(0, 220)
+	var boss = _spawn_one_enemy(script, landmark.pos + offset)
+	boss.set_physics_process(false)
+	landmark_bosses[landmark.id] = boss
+	boss.died.connect(func(_xp): defeated_landmark_bosses[landmark.id] = true)
+	if hud != null:
+		hud.show_message("%s waits at %s..." % [boss.get_display_name(), landmark.name])
 
 func _spawn_boss_wave() -> void:
 	# Data-driven off WORLDS[current_world_index]: wave 5-of-10 in any world
@@ -3063,6 +3330,8 @@ func _process(delta: float) -> void:
 	_handle_debug_input()
 	_update_party_followers()
 	_update_town_label()
+	if not in_battle and not game_over and not event_choosing and not choosing_stat and not shop_open:
+		_update_regional_world(delta)
 
 	if event_choosing:
 		return
@@ -3257,7 +3526,7 @@ func _advance_wave_tier() -> void:
 	hud.update_wave(wave)
 	# The Seer sets out fresh talismans every kill milestone.
 	_roll_seer_stock()
-	if not nothingness_rush_complete:
+	if not nothingness_rush_complete and not regional_world:
 		current_world_index = _world_index_for_wave(wave)
 	_apply_world_visuals()
 	if shrine_effect_waves_remaining > 0:
@@ -3598,7 +3867,8 @@ func _setup_battle_grid(squad: Array) -> void:
 		# Baby/Hard/Apocalyptic (SaveData.gd:DIFFICULTIES) scale the same two
 		# real combat numbers "enemy stats" already means everywhere else
 		# (elite bonuses, level scaling) -- not enemy counts or move ranges.
-		var scale_mult: float = _enemy_level_scale(traits.get("is_boss_tier", false))
+		# The danger tier of the ground the enemy was spawned on (regional world; absent = 1.0).
+		var scale_mult: float = _enemy_level_scale(traits.get("is_boss_tier", false)) * float(e.get_meta("region_tier_power", 1.0))
 		var scaled_hp: int = max(1, int(round(e.MAX_HEALTH * scale_mult * elite_hp_mult * player.difficulty_mult * power_tier)))
 		if display_name == "Gnome" and gnome_pack_size > 1:
 			scaled_hp += (gnome_pack_size - 1) * GNOME_HP_PER_PACKMATE

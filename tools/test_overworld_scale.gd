@@ -10,6 +10,7 @@ func _init() -> void:
 	# is a real change, not luck.
 	seed(20260926)
 	var main = load("res://Main.tscn").instantiate()
+	main.regional_world = false  # this test drives the old wave-ladder world
 	root.add_child(main)
 	await physics_frame
 	await physics_frame

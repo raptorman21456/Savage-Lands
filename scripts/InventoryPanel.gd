@@ -24,6 +24,8 @@ const ArmorScript := preload("res://scripts/Armor.gd")
 const BlacksmithScript := preload("res://scripts/Blacksmith.gd")
 const TalismansScript := preload("res://scripts/Talismans.gd")
 const WeaponIconsScript := preload("res://scripts/WeaponIcons.gd")
+const WorldMapScript := preload("res://scripts/WorldMap.gd")
+const MiniMapScript := preload("res://scripts/MiniMap.gd")
 const PartyScreenScript := preload("res://scripts/PartyScreen.gd")
 
 const TABS := ["Weapons", "Items", "Talismans", "Party", "Map", "Settings"]
@@ -672,7 +674,7 @@ func _build_map_tab(container: VBoxContainer) -> void:
 	map_canvas.draw.connect(_on_map_draw)
 	container.add_child(map_canvas)
 	var legend := Label.new()
-	legend.text = "Green: you. Numbered gold dots: shops and services you've found so far. Tan box: the town."
+	legend.text = "White dot: you. Red dots: bosses. Gold squares: the castle town, the ranch and the ruins. Numbered gold dots: shops and services you've found so far."
 	legend.add_theme_font_size_override("font_size", 12)
 	legend.add_theme_color_override("font_color", Color(0.7, 0.7, 0.65))
 	container.add_child(legend)
@@ -699,6 +701,26 @@ func _on_map_draw() -> void:
 		return draw_offset + world_pos * scale_factor
 
 	map_canvas.draw_rect(Rect2(draw_offset, draw_size), Color(0.16, 0.22, 0.14), true)
+	# The continent: every region of the world map, painted bottom to top, with the big ones named.
+	if main.regional_world:
+		for r in WorldMapScript.regions:
+			var pts := PackedVector2Array()
+			for p in r.polygon:
+				pts.append(to_map.call(p))
+			if pts.size() >= 3 and not Geometry2D.triangulate_polygon(pts).is_empty():
+				map_canvas.draw_colored_polygon(pts, MiniMapScript.region_color(r))
+		for r in WorldMapScript.regions:
+			if r.id in ["great_expanse", "woods", "volcano_hills", "swamp", "ocean", "frozen_wastes", "voidlands", "desert", "mountains"]:
+				var centre: Vector2 = to_map.call(r.bounds.get_center() if r.id != "great_expanse" else Vector2(WorldMapScript.SIZE.x * 0.62, WorldMapScript.SIZE.y * 0.42))
+				var label_text: String = "Lexian Peaks" if r.id == "mountains" else str(r.name)
+				map_canvas.draw_string(font, centre + Vector2(-60, 0), label_text, HORIZONTAL_ALIGNMENT_CENTER, 120, 12, Color(1, 1, 1, 0.85))
+		for l in WorldMapScript.landmarks:
+			var at: Vector2 = to_map.call(l.pos)
+			if l.kind == "boss":
+				map_canvas.draw_circle(at, 4.0, Color(0.9, 0.2, 0.2))
+				map_canvas.draw_circle(at, 4.0, Color(0, 0, 0, 0.8), false, 1.0)
+			elif l.kind in ["town", "ruins", "ranch"]:
+				map_canvas.draw_rect(Rect2(at - Vector2(3.5, 3.5), Vector2(7, 7)), Color(1.0, 0.85, 0.3))
 	map_canvas.draw_rect(Rect2(draw_offset, draw_size), Color(0.55, 0.55, 0.5), false, 2.0)
 
 	var town_top_left: Vector2 = to_map.call(main.TOWN_AREA_ORIGIN)
@@ -728,8 +750,12 @@ func _on_map_draw() -> void:
 		number += 1
 
 	var player_p: Vector2 = to_map.call(_player.global_position)
-	map_canvas.draw_circle(player_p, 6, Color(0.3, 0.95, 0.3))
-	map_canvas.draw_circle(player_p, 6, Color(1, 1, 1), false, 1.5)
+	if main.regional_world:
+		map_canvas.draw_circle(player_p, 7, Color(0, 0, 0, 0.85))
+		map_canvas.draw_circle(player_p, 5, Color(1, 1, 1))
+	else:
+		map_canvas.draw_circle(player_p, 6, Color(0.3, 0.95, 0.3))
+		map_canvas.draw_circle(player_p, 6, Color(1, 1, 1), false, 1.5)
 
 # Wearing an armour from the grid (it is owned, so this costs nothing).
 func _on_armor_picked(armor: Dictionary) -> void:

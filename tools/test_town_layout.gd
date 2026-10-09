@@ -24,6 +24,7 @@ func _init() -> void:
 	# is a real change, not luck.
 	seed(20260926)
 	var main = load("res://Main.tscn").instantiate()
+	main.regional_world = false  # this test drives the old wave-ladder world
 	root.add_child(main)
 	await physics_frame
 	await physics_frame
@@ -41,7 +42,7 @@ func _init() -> void:
 	var castle := Rect2(Vector2(center.x, 260) - Vector2(320, 288) / 2.0, Vector2(320, 288))
 	var fountain := Rect2(center - Vector2(120, 108) / 2.0, Vector2(120, 108))
 
-	print("world is the bigger 4800x3400 map: %s (expected true)" % [main.WORLD_SIZE == Vector2(4800, 3400)])
+	print("world is the 7x map (33600 x 23800): %s (expected true)" % [main.WORLD_SIZE == Vector2(33600, 23800)])
 	print("all %d layout slots are non-empty and every built kind has one: %s (expected true)" % [
 		layout.size(), layout.size() >= 13 and main.TOWN_BUILT_KINDS.all(func(k): return layout.has(k))
 	])

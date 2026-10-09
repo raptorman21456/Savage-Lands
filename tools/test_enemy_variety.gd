@@ -20,6 +20,7 @@ func _init() -> void:
 	seed(20260926)
 	var main_scene = load("res://Main.tscn")
 	var main = main_scene.instantiate()
+	main.regional_world = false  # this test drives the old wave-ladder world
 	root.add_child(main)
 	await physics_frame
 	await physics_frame
@@ -168,6 +169,7 @@ func _init() -> void:
 	player.xp = 0
 	player.xp_to_next = player.XP_BASE + player.XP_PER_LEVEL * player.level
 	player.stat_vigor = 100
+	player.berserk_turns_remaining = 0  # a kill in the loop above can leave Berserk running
 	player._recalc_stats()
 	main.choosing_stat = false
 	main.get_tree().paused = false
@@ -177,8 +179,11 @@ func _init() -> void:
 	main.battle_player_tile = Vector2i(2, 2)
 	main.battle_player_defending = false
 	player.health = player.max_health
-	main.battle_units = [_make_unit(main, shade, Vector2i(3, 2), 1, "Shade", 10)]
-	main._process_enemy_turn()
+	var landing_unit: Dictionary = _make_unit(main, shade, Vector2i(3, 2), 1, "Shade", 10)
+	main.battle_units = [landing_unit]
+	# Resolve ONE landed hit directly: a whole enemy turn also lets the hero's forced Fear attack miss (the Shade
+	# dodges 40%) and the Shade swing again, which would make this depend on the dice.
+	await main._enemy_apply_damage(landing_unit, main.battle_player_tile, 10, main.ENEMY_TRAITS["Shade"])
 	print("shade deals 10 damage when it lands a hit: player_health=%d (expected max_health-10=%d)" % [
 		player.health, player.max_health - 10
 	])
