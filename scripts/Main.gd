@@ -55,6 +55,7 @@ const AttackTimingsScript := preload("res://scripts/AttackTimings.gd")
 const AttackMinigameScript := preload("res://scripts/AttackMinigame.gd")
 const PartyRulesScript := preload("res://scripts/PartyRules.gd")
 const PartyKitsScript := preload("res://scripts/PartyKits.gd")
+const MaterialsScript := preload("res://scripts/Materials.gd")
 
 # Phantom Guard's "evasive" special: fired the instant the player picks one
 # of the offered dodge-roll directions -- see _prompt_evasion_reposition.
@@ -560,6 +561,8 @@ const CENTAUR_ARCHER_ATTACK_RANGE := 3
 # A Shade has only 1 HP (see Shade.gd) -- this is its entire defense.
 const SHADE_DODGE_CHANCE := 0.4
 
+# "harm" says what kind of damage its attacks deal: "bodily" (the default -- weapons, claws, arrows), "magical"
+# (spells), or "both" (breath weapons: half and half). See _apply_incoming_reductions.
 # Each non-default enemy type's tile-battle combat identity, looked up by
 # display name -- adding a new type's gimmick is a data entry here instead of
 # another name check scattered through the turn logic below. Anything absent
@@ -579,7 +582,7 @@ const ENEMY_TRAITS := {
 	# _can_battle_attack) -- a caster's arcing bolt instead of a bowstring's
 	# dead-straight shot. Doesn't kite/strafe -- that identity moved to the
 	# Centaur Archer variant below, so the two ranged enemies feel distinct.
-	"Apprentice Mage": {"attack_range": ARCHER_ATTACK_RANGE, "ignore_line": true, "inflicts_blind": true, "inflicts_fear": true},
+	"Apprentice Mage": {"harm": "magical", "attack_range": ARCHER_ATTACK_RANGE, "ignore_line": true, "inflicts_blind": true, "inflicts_fear": true},
 	# A full 2x2 footprint (see the "size" field in _setup_battle_grid) that
 	# ignores every terrain rule entirely -- rocks, water, ledges, cliffs all
 	# do nothing to it -- on top of shrugging off rock cover and resisting
@@ -588,7 +591,7 @@ const ENEMY_TRAITS := {
 	# Fastest thing on the grid, but a single hit that actually lands is
 	# always lethal (1 HP) -- its only defense is a real chance to dodge
 	# entirely instead of soaking the hit.
-	"Shade": {"move_range": 3, "big_squad": true, "dodge_chance": SHADE_DODGE_CHANCE, "inflicts_fear": true},
+	"Shade": {"harm": "magical", "move_range": 3, "big_squad": true, "dodge_chance": SHADE_DODGE_CHANCE, "inflicts_fear": true},
 	# Fast mobility on the grid, same as Shade, but no dodge chance and no
 	# big-squad flag -- a Traitor Wolf is combat-identical, just a rarer
 	# named spawn (see Wolf.gd/_spawn_enemies) with a shot at recruitment on
@@ -607,7 +610,7 @@ const ENEMY_TRAITS := {
 	# still 0) -- its only battle behavior is spawns_fae, below.
 	"Fae Hut": {"move_range": 1, "spawns_fae": true},
 	# Small and fast, but barely a threat alone -- see FAE_HUT_SPAWN_INTERVAL.
-	"Fae": {},
+	"Fae": {"harm": "magical", },
 	# HP/damage scaling itself lives in _setup_battle_grid (HP, one-time) and
 	# the normal-attack branch of _process_enemy_turn (damage, live) --
 	# big_squad so a Gnome-initiated fight can actually seat a pack of up to
@@ -621,7 +624,7 @@ const ENEMY_TRAITS := {
 	# reptiles biting) instead of one heavy telegraphed hit.
 	"Lizen Warband": {"windup": true, "move_range": 2, "quick_jab_chance": 0.5, "knockback_resist": ORC_KNOCKBACK_RESIST_CHANCE, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true},
 	# A miniboss -- a breath-weapon sweep.
-	"Black Dragonlet": {"windup": true, "sweeps": true, "armored": true, "knockback_resist": 0.7, "move_range": 1, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true, "is_miniboss": true, "inflicts_bleed": true},
+	"Black Dragonlet": {"harm": "both", "windup": true, "sweeps": true, "armored": true, "knockback_resist": 0.7, "move_range": 1, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true, "is_miniboss": true, "inflicts_bleed": true},
 	# A miniboss -- rooted and tanky, resists being shoved.
 	"Treant": {"windup": true, "armored": true, "knockback_resist": 0.85, "move_range": 1, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true, "is_miniboss": true},
 	# Forest's world-ending boss -- Treant aged up, a wide branch sweep.
@@ -629,22 +632,22 @@ const ENEMY_TRAITS := {
 	# A miniboss -- an immovable construct.
 	"Iron Construct": {"windup": true, "armored": true, "knockback_resist": 1.0, "move_range": 1, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true, "is_miniboss": true, "inflicts_concussion": true},
 	# Tundra's world-ending boss -- an icy breath sweep.
-	"White Dragon": {"windup": true, "sweeps": true, "armored": true, "knockback_resist": 0.7, "move_range": 1, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true},
+	"White Dragon": {"harm": "both", "windup": true, "sweeps": true, "armored": true, "knockback_resist": 0.7, "move_range": 1, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true},
 	# A miniboss -- a molten cousin of the Iron Construct, lumbering
 	# rather than fully immovable.
-	"Lava Construct": {"windup": true, "armored": true, "knockback_resist": 0.65, "move_range": 1, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true, "is_miniboss": true},
+	"Lava Construct": {"harm": "both", "windup": true, "armored": true, "knockback_resist": 0.65, "move_range": 1, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true, "is_miniboss": true},
 	# Volcano's world-ending boss -- the tankiest dragon yet ("Wyrm" reads
 	# ancient/elder), with a wide breath reach.
-	"Red Wyrm": {"windup": true, "sweeps": true, "attack_range": 2, "armored": true, "knockback_resist": 0.8, "move_range": 1, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true, "inflicts_bleed": true},
+	"Red Wyrm": {"harm": "both", "windup": true, "sweeps": true, "attack_range": 2, "armored": true, "knockback_resist": 0.8, "move_range": 1, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true, "inflicts_bleed": true},
 	# A miniboss -- fast, evasive, and genuinely ranged (void bolts
 	# that ignore obstacles).
-	"Voidwing": {"windup": true, "move_range": 3, "dodge_chance": 0.3, "ignore_line": true, "attack_range": 2, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true, "is_miniboss": true, "inflicts_bleed": true},
+	"Voidwing": {"harm": "magical", "windup": true, "move_range": 3, "dodge_chance": 0.3, "ignore_line": true, "attack_range": 2, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true, "is_miniboss": true, "inflicts_bleed": true},
 	# Voidlands' world-ending boss -- the last "normal" world boss before
 	# Nothingness, and the one that gets rematched there (see
 	# scripts/Archmage.gd's power_tier). A wide multi-target spell
 	# that ignores obstacles entirely, unarmored (a glass-cannon caster,
 	# not a brute).
-	"Archmage": {"windup": true, "sweeps": true, "ignore_line": true, "attack_range": 2, "knockback_resist": 0.4, "move_range": 1, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true},
+	"Archmage": {"harm": "magical", "windup": true, "sweeps": true, "ignore_line": true, "attack_range": 2, "knockback_resist": 0.4, "move_range": 1, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true},
 }
 
 # The Nothingness (world index 10, WORLDS.size()-1) is a fixed 6-fight
@@ -903,7 +906,7 @@ var pending_event_weapon: Dictionary = {}
 var shrine_effect_waves_remaining := 0
 var event_extra_goblins := 0
 var event_force_elite := false
-var prev_num_key := {1: false, 2: false, 3: false, 4: false, 5: false, 6: false, 7: false, 8: false}
+var prev_num_key := {1: false, 2: false, 3: false, 4: false, 5: false, 6: false, 7: false, 8: false, 9: false}
 var prev_shop_num_key := {1: false, 2: false, 3: false, 4: false, 5: false, 6: false, 7: false, 8: false, 9: false}
 var prev_enter_key := false
 var prev_reroll_key := false
@@ -951,6 +954,12 @@ var battle_rally_turns := 0
 # The Druid's Empower on the hero: while above 0 the hero deals extra damage (a member's own timer is its
 # "buff_turns"). Counts down once per round with the other kit timers.
 var battle_hero_buff_turns := 0
+# Armour traits (Armor.gd): Bloodrage Hide's damage stacks and their timer, the crit Shadowweave sets up
+# after a dodge, and whether Spellward Robes have spent their one free ward this battle.
+var battle_bloodrage_stacks := 0
+var battle_bloodrage_turns := 0
+var battle_shadow_crit := false
+var battle_spellward_used := false
 # While >= 0, the stat a swing is built on instead of the acting member's attack (Body Slam hits with
 # its DEFENSE). Set and cleared around that one hit.
 var battle_stat_override := -1.0
@@ -2422,6 +2431,16 @@ func _on_enemy_died(xp_reward: int, enemy_name: String = "") -> void:
 			was_boss = true
 	# Every enemy that falls (whoever landed the blow) is worth Essence.
 	run_essence += SaveDataScript.essence_for_kill(was_boss)
+	# Crafting materials (Materials.gd): whatever this kind of enemy leaves behind.
+	if enemy_name != "":
+		var drops: Dictionary = MaterialsScript.roll_drops(enemy_name)
+		for material_id in drops:
+			player.add_material(str(material_id), int(drops[material_id]))
+			var found_text: String = "The %s drops %d %s." % [enemy_name, int(drops[material_id]), MaterialsScript.name_of(str(material_id))]
+			if in_battle:
+				hud.battle_log(found_text)
+			else:
+				hud.show_message(found_text)
 	# Momentum: stacks for the rest of THIS battle, reset in
 	# _setup_battle_grid -- only tracked at all when the skill is owned, so
 	# it can't silently accumulate across a run for players without it.
@@ -2798,7 +2817,8 @@ func _roll_random_shop_item() -> Dictionary:
 			var base: Dictionary = pool[randi() % pool.size()]
 			return _tagged(WeaponsScript.make_variant(base, 0, player.total_luck()), "weapon")
 		"armor":
-			var tier: Dictionary = ArmorScript.TIERS[randi() % ArmorScript.TIERS.size()]
+			var armor_pool: Array = ArmorScript.shop_pool()
+			var tier: Dictionary = armor_pool[randi() % armor_pool.size()]
 			return _tagged(tier, "armor")
 		"shield":
 			# Unlike weapons (a fresh variant is always worth seeing again)
@@ -2944,7 +2964,7 @@ func _on_player_leveled_up(new_level: int) -> void:
 		hud.show_message("A new talisman slot opens!")
 	choosing_stat = true
 	get_tree().paused = true
-	hud.show_levelup_choice(new_level, player.stat_intimidation, player.stat_strength, player.stat_vigor, player.stat_agility, player.stat_might, player.stat_resilience, player.stat_reflexes, player.stat_dexterity, player.meta_resilience_unlocked, player.meta_reflexes_unlocked, player.meta_dexterity_unlocked)
+	hud.show_levelup_choice(new_level, player.stat_intimidation, player.stat_strength, player.stat_vigor, player.stat_agility, player.stat_might, player.stat_resilience, player.stat_reflexes, player.stat_dexterity, player.meta_resilience_unlocked, player.meta_reflexes_unlocked, player.meta_dexterity_unlocked, player.stat_fortitude, player.meta_fortitude_unlocked)
 
 var prev_debug_keys := {}
 
@@ -3098,10 +3118,12 @@ func _levelup_choice_order() -> Array:
 		order.append("reflexes")
 	if player.meta_dexterity_unlocked:
 		order.append("dexterity")
+	if player.meta_fortitude_unlocked:
+		order.append("fortitude")
 	return order
 
 func _handle_stat_choice_input() -> void:
-	var keys := {1: KEY_1, 2: KEY_2, 3: KEY_3, 4: KEY_4, 5: KEY_5, 6: KEY_6, 7: KEY_7, 8: KEY_8}
+	var keys := {1: KEY_1, 2: KEY_2, 3: KEY_3, 4: KEY_4, 5: KEY_5, 6: KEY_6, 7: KEY_7, 8: KEY_8, 9: KEY_9}
 	var order: Array = _levelup_choice_order()
 	for i in order.size():
 		var key_num := i + 1
@@ -3370,7 +3392,7 @@ func _gear_quality_score() -> int:
 	var score := 0
 	if player.current_weapon.get("tier_name", "") in ["Masterwork", "Legendary", "Mythic"]:
 		score += 1
-	if ArmorScript.tier_rank(player.equipped_armor) >= 3:
+	if player.equipped_armor.get("high_grade", false):
 		score += 1
 	return score
 
@@ -3413,7 +3435,9 @@ func _battle_player_move_range() -> int:
 		bonus += ENERGY_POTION_MOVE_BONUS
 	# Pathfinder's Compass (talisman).
 	bonus += int(player.talisman_bonus("move_range"))
-	return PLAYER_BASE_MOVE_RANGE + bonus
+	# Armour: Windrunner's Jerkin +1, Fortress Plate -1.
+	bonus += int(player.armor_trait_value("move_bonus", 0))
+	return maxi(1, PLAYER_BASE_MOVE_RANGE + bonus)
 
 func _setup_battle_grid(squad: Array) -> void:
 	# A boss fight (always solo -- see _gather_squad) gets a bigger arena,
@@ -3432,6 +3456,10 @@ func _setup_battle_grid(squad: Array) -> void:
 	battle_rally_turns = 0
 	battle_hero_buff_turns = 0
 	battle_stat_override = -1.0
+	battle_bloodrage_stacks = 0
+	battle_bloodrage_turns = 0
+	battle_shadow_crit = false
+	battle_spellward_used = false
 	# A Shaman's talismans reach the hero too while she stands close (cleared when the battle ends).
 	player.shared_talisman_provider = Callable(self, "_hero_shared_effect")
 	battle_commanding_ally = null
@@ -3722,6 +3750,7 @@ func _make_member_battle_unit(member, tile: Vector2i, might_mult: float) -> Dict
 		# Kind traits: the Knight cannot dodge (nothing dodges for members yet), and the Necromancer
 		# grows with every kill.
 		"cannot_dodge": bool(rules.get("cannot_dodge", false)),
+		"fortitude": member.fortitude(),
 		"unlimited_range": bool(rules.get("unlimited_range", false)),
 		"ignore_cover": bool(rules.get("ignore_cover", false)),
 		"steal_chance": float(rules.get("steal_chance", 0.0)),
@@ -4701,6 +4730,10 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 	var bleeding_cut_forced_crit := effect == "bleed_or_crit" and randf() < 0.5
 	# Sucker Punch: always a crit against an enemy still at full HP.
 	var sucker_forced_crit: bool = effect == "sucker_punch" and u.hp >= u.max_hp
+	# Shadowweave: the hit after a dodge is a guaranteed crit.
+	var shadow_forced_crit: bool = attacker_label == "You" and battle_shadow_crit
+	if shadow_forced_crit:
+		battle_shadow_crit = false
 	# attack_stat >= 0 is a PartyMember ally swinging on its OWN attack stat (see
 	# _make_member_battle_unit); everyone else builds on the hero's attack_damage.
 	var base_attack: float = attack_stat if attack_stat >= 0.0 else float(player.attack_damage)
@@ -4840,7 +4873,7 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 	# player's stat) -- doubles damage and ignores the rock-cover reduction
 	# below entirely ("ignores defense"), same as Blindness's guaranteed
 	# crit-on-hit reuses.
-	var is_crit := blind_forced_crit or stealth_forced_crit or bleeding_cut_forced_crit or sucker_forced_crit or effect == "jugular"
+	var is_crit := blind_forced_crit or stealth_forced_crit or bleeding_cut_forced_crit or sucker_forced_crit or shadow_forced_crit or effect == "jugular"
 	# A member crits off its own crit chance (talismans, favours) -- never the hero's stat.
 	var actor_crit_chance: float = _actor_tb("crit_chance") if _actor_is_ally() else (player.crit_chance_total() if attacker_label == "You" else 0.0)
 	# The Marksman's bow favour multiplies whatever crit chance it has.
@@ -4862,6 +4895,9 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 		dmg = int(round(dmg * PartyKitsScript.DRUID_BUFF_MULT))
 	elif _actor_is_ally() and int(battle_actor.get("buff_turns", 0)) > 0:
 		dmg = int(round(dmg * PartyKitsScript.DRUID_BUFF_MULT))
+	# Bloodrage Hide: every hit taken stacks extra damage dealt, for a couple of turns.
+	if attacker_label == "You" and battle_bloodrage_stacks > 0:
+		dmg = int(round(dmg * (1.0 + battle_bloodrage_stacks * float(player.armor_trait_value("dmg_per_stack", 0.1)))))
 	# The Looongblade/Aimbot's passive_damage_per_tile_distance: damage scales
 	# with the Manhattan distance between attacker and target -- positive for
 	# the Looongblade (hits harder at range), negative for Aimbot (falls off
@@ -6043,7 +6079,7 @@ func _cleanse_player_status() -> void:
 
 func _battle_player_defend() -> void:
 	battle_player_defending = true
-	player.regen_stamina(STAMINA_REGEN_ON_DEFEND)
+	player.regen_stamina(STAMINA_REGEN_ON_DEFEND + int(player.armor_trait_value("defend_stamina_bonus", 0)))
 	hud.battle_log("You brace for impact.")
 	# Resilience (repurposed): heal a flat amount every time you Defend.
 	if player.block_heal_amount() > 0:
@@ -6064,7 +6100,7 @@ func _battle_player_taunt() -> void:
 	# target (see _apply_single_hit).
 	for u in battle_units:
 		u["aware_of_player"] = true
-	player.regen_stamina(STAMINA_REGEN_ON_DEFEND)
+	player.regen_stamina(STAMINA_REGEN_ON_DEFEND + int(player.armor_trait_value("defend_stamina_bonus", 0)))
 	hud.battle_log("You taunt the enemy, daring them to attack!")
 	if player.block_heal_amount() > 0:
 		player.heal(player.block_heal_amount())
@@ -7171,9 +7207,11 @@ func _start_enemy_turn() -> void:
 	_refresh_battle_display()
 	_process_enemy_turn()
 
-# Shared "how much of this incoming hit actually lands" pipeline: Defend,
-# rock cover (unless the attacker ignores it), armor, and Fortitude all
-# stack the same way regardless of which attack path dealt the damage.
+# Shared "how much of this incoming hit actually lands" pipeline. Harm comes in two kinds (the
+# enemy's "harm" trait): BODILY (weapons, claws, arrows -- cut by armour, Resilience, shield, cover
+# and the Blacksmith) and MAGICAL (spells, breath -- cut by Fortitude alone), or "both", half and
+# half. Defend, a Resilience Potion and Last Stand cut either kind. Burn, poison and the other
+# statuses never come through here: nothing reduces or prevents them.
 func _apply_incoming_reductions(dmg: int, traits: Dictionary) -> int:
 	var reduced := dmg
 	if battle_player_defending:
@@ -7187,25 +7225,101 @@ func _apply_incoming_reductions(dmg: int, traits: Dictionary) -> int:
 		if block_negate_chance > 0.0 and randf() < block_negate_chance:
 			return 0
 		# Below the threshold, Defend alone stops it cold; at or above,
-		# it only halves it -- no amount of bracing no-sells a real blow.
-		var negate_threshold: int = DEFEND_FULL_NEGATE_THRESHOLD + player.shield_defend_threshold_bonus()
+		# it only halves it -- no amount of bracing no-sells a real blow. Bastion Mail raises it.
+		var negate_threshold: int = DEFEND_FULL_NEGATE_THRESHOLD + player.shield_defend_threshold_bonus() + int(player.armor_trait_value("defend_threshold_bonus", 0))
 		if dmg < negate_threshold:
 			return 0
 		reduced = int(round(reduced * (1.0 - DEFEND_DAMAGE_REDUCTION)))
-	if not traits.get("ignore_cover", false) and _has_adjacent_rock(battle_player_tile):
-		reduced = int(round(reduced * (1.0 - ROCK_COVER_REDUCTION)))
-	# Resilience Potion: a temporary flat cut for a few of the player's own
-	# turns, stacking additively with every other source here.
-	var resilience_potion_bonus: float = RESILIENCE_POTION_DAMAGE_REDUCTION_PCT if player.potion_resilience_turns > 0 else 0.0
-	var total_reduction: float = player.armor_damage_reduction() + player.resilience_reduction + player.meta_war_chest_reduction + player.shield_damage_reduction_pct() + resilience_potion_bonus
-	# Last Stand: scales continuously with how hurt you are, not a flat
-	# below-30% threshold -- every 10% HP missing adds another step.
+	var harm: String = str(traits.get("harm", "bodily"))
+	var bodily_part: int = reduced
+	var magical_part := 0
+	if harm == "magical":
+		bodily_part = 0
+		magical_part = reduced
+	elif harm == "both":
+		bodily_part = int(round(reduced * 0.5))
+		magical_part = reduced - bodily_part
+	var total := 0
+	if bodily_part > 0:
+		total += _reduce_bodily(bodily_part, traits)
+	if magical_part > 0:
+		total += _reduce_magical(magical_part)
+	return total
+
+# The cuts that apply to either kind of harm: a Resilience Potion, and Last Stand (which scales
+# continuously with how hurt you are -- every 10% HP missing adds another step).
+func _generic_reduction() -> float:
+	var generic: float = RESILIENCE_POTION_DAMAGE_REDUCTION_PCT if player.potion_resilience_turns > 0 else 0.0
 	if player.meta_last_stand_pct_per_10 > 0.0:
 		var missing_pct: float = 1.0 - float(player.health) / float(player.max_health)
-		total_reduction += player.meta_last_stand_pct_per_10 * floor(missing_pct * 10.0)
+		generic += player.meta_last_stand_pct_per_10 * floor(missing_pct * 10.0)
+	return generic
+
+# Bodily harm: rock cover (unless the attacker ignores it), then armour + clothes + Resilience +
+# War Chest + the shield + Martyr's Mantle + the generic cuts (capped at 90%), then Stonehide's
+# flat cut.
+func _reduce_bodily(dmg: int, traits: Dictionary) -> int:
+	var reduced := dmg
+	if not traits.get("ignore_cover", false) and _has_adjacent_rock(battle_player_tile):
+		reduced = int(round(reduced * (1.0 - ROCK_COVER_REDUCTION)))
+	var total_reduction: float = player.armor_damage_reduction() + player.resilience_reduction + player.meta_war_chest_reduction + player.shield_damage_reduction_pct() + _generic_reduction()
+	if player.armor_trait() == "martyr":
+		var missing: float = 1.0 - float(player.health) / float(player.max_health)
+		total_reduction += float(player.armor_trait_value("bodily_per_10_missing", 0.0)) * floor(missing * 10.0)
 	total_reduction = clampf(total_reduction, 0.0, 0.9)
 	reduced = int(round(reduced * (1.0 - total_reduction)))
+	var flat_cut: int = int(player.armor_trait_value("flat_reduction", 0))
+	if flat_cut > 0 and reduced > 0:
+		reduced = maxi(1, reduced - flat_cut)
 	return reduced
+
+# Magical harm: Fortitude (armour + shield + the stat) and the generic cuts; a negative total
+# makes it worse (down to +50%). Spellward Robes swallow the first magical hit of a battle and
+# turn every one into stamina.
+func _reduce_magical(dmg: int) -> int:
+	var reduced := dmg
+	var spellward: bool = player.armor_trait() == "spellward"
+	if spellward and not battle_spellward_used:
+		battle_spellward_used = true
+		reduced = 0
+		hud.battle_log("Your wards swallow the spell whole!")
+	else:
+		var total_reduction: float = clampf(player.fortitude_reduction() + _generic_reduction(), PlayerScript.FORTITUDE_NEGATIVE_FLOOR, 0.9)
+		reduced = int(round(reduced * (1.0 - total_reduction)))
+	if spellward:
+		player.regen_stamina(int(player.armor_trait_value("magic_hit_stamina", 0)))
+	return reduced
+
+# What the worn armour does when a blow actually lands on the hero (after every reduction).
+func _armor_on_hit(u: Dictionary, dmg: int, traits: Dictionary) -> void:
+	var trait_id: String = player.armor_trait()
+	if trait_id == "":
+		return
+	# Melee: the attacker is next to you and not a caster.
+	var melee: bool = int(u.get("attack_range", 1)) <= 1 and str(traits.get("harm", "bodily")) != "magical"
+	match trait_id:
+		"bloodrage":
+			var max_stacks: int = int(player.armor_trait_value("max_stacks", 5))
+			if battle_bloodrage_stacks < max_stacks:
+				battle_bloodrage_stacks += 1
+			battle_bloodrage_turns = int(player.armor_trait_value("turns", 2))
+			hud.battle_log("The blow feeds your rage! (+%d%% damage)" % int(round(battle_bloodrage_stacks * float(player.armor_trait_value("dmg_per_stack", 0.1)) * 100.0)))
+		"thorns":
+			if melee and u.has("hp"):
+				var reflected: int = maxi(1, int(round(dmg * float(player.armor_trait_value("reflect_pct", 0.0)))))
+				u.hp -= reflected
+				_spawn_battle_damage_number(u.tile, reflected, u.get("size", 1))
+				hud.battle_log("Your thorns throw %d damage back at the %s!" % [reflected, u.get("name", "attacker")])
+		"cinder":
+			if melee and not u.get("burning", false):
+				u["burning"] = true
+				hud.battle_log("The %s catches fire from your cinders!" % u.get("name", "attacker"))
+
+# Shadowweave: slipping a blow sets up a guaranteed crit on your next hit.
+func _on_hero_dodged() -> void:
+	if player.armor_trait() == "shadowweave":
+		battle_shadow_crit = true
+		hud.battle_log("Slipping the blow, you set up a killing strike!")
 
 # A shield's special ability, triggered only when its own passive block roll
 # (see _enemy_apply_damage's shield_block_chance() check) actually succeeds --
@@ -7446,6 +7560,7 @@ func _enemy_apply_damage(u: Dictionary, target_tile: Vector2i, raw_dmg: int, tra
 		if player.berserk_turns_remaining > 0:
 			dodge_chance *= BERSERK_DEFENSE_MULT
 		if dodge_chance > 0.0 and randf() < dodge_chance:
+			_on_hero_dodged()
 			# Riposte: a dodge has a further chance to immediately counter
 			# whoever swung at you. Found by tile rather than array identity
 			# since u is the exact same Dictionary reference battle_units
@@ -7476,8 +7591,11 @@ func _enemy_apply_damage(u: Dictionary, target_tile: Vector2i, raw_dmg: int, tra
 		_land_enemy_hit_on_player(u, dmg, traits)
 		return {"dmg": dmg, "is_player": true, "target_name": "", "dodged": false}
 	var dmg: int = raw_dmg
+	# Bodily harm is turned by cover and defense, magical harm by neither (Fortitude instead, below).
+	var harm: String = str(traits.get("harm", "bodily"))
+	var bodily_share: float = 1.0 if harm == "bodily" else (0.0 if harm == "magical" else 0.5)
 	if not traits.get("ignore_cover", false) and _has_adjacent_rock(target_tile):
-		dmg = int(round(dmg * (1.0 - ROCK_COVER_REDUCTION)))
+		dmg = int(round(dmg * (1.0 - ROCK_COVER_REDUCTION * bodily_share)))
 	var target_name := ""
 	var target_ally = null
 	for a in battle_allies:
@@ -7493,9 +7611,14 @@ func _enemy_apply_damage(u: Dictionary, target_tile: Vector2i, raw_dmg: int, tra
 			dmg = int(round(dmg * (1.0 - ally_dr)))
 		# A PartyMember's own defense (a percentage cut, one point = one percent, capped
 		# at 90% like the hero's armour), and never below 1 damage.
-		var ally_defense: float = float(target_ally.get("defense_pct", 0.0))
-		if ally_defense > 0.0:
-			dmg = maxi(1, int(round(dmg * (1.0 - minf(ally_defense / 100.0, 0.9)))))
+		# Bodily harm is cut by the ally's defense, magical harm by its Fortitude (an attack that is
+		# both, by each in turn, half and half).
+		var ally_cut: float = bodily_share * minf(float(target_ally.get("defense_pct", 0.0)) / 100.0, 0.9) + (1.0 - bodily_share) * clampf(float(target_ally.get("fortitude", 0.0)) / 100.0, PlayerScript.FORTITUDE_NEGATIVE_FLOOR, PlayerScript.FORTITUDE_REDUCTION_CAP)
+		if ally_cut != 0.0:
+			dmg = maxi(1, int(round(dmg * (1.0 - ally_cut))))
+		# Warden's Aegis: allies standing near the hero take less.
+		if player.armor_trait() == "warden" and abs(target_ally.tile.x - battle_player_tile.x) + abs(target_ally.tile.y - battle_player_tile.y) <= int(player.armor_trait_value("ally_radius", 2)):
+			dmg = maxi(1, int(round(dmg * (1.0 - float(player.armor_trait_value("ally_reduction", 0.0))))))
 		# Guard (this ally's own commanded action, see _on_battle_ally_action):
 		# same flat reduction Defend gives the hero, cleared at the start of
 		# its next commanded turn. Parry Master (Astral) lets a guarding ally shrug a hit off.
@@ -7578,6 +7701,8 @@ func _land_enemy_hit_on_player(u: Dictionary, dmg: int, traits: Dictionary) -> v
 	var target_tile: Vector2i = battle_player_tile
 	player.take_battle_damage(dmg)
 	run_damage_taken += dmg
+	if dmg > 0:
+		_armor_on_hit(u, dmg, traits)
 	battle_had_combat_action_this_cycle = true
 	# Momentum Chain (talisman): taking a hit breaks the chain and costs
 	# the player their next turn.
@@ -7676,6 +7801,7 @@ func _resolve_minigame_results(u: Dictionary, raw_dmg: int, traits: Dictionary, 
 		match outcome:
 			"perfect", "good":
 				avoided += 1
+				_on_hero_dodged()
 				if roll_dir == Vector2i.ZERO:
 					roll_dir = r.get("dir", Vector2i.ZERO)
 				hud.battle_log("Perfect dodge!" if outcome == "perfect" else "You slip the blow!")
@@ -8223,6 +8349,10 @@ func _process_enemy_turn() -> void:
 		battle_rally_turns -= 1
 	if battle_hero_buff_turns > 0:
 		battle_hero_buff_turns -= 1
+	if battle_bloodrage_turns > 0:
+		battle_bloodrage_turns -= 1
+		if battle_bloodrage_turns == 0:
+			battle_bloodrage_stacks = 0
 	for ally_unit in battle_allies:
 		if int(ally_unit.get("charm_turns", 0)) > 0:
 			ally_unit["charm_turns"] = int(ally_unit.charm_turns) - 1

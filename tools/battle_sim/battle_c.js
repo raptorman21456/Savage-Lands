@@ -103,20 +103,99 @@ Object.assign(Sim.prototype, {
       let negate = p.meta_block_negate_chance;
       if (p.berserk_turns_remaining > 0) negate *= MC.BERSERK_DEFENSE_MULT;
       if (negate > 0 && this.rng.randf() < negate) return 0;
-      const threshold = MC.DEFEND_FULL_NEGATE_THRESHOLD + p.shield_defend_threshold_bonus();
+      // Bastion Mail raises the threshold Defend negates a hit below.
+      const threshold = MC.DEFEND_FULL_NEGATE_THRESHOLD + p.shield_defend_threshold_bonus() + Math.trunc(p.armor_trait_value("defend_threshold_bonus", 0));
       if (dmg < threshold) return 0;
       reduced = round(reduced * (1.0 - MC.DEFEND_DAMAGE_REDUCTION));
     }
-    if (!traits.ignore_cover && this._has_adjacent_rock(this.battle_player_tile)) reduced = round(reduced * (1.0 - MC.ROCK_COVER_REDUCTION));
-    const resilience_potion = p.potion_resilience_turns > 0 ? MC.RESILIENCE_POTION_DAMAGE_REDUCTION_PCT : 0.0;
-    let total = p.armor_damage_reduction() + p.resilience_reduction + p.meta_war_chest_reduction + p.shield_damage_reduction_pct() + resilience_potion;
+    // Harm is BODILY (armour, Resilience, shield, cover), MAGICAL (Fortitude) or "both", half and half.
+    const harm = traits.harm || "bodily";
+    let bodily_part = reduced;
+    let magical_part = 0;
+    if (harm === "magical") { bodily_part = 0; magical_part = reduced; }
+    else if (harm === "both") { bodily_part = round(reduced * 0.5); magical_part = reduced - bodily_part; }
+    let total = 0;
+    if (bodily_part > 0) total += this._reduce_bodily(bodily_part, traits);
+    if (magical_part > 0) total += this._reduce_magical(magical_part);
+    return total;
+  },
+
+  // The cuts that apply to either kind of harm: a Resilience Potion and Last Stand.
+  _generic_reduction() {
+    const p = this.player;
+    let generic = p.potion_resilience_turns > 0 ? MC.RESILIENCE_POTION_DAMAGE_REDUCTION_PCT : 0.0;
     if (p.meta_last_stand_pct_per_10 > 0) {
       const missing = 1.0 - p.health / p.max_health;
-      total += p.meta_last_stand_pct_per_10 * Math.floor(missing * 10.0);
+      generic += p.meta_last_stand_pct_per_10 * Math.floor(missing * 10.0);
+    }
+    return generic;
+  },
+
+  _reduce_bodily(dmg, traits) {
+    const p = this.player;
+    let reduced = dmg;
+    if (!traits.ignore_cover && this._has_adjacent_rock(this.battle_player_tile)) reduced = round(reduced * (1.0 - MC.ROCK_COVER_REDUCTION));
+    let total = p.armor_damage_reduction() + p.resilience_reduction + p.meta_war_chest_reduction + p.shield_damage_reduction_pct() + this._generic_reduction();
+    if (p.armor_trait() === "martyr") {
+      const missing = 1.0 - p.health / p.max_health;
+      total += p.armor_trait_value("bodily_per_10_missing", 0.0) * Math.floor(missing * 10.0);
     }
     total = clamp(total, 0.0, 0.9);
     reduced = round(reduced * (1.0 - total));
+    const flat_cut = Math.trunc(p.armor_trait_value("flat_reduction", 0));
+    if (flat_cut > 0 && reduced > 0) reduced = Math.max(1, reduced - flat_cut);
     return reduced;
+  },
+
+  _reduce_magical(dmg) {
+    const p = this.player;
+    let reduced = dmg;
+    const spellward = p.armor_trait() === "spellward";
+    if (spellward && !this.battle_spellward_used) {
+      this.battle_spellward_used = true;
+      reduced = 0;
+      this.log("Your wards swallow the spell whole!");
+    } else {
+      const total = clamp(p.fortitude_reduction() + this._generic_reduction(), PC.FORTITUDE_NEGATIVE_FLOOR, 0.9);
+      reduced = round(reduced * (1.0 - total));
+    }
+    if (spellward) p.regen_stamina(Math.trunc(p.armor_trait_value("magic_hit_stamina", 0)));
+    return reduced;
+  },
+
+  // What the worn armour does when a blow actually lands on the hero.
+  _armor_on_hit(u, dmg, traits) {
+    const p = this.player;
+    const trait_id = p.armor_trait();
+    if (!trait_id) return;
+    const melee = (u.attack_range ?? 1) <= 1 && (traits.harm || "bodily") !== "magical";
+    switch (trait_id) {
+      case "bloodrage": {
+        const max_stacks = Math.trunc(p.armor_trait_value("max_stacks", 5));
+        if (this.battle_bloodrage_stacks < max_stacks) this.battle_bloodrage_stacks += 1;
+        this.battle_bloodrage_turns = Math.trunc(p.armor_trait_value("turns", 2));
+        this.log(`The blow feeds your rage! (+${round(this.battle_bloodrage_stacks * p.armor_trait_value("dmg_per_stack", 0.1) * 100.0)}% damage)`);
+        break;
+      }
+      case "thorns":
+        if (melee && u.hp !== undefined) {
+          const reflected = Math.max(1, round(dmg * p.armor_trait_value("reflect_pct", 0.0)));
+          u.hp -= reflected;
+          this.log(`Your thorns throw ${reflected} damage back at the ${u.name ?? "attacker"}!`);
+        }
+        break;
+      case "cinder":
+        if (melee && !u.burning) { u.burning = true; this.log(`The ${u.name ?? "attacker"} catches fire from your cinders!`); }
+        break;
+    }
+  },
+
+  // Shadowweave: slipping a blow sets up a guaranteed crit on your next hit.
+  _on_hero_dodged() {
+    if (this.player.armor_trait() === "shadowweave") {
+      this.battle_shadow_crit = true;
+      this.log("Slipping the blow, you set up a killing strike!");
+    }
   },
 
   _resolve_shield_block(attacker, raw_dmg) {
@@ -229,6 +308,7 @@ Object.assign(Sim.prototype, {
       let dodge = p.dodge_chance_total();
       if (p.berserk_turns_remaining > 0) dodge *= MC.BERSERK_DEFENSE_MULT;
       if (dodge > 0 && rng.randf() < dodge) {
+        this._on_hero_dodged();
         if (p.meta_riposte_chance > 0 && rng.randf() < p.meta_riposte_chance) {
           const aidx = this._unit_index_at_tile(u.tile);
           if (aidx >= 0) { this.log("You riposte!", "good"); this._apply_single_hit(aidx, MC.RIPOSTE_DAMAGE_PCT, "riposte", p.current_weapon); }
@@ -244,6 +324,7 @@ Object.assign(Sim.prototype, {
       const dmg = this._apply_incoming_reductions(raw_dmg, traits);
       p.take_battle_damage(dmg);
       this.stats.damage_taken += dmg;
+      if (dmg > 0) this._armor_on_hit(u, dmg, traits);
       this.battle_had_combat_action_this_cycle = true;
       if (dmg > 0 && p.talisman_bonus("momentum_chain") > 0 && this.battle_momentum_chain_stacks > 0) {
         this.battle_momentum_chain_stacks = 0; this.battle_player_turns_to_skip += 1;
@@ -256,15 +337,21 @@ Object.assign(Sim.prototype, {
       return { dmg, is_player: true, target_name: "", dodged: false };
     }
     let dmg = raw_dmg;
-    if (!traits.ignore_cover && this._has_adjacent_rock(target_tile)) dmg = round(dmg * (1.0 - MC.ROCK_COVER_REDUCTION));
+    // Bodily harm is turned by cover and defense, magical harm by neither (Fortitude instead, below).
+    const harm = traits.harm || "bodily";
+    const bodily_share = harm === "bodily" ? 1.0 : (harm === "magical" ? 0.0 : 0.5);
+    if (!traits.ignore_cover && this._has_adjacent_rock(target_tile)) dmg = round(dmg * (1.0 - MC.ROCK_COVER_REDUCTION * bodily_share));
     let target_name = "";
     let target_ally = null;
     for (const a of this.battle_allies) if (veq(a.tile, target_tile)) { target_ally = a; break; }
     if (target_ally) {
       const ally_dr = p.talisman_bonus("ally_defense_pct");
       if (ally_dr > 0) dmg = round(dmg * (1.0 - ally_dr));
-      const ally_def = target_ally.defense_pct || 0;
-      if (ally_def > 0) dmg = Math.max(1, round(dmg * (1.0 - Math.min(ally_def / 100.0, 0.9))));
+      // Bodily harm is cut by the ally's defense, magical harm by its Fortitude (both: half and half).
+      const ally_cut = bodily_share * Math.min((target_ally.defense_pct || 0) / 100.0, 0.9) + (1.0 - bodily_share) * clamp((target_ally.fortitude || 0) / 100.0, PC.FORTITUDE_NEGATIVE_FLOOR, PC.FORTITUDE_REDUCTION_CAP);
+      if (ally_cut !== 0) dmg = Math.max(1, round(dmg * (1.0 - ally_cut)));
+      // Warden's Aegis: allies standing near the hero take less.
+      if (p.armor_trait() === "warden" && abs(target_ally.tile.x - this.battle_player_tile.x) + abs(target_ally.tile.y - this.battle_player_tile.y) <= Math.trunc(p.armor_trait_value("ally_radius", 2))) dmg = Math.max(1, round(dmg * (1.0 - p.armor_trait_value("ally_reduction", 0.0))));
       if (target_ally.defending) dmg = Math.max(1, round(dmg * (1.0 - MC.DEFEND_DAMAGE_REDUCTION)));
       target_ally.hp -= dmg;
       target_name = target_ally.name;
@@ -533,6 +620,10 @@ Object.assign(Sim.prototype, {
     if (p.potion_attack_turns > 0) p.potion_attack_turns -= 1;
     if (p.potion_resilience_turns > 0) p.potion_resilience_turns -= 1;
     if (p.potion_energy_turns > 0) p.potion_energy_turns -= 1;
+    if (this.battle_bloodrage_turns > 0) {
+      this.battle_bloodrage_turns -= 1;
+      if (this.battle_bloodrage_turns === 0) this.battle_bloodrage_stacks = 0;
+    }
 
     this.stats.turns += 1;
     if (this.battle_player_turns_to_skip > 0) {

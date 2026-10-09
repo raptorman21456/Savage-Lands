@@ -50,9 +50,9 @@ func _init() -> void:
 	# negates it entirely.
 	player.coins = 1000
 	var next_armor: Dictionary = armor_script.get_next_tier(player.owned_armor)
-	print("first armor offer is Leather Vest: %s (expected true)" % [next_armor.id == "armor_leather"])
+	print("first armor offer is Gambeson: %s (expected true)" % [next_armor.id == "armor_gambeson"])
 	var bought_armor: bool = player.try_buy_armor(next_armor)
-	print("bought leather armor=%s equipped=%s owned=%s" % [bought_armor, player.equipped_armor.id, player.owned_armor.has("armor_leather")])
+	print("bought leather armor=%s equipped=%s owned=%s" % [bought_armor, player.equipped_armor.id, player.owned_armor.has("armor_gambeson")])
 
 	main.in_battle = true
 	main.battle_terrain.clear()
@@ -70,12 +70,12 @@ func _init() -> void:
 	player.health = player.max_health
 	main._process_enemy_turn()
 	var expected_dmg: int = int(round(10 * (1.0 - 0.15)))
-	print("leather armor reduces incoming damage: player_health=%d (expected max_health-%d = %d)" % [
+	print("gambeson reduces incoming damage: player_health=%d (expected max_health-%d = %d)" % [
 		player.health, expected_dmg, player.max_health - expected_dmg
 	])
 
-	# Iron Plate halves fall damage.
-	player.owned_armor["armor_iron"] = true
+	# Thornmail takes cliff falls as they come (the old Iron Plate's halving is gone).
+	player.owned_armor["armor_thornmail"] = true
 	player.equipped_armor = armor_script.TIERS[2]
 	main.battle_terrain.clear()
 	main.battle_terrain[Vector2i(2, 1)] = {"type": "cliff", "dir": Vector2i(0, 1)}
@@ -83,13 +83,13 @@ func _init() -> void:
 	main.battle_player_moves_left = 3
 	player.health = player.max_health
 	main._try_battle_player_move(Vector2i(0, 1))
-	var expected_iron_fall: int = int(round(player.max_health * main.CLIFF_FALL_DAMAGE_PCT * 0.5))
-	print("iron plate halves cliff fall damage: player_health=%d (expected max_health-%d = %d)" % [
+	var expected_iron_fall: int = int(round(player.max_health * main.CLIFF_FALL_DAMAGE_PCT * 1.0))
+	print("thornmail takes the normal cliff fall damage: player_health=%d (expected max_health-%d = %d)" % [
 		player.health, expected_iron_fall, player.max_health - expected_iron_fall
 	])
 
 	# Steel Plate increases fall damage instead of reducing it.
-	player.owned_armor["armor_steel"] = true
+	player.owned_armor["armor_fortress"] = true
 	player.equipped_armor = armor_script.TIERS[3]
 	main.battle_terrain.clear()
 	main.battle_terrain[Vector2i(2, 1)] = {"type": "cliff", "dir": Vector2i(0, 1)}
@@ -98,7 +98,7 @@ func _init() -> void:
 	player.health = player.max_health
 	main._try_battle_player_move(Vector2i(0, 1))
 	var expected_steel_fall: int = int(round(player.max_health * main.CLIFF_FALL_DAMAGE_PCT * 1.5))
-	print("steel plate increases cliff fall damage: player_health=%d (expected max_health-%d = %d)" % [
+	print("fortress plate increases cliff fall damage: player_health=%d (expected max_health-%d = %d)" % [
 		player.health, expected_steel_fall, player.max_health - expected_steel_fall
 	])
 

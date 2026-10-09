@@ -2,55 +2,260 @@
 	"armor": [
 		{
 			"damage_reduction": 0.0,
-			"description": "No damage reduction, no fall protection.",
+			"description": "No protection of any kind.",
 			"fall_damage_mult": 1.0,
+			"fortitude": 0,
 			"icon": "armor_rags",
 			"id": "armor_rags",
 			"name": "Rags",
 			"price": 0,
-			"shop_description": "Technically clothing. I wouldn't call it armor, but it's free."
+			"shop_description": "Technically clothing. I wouldn't call it armor, but it's free.",
+			"trait": "",
+			"trait_params": {}
 		},
 		{
 			"damage_reduction": 0.15,
-			"description": "-15% damage taken.",
+			"description": "-15% bodily harm, +5 Fortitude. A quilted coat: nothing fancy, and nothing missing either.",
 			"fall_damage_mult": 1.0,
+			"fortitude": 5,
 			"icon": "armor_leather",
-			"id": "armor_leather",
-			"name": "Leather Vest",
+			"icon_fallback": "armor_leather",
+			"id": "armor_gambeson",
+			"name": "Gambeson",
 			"price": 20,
-			"shop_description": "A step up from bare skin. Modest, but modest beats dead."
+			"shop_description": "A step up from bare skin. Modest, but modest beats dead.",
+			"trait": "",
+			"trait_params": {}
 		},
 		{
 			"damage_reduction": 0.3,
-			"description": "-30% damage taken, and cliff falls deal half damage.",
-			"fall_damage_mult": 0.5,
-			"icon": "armor_iron",
-			"id": "armor_iron",
+			"description": "-30% bodily harm, -5 Fortitude. 30% of the damage a melee attacker deals to you is thrown straight back. Ranged and magical attacks sail past the spikes, and spells hurt a little more.",
+			"fall_damage_mult": 1.0,
+			"fortitude": -5,
+			"icon": "armor_steel",
+			"icon_fallback": "armor_steel",
+			"id": "armor_thornmail",
 			"metal": true,
-			"name": "Iron Plate",
-			"price": 45,
-			"shop_description": "Solid stuff. Even softens a bad landing, for what that's worth."
+			"name": "Thornmail",
+			"price": 85,
+			"shop_description": "Hit it and you'll wish you hadn't. Spells don't mind it nearly as much.",
+			"trait": "thorns",
+			"trait_params": {
+				"reflect_pct": 0.3
+			}
+		},
+		{
+			"damage_reduction": 0.55,
+			"description": "-55% bodily harm, 0 Fortitude. Nothing sweeps you off a water tile -- but you move 1 tile less, and cliff falls deal 50% more damage.",
+			"fall_damage_mult": 1.5,
+			"fortitude": 0,
+			"high_grade": true,
+			"icon": "armor_steel",
+			"icon_fallback": "armor_steel",
+			"id": "armor_fortress",
+			"metal": true,
+			"name": "Fortress Plate",
+			"price": 90,
+			"shop_description": "Stops almost anything short. Just don't trip near a cliff wearing it.",
+			"trait": "fortress",
+			"trait_params": {
+				"move_bonus": -1,
+				"push_immune": true
+			}
 		},
 		{
 			"damage_reduction": 0.45,
-			"description": "-45% damage taken, but the rigid plate makes falls worse -- cliff falls deal 50% more damage.",
-			"fall_damage_mult": 1.5,
-			"icon": "armor_steel",
-			"id": "armor_steel",
-			"metal": true,
-			"name": "Steel Plate",
-			"price": 90,
-			"shop_description": "Stops almost anything short. Just don't trip near a cliff wearing it."
-		},
-		{
-			"damage_reduction": 0.6,
-			"description": "-60% damage taken, and cliff falls deal no damage at all. Forged from the hide of something that shouldn't have died so easily.",
+			"description": "-45% bodily harm, +35 Fortitude, and cliff falls deal no damage at all. Scaled by hand from something that shouldn't have died so easily.",
 			"fall_damage_mult": 0.0,
+			"fortitude": 35,
+			"high_grade": true,
 			"icon": "armor_dragonskin",
+			"icon_fallback": "armor_dragonskin",
 			"id": "armor_dragonskin",
 			"name": "Dragonskin Plating",
 			"price": 160,
-			"shop_description": "Don't ask where I got this. Just know it used to be attached to something much bigger than you."
+			"recipe": {
+				"coins": 120,
+				"materials": {
+					"dragon_scale": 8
+				}
+			},
+			"shop_description": "Don't ask where I got this. Just know it used to be attached to something much bigger than you.",
+			"trait": "",
+			"trait_params": {}
+		},
+		{
+			"damage_reduction": 0.1,
+			"description": "-10% bodily harm, +5 Fortitude, and every bodily hit that lands does 3 less damage (never below 1). A wall against goblin packs; a big single blow shrugs it off.",
+			"fall_damage_mult": 1.0,
+			"fortitude": 5,
+			"icon": "armor_iron",
+			"icon_fallback": "armor_iron",
+			"id": "armor_stonehide",
+			"metal": true,
+			"name": "Stonehide Mail",
+			"price": 60,
+			"shop_description": "Small hits just stop mattering. Big ones, well. Let's not talk about the big ones.",
+			"trait": "stonehide",
+			"trait_params": {
+				"flat_reduction": 3
+			}
+		},
+		{
+			"damage_reduction": 0.25,
+			"description": "-25% bodily harm, +5 Fortitude. Built for bracing: Defend negates hits 8 points bigger than usual, and Defend and Taunt give back 10 more stamina. Nothing special unless you brace.",
+			"fall_damage_mult": 1.0,
+			"fortitude": 5,
+			"icon": "armor_iron",
+			"icon_fallback": "armor_iron",
+			"id": "armor_bastion",
+			"metal": true,
+			"name": "Bastion Mail",
+			"price": 80,
+			"shop_description": "Plant your feet and let them come. It's meant for exactly that.",
+			"trait": "bastion",
+			"trait_params": {
+				"defend_stamina_bonus": 10,
+				"defend_threshold_bonus": 8
+			}
+		},
+		{
+			"damage_reduction": 0.05,
+			"description": "-5% bodily harm, +10 Fortitude, and a further -3% bodily harm for every 10% of your HP you're missing. Frail at full health; stubborn when you're not.",
+			"fall_damage_mult": 1.0,
+			"fortitude": 10,
+			"icon": "armor_rags",
+			"icon_fallback": "armor_rags",
+			"id": "armor_martyr",
+			"name": "Martyr's Mantle",
+			"price": 75,
+			"shop_description": "It hardens with every wound. I'd rather not say how I know.",
+			"trait": "martyr",
+			"trait_params": {
+				"bodily_per_10_missing": 0.03
+			}
+		},
+		{
+			"damage_reduction": 0.25,
+			"description": "-25% bodily harm, +10 Fortitude. Whatever hits you in melee catches fire. The heat wears you down: -10 max stamina.",
+			"fall_damage_mult": 1.0,
+			"fortitude": 10,
+			"icon": "armor_iron",
+			"icon_fallback": "armor_iron",
+			"id": "armor_cinder",
+			"metal": true,
+			"name": "Cinder Mail",
+			"price": 100,
+			"shop_description": "Still warm from the forge. Stays that way, somehow.",
+			"trait": "cinder",
+			"trait_params": {
+				"ignite_melee": true,
+				"max_stamina_bonus": -10
+			}
+		},
+		{
+			"damage_reduction": 0.1,
+			"description": "-10% bodily harm, +26 Fortitude. Every hit you take stacks +10% damage dealt (up to 5 stacks, lasting 2 turns). Thin protection for a short temper.",
+			"fall_damage_mult": 1.0,
+			"fortitude": 26,
+			"icon": "armor_leather",
+			"icon_fallback": "armor_leather",
+			"id": "armor_bloodrage",
+			"name": "Bloodrage Hide",
+			"price": 70,
+			"recipe": {
+				"coins": 40,
+				"materials": {
+					"bear_pelt": 3,
+					"mage_hair": 3
+				}
+			},
+			"shop_description": "It remembers every blow. And returns them.",
+			"trait": "bloodrage",
+			"trait_params": {
+				"dmg_per_stack": 0.1,
+				"max_stacks": 5,
+				"turns": 2
+			}
+		},
+		{
+			"damage_reduction": 0.05,
+			"description": "-5% bodily harm, +30 Fortitude, +10% dodge, and a dodge makes your next attack a crit. Anything that does land hurts.",
+			"fall_damage_mult": 1.0,
+			"fortitude": 30,
+			"icon": "armor_leather",
+			"icon_fallback": "armor_leather",
+			"id": "armor_shadowweave",
+			"name": "Shadowweave",
+			"price": 110,
+			"recipe": {
+				"coins": 60,
+				"materials": {
+					"spider_silk": 6
+				}
+			},
+			"shop_description": "You won't even feel it. Neither will they -- until it's too late.",
+			"trait": "shadowweave",
+			"trait_params": {
+				"dodge_bonus": 0.1
+			}
+		},
+		{
+			"damage_reduction": 0.1,
+			"description": "-10% bodily harm, +28 Fortitude, +1 move tile, +2 Speed (it will matter for turn order), and cliff falls deal no damage. Very thin.",
+			"fall_damage_mult": 0.0,
+			"fortitude": 28,
+			"icon": "armor_leather",
+			"icon_fallback": "armor_leather",
+			"id": "armor_windrunner",
+			"name": "Windrunner's Jerkin",
+			"price": 95,
+			"recipe": {
+				"coins": 50,
+				"materials": {
+					"feather": 5
+				}
+			},
+			"shop_description": "Light enough to forget you're wearing it. Fast enough to forget they were chasing you.",
+			"trait": "windrunner",
+			"trait_params": {
+				"move_bonus": 1,
+				"speed_bonus": 2
+			}
+		},
+		{
+			"damage_reduction": 0.05,
+			"description": "-5% bodily harm, +25 Fortitude. The first magical hit of every battle is negated outright, and each magical hit that reaches you gives back 10 stamina. Almost no protection against steel.",
+			"fall_damage_mult": 1.0,
+			"fortitude": 25,
+			"icon": "armor_rags",
+			"icon_fallback": "armor_rags",
+			"id": "armor_spellward",
+			"name": "Spellward Robes",
+			"price": 120,
+			"shop_description": "Stitched with wards by someone who clearly hated wizards.",
+			"trait": "spellward",
+			"trait_params": {
+				"magic_hit_stamina": 10
+			}
+		},
+		{
+			"damage_reduction": 0.2,
+			"description": "-20% bodily harm, +5 Fortitude. Allies within 2 tiles of you take 15% less damage.",
+			"fall_damage_mult": 1.0,
+			"fortitude": 5,
+			"icon": "armor_steel",
+			"icon_fallback": "armor_steel",
+			"id": "armor_warden",
+			"metal": true,
+			"name": "Warden's Aegis",
+			"price": 130,
+			"shop_description": "Made for standing in front of other people.",
+			"trait": "warden",
+			"trait_params": {
+				"ally_radius": 2,
+				"ally_reduction": 0.15
+			}
 		}
 	],
 	"blacksmith": {
@@ -323,7 +528,7 @@
 			"xp_reward": 715
 		}
 	],
-	"exported": "2026-10-05T18:58:55",
+	"exported": "2026-10-08T19:20:16",
 	"foods": [
 		{
 			"description": "Heals 5 HP and restores 15 stamina.",
@@ -425,6 +630,7 @@
 	"main_consts": {
 		"AGILITY_PER_EXTRA_MOVE": 20,
 		"ALLY_ATTACK_RANGE": 1,
+		"ALLY_GUARD_MANA": 15,
 		"ALLY_MAX_HP_PCT": 0.7,
 		"ALLY_MOVE_RANGE": 2,
 		"ARCHER_ATTACK_RANGE": 4,
@@ -437,6 +643,10 @@
 		"ARROW_FREEZE_MAX_TURNS": 4,
 		"ARROW_FREEZE_MIN_TURNS": 2,
 		"ATTACK_POTION_DAMAGE_BONUS_PCT": 0.25,
+		"ATTACK_TIMING_HIT_MULT": 1.0,
+		"ATTACK_TIMING_MISS_MULT": 0.8,
+		"ATTACK_TIMING_PERFECT_MULT": 1.25,
+		"ATTACK_TIMING_PERFECT_STAMINA": 5,
 		"BATTLE_FLEE_COOLDOWN": 2.0,
 		"BATTLE_GATHER_RADIUS": 200.0,
 		"BERSERK_DAMAGE_BONUS_PCT": 0.5,
@@ -479,6 +689,7 @@
 		"CENTAUR_ARCHER_ATTACK_RANGE": 3,
 		"CENTAUR_PACK_SIZE": 3,
 		"CENTAUR_WAVE_START": 7,
+		"CHANNEL_RESTORE_PCT": 0.2,
 		"CHAOS_SHARD_MAX_MULT": 1.6,
 		"CHAOS_SHARD_MIN_MULT": 0.5,
 		"CLIFF_FALL_DAMAGE_PCT": 0.05,
@@ -518,6 +729,7 @@
 		"ENEMY_TRAITS": {
 			"Apprentice Mage": {
 				"attack_range": 4,
+				"harm": "magical",
 				"ignore_line": true,
 				"inflicts_blind": true,
 				"inflicts_fear": true
@@ -526,6 +738,7 @@
 				"attack_range": 2,
 				"enrage_mult": 1.5,
 				"enrage_threshold": 0.3,
+				"harm": "magical",
 				"ignore_line": true,
 				"is_boss_tier": true,
 				"knockback_resist": 0.4,
@@ -537,6 +750,7 @@
 				"armored": true,
 				"enrage_mult": 1.5,
 				"enrage_threshold": 0.3,
+				"harm": "both",
 				"inflicts_bleed": true,
 				"is_boss_tier": true,
 				"is_miniboss": true,
@@ -573,7 +787,9 @@
 				"sweeps": true,
 				"windup": true
 			},
-			"Fae": {},
+			"Fae": {
+				"harm": "magical"
+			},
 			"Fae Hut": {
 				"move_range": 1,
 				"spawns_fae": true
@@ -599,6 +815,7 @@
 				"armored": true,
 				"enrage_mult": 1.5,
 				"enrage_threshold": 0.3,
+				"harm": "both",
 				"is_boss_tier": true,
 				"is_miniboss": true,
 				"knockback_resist": 0.65,
@@ -640,6 +857,7 @@
 				"attack_range": 2,
 				"enrage_mult": 1.5,
 				"enrage_threshold": 0.3,
+				"harm": "both",
 				"inflicts_bleed": true,
 				"is_boss_tier": true,
 				"knockback_resist": 0.8,
@@ -650,6 +868,7 @@
 			"Shade": {
 				"big_squad": true,
 				"dodge_chance": 0.4,
+				"harm": "magical",
 				"inflicts_fear": true,
 				"move_range": 3
 			},
@@ -671,6 +890,7 @@
 				"dodge_chance": 0.3,
 				"enrage_mult": 1.5,
 				"enrage_threshold": 0.3,
+				"harm": "magical",
 				"ignore_line": true,
 				"inflicts_bleed": true,
 				"is_boss_tier": true,
@@ -682,6 +902,7 @@
 				"armored": true,
 				"enrage_mult": 1.5,
 				"enrage_threshold": 0.3,
+				"harm": "both",
 				"is_boss_tier": true,
 				"knockback_resist": 0.7,
 				"move_range": 1,
@@ -697,6 +918,7 @@
 		"FAE_HUT_SPAWN_INTERVAL": 3,
 		"FAE_HUT_WAVE_START": 3,
 		"FEAR_CASCADE_LIMIT": 8,
+		"FIREBALL_FALLOFF_PER_TILE": 5.0,
 		"FOLLOWER_TRAIL_SPACING": 18,
 		"GNOME_DAMAGE_PCT_PER_PACKMATE": 0.2,
 		"GNOME_HP_PER_PACKMATE": 2,
@@ -706,8 +928,10 @@
 		"GOLD_KILL_COIN_BONUS": 1,
 		"KILLS_PER_TIER": 12,
 		"KNIFE_STEALTH_CRIT_BONUS": 30,
+		"LANDFALL_STUN_CHANCE": 0.25,
 		"LIFESTEAL_PCT": 0.5,
 		"LOW_SWEEP_CHANCE": 0.8,
+		"MANA_PER_HP": 5,
 		"MARACAS_ARMORED_MULT": 1.53846153846154,
 		"MAX_AMBIENT_ENEMIES": 40,
 		"MAX_BATTLE_ENEMIES_GOBLIN": 2,
@@ -814,6 +1038,21 @@
 		"SHADE_DODGE_CHANCE": 0.4,
 		"SHADE_WAVE_START": 4,
 		"SHAMAN_HEAL_PCT": 0.25,
+		"SHARED_TALISMAN_KEYS": [
+			"damage_pct",
+			"crit_chance",
+			"crit_damage_mult_bonus",
+			"low_hp_damage_pct",
+			"burn_chance",
+			"burn_chance_multihit",
+			"first_attack_damage_pct",
+			"lifesteal_pct",
+			"heal_on_kill",
+			"hp_regen_turn",
+			"hp_regen_per_20_max_hp",
+			"stamina_regen",
+			"double_secondary_chance"
+		],
 		"SHOP_CATEGORY_WEIGHTS": {
 			"armor": 16.7,
 			"potion": 16.6,
@@ -1136,19 +1375,75 @@
 		"consts": {
 			"BASE_MOVE_TILES": 2,
 			"KINDS": {
+				"brawler": {
+					"attack_range": 1,
+					"base": {
+						"attack": 2.0,
+						"defense": 2.0,
+						"fortitude": 5.0,
+						"hp": 20.0,
+						"magic": 0.0,
+						"speed": 4.0
+					},
+					"caster": false,
+					"favour": {
+						"range_bonus": 1.0,
+						"weapons": [
+							"knuckle_gloves",
+							""
+						]
+					},
+					"growth": {
+						"attack": 1.4,
+						"defense": 1.3,
+						"fortitude": 1.3,
+						"hp": 1.5,
+						"magic": 1.0,
+						"speed": 0.6
+					},
+					"levels": true,
+					"move": {
+						"min": 2
+					},
+					"name": "Brawler",
+					"perks": {
+						"crit_chance": 0.1,
+						"double_hit_chance": 0.1
+					},
+					"stamina": 100,
+					"stats": [
+						"hp",
+						"attack",
+						"defense",
+						"speed",
+						"fortitude"
+					],
+					"tint": [
+						1.0,
+						0.620000004768372,
+						0.5,
+						1.0
+					]
+				},
 				"druid": {
 					"attack_range": 1,
 					"base": {
 						"attack": 1.0,
 						"defense": 0.0,
+						"fortitude": 5.0,
 						"hp": 10.0,
 						"magic": 10.0,
 						"speed": 5.0
 					},
 					"caster": true,
+					"favour": {
+						"magic_mult": 1.15,
+						"weapon": "staff"
+					},
 					"growth": {
 						"attack": 0.5,
 						"defense": 0.66,
+						"fortitude": 1.2,
 						"hp": 1.2,
 						"magic": 1.0,
 						"speed": 1.0
@@ -1162,7 +1457,8 @@
 						"attack",
 						"defense",
 						"speed",
-						"magic"
+						"magic",
+						"fortitude"
 					],
 					"tint": [
 						0.550000011920929,
@@ -1176,6 +1472,7 @@
 					"base": {
 						"attack": 1.0,
 						"defense": 5.0,
+						"fortitude": 0.0,
 						"hp": 25.0,
 						"magic": 0.0,
 						"speed": 5.0
@@ -1183,7 +1480,8 @@
 					"caster": false,
 					"growth": {
 						"attack": 1.0,
-						"defense": 1.5,
+						"defense": 2.0,
+						"fortitude": 1.3,
 						"hp": 1.25,
 						"magic": 1.0,
 						"speed": 1.0
@@ -1193,11 +1491,13 @@
 						"fixed": 1
 					},
 					"name": "Guardian",
+					"shield_damage_mult": 2.0,
 					"stamina": 100,
 					"stats": [
 						"hp",
 						"attack",
-						"defense"
+						"defense",
+						"fortitude"
 					],
 					"tint": [
 						0.699999988079071,
@@ -1206,24 +1506,78 @@
 						1.0
 					]
 				},
+				"knight": {
+					"attack_range": 1,
+					"base": {
+						"attack": 3.0,
+						"defense": 3.0,
+						"fortitude": 10.0,
+						"hp": 30.0,
+						"magic": 0.0,
+						"speed": 4.0
+					},
+					"cannot_dodge": true,
+					"caster": false,
+					"favour": {
+						"special_stamina_discount": 0.2,
+						"weapon": "greatsword"
+					},
+					"growth": {
+						"attack": 1.3,
+						"defense": 1.5,
+						"fortitude": 0.9,
+						"hp": 1.0,
+						"magic": 1.0,
+						"speed": 0.75
+					},
+					"levels": true,
+					"move": {
+						"min": 2
+					},
+					"name": "Knight",
+					"shield_with_two_handed": true,
+					"stamina": 100,
+					"stats": [
+						"hp",
+						"attack",
+						"defense",
+						"speed",
+						"magic",
+						"fortitude"
+					],
+					"tint": [
+						0.819999992847443,
+						0.860000014305115,
+						0.949999988079071,
+						1.0
+					]
+				},
 				"marksman": {
+					"arrow_price_mult": 0.4,
 					"attack_range": 1,
 					"base": {
 						"attack": 1.0,
 						"defense": 0.0,
+						"fortitude": 0.0,
 						"hp": 10.0,
 						"magic": 0.0,
 						"speed": 5.0
 					},
 					"caster": false,
 					"defense_fixed": 0.0,
+					"favour": {
+						"crit_chance_mult": 1.5,
+						"weapon": "bow"
+					},
 					"growth": {
 						"attack": 1.0,
 						"defense": 1.0,
+						"fortitude": 1.0,
 						"hp": 0.25,
 						"magic": 1.0,
 						"speed": 1.0
 					},
+					"ignore_cover": true,
 					"levels": true,
 					"move": {
 						"base": 1.0,
@@ -1234,12 +1588,60 @@
 					"stats": [
 						"hp",
 						"attack",
-						"speed"
+						"speed",
+						"fortitude"
 					],
 					"tint": [
 						1.0,
 						0.899999976158142,
 						0.600000023841858,
+						1.0
+					],
+					"unlimited_range": true,
+					"weapon_only": "bow",
+					"weapon_price_mult": 1.25
+				},
+				"necromancer": {
+					"attack_range": 1,
+					"base": {
+						"attack": 1.0,
+						"defense": 0.0,
+						"fortitude": 0.0,
+						"hp": 15.0,
+						"magic": 10.0,
+						"speed": 5.0
+					},
+					"caster": true,
+					"favour": {
+						"kill_heal": 2.0,
+						"weapon": "staff"
+					},
+					"growth": {
+						"attack": 0.4,
+						"defense": 0.7,
+						"fortitude": 1.4,
+						"hp": 1.8,
+						"magic": 3.0,
+						"speed": 0.9
+					},
+					"hp_as_mana": true,
+					"kill_max_hp": 1.0,
+					"levels": true,
+					"move": {},
+					"name": "Necromancer",
+					"stamina": 0,
+					"stats": [
+						"hp",
+						"attack",
+						"defense",
+						"speed",
+						"magic",
+						"fortitude"
+					],
+					"tint": [
+						0.600000023841858,
+						0.449999988079071,
+						0.75,
 						1.0
 					]
 				},
@@ -1248,14 +1650,20 @@
 					"base": {
 						"attack": 1.0,
 						"defense": 0.0,
+						"fortitude": 0.0,
 						"hp": 20.0,
 						"magic": 0.0,
 						"speed": 5.0
 					},
 					"caster": false,
+					"favour": {
+						"damage_pct": 0.25,
+						"weapon": "dagger"
+					},
 					"growth": {
 						"attack": 1.3,
 						"defense": 0.7,
+						"fortitude": 1.0,
 						"hp": 1.0,
 						"magic": 1.0,
 						"speed": 1.4
@@ -1265,18 +1673,65 @@
 						"base": 2.0,
 						"per_speed": 0.12
 					},
+					"moves_after_attack": true,
 					"name": "Rogue",
 					"stamina": 100,
 					"stats": [
 						"hp",
 						"attack",
 						"defense",
-						"speed"
+						"speed",
+						"fortitude"
 					],
+					"steal_chance": 0.25,
 					"tint": [
 						0.850000023841858,
 						0.699999988079071,
 						1.0,
+						1.0
+					]
+				},
+				"shaman": {
+					"attack_range": 1,
+					"base": {
+						"attack": 0.0,
+						"defense": 1.0,
+						"fortitude": 10.0,
+						"hp": 12.0,
+						"magic": 10.0,
+						"speed": 5.0
+					},
+					"caster": true,
+					"charm_range": 4,
+					"favour": {
+						"talisman_share": 0.5,
+						"weapon": "staff"
+					},
+					"growth": {
+						"attack": 0.0,
+						"defense": 0.7,
+						"fortitude": 1.5,
+						"hp": 1.2,
+						"magic": 1.7,
+						"speed": 1.1
+					},
+					"levels": true,
+					"move": {},
+					"name": "Shaman",
+					"share_range": 2,
+					"stamina": 0,
+					"stats": [
+						"hp",
+						"defense",
+						"speed",
+						"magic",
+						"fortitude"
+					],
+					"talisman_slots": 4,
+					"tint": [
+						0.5,
+						0.899999976158142,
+						0.850000023841858,
 						1.0
 					]
 				},
@@ -1285,6 +1740,7 @@
 					"base": {
 						"attack": 1.0,
 						"defense": 0.0,
+						"fortitude": -5.0,
 						"hp": 20.0,
 						"magic": 0.0,
 						"speed": 5.0
@@ -1293,6 +1749,7 @@
 					"final_mult": {
 						"attack": 1.25,
 						"defense": 0.75,
+						"fortitude": 0.8,
 						"hp": 0.9,
 						"magic": 1.0,
 						"speed": 1.5
@@ -1315,9 +1772,11 @@
 			},
 			"MANA_PER_MAGIC": 5,
 			"MAX_LEVEL": 99,
+			"MEMBER_TALISMAN_SLOTS": 2,
 			"PASSIVE_GAIN": {
 				"attack": 1.0,
 				"defense": 1.0,
+				"fortitude": 1.0,
 				"hp": 1.0,
 				"magic": 1.0,
 				"speed": 0.2
@@ -1325,6 +1784,7 @@
 			"PICK_GAIN": {
 				"attack": 1.0,
 				"defense": 1.0,
+				"fortitude": 1.0,
 				"hp": 1.0,
 				"magic": 1.0,
 				"speed": 1.0
@@ -1336,7 +1796,8 @@
 				"attack",
 				"defense",
 				"speed",
-				"magic"
+				"magic",
+				"fortitude"
 			],
 			"WOLF_BASE_STAY_BATTLES": 10,
 			"WOLF_MAX_FAINTS": 3,
@@ -1344,19 +1805,75 @@
 			"XP_PER_LEVEL": 8
 		},
 		"kinds": {
+			"brawler": {
+				"attack_range": 1,
+				"base": {
+					"attack": 2.0,
+					"defense": 2.0,
+					"fortitude": 5.0,
+					"hp": 20.0,
+					"magic": 0.0,
+					"speed": 4.0
+				},
+				"caster": false,
+				"favour": {
+					"range_bonus": 1.0,
+					"weapons": [
+						"knuckle_gloves",
+						""
+					]
+				},
+				"growth": {
+					"attack": 1.4,
+					"defense": 1.3,
+					"fortitude": 1.3,
+					"hp": 1.5,
+					"magic": 1.0,
+					"speed": 0.6
+				},
+				"levels": true,
+				"move": {
+					"min": 2
+				},
+				"name": "Brawler",
+				"perks": {
+					"crit_chance": 0.1,
+					"double_hit_chance": 0.1
+				},
+				"stamina": 100,
+				"stats": [
+					"hp",
+					"attack",
+					"defense",
+					"speed",
+					"fortitude"
+				],
+				"tint": [
+					1.0,
+					0.620000004768372,
+					0.5,
+					1.0
+				]
+			},
 			"druid": {
 				"attack_range": 1,
 				"base": {
 					"attack": 1.0,
 					"defense": 0.0,
+					"fortitude": 5.0,
 					"hp": 10.0,
 					"magic": 10.0,
 					"speed": 5.0
 				},
 				"caster": true,
+				"favour": {
+					"magic_mult": 1.15,
+					"weapon": "staff"
+				},
 				"growth": {
 					"attack": 0.5,
 					"defense": 0.66,
+					"fortitude": 1.2,
 					"hp": 1.2,
 					"magic": 1.0,
 					"speed": 1.0
@@ -1370,7 +1887,8 @@
 					"attack",
 					"defense",
 					"speed",
-					"magic"
+					"magic",
+					"fortitude"
 				],
 				"tint": [
 					0.550000011920929,
@@ -1384,6 +1902,7 @@
 				"base": {
 					"attack": 1.0,
 					"defense": 5.0,
+					"fortitude": 0.0,
 					"hp": 25.0,
 					"magic": 0.0,
 					"speed": 5.0
@@ -1391,7 +1910,8 @@
 				"caster": false,
 				"growth": {
 					"attack": 1.0,
-					"defense": 1.5,
+					"defense": 2.0,
+					"fortitude": 1.3,
 					"hp": 1.25,
 					"magic": 1.0,
 					"speed": 1.0
@@ -1401,11 +1921,13 @@
 					"fixed": 1
 				},
 				"name": "Guardian",
+				"shield_damage_mult": 2.0,
 				"stamina": 100,
 				"stats": [
 					"hp",
 					"attack",
-					"defense"
+					"defense",
+					"fortitude"
 				],
 				"tint": [
 					0.699999988079071,
@@ -1414,24 +1936,78 @@
 					1.0
 				]
 			},
+			"knight": {
+				"attack_range": 1,
+				"base": {
+					"attack": 3.0,
+					"defense": 3.0,
+					"fortitude": 10.0,
+					"hp": 30.0,
+					"magic": 0.0,
+					"speed": 4.0
+				},
+				"cannot_dodge": true,
+				"caster": false,
+				"favour": {
+					"special_stamina_discount": 0.2,
+					"weapon": "greatsword"
+				},
+				"growth": {
+					"attack": 1.3,
+					"defense": 1.5,
+					"fortitude": 0.9,
+					"hp": 1.0,
+					"magic": 1.0,
+					"speed": 0.75
+				},
+				"levels": true,
+				"move": {
+					"min": 2
+				},
+				"name": "Knight",
+				"shield_with_two_handed": true,
+				"stamina": 100,
+				"stats": [
+					"hp",
+					"attack",
+					"defense",
+					"speed",
+					"magic",
+					"fortitude"
+				],
+				"tint": [
+					0.819999992847443,
+					0.860000014305115,
+					0.949999988079071,
+					1.0
+				]
+			},
 			"marksman": {
+				"arrow_price_mult": 0.4,
 				"attack_range": 1,
 				"base": {
 					"attack": 1.0,
 					"defense": 0.0,
+					"fortitude": 0.0,
 					"hp": 10.0,
 					"magic": 0.0,
 					"speed": 5.0
 				},
 				"caster": false,
 				"defense_fixed": 0.0,
+				"favour": {
+					"crit_chance_mult": 1.5,
+					"weapon": "bow"
+				},
 				"growth": {
 					"attack": 1.0,
 					"defense": 1.0,
+					"fortitude": 1.0,
 					"hp": 0.25,
 					"magic": 1.0,
 					"speed": 1.0
 				},
+				"ignore_cover": true,
 				"levels": true,
 				"move": {
 					"base": 1.0,
@@ -1442,12 +2018,60 @@
 				"stats": [
 					"hp",
 					"attack",
-					"speed"
+					"speed",
+					"fortitude"
 				],
 				"tint": [
 					1.0,
 					0.899999976158142,
 					0.600000023841858,
+					1.0
+				],
+				"unlimited_range": true,
+				"weapon_only": "bow",
+				"weapon_price_mult": 1.25
+			},
+			"necromancer": {
+				"attack_range": 1,
+				"base": {
+					"attack": 1.0,
+					"defense": 0.0,
+					"fortitude": 0.0,
+					"hp": 15.0,
+					"magic": 10.0,
+					"speed": 5.0
+				},
+				"caster": true,
+				"favour": {
+					"kill_heal": 2.0,
+					"weapon": "staff"
+				},
+				"growth": {
+					"attack": 0.4,
+					"defense": 0.7,
+					"fortitude": 1.4,
+					"hp": 1.8,
+					"magic": 3.0,
+					"speed": 0.9
+				},
+				"hp_as_mana": true,
+				"kill_max_hp": 1.0,
+				"levels": true,
+				"move": {},
+				"name": "Necromancer",
+				"stamina": 0,
+				"stats": [
+					"hp",
+					"attack",
+					"defense",
+					"speed",
+					"magic",
+					"fortitude"
+				],
+				"tint": [
+					0.600000023841858,
+					0.449999988079071,
+					0.75,
 					1.0
 				]
 			},
@@ -1456,14 +2080,20 @@
 				"base": {
 					"attack": 1.0,
 					"defense": 0.0,
+					"fortitude": 0.0,
 					"hp": 20.0,
 					"magic": 0.0,
 					"speed": 5.0
 				},
 				"caster": false,
+				"favour": {
+					"damage_pct": 0.25,
+					"weapon": "dagger"
+				},
 				"growth": {
 					"attack": 1.3,
 					"defense": 0.7,
+					"fortitude": 1.0,
 					"hp": 1.0,
 					"magic": 1.0,
 					"speed": 1.4
@@ -1473,18 +2103,65 @@
 					"base": 2.0,
 					"per_speed": 0.12
 				},
+				"moves_after_attack": true,
 				"name": "Rogue",
 				"stamina": 100,
 				"stats": [
 					"hp",
 					"attack",
 					"defense",
-					"speed"
+					"speed",
+					"fortitude"
 				],
+				"steal_chance": 0.25,
 				"tint": [
 					0.850000023841858,
 					0.699999988079071,
 					1.0,
+					1.0
+				]
+			},
+			"shaman": {
+				"attack_range": 1,
+				"base": {
+					"attack": 0.0,
+					"defense": 1.0,
+					"fortitude": 10.0,
+					"hp": 12.0,
+					"magic": 10.0,
+					"speed": 5.0
+				},
+				"caster": true,
+				"charm_range": 4,
+				"favour": {
+					"talisman_share": 0.5,
+					"weapon": "staff"
+				},
+				"growth": {
+					"attack": 0.0,
+					"defense": 0.7,
+					"fortitude": 1.5,
+					"hp": 1.2,
+					"magic": 1.7,
+					"speed": 1.1
+				},
+				"levels": true,
+				"move": {},
+				"name": "Shaman",
+				"share_range": 2,
+				"stamina": 0,
+				"stats": [
+					"hp",
+					"defense",
+					"speed",
+					"magic",
+					"fortitude"
+				],
+				"talisman_slots": 4,
+				"tint": [
+					0.5,
+					0.899999976158142,
+					0.850000023841858,
 					1.0
 				]
 			},
@@ -1493,6 +2170,7 @@
 				"base": {
 					"attack": 1.0,
 					"defense": 0.0,
+					"fortitude": -5.0,
 					"hp": 20.0,
 					"magic": 0.0,
 					"speed": 5.0
@@ -1501,6 +2179,7 @@
 				"final_mult": {
 					"attack": 1.25,
 					"defense": 0.75,
+					"fortitude": 0.8,
 					"hp": 0.9,
 					"magic": 1.0,
 					"speed": 1.5
@@ -1545,6 +2224,8 @@
 		"EXHAUSTED_CLEAR_STAMINA_PCT": 0.5,
 		"EXHAUSTED_STAMINA_REGEN_MULT": 0.5,
 		"FLASH_DURATION": 0.15,
+		"FORTITUDE_NEGATIVE_FLOOR": -0.5,
+		"FORTITUDE_REDUCTION_CAP": 0.75,
 		"INVINCIBILITY_TIME": 0.9,
 		"ITEM_HEAL_AMOUNT": 5,
 		"MAX_LEVEL": 99,
@@ -1688,6 +2369,7 @@
 			"damage_reduction_pct": 0.08,
 			"defend_threshold_bonus": 2,
 			"description": "Strapped to the forearm, built to punish -- a blocked hit only feeds the fire behind your next punch. Vengeance: a successful block empowers your very next attack for +50% damage (+75% with Knuckle Gloves). Passively soaks 8% off every hit that lands. Fighting one-handed costs 10% of your own damage.",
+			"fortitude": 4,
 			"icon": "shield_brawler",
 			"id": "shield_brawler",
 			"name": "Brawler's Buckler",
@@ -1701,6 +2383,7 @@
 		"shield_buckler": {
 			"block_chance": 0.33,
 			"description": "A simple wooden shield -- steady, reliable, free. No special trick, just a full third of incoming hits bouncing right off. Pairs naturally with a Club: neither needs finesse.",
+			"fortitude": 3,
 			"icon": "shield_buckler",
 			"id": "shield_buckler",
 			"name": "Wooden Buckler",
@@ -1717,6 +2400,7 @@
 			"damage_reduction_pct": 0.15,
 			"defend_threshold_bonus": 8,
 			"description": "A slab of iron built to eat a blow head-on and throw it right back -- a Hammer-wielder's whole philosophy, in shield form. Thorns: a successful block reflects 25% of the blocked hit back at the attacker (40% with a Hammer). Passively soaks 15% off every hit that lands, and the best Defend threshold in the game on top. This much dead weight costs 15% of your own damage.",
+			"fortitude": 0,
 			"icon": "shield_bulwark",
 			"id": "shield_bulwark",
 			"name": "Iron Bulwark",
@@ -1733,6 +2417,7 @@
 			"damage_reduction_pct": 0.1,
 			"defend_threshold_bonus": 4,
 			"description": "A slab too solid to move -- you can't be pushed while it's raised, water current included. A successful block shoves the attacker back a tile (two, with a Spear to brace against). Passively soaks 10% off every hit that lands, and Defend alone shrugs off a bigger blow before falling back to halving it. Bracing this much steel behind you costs 10% of your own damage.",
+			"fortitude": 0,
 			"icon": "shield_round",
 			"id": "shield_heavy",
 			"name": "Heavy Shield",
@@ -1749,6 +2434,7 @@
 			"damage_penalty_pct": 0.08,
 			"damage_reduction_pct": 0.05,
 			"description": "Barely more than a bracer -- less about blocking a blow than never being where it lands. A dodge earns you a single dodge-roll: back, left, or right, whichever way isn't blocked. Passively soaks a light 5% off every hit that lands. Even this light a shield costs 8% of your own damage.",
+			"fortitude": 12,
 			"icon": "shield_phantom",
 			"id": "shield_phantom",
 			"name": "Phantom Guard",
@@ -2168,6 +2854,7 @@
 	"traits": {
 		"Apprentice Mage": {
 			"attack_range": 4,
+			"harm": "magical",
 			"ignore_line": true,
 			"inflicts_blind": true,
 			"inflicts_fear": true
@@ -2176,6 +2863,7 @@
 			"attack_range": 2,
 			"enrage_mult": 1.5,
 			"enrage_threshold": 0.3,
+			"harm": "magical",
 			"ignore_line": true,
 			"is_boss_tier": true,
 			"knockback_resist": 0.4,
@@ -2187,6 +2875,7 @@
 			"armored": true,
 			"enrage_mult": 1.5,
 			"enrage_threshold": 0.3,
+			"harm": "both",
 			"inflicts_bleed": true,
 			"is_boss_tier": true,
 			"is_miniboss": true,
@@ -2223,7 +2912,9 @@
 			"sweeps": true,
 			"windup": true
 		},
-		"Fae": {},
+		"Fae": {
+			"harm": "magical"
+		},
 		"Fae Hut": {
 			"move_range": 1,
 			"spawns_fae": true
@@ -2249,6 +2940,7 @@
 			"armored": true,
 			"enrage_mult": 1.5,
 			"enrage_threshold": 0.3,
+			"harm": "both",
 			"is_boss_tier": true,
 			"is_miniboss": true,
 			"knockback_resist": 0.65,
@@ -2290,6 +2982,7 @@
 			"attack_range": 2,
 			"enrage_mult": 1.5,
 			"enrage_threshold": 0.3,
+			"harm": "both",
 			"inflicts_bleed": true,
 			"is_boss_tier": true,
 			"knockback_resist": 0.8,
@@ -2300,6 +2993,7 @@
 		"Shade": {
 			"big_squad": true,
 			"dodge_chance": 0.4,
+			"harm": "magical",
 			"inflicts_fear": true,
 			"move_range": 3
 		},
@@ -2321,6 +3015,7 @@
 			"dodge_chance": 0.3,
 			"enrage_mult": 1.5,
 			"enrage_threshold": 0.3,
+			"harm": "magical",
 			"ignore_line": true,
 			"inflicts_bleed": true,
 			"is_boss_tier": true,
@@ -2332,6 +3027,7 @@
 			"armored": true,
 			"enrage_mult": 1.5,
 			"enrage_threshold": 0.3,
+			"harm": "both",
 			"is_boss_tier": true,
 			"knockback_resist": 0.7,
 			"move_range": 1,
@@ -2656,6 +3352,20 @@
 				],
 				"stat_bonus": 0.15
 			},
+			"mental_mush": {
+				"base_cost": 30,
+				"cost_step": 18,
+				"description": "Fortitude grows by +1 more per level owned on every level-up.",
+				"max_level": 3,
+				"name": "Mental Mush",
+				"prereqs": [
+					{
+						"id": "warded_mind",
+						"min_level": 1
+					}
+				],
+				"stat_bonus": 1
+			},
 			"momentum": {
 				"base_cost": 40,
 				"cost_step": 25,
@@ -2837,6 +3547,20 @@
 				],
 				"stat_bonus": 1
 			},
+			"smort_savage": {
+				"base_cost": 40,
+				"cost_step": 0,
+				"description": "The bonus pick you put into Fortitude counts double.",
+				"max_level": 1,
+				"name": "Smort Savage",
+				"prereqs": [
+					{
+						"id": "mental_mush",
+						"min_level": 1
+					}
+				],
+				"stat_bonus": 1
+			},
 			"stamina": {
 				"base_cost": 15,
 				"cost_step": 8,
@@ -2976,6 +3700,14 @@
 				],
 				"stat_bonus": 0.15
 			},
+			"warded_mind": {
+				"base_cost": 20,
+				"cost_step": 12,
+				"description": "Unlocks Fortitude as a level-up choice -- 1% less damage from MAGICAL harm per point, capped at 75%, on top of your armour's Fortitude.",
+				"max_level": 1,
+				"name": "Warded Mind",
+				"stat_bonus": 1
+			},
 			"warlord": {
 				"base_cost": 600,
 				"cost_step": 0,
@@ -3088,7 +3820,10 @@
 			"warband",
 			"battle_medic",
 			"war_chest",
-			"war_profiteer"
+			"war_profiteer",
+			"warded_mind",
+			"mental_mush",
+			"smort_savage"
 		]
 	},
 	"weapons": {
@@ -3644,6 +4379,13 @@
 				"passive": {
 					"passive_heal_chance": 0.25,
 					"passive_heal_flat": 5
+				}
+			},
+			"staff": {
+				"description": "Whoever carries it learns the old words twice as fast.",
+				"name": "Moonstick",
+				"passive": {
+					"passive_magic_gain_mult": 2.0
 				}
 			}
 		},

@@ -28,16 +28,18 @@ const MIN_GAP := 96.0
 const PAN_MARGIN := 260.0
 const ISOLATED_RADIUS := 1150.0
 
-# Wing roots fan out at 120 degrees apart (screen coordinates: y grows down).
+# Wing roots fan out around the hub (screen coordinates: y grows down).
 const WING_ANGLES := {
 	"warrior": 3.665191,   # 210 degrees: up and to the left
 	"merchant": 5.759587,  # 330 degrees: up and to the right
 	"survivor": 1.570796,  # 90 degrees: straight down
+	"magical": 4.712389,   # 270 degrees: straight up
 }
 const WING_TINTS := {
 	"warrior": Color(1.0, 0.46, 0.27),
 	"merchant": Color(1.0, 0.82, 0.3),
 	"survivor": Color(0.36, 0.9, 0.62),
+	"magical": Color(0.62, 0.5, 1.0),
 	"convergence": Color(0.74, 0.52, 1.0),
 	"isolated": Color(0.7, 0.95, 1.0),
 }

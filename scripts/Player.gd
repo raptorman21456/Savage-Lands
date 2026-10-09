@@ -3,6 +3,7 @@ class_name Player
 
 const WeaponsScript := preload("res://scripts/Weapons.gd")
 const ArmorScript := preload("res://scripts/Armor.gd")
+const MaterialsScript := preload("res://scripts/Materials.gd")
 const ShieldsScript := preload("res://scripts/Shields.gd")
 const SaveDataScript := preload("res://scripts/SaveData.gd")
 const EnchantmentsScript := preload("res://scripts/Enchantments.gd")
@@ -85,6 +86,10 @@ var stat_might := 0
 var stat_resilience := 0
 var stat_reflexes := 0
 var stat_dexterity := 0
+# Fortitude: protection against MAGICAL harm (1 point = 1%, see fortitude_reduction). Locked at 0 until
+# the Church's magical wing unlocks it (meta_fortitude_unlocked). Mental Mush adds extra points
+# every level-up; Smort Savage doubles the bonus pick put into it.
+var stat_fortitude := 0
 var awaiting_bonus := false
 
 var max_health := stat_vigor
@@ -214,6 +219,9 @@ var meta_crit_chance := 0.0
 var meta_resilience_unlocked := false
 var meta_reflexes_unlocked := false
 var meta_dexterity_unlocked := false
+var meta_fortitude_unlocked := false
+var meta_fortitude_passive_bonus := 0
+var meta_fortitude_pick_doubled := false
 # Rage: bonus damage multiplier added on top of Berserk's own base bonus
 # while Berserk is active (see berserk_turns_remaining below).
 var meta_rage_bonus_pct := 0.0
@@ -655,6 +663,11 @@ func _refresh_meta_passives(bonuses: Dictionary) -> void:
 	meta_resilience_unlocked = bonuses.get("resilience_unlock", 0) > 0
 	meta_reflexes_unlocked = bonuses.get("reflexes_unlock", 0) > 0
 	meta_dexterity_unlocked = bonuses.get("dexterity_unlock", 0) > 0
+	# The magical wing: Warded Mind unlocks Fortitude, Mental Mush grows it every level-up, Smort
+	# Savage doubles the bonus pick put into it.
+	meta_fortitude_unlocked = bonuses.get("warded_mind", 0) > 0
+	meta_fortitude_passive_bonus = int(bonuses.get("mental_mush", 0))
+	meta_fortitude_pick_doubled = bonuses.get("smort_savage", 0) > 0
 	meta_rage_bonus_pct = bonuses.get("rage", 0.0)
 	meta_double_hit_chance = bonuses.get("berserker_edge", 0.0)
 	meta_lifesteal_pct = bonuses.get("vampiric_grit", 0.0)
@@ -722,7 +735,7 @@ func apply_meta_purchase(id: String) -> void:
 		"stamina":
 			_base_max_stamina = MAX_STAMINA + int(bonuses.get("stamina", 0))
 			var old_max_stamina := max_stamina
-			max_stamina = _base_max_stamina + int(talisman_bonus("max_stamina"))
+			max_stamina = _base_max_stamina + int(talisman_bonus("max_stamina")) + armor_max_stamina_bonus()
 			stamina = clampi(stamina + (max_stamina - old_max_stamina), 0, max_stamina)
 			stamina_changed.emit(stamina, max_stamina)
 		"potions", "second_wind":
@@ -1186,7 +1199,7 @@ func _on_talismans_changed() -> void:
 	_rebuild_talisman_cache()
 	_recalc_stats()
 	var old_max_stamina := max_stamina
-	max_stamina = _base_max_stamina + int(talisman_bonus("max_stamina"))
+	max_stamina = _base_max_stamina + int(talisman_bonus("max_stamina")) + armor_max_stamina_bonus()
 	stamina = clampi(stamina + (max_stamina - old_max_stamina), 0, max_stamina)
 	stamina_changed.emit(stamina, max_stamina)
 	if not current_weapon_base.is_empty():
@@ -1205,7 +1218,7 @@ func block_heal_amount() -> int:
 	return int(meta_block_heal_amount) + int(talisman_bonus("block_heal"))
 
 func dodge_chance_total() -> float:
-	return meta_dodge_chance + talisman_bonus("dodge_chance")
+	return meta_dodge_chance + talisman_bonus("dodge_chance") + armor_trait_value("dodge_bonus")
 
 func crit_chance_total() -> float:
 	return meta_crit_chance + talisman_bonus("crit_chance")
@@ -1403,7 +1416,11 @@ func try_buy_armor(armor: Dictionary) -> bool:
 	var id: String = armor.id
 	if owned_armor.has(id):
 		equipped_armor = armor
+		refresh_armor_effects()
 		return true
+	# Pelt armours are crafted at the Blacksmith, never bought.
+	if ArmorScript.is_crafted(armor):
+		return false
 	var price := get_armor_price(armor)
 	if coins < price:
 		return false
@@ -1411,6 +1428,7 @@ func try_buy_armor(armor: Dictionary) -> bool:
 	coins_changed.emit(coins)
 	owned_armor[id] = true
 	equipped_armor = armor
+	refresh_armor_effects()
 	return true
 
 # Total damage reduction from worn gear: the armour tier plus every worn
@@ -1445,6 +1463,78 @@ func coin_scaled_defense_bonus() -> float:
 func armor_tier_damage_reduction() -> float:
 	var armor_id: String = equipped_armor.get("id", "")
 	return equipped_armor.get("damage_reduction", 0.0) + BlacksmithScript.armor_bonus(get_armor_upgrade_level(armor_id))
+
+# --- Armour traits and Fortitude -------------------------------------------------------------
+# The worn armour's signature effect (Armor.gd lists the ids) and its numbers.
+func armor_trait() -> String:
+	return str(equipped_armor.get("trait", ""))
+
+func armor_trait_value(key: String, default = 0.0):
+	return equipped_armor.get("trait_params", {}).get(key, default)
+
+# +n / -n max stamina from the worn armour (Cinder Mail's heat).
+func armor_max_stamina_bonus() -> int:
+	return int(armor_trait_value("max_stamina_bonus", 0))
+
+# Speed the worn armour adds (Windrunner's Jerkin); it will count for turn order.
+func armor_speed_bonus() -> int:
+	return int(armor_trait_value("speed_bonus", 0))
+
+# Points of protection against MAGICAL harm: the armour's, the shield's skew, and the stat.
+func fortitude_total() -> float:
+	return float(equipped_armor.get("fortitude", 0)) + shield_fortitude() + float(stat_fortitude) + talisman_bonus("fortitude")
+
+# Magical harm cut by Fortitude alone: 1% a point, capped at 75%, and a negative total (Thornmail)
+# makes spells hurt more, down to +50%.
+func fortitude_reduction() -> float:
+	return clampf(fortitude_total() / 100.0, FORTITUDE_NEGATIVE_FLOOR, FORTITUDE_REDUCTION_CAP)
+
+const FORTITUDE_REDUCTION_CAP := 0.75
+const FORTITUDE_NEGATIVE_FLOOR := -0.5
+
+# A shield's skew towards Fortitude (Phantom Guard); only while it is actually usable.
+func shield_fortitude() -> float:
+	if equipped_shield.is_empty() or not _shield_weapon_ok():
+		return 0.0
+	return float(equipped_shield.get("fortitude", 0))
+
+# Re-derives everything the worn armour touches (max stamina) after it is changed.
+func refresh_armor_effects() -> void:
+	_on_talismans_changed()
+
+# --- Crafting materials (Materials.gd) ---------------------------------------------------------
+var materials := {}
+
+func material_count(id: String) -> int:
+	return int(materials.get(id, 0))
+
+func add_material(id: String, amount: int = 1) -> void:
+	if amount > 0:
+		materials[id] = material_count(id) + amount
+
+# Whether the recipe's materials and coins are all in hand.
+func can_craft_armor(armor: Dictionary) -> bool:
+	var recipe: Dictionary = armor.get("recipe", {})
+	if recipe.is_empty() or owned_armor.has(armor.get("id", "")):
+		return false
+	for id in recipe.get("materials", {}):
+		if material_count(str(id)) < int(recipe.materials[id]):
+			return false
+	return coins >= int(recipe.get("coins", 0))
+
+# Spends the materials and coins and puts the armour in your collection (and on, like a purchase).
+func try_craft_armor(armor: Dictionary) -> bool:
+	if not can_craft_armor(armor):
+		return false
+	var recipe: Dictionary = armor.recipe
+	for id in recipe.get("materials", {}):
+		materials[id] = material_count(str(id)) - int(recipe.materials[id])
+	coins -= int(recipe.get("coins", 0))
+	coins_changed.emit(coins)
+	owned_armor[armor.id] = true
+	equipped_armor = armor
+	refresh_armor_effects()
+	return true
 
 func clothing_damage_reduction() -> float:
 	var total := 0.0
@@ -1536,6 +1626,9 @@ func shield_usable() -> bool:
 # Heavy Shield's passive: immune to forced repositioning (water push) while
 # raised. Same weapon-compat gating as shield_block_chance().
 func shield_push_immune() -> bool:
+	# Fortress Plate: nothing sweeps you off a water tile.
+	if bool(armor_trait_value("push_immune", false)):
+		return true
 	if equipped_shield.is_empty() or not _shield_weapon_ok():
 		return false
 	return equipped_shield.get("push_immune", false)
@@ -1861,6 +1954,8 @@ func _level_up() -> void:
 		stat_reflexes += 1
 	if meta_dexterity_unlocked:
 		stat_dexterity += 1
+	if meta_fortitude_unlocked:
+		stat_fortitude += 1 + meta_fortitude_passive_bonus
 	if level >= MAX_LEVEL:
 		xp = 0
 		xp_to_next = 0
@@ -1897,6 +1992,8 @@ func apply_bonus_stat(stat_name: String) -> void:
 				stat_reflexes += 1
 			"dexterity":
 				stat_dexterity += 1
+			"fortitude":
+				stat_fortitude += 2 if meta_fortitude_pick_doubled else 1
 	awaiting_bonus = false
 	_recalc_stats()
 

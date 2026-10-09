@@ -42,6 +42,7 @@ const UPGRADE_IDS := [
 	"undying", "second_wind", "block_master", "second_breath",
 	"favour", "last_stand", "shield_mastery", "unbreakable_guard", "worldwalker",
 	"warband", "battle_medic", "war_chest", "war_profiteer",
+	"warded_mind", "mental_mush", "smort_savage",
 ]
 static var UPGRADES := {
 	# --- Warrior wing: combat stats, splitting into a raw-power path
@@ -116,6 +117,12 @@ static var UPGRADES := {
 	# itself, just the unlock gate for the new Resilience level-up stat
 	# (Player.gd:stat_resilience / resilience_reduction). A single purchase.
 	"resilience_unlock": {"name": "Resilience", "stat_bonus": 1, "base_cost": 18, "cost_step": 10, "max_level": 1, "description": "Unlocks Resilience as a level-up choice -- 1% damage reduction per point owned, capped at 20%, stacking with armor.", "prereqs": [{"id": "stamina", "min_level": 1}]},
+	# --- The magical wing: Fortitude, protection against MAGICAL harm (Player.gd:stat_fortitude). Warded Mind
+	# unlocks it as a level-up stat; Mental Mush grows it by more every level-up; Smort Savage doubles the
+	# bonus pick put into it. (Names are the user's working titles; costs are drafts.) ---
+	"warded_mind": {"name": "Warded Mind", "stat_bonus": 1, "base_cost": 20, "cost_step": 12, "max_level": 1, "description": "Unlocks Fortitude as a level-up choice -- 1% less damage from MAGICAL harm per point, capped at 75%, on top of your armour's Fortitude."},
+	"mental_mush": {"name": "Mental Mush", "stat_bonus": 1, "base_cost": 30, "cost_step": 18, "max_level": 3, "description": "Fortitude grows by +1 more per level owned on every level-up.", "prereqs": [{"id": "warded_mind", "min_level": 1}]},
+	"smort_savage": {"name": "Smort Savage", "stat_bonus": 1, "base_cost": 40, "cost_step": 0, "max_level": 1, "description": "The bonus pick you put into Fortitude counts double.", "prereqs": [{"id": "mental_mush", "min_level": 1}]},
 	"potions": {"name": "Provisions", "stat_bonus": 1, "base_cost": 25, "cost_step": 15, "description": "+1 healing item at the start of every run.", "prereqs": [{"id": "resilience_unlock", "min_level": 1}]},
 	"herbalism": {"name": "Herbalism", "stat_bonus": 0.15, "base_cost": 20, "cost_step": 12, "max_level": 5, "description": "+15% bonus healing per level from every healing item.", "prereqs": [{"id": "resilience_unlock", "min_level": 1}]},
 	"vampiric_grit": {"name": "Vampiric Grit", "stat_bonus": 0.05, "base_cost": 30, "cost_step": 18, "description": "+5% lifesteal per level on every hit, with any weapon.", "prereqs": [{"id": "potions", "min_level": 1}]},

@@ -49,7 +49,7 @@ func _init() -> void:
 	for a in armor.TIERS:
 		if a.get("metal", false):
 			metal_ids.append(a.id)
-	print("only Iron and Steel are metal: %s (expected [armor_iron, armor_steel])" % [metal_ids])
+	print("the metal armours (the smith will work them): %s (expected the six plate armours)" % [metal_ids])
 
 	# --- Weapons -------------------------------------------------------------------
 	var spear: Dictionary = weapons.get_owned_variant("spear_fine_steel")
@@ -112,33 +112,33 @@ func _init() -> void:
 
 	# --- Armour --------------------------------------------------------------------
 	player.coins = 1000
-	player.owned_armor["armor_iron"] = true
+	player.owned_armor["armor_thornmail"] = true
 	player.equipped_armor = armor.TIERS[2]
 	print("Iron Plate is 30%% before any upgrade: %.3f (expected 0.300)" % [player.armor_damage_reduction()])
-	print("upgrading metal armour works: ok=%s (expected true), coins=%d (expected 960), level=%d (expected 1)" % [player.try_upgrade_armor("armor_iron"), player.coins, player.get_armor_upgrade_level("armor_iron")])
+	print("upgrading metal armour works: ok=%s (expected true), coins=%d (expected 960), level=%d (expected 1)" % [player.try_upgrade_armor("armor_thornmail"), player.coins, player.get_armor_upgrade_level("armor_thornmail")])
 	print("...+2.5%% damage reduction: %.3f (expected 0.325)" % [player.armor_damage_reduction()])
-	player.try_upgrade_armor("armor_iron")
-	player.try_upgrade_armor("armor_iron")
+	player.try_upgrade_armor("armor_thornmail")
+	player.try_upgrade_armor("armor_thornmail")
 	print("stops at +3: level=%d (expected 3), dr=%.3f (expected 0.375), a fourth refused=%s (expected false)" % [
-		player.get_armor_upgrade_level("armor_iron"), player.armor_damage_reduction(), player.try_upgrade_armor("armor_iron")
+		player.get_armor_upgrade_level("armor_thornmail"), player.armor_damage_reduction(), player.try_upgrade_armor("armor_thornmail")
 	])
 
-	player.owned_armor["armor_leather"] = true
+	player.owned_armor["armor_gambeson"] = true
 	print("leather and dragonhide aren't metal, unowned armour isn't upgradable: leather=%s dragonskin=%s steel=%s (expected false false false)" % [
-		player.try_upgrade_armor("armor_leather"), player.try_upgrade_armor("armor_dragonskin"), player.try_upgrade_armor("armor_steel")
+		player.try_upgrade_armor("armor_gambeson"), player.try_upgrade_armor("armor_dragonskin"), player.try_upgrade_armor("armor_fortress")
 	])
 
 	# The bonus follows the armour that is actually WORN, not every owned piece.
-	player.owned_armor["armor_steel"] = true
+	player.owned_armor["armor_fortress"] = true
 	player.equipped_armor = armor.TIERS[3]
-	print("an un-upgraded Steel Plate ignores Iron's levels: %.3f (expected 0.450)" % [player.armor_damage_reduction()])
+	print("an un-upgraded Fortress Plate ignores Thornmail's levels: %.3f (expected 0.550)" % [player.armor_damage_reduction()])
 	player.equipped_armor = armor.TIERS[2].duplicate()
 	player.equipped_armor["category"] = "armor"
 	print("a shop-tagged copy of Iron still gets its levels: %.3f (expected 0.375)" % [player.armor_damage_reduction()])
 
 	# Stacks with clothes and reaches the real damage path.
 	player.equipped_armor = armor.TIERS[2]
-	player.armor_upgrade_levels["armor_iron"] = 2
+	player.armor_upgrade_levels["armor_thornmail"] = 2
 	player.owned_clothing["cloth_cloak"] = true
 	player.equip_clothing("cloth_cloak")
 	main.in_battle = true
@@ -164,21 +164,21 @@ func _init() -> void:
 		player.armor_upgrade_levels = {}
 		player.try_buy_weapon(weapons.CLUB)
 		player.equipped_armor = armor.TIERS[2]
-		player.owned_armor = {"armor_rags": true, "armor_iron": true, "armor_leather": true}
+		player.owned_armor = {"armor_rags": true, "armor_thornmail": true, "armor_gambeson": true}
 		player.equipped_clothing = {"head": "", "body": "", "feet": ""}
 		player.coins = 100
 		main._try_open_panel("blacksmith")
 		print("the door opens it: visible=%s (expected true), title=%s (expected THE BLACKSMITH)" % [panel.visible, panel.title_label.text])
 		print("upgrading the Club through the panel: ok=%s (expected true), coins=%d (expected 75)" % [panel.upgrade_weapon("club"), player.coins])
-		print("...and armour: ok=%s (expected true), coins=%d (expected 35)" % [panel.upgrade_armor("armor_iron"), player.coins])
-		print("refuses leather (not metal): %s (expected false)" % [panel.upgrade_armor("armor_leather")])
-		print("refuses when broke: %s (expected false)" % [panel.upgrade_armor("armor_iron")])
+		print("...and armour: ok=%s (expected true), coins=%d (expected 35)" % [panel.upgrade_armor("armor_thornmail"), player.coins])
+		print("refuses leather (not metal): %s (expected false)" % [panel.upgrade_armor("armor_gambeson")])
+		print("refuses when broke: %s (expected false)" % [panel.upgrade_armor("armor_thornmail")])
 
 		# --- The gear picker: your gear on the left, the selected piece's upgrade on the right ---
 		player.owned_weapons = {"club": true, "dagger_worn_wood": true, "spear_fine_steel": true}
 		player.weapon_upgrade_levels = {}
 		player.armor_upgrade_levels = {}
-		player.owned_armor = {"armor_rags": true, "armor_leather": true, "armor_iron": true}
+		player.owned_armor = {"armor_rags": true, "armor_gambeson": true, "armor_thornmail": true}
 		player.equipped_armor = armor.TIERS[2]
 		player.attack_damage = 20
 		player.coins = 100
@@ -208,18 +208,18 @@ func _init() -> void:
 		panel.select("weapon", "dagger_worn_wood")
 		print("a maxed weapon says it is fully forged: %s (expected true)" % [_labels(panel.detail_box).has("Fully forged")])
 		print("...its Upgrade button is gone, and the maxed card has a disabled Maxed button: %s (expected true)" % [_buttons_text(panel.detail_box).has("Maxed")])
-		panel.select("armor", "armor_iron")
+		panel.select("armor", "armor_thornmail")
 		print("armour shows its damage reduction before and after: %s (expected true)" % [_labels(panel.detail_box).has("30.0%") and _labels(panel.detail_box).has("32.5%")])
 		panel.upgrade_button.pressed.emit()
-		print("upgrading armour through the panel: level=%d (expected 1)" % [player.get_armor_upgrade_level("armor_iron")])
-		panel.select("armor", "armor_leather")
+		print("upgrading armour through the panel: level=%d (expected 1)" % [player.get_armor_upgrade_level("armor_thornmail")])
+		panel.select("armor", "armor_gambeson")
 		print("non-metal armour explains itself and has no Upgrade button: %s, button=%s (expected true, null)" % [
 			_labels(panel.detail_box).any(func(t): return t.begins_with("Not metal -- the smith")), panel.upgrade_button
 		])
 		player.owned_weapons = {}
 		player.owned_armor = {"armor_rags": true}
 		panel._refresh()
-		print("with nothing to work on the picker is empty and says so: entries=%d, text=%s (expected 0)" % [panel.entry_buttons.size(), " ".join(_labels(panel.detail_box)).left(30)])
+		print("with nothing to work on the picker lists no gear (only the smith's commissions): gear entries=%d (expected 0), commissions=%d (expected 4)" % [panel.entry_buttons.keys().filter(func(k): return not str(k).begins_with("recipe:")).size(), panel.entry_buttons.keys().filter(func(k): return str(k).begins_with("recipe:")).size()])
 		panel.close()
 
 	quit()

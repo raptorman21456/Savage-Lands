@@ -396,6 +396,7 @@ static var UI_TEXT := {
 	"levelup.agility": "+1 overworld speed per point, a faster attack cooldown, and +1 battle move tile every 20 points.",
 	"levelup.might": "Better weapons require higher Might to equip; boosts recruited party/wolf damage.",
 	"levelup.resilience": "1% damage reduction per point, capped at 20%, stacking with armor.",
+	"levelup.fortitude": "1% less damage from MAGICAL harm per point, capped at 75%, on top of your armour's Fortitude.",
 	"levelup.reflexes": "0.75% dodge chance per point, capped at 15%.",
 	"levelup.dexterity": "0.75% crit chance per point (double damage, ignores cover), capped at 15%.",
 }
@@ -2019,7 +2020,7 @@ func _populate_game_over_stats(essence_earned: int, total_essence: int, stats: D
 # plus Might are always shown, Resilience/Reflexes/Dexterity only once each
 # is unlocked via its own skill-tree node. Main.gd:_levelup_choice_order()
 # mirrors this exact same order for its number-key (1-8) shortcuts.
-func show_levelup_choice(new_level: int, intimidation: int, strength: int, vigor: int, agility: int, might: int, resilience: int, reflexes: int, dexterity: int, resilience_unlocked: bool, reflexes_unlocked: bool, dexterity_unlocked: bool) -> void:
+func show_levelup_choice(new_level: int, intimidation: int, strength: int, vigor: int, agility: int, might: int, resilience: int, reflexes: int, dexterity: int, resilience_unlocked: bool, reflexes_unlocked: bool, dexterity_unlocked: bool, fortitude: int = 0, fortitude_unlocked: bool = false) -> void:
 	levelup_label.text = "LEVEL UP! Now level %d\nAll stats +1. Choose ONE bonus +1:" % new_level
 	for c in levelup_box.get_children():
 		c.queue_free()
@@ -2041,6 +2042,8 @@ func show_levelup_choice(new_level: int, intimidation: int, strength: int, vigor
 		rows.append(["reflexes", "Reflexes (%d)" % reflexes, UI_TEXT["levelup.reflexes"]])
 	if dexterity_unlocked:
 		rows.append(["dexterity", "Dexterity (%d)" % dexterity, UI_TEXT["levelup.dexterity"]])
+	if fortitude_unlocked:
+		rows.append(["fortitude", "Fortitude (%d)" % fortitude, UI_TEXT["levelup.fortitude"]])
 
 	for i in rows.size():
 		var row: Array = rows[i]

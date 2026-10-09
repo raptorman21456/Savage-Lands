@@ -53,7 +53,7 @@ function parityStats(sim) {
   return { max_health: p.max_health, attack_damage: p.attack_damage, max_stamina: p.max_stamina, stat_might: p.stat_might, stat_intimidation: p.stat_intimidation, stat_agility: p.stat_agility,
     dodge: p.dodge_chance_total(), crit: p.crit_chance_total(), armor_dr: p.armor_damage_reduction(), resilience: p.resilience_reduction, move_range: sim._battle_player_move_range(),
     hp_regen: p.hp_regen_per_turn(), stamina_regen: p.stamina_regen_per_turn(), block_heal: p.block_heal_amount(), luck: p.total_luck(), low_hp_bonus: p.low_hp_damage_bonus_total(), crit_mult: p.crit_damage_mult(),
-    shield_block: p.shield_block_chance(), shield_threshold: p.shield_defend_threshold_bonus(), shield_penalty: p.shield_damage_penalty_pct(), shield_dr: p.shield_damage_reduction_pct(), shield_push_immune: p.shield_push_immune(), party_capacity: p.party_capacity(), weapon: wsum };
+    shield_block: p.shield_block_chance(), shield_threshold: p.shield_defend_threshold_bonus(), shield_penalty: p.shield_damage_penalty_pct(), shield_dr: p.shield_damage_reduction_pct(), fortitude: p.fortitude_total(), fortitude_reduction: p.fortitude_reduction(), shield_push_immune: p.shield_push_immune(), party_capacity: p.party_capacity(), weapon: wsum };
 }
 function parityDiff(exp, got, path, out) {
   if (exp !== null && typeof exp === "object") {
@@ -80,7 +80,7 @@ async function runParity() {
       sim.in_battle = true; sim.battle_terrain = {}; sim.battle_allies = []; sim.battle_player_tile = V(2, 2);
       const etile = V(2 + st.distance, 2);
       if (e.rock) sim.battle_terrain[vkey(V(etile.x, etile.y - 1))] = { type: "rock" };
-      sim.battle_first_attack_used = st.first_used; sim.battle_momentum_stacks = st.momentum; sim.battle_momentum_chain_stacks = st.chain; sim.player_burning = st.burning; sim.player_blind_turns = 0;
+      sim.battle_first_attack_used = st.first_used; sim.battle_bloodrage_stacks = st.bloodrage; sim.battle_shadow_crit = !!st.shadow_crit; sim.battle_momentum_stacks = st.momentum; sim.battle_momentum_chain_stacks = st.chain; sim.player_burning = st.burning; sim.player_blind_turns = 0;
       p.health = Math.max(1, round(p.max_health * st.health_frac));
       p.potion_attack_turns = st.attack_potion ? 2 : 0; p.berserk_turns_remaining = st.berserk ? 2 : 0; p.pichaku_active = st.pichaku; p.stealth_turns_remaining = st.stealth ? 2 : 0;
       if (p.talisman_bonus("bloodmoon_fang") > 0) { p.bloodmoon_stacks = st.bloodmoon; p._recalc_stats(); }
@@ -93,9 +93,9 @@ async function runParity() {
     } else if (c.kind === "incoming") {
       const p = sim.player, s = c.scenario;
       sim.battle_terrain = {}; sim.battle_player_tile = V(2, 2); if (s.rock) sim.battle_terrain[vkey(V(2, 1))] = { type: "rock" };
-      sim.battle_player_defending = s.defending; p.berserk_turns_remaining = s.berserk ? 2 : 0; p.potion_resilience_turns = s.resilience_potion ? 2 : 0;
+      sim.battle_spellward_used = !!s.spellward_used; sim.battle_player_defending = s.defending; p.berserk_turns_remaining = s.berserk ? 2 : 0; p.potion_resilience_turns = s.resilience_potion ? 2 : 0;
       p.health = Math.max(1, round(p.max_health * s.health_frac));
-      got = { reduced: sim._apply_incoming_reductions(s.dmg, { ignore_cover: s.ignore_cover }) };
+      got = { reduced: sim._apply_incoming_reductions(s.dmg, { ignore_cover: s.ignore_cover, harm: s.harm }) };
     } else if (c.kind === "enemy_turn") {
       const p = sim.player;
       p.level = 99;
@@ -134,13 +134,13 @@ async function main() {
   const errors = [];
   await runParity();
   // 1. basic auto battles
-  const cfg = { level: 5, weapon: { base: "club" }, armor: "armor_leather", talismans: [], upgrades: {}, enemies: [{ name: "Goblin" }, { name: "Goblin" }], world: "plains", seed: 123, consumables: [{ id: "potion_health", n: 2 }] };
+  const cfg = { level: 5, weapon: { base: "club" }, armor: "armor_gambeson", talismans: [], upgrades: {}, enemies: [{ name: "Goblin" }, { name: "Goblin" }], world: "plains", seed: 123, consumables: [{ id: "potion_health", n: 2 }] };
   const b = await runBatch(cfg, 40, {}, null);
   P(`auto batch club L5 vs 2 goblins: win ${(b.win_rate * 100).toFixed(0)}% avgTurns ${b.avg_turns.toFixed(1)} avgHP% ${(b.avg_hp_pct_win * 100).toFixed(0)}`);
 
   // 1b. per-level enemy scaling (Main._enemy_level_scale): regulars at the difficulty rate, bosses/minibosses at half of it.
   const scaleCase = (diff, level, enemy) => {
-    const s = createSim({ level, difficulty: diff, weapon: { base: "club" }, armor: "armor_leather", talismans: [], upgrades: {}, enemies: [{ name: enemy }], world: "plains", seed: 1, consumables: [] }, 1);
+    const s = createSim({ level, difficulty: diff, weapon: { base: "club" }, armor: "armor_gambeson", talismans: [], upgrades: {}, enemies: [{ name: enemy }], world: "plains", seed: 1, consumables: [] }, 1);
     return JSON.stringify([s.battle_units[0].hp, s.battle_units[0].damage]);
   };
   P(`scaling Hard L10 Goblin [hp,dmg]: ${scaleCase("hard", 10, "Goblin")} (expected [9,3])`);

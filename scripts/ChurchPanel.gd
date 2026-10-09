@@ -37,6 +37,8 @@ const WING_MEMBERS := {
 		"undying", "second_wind", "second_breath", "block_master", "last_stand", "shield_mastery",
 		"unbreakable_guard", "favour",
 	],
+	# Fortitude (protection against magical harm) has a wing of its own, straight up.
+	"magical": ["warded_mind", "mental_mush", "smort_savage"],
 	"convergence": ["warband", "war_chest", "battle_medic", "war_profiteer"],
 	"isolated": ["worldwalker"],
 }
@@ -61,12 +63,13 @@ const NODE_ICONS := {
 	"unbreakable_guard": "shield_phantom", "favour": "talisman_epic",
 	"warband": "enemy_brute", "war_chest": "armor_steel", "battle_medic": "meat", "war_profiteer": "coin",
 	"worldwalker": "enemy_voidwing",
+	"warded_mind": "talisman_rare", "mental_mush": "talisman_uncommon", "smort_savage": "talisman_epic",
 }
 
 const TOOLTIP_WIDTH := 330.0
 # Shift+click on a node buys up to this many levels at once.
 const SHIFT_BUY_LEVELS := 5
-const WING_NAMES := {"warrior": "WARRIOR", "merchant": "MERCHANT", "survivor": "SURVIVOR"}
+const WING_NAMES := {"warrior": "WARRIOR", "merchant": "MERCHANT", "survivor": "SURVIVOR", "magical": "MAGICAL"}
 # Shared with the Dojo/Blacksmith (TownUI.gd) so all three town panels read from the
 # same palette: COLOR_GOOD/BAD/DIM are kept as aliases since test_church.gd and the
 # rest of this file were written against those names.

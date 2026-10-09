@@ -13,6 +13,10 @@ class_name Shields
 # Checked in Player.gd's shield_block_chance()/shield_push_immune() helpers.
 const COMPATIBLE_WEAPONS := ["club", "spear", "hammer", "dagger", "knuckle_gloves"]
 
+# Every shield blocks MAGICAL attacks as well as bodily ones (the block roll does not care). `fortitude`
+# is how far a shield leans towards magic: points of Fortitude while it is usable (Player.shield_fortitude)
+# -- the Phantom Guard leans furthest. A DRAFT table, to be tuned.
+
 # block_chance is flat -- identical with ANY compatible weapon equipped, not
 # just the shield's own synergy_weapon (a shield is fully usable off its
 # synergy pick, just without the special's extra kick). Only special_pct
@@ -60,6 +64,7 @@ static var SHIELDS := {
 		"id": "shield_buckler", "name": "Wooden Buckler", "price": 0,
 		"synergy_weapon": "club",
 		"block_chance": 0.33,
+		"fortitude": 3,
 		"special": "", "special_pct": 0.0, "synergy_special_pct": 0.0,
 		"description": "A simple wooden shield -- steady, reliable, free. No special trick, just a full third of incoming hits bouncing right off. Pairs naturally with a Club: neither needs finesse.",
 		"shop_description": "Every adventurer's first shield. Simple, honest, doesn't cost you a thing.",
@@ -69,6 +74,7 @@ static var SHIELDS := {
 		"id": "shield_heavy", "name": "Heavy Shield", "price": 40,
 		"synergy_weapon": "spear",
 		"block_chance": 0.15,
+		"fortitude": 0,
 		"push_immune": true,
 		"damage_penalty_pct": 0.10,
 		"damage_reduction_pct": 0.10,
@@ -82,6 +88,7 @@ static var SHIELDS := {
 		"id": "shield_bulwark", "name": "Iron Bulwark", "price": 60,
 		"synergy_weapon": "hammer",
 		"block_chance": 0.18,
+		"fortitude": 0,
 		"damage_penalty_pct": 0.15,
 		"damage_reduction_pct": 0.15,
 		"defend_threshold_bonus": 8,
@@ -94,6 +101,7 @@ static var SHIELDS := {
 		"id": "shield_phantom", "name": "Phantom Guard", "price": 50,
 		"synergy_weapon": "dagger",
 		"block_chance": 0.18,
+		"fortitude": 12,
 		"damage_penalty_pct": 0.08,
 		"damage_reduction_pct": 0.05,
 		"special": "evasive",
@@ -105,6 +113,7 @@ static var SHIELDS := {
 		"id": "shield_brawler", "name": "Brawler's Buckler", "price": 55,
 		"synergy_weapon": "knuckle_gloves",
 		"block_chance": 0.10,
+		"fortitude": 4,
 		"damage_penalty_pct": 0.10,
 		"damage_reduction_pct": 0.08,
 		"defend_threshold_bonus": 2,

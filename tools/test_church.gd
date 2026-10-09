@@ -80,7 +80,7 @@ func _init() -> void:
 	# --- Reveal: a fresh save shows only the three roots ---
 	var shown: Array = panel.view.node_ids().filter(func(id): return panel.view.is_revealed(id))
 	shown.sort()
-	print("a fresh save shows only the three wing roots: %s (expected [coins, stamina, strength])" % [shown])
+	print("a fresh save shows only the four wing roots: %s (expected [coins, stamina, strength, warded_mind])" % [shown])
 	print("...the rest are really hidden, not just dimmed: agility_visible=%s worldwalker_visible=%s strength_visible=%s (expected false, false, true)" % [
 		panel.view.button_for("agility").visible, panel.view.button_for("worldwalker").visible, panel.view.button_for("strength").visible
 	])

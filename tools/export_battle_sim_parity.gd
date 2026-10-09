@@ -65,7 +65,7 @@ func _init() -> void:
 # ---------------------------------------------------------------- builds
 func _random_build(for_hit: bool) -> Dictionary:
 	var level: int = 1 + rng.randi() % 60
-	var core := ["strength", "vigor", "agility", "might", "intimidation"]
+	var core := ["strength", "vigor", "agility", "might", "intimidation", "fortitude"]
 	var picks := {}
 	for l in range(1, level):
 		var s: String = _pick(core)
@@ -124,8 +124,13 @@ func _apply_build(b: Dictionary) -> void:
 	p.stat_might = 0
 	p.stat_resilience = 0
 	p.stat_reflexes = 0
+	p.stat_fortitude = 0
 	p.stat_dexterity = 0
 	p.level = 1
+	main.battle_bloodrage_stacks = 0
+	main.battle_bloodrage_turns = 0
+	main.battle_shadow_crit = false
+	main.battle_spellward_used = false
 	p.hardened_hp_bonus = 0
 	p.equipped_talismans = []
 	p.owned_talismans = {}
@@ -150,6 +155,8 @@ func _apply_build(b: Dictionary) -> void:
 			p.stat_reflexes += 1
 		if p.meta_dexterity_unlocked:
 			p.stat_dexterity += 1
+		if p.meta_fortitude_unlocked:
+			p.stat_fortitude += 1 + p.meta_fortitude_passive_bonus
 	for s in b.picks:
 		for n in int(b.picks[s]):
 			p.apply_bonus_stat(s)
@@ -165,6 +172,8 @@ func _apply_build(b: Dictionary) -> void:
 	p.equipped_shield = Shields.SHIELDS[b.shield].duplicate(true) if b.shield != "" else {}
 	p.equipped_talismans = b.talismans.duplicate()
 	p._rebuild_talisman_cache()
+	# Max stamina counts talismans and the worn armour (Cinder Mail's heat).
+	p.max_stamina = p._base_max_stamina + int(p.talisman_bonus("max_stamina")) + p.armor_max_stamina_bonus()
 	p._recalc_stats()
 	p.health = p.max_health
 	p.learn_all_specials()
@@ -208,7 +217,7 @@ func _read_stats() -> Dictionary:
 		"luck": p.total_luck(), "low_hp_bonus": p.low_hp_damage_bonus_total(), "crit_mult": p.crit_damage_mult(),
 		"shield_block": p.shield_block_chance(), "shield_threshold": p.shield_defend_threshold_bonus(),
 		"shield_penalty": p.shield_damage_penalty_pct(), "shield_dr": p.shield_damage_reduction_pct(),
-		"shield_push_immune": p.shield_push_immune(), "party_capacity": p.party_capacity(),
+		"fortitude": p.fortitude_total(), "fortitude_reduction": p.fortitude_reduction(), "shield_push_immune": p.shield_push_immune(), "party_capacity": p.party_capacity(),
 		"miss_mastered": p.miss_chance_for(p.current_weapon),
 		"weapon": _weapon_summary(p.current_weapon),
 	}
@@ -239,6 +248,7 @@ func _hit_case() -> Dictionary:
 		"pichaku": rng.randi() % 5 == 0, "stealth": rng.randi() % 5 == 0, "first_used": rng.randf() < 0.6,
 		"momentum": rng.randi() % 4, "chain": rng.randi() % 3, "burning": rng.randi() % 8 == 0, "bloodmoon": rng.randi() % 4,
 		"distance": 1 + rng.randi() % 4,
+		"bloodrage": rng.randi() % 4, "shadow_crit": rng.randf() < 0.2,
 	}
 	var out := _run_hit(b, action, enemy, state)
 	# a kill triggers XP/loot/level-up side effects in the real game that the harness does not model -- retry with a sturdier target
@@ -262,6 +272,8 @@ func _run_hit(b: Dictionary, action: Dictionary, enemy: Dictionary, st: Dictiona
 	if enemy.rock:
 		main.battle_terrain[etile + Vector2i(0, -1)] = {"type": "rock"}
 	main.battle_first_attack_used = st.first_used
+	main.battle_bloodrage_stacks = int(st.bloodrage)
+	main.battle_shadow_crit = bool(st.shadow_crit)
 	main.battle_momentum_stacks = st.momentum
 	main.battle_momentum_chain_stacks = st.chain
 	main.player_burning = st.burning
@@ -298,17 +310,19 @@ func _incoming_case() -> Dictionary:
 	var c := {
 		"dmg": 1 + rng.randi() % 80, "defending": rng.randf() < 0.5, "berserk": rng.randi() % 4 == 0, "resilience_potion": rng.randi() % 4 == 0,
 		"rock": rng.randf() < 0.4, "ignore_cover": rng.randi() % 4 == 0, "health_frac": _pick([1.0, 0.7, 0.4, 0.1]),
+		"harm": _pick(["bodily", "bodily", "magical", "both"]), "spellward_used": rng.randf() < 0.5,
 	}
 	var p = player
 	main.battle_terrain.clear()
 	main.battle_player_tile = Vector2i(2, 2)
 	if c.rock:
 		main.battle_terrain[Vector2i(2, 1)] = {"type": "rock"}
+	main.battle_spellward_used = c.spellward_used
 	main.battle_player_defending = c.defending
 	p.berserk_turns_remaining = 2 if c.berserk else 0
 	p.potion_resilience_turns = 2 if c.resilience_potion else 0
 	p.health = maxi(1, int(round(p.max_health * float(c.health_frac))))
-	var reduced: int = main._apply_incoming_reductions(int(c.dmg), {"ignore_cover": c.ignore_cover})
+	var reduced: int = main._apply_incoming_reductions(int(c.dmg), {"ignore_cover": c.ignore_cover, "harm": c.harm})
 	main.battle_player_defending = false
 	main.battle_terrain.clear()
 	p.berserk_turns_remaining = 0
@@ -368,6 +382,9 @@ func _enemy_turn_case() -> Dictionary:
 		allies.append({"tile": t, "hp": hp, "max_hp": hp, "name": "Ally%d" % i, "defense_pct": _pick([0.0, 5.0, 20.0]), "defending": rng.randf() < 0.3})
 	var b := _random_build(true)
 	b.upgrades = {}
+	# Shadowweave carries its own dodge chance, a random roll the two RNGs cannot be made to share.
+	if b.armor == "armor_shadowweave":
+		b.armor = "armor_spellward"
 	b.talismans = []
 	b.shield = ""
 	return {"kind": "enemy_turn", "build": b, "grid": gw, "player_tile": ptile, "terrain": terrain, "units": units, "allies": allies,

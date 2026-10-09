@@ -20,6 +20,8 @@ const PotionsScript := preload("res://scripts/Potions.gd")
 const WeaponsScript := preload("res://scripts/Weapons.gd")
 const ShieldsScript := preload("res://scripts/Shields.gd")
 const ClothingScript := preload("res://scripts/Clothing.gd")
+const ArmorScript := preload("res://scripts/Armor.gd")
+const BlacksmithScript := preload("res://scripts/Blacksmith.gd")
 const TalismansScript := preload("res://scripts/Talismans.gd")
 const WeaponIconsScript := preload("res://scripts/WeaponIcons.gd")
 
@@ -228,20 +230,27 @@ func _build_weapons_tab(container: VBoxContainer) -> void:
 		weapon_grid.add_child(_make_weapon_card(variant, variant.get("id", "") == current_weapon_id))
 
 	_add_section_heading(container, "ARMOR")
-	var armor_row := HBoxContainer.new()
-	container.add_child(armor_row)
-	var armor: Dictionary = _player.equipped_armor
-	var armor_level: int = _player.get_armor_upgrade_level(armor.get("id", ""))
-	var armor_title: String = armor.get("name", "Rags")
-	if armor_level > 0:
-		armor_title += " +%d" % armor_level
-	armor_row.add_child(_make_grid_cell(
-		"res://assets/%s.png" % armor.get("icon", ""), armor_title,
-		"-%d%% damage" % int(round(_player.armor_tier_damage_reduction() * 100)), true,
-		armor.get("description", ""), Callable()
-	))
-	if _player.clothing_damage_reduction() > 0.0:
-		_add_plain_label(container, "With your clothes: -%d%% damage taken in total." % int(round(_player.armor_damage_reduction() * 100)))
+	# Every armour you own: click one to wear it. Each cuts BODILY harm by a share and adds points of
+	# Fortitude against MAGICAL harm, and most have a trick (hover for the details).
+	var armor_grid := GridContainer.new()
+	armor_grid.columns = GRID_COLUMNS
+	armor_grid.add_theme_constant_override("h_separation", 10)
+	armor_grid.add_theme_constant_override("v_separation", 10)
+	container.add_child(armor_grid)
+	var worn_id: String = _player.equipped_armor.get("id", "")
+	for armor in ArmorScript.TIERS:
+		if not _player.owned_armor.has(armor.id) and armor.id != worn_id:
+			continue
+		var armor_level: int = _player.get_armor_upgrade_level(armor.id)
+		var armor_title: String = armor.name + (" +%d" % armor_level if armor_level > 0 else "")
+		var bodily_pct: int = int(round((float(armor.damage_reduction) + BlacksmithScript.armor_bonus(armor_level)) * 100.0))
+		armor_grid.add_child(_make_grid_cell(
+			ArmorScript.icon_path(armor), armor_title,
+			"-%d%% bodily  %+d Fort" % [bodily_pct, int(armor.fortitude)], armor.id == worn_id,
+			armor.get("description", ""), _on_armor_picked.bind(armor)
+		))
+	var bodily_total: float = minf(0.9, _player.armor_damage_reduction() + _player.resilience_reduction + _player.meta_war_chest_reduction + _player.shield_damage_reduction_pct())
+	_add_plain_label(container, "Bodily harm: -%d%% (armour, clothes, Resilience and shield).   Magical harm: -%d%% (Fortitude %d)." % [int(round(bodily_total * 100.0)), int(round(_player.fortitude_reduction() * 100.0)), int(round(_player.fortitude_total()))])
 
 	# Clothes: light extra armour pieces from the Flea Market tailor, one
 	# worn per slot -- click any owned piece to wear it (see Player.equip_clothing).
@@ -784,6 +793,11 @@ func _on_map_draw() -> void:
 	var player_p: Vector2 = to_map.call(_player.global_position)
 	map_canvas.draw_circle(player_p, 6, Color(0.3, 0.95, 0.3))
 	map_canvas.draw_circle(player_p, 6, Color(1, 1, 1), false, 1.5)
+
+# Wearing an armour from the grid (it is owned, so this costs nothing).
+func _on_armor_picked(armor: Dictionary) -> void:
+	_player.try_buy_armor(armor)
+	_refresh()
 
 # --- Shared grid-cell builder --------------------------------------------
 

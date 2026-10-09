@@ -15,6 +15,7 @@ const BlacksmithScript := preload("res://scripts/Blacksmith.gd")
 const ArmorScript := preload("res://scripts/Armor.gd")
 const WeaponsScript := preload("res://scripts/Weapons.gd")
 const WeaponIconsScript := preload("res://scripts/WeaponIcons.gd")
+const MaterialsScript := preload("res://scripts/Materials.gd")
 const TownUIScript := preload("res://scripts/TownUI.gd")
 
 const METAL_TINT := Color(0.62, 0.68, 0.82)
@@ -24,7 +25,7 @@ var coins_label: Label
 var speech_label: Label
 var gear_list: VBoxContainer
 var detail_box: VBoxContainer
-# What the right side is showing: "weapon" or "armor", and that piece's id.
+# What the right side is showing: "weapon", "armor" or "recipe" (a pelt armour you can make), and that piece's id.
 var selected_kind := ""
 var selected_id := ""
 # "weapon:<id>" / "armor:<id>" -> its entry in the left list; and the Upgrade
@@ -48,7 +49,7 @@ func _build_content(outer: VBoxContainer) -> void:
 	detail_box = body.detail
 
 func _on_opened() -> void:
-	speech_label.text = "\"Bring me steel and coin and I'll make it bite harder. Metal armour too -- I don't work leather.\""
+	speech_label.text = "\"Bring me steel and coin and I'll make it bite harder. Metal armour too. Bring me scales, hair and hide and I'll make you something better than any shop sells.\""
 	var key := _key(selected_kind, selected_id)
 	if entry_buttons.has(key):
 		entry_buttons[key].grab_focus()
@@ -108,7 +109,17 @@ func _pips(level: int, max_level: int) -> Array:
 	return pips
 
 func _armor_texture(armor: Dictionary) -> Texture2D:
-	return load("res://assets/%s.png" % armor.get("icon", "armor_rags"))
+	return load(ArmorScript.icon_path(armor))
+
+# Pelt armours you have not made yet -- the smith's commissions.
+func _commissions() -> Array:
+	return ArmorScript.TIERS.filter(func(a): return ArmorScript.is_crafted(a) and not _player.owned_armor.has(a.id))
+
+func _recipe_by_id(id: String) -> Dictionary:
+	for armor in _commissions():
+		if armor.id == id:
+			return armor
+	return {}
 
 # The 16x16 armour art on a plate, drawn at a whole multiple so it stays crisp.
 func _armor_plate(armor: Dictionary, icon_scale: int) -> PanelContainer:
@@ -129,7 +140,7 @@ func _refresh() -> void:
 	var weapons: Array = _ordered_weapons()
 	var armors: Array = _owned_armor()
 	# Keep the selection if it still exists, else the weapon in hand, else the first thing.
-	var still_valid: bool = (selected_kind == "weapon" and _player.owned_weapons.has(selected_id)) or (selected_kind == "armor" and not _armor_by_id(selected_id).is_empty())
+	var still_valid: bool = (selected_kind == "weapon" and _player.owned_weapons.has(selected_id)) or (selected_kind == "armor" and not _armor_by_id(selected_id).is_empty()) or (selected_kind == "recipe" and not _recipe_by_id(selected_id).is_empty())
 	if not still_valid:
 		if not weapons.is_empty():
 			selected_kind = "weapon"
@@ -166,6 +177,17 @@ func _refresh() -> void:
 		entry_buttons[_key("armor", id)] = entry
 	if armors.is_empty():
 		gear_list.add_child(_make_label("You own no armour worth working yet.", 13, TownUIScript.DIM))
+	# Pelt armours are made, not sold: the ones you have not made yet.
+	var commissions: Array = _commissions()
+	if not commissions.is_empty():
+		gear_list.add_child(_make_label("COMMISSIONS", 11, TownUIScript.GOLD))
+		for armor in commissions:
+			var id: String = armor.id
+			var ready: bool = _player.can_craft_armor(armor)
+			var entry: Button = TownUIScript.make_entry(_armor_plate(armor, 2), armor.name, [], "READY" if ready else "", TownUIScript.GOOD)
+			entry.pressed.connect(func(): select("recipe", id))
+			gear_list.add_child(entry)
+			entry_buttons[_key("recipe", id)] = entry
 	_style_entries()
 	_build_detail()
 
@@ -191,6 +213,8 @@ func _build_detail() -> void:
 		_build_weapon_detail(_weapon_by_id(selected_id))
 	elif selected_kind == "armor" and not _armor_by_id(selected_id).is_empty():
 		_build_armor_detail(_armor_by_id(selected_id))
+	elif selected_kind == "recipe" and not _recipe_by_id(selected_id).is_empty():
+		_build_recipe_detail(_recipe_by_id(selected_id))
 	else:
 		detail_box.add_child(_make_label("You have nothing for the smith to work on yet.", 15, TownUIScript.DIM))
 
@@ -269,6 +293,41 @@ func _build_armor_detail(armor: Dictionary) -> void:
 	for i in max_level:
 		chips.append({"cost": BlacksmithScript.armor_cost(i), "effect": "+%.1f%% DR" % (BlacksmithScript.ARMOR_DR_PER_LEVEL * 100.0 * (i + 1))})
 	_add_level_row(level, chips)
+
+# A pelt armour the smith can make: what it takes (materials you have / need, and coins) and the
+# Craft button.
+func _build_recipe_detail(armor: Dictionary) -> void:
+	var lines: Array = [
+		["Made from what enemies leave behind", TownUIScript.DIM, 14],
+		["-%d%% bodily harm   |   %+d Fortitude" % [int(round(float(armor.get("damage_reduction", 0.0)) * 100.0)), int(armor.get("fortitude", 0))], TownUIScript.GOOD, 13],
+	]
+	if armor.get("description", "") != "":
+		lines.append([armor.description, Color(0.6, 0.6, 0.64), 12])
+	detail_box.add_child(TownUIScript.make_header(_armor_plate(armor, 4), armor.name.to_upper(), lines))
+	detail_box.add_child(_make_label("WHAT IT TAKES", 12, TownUIScript.DIM))
+	var recipe: Dictionary = armor.get("recipe", {})
+	var card := PanelContainer.new()
+	card.add_theme_stylebox_override("panel", TownUIScript.box(Color(0.11, 0.11, 0.14, 0.95), Color(0.38, 0.38, 0.44), 2, 7, 12))
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 14)
+	card.add_child(row)
+	var text_col := VBoxContainer.new()
+	text_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	text_col.alignment = BoxContainer.ALIGNMENT_CENTER
+	text_col.add_theme_constant_override("separation", 6)
+	row.add_child(text_col)
+	for material_id in recipe.get("materials", {}):
+		var need: int = int(recipe.materials[material_id])
+		var have: int = _player.material_count(str(material_id))
+		text_col.add_child(_make_label("%s   %d / %d" % [MaterialsScript.name_of(str(material_id)), have, need], 15, TownUIScript.GOOD if have >= need else TownUIScript.BAD))
+	var coins_needed: int = int(recipe.get("coins", 0))
+	text_col.add_child(_make_label("Coins   %d / %d" % [_player.coins, coins_needed], 15, TownUIScript.GOOD if _player.coins >= coins_needed else TownUIScript.BAD))
+	var ready: bool = _player.can_craft_armor(armor)
+	var action: Dictionary = TownUIScript.make_action("%d coins" % coins_needed, ready, "Craft", not ready)
+	action.button.pressed.connect(Callable(self, "craft_armor").bind(armor.id))
+	upgrade_button = action.button
+	row.add_child(action.box)
+	detail_box.add_child(card)
 
 # The "next upgrade" card: what it changes (rows of [label, now, after, note]), the
 # price, and the Upgrade button -- or, once maxed, a plain "fully forged" note.
@@ -393,6 +452,19 @@ func upgrade_armor(armor_id: String) -> bool:
 	var ok: bool = _player.try_upgrade_armor(armor_id)
 	_play_sfx("purchase" if ok else "error")
 	speech_label.text = "\"Reinforced. That'll turn a blade.\"" if ok else "\"No. Not enough coin, not metal, or already maxed.\""
+	_refresh()
+	if visible:
+		_restore_focus()
+	return ok
+
+# Makes a pelt armour from materials and coins; returns whether it went through (tests drive this).
+func craft_armor(armor_id: String) -> bool:
+	var armor: Dictionary = ArmorScript.find(armor_id)
+	var ok: bool = _player.try_craft_armor(armor)
+	_play_sfx("purchase" if ok else "error")
+	speech_label.text = "\"Fine work, even if I say so myself. Wear it well.\"" if ok else "\"I can't make that yet -- bring more of what it needs, and the coin to pay me.\""
+	if ok and selected_kind == "recipe" and selected_id == armor_id:
+		selected_kind = "armor"
 	_refresh()
 	if visible:
 		_restore_focus()

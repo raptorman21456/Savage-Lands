@@ -7,7 +7,7 @@ func _init() -> void:
 	var save_data_script = load("res://scripts/SaveData.gd")
 	save_data_script.save_data({"essence": 0, "upgrades": {}, "best_wave": 0})
 
-	print("tree has grown noticeably bigger, now with block/riposte/momentum/wolf-duration/shield/Dexterity/Rage/etc. nodes too: %d ids (expected 48)" % [save_data_script.UPGRADE_IDS.size()])
+	print("tree has grown noticeably bigger, now with block/riposte/momentum/wolf-duration/shield/Dexterity/Rage/etc. nodes too: %d ids (expected 51, with the three Fortitude nodes)" % [save_data_script.UPGRADE_IDS.size()])
 
 	var data: Dictionary = save_data_script.load_data()
 	data.essence = 10000

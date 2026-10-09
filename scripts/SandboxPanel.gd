@@ -18,6 +18,7 @@ const SaveDataScript := preload("res://scripts/SaveData.gd")
 const PartyRulesScript := preload("res://scripts/PartyRules.gd")
 const PartyMemberScript := preload("res://scripts/PartyMember.gd")
 const BlacksmithScript := preload("res://scripts/Blacksmith.gd")
+const MaterialsScript := preload("res://scripts/Materials.gd")
 const DojoScript := preload("res://scripts/Dojo.gd")
 
 const RARITY_COLORS := {
@@ -346,7 +347,7 @@ func _build_character(box: VBoxContainer) -> void:
 		"Max HP: %d" % p.max_health, "Attack (base damage): %d" % p.attack_damage, "Battle move range: %d tiles" % move_range,
 		"Stamina: %d (battle start: %d)" % [p.max_stamina, int(round(p.max_stamina * PlayerScriptConst().BATTLE_START_STAMINA_PCT))],
 		"Crit chance: %.1f%%   Dodge chance: %.1f%%" % [p.crit_chance_total() * 100.0, p.dodge_chance_total() * 100.0],
-		"Damage reduction (armor + clothes + shield + resilience): %.1f%%" % [minf(0.9, p.armor_damage_reduction() + p.resilience_reduction + p.meta_war_chest_reduction + p.shield_damage_reduction_pct()) * 100.0],
+		"Bodily harm reduction (armor + clothes + shield + resilience): %.1f%%   Magical harm reduction (Fortitude %d): %.1f%%" % [minf(0.9, p.armor_damage_reduction() + p.resilience_reduction + p.meta_war_chest_reduction + p.shield_damage_reduction_pct()) * 100.0, int(p.fortitude_total()), p.fortitude_reduction() * 100.0],
 		"Talisman slots: %d" % TalismansScript.slots_for_level(p.level),
 	]
 	_note(box, "\n".join(lines), Color(0.8, 0.85, 0.9))
@@ -436,7 +437,7 @@ func _build_gear(box: VBoxContainer) -> void:
 	_heading(box, "Armor")
 	var armor_items := []
 	for a in ArmorScript.TIERS:
-		armor_items.append([a.id, "%s (-%d%% damage)" % [a.name, int(round(a.damage_reduction * 100.0))]])
+		armor_items.append([a.id, "%s (-%d%% bodily, %+d Fortitude%s)" % [a.name, int(round(a.damage_reduction * 100.0)), int(a.fortitude), ", crafted" if a.has("recipe") else ""]])
 	_option(_row(box, "Armor"), armor_items, cfg.armor, func(v):
 		cfg.armor = v
 		_changed(["Gear", "Character"]))
@@ -446,6 +447,16 @@ func _build_gear(box: VBoxContainer) -> void:
 		_changed(["Character"]))
 	smith.editable = armor.get("metal", false)
 	_note(box, "+2.5% damage reduction per level (metal armor only).")
+	_note(box, str(armor.get("description", "")), Color(0.8, 0.85, 0.9))
+	_heading(box, "Crafting materials")
+	if not cfg.has("materials"):
+		cfg["materials"] = {}
+	for material_id in MaterialsScript.ITEMS:
+		var mat_id: String = material_id
+		_spin(_row(box, MaterialsScript.name_of(mat_id)), int(cfg.materials.get(mat_id, 0)), 0, 99, func(v):
+			cfg.materials[mat_id] = int(v)
+			_changed(["Character"]))
+	_note(box, "Spent at the Blacksmith's Commissions to make the pelt armours.")
 	_heading(box, "Clothing")
 	for slot in ["head", "body", "feet"]:
 		var items := [["", "None"]]

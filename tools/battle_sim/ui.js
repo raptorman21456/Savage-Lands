@@ -11,7 +11,7 @@ const DIR_ARROW = (d) => (d.x === 1 ? "→" : d.x === -1 ? "←" : d.y === 1 ? "
 
 const NOTHINGNESS_ORDER = ["Leviathan", "Lizen Warband", "Elder Oak", "White Dragon", "Red Wyrm", "Archmage"];
 // Astral upgrades that touch the tile battle (the rest are shop/economy/run-start perks). Update when the tree changes.
-const COMBAT_UPGRADES = new Set(["strength", "agility", "vigor", "reflexes_unlock", "berserker_edge", "adrenaline", "dexterity_unlock", "battle_hardened",
+const COMBAT_UPGRADES = new Set(["warded_mind", "mental_mush", "smort_savage", "strength", "agility", "vigor", "reflexes_unlock", "berserker_edge", "adrenaline", "dexterity_unlock", "battle_hardened",
   "pack_leader", "prodigy", "warlord", "beastmaster", "riposte", "momentum", "rage", "hardened", "intimidation", "luck", "silver_tongue", "haggling",
   "stamina", "resilience_unlock", "herbalism", "vampiric_grit", "vigilant_defense", "undying", "block_master", "second_breath", "favour", "last_stand",
   "shield_mastery", "unbreakable_guard", "worldwalker", "warband", "battle_medic", "war_chest", "war_profiteer", "windfall", "pack_bond"]);
@@ -79,6 +79,7 @@ function pickableStats(p) {
   if (p.meta_resilience_unlocked) base.push("resilience");
   if (p.meta_reflexes_unlocked) base.push("reflexes");
   if (p.meta_dexterity_unlocked) base.push("dexterity");
+  if (p.meta_fortitude_unlocked) base.push("fortitude");
   return base;
 }
 
@@ -98,10 +99,11 @@ function secCharacter(p) {
       <button data-act="fillpicks" data-s="strength">All Str</button><button data-act="fillpicks" data-s="vigor">All Vig</button><button data-act="fillpicks" data-s="balanced">Balanced</button><button data-act="fillpicks" data-s="reset">Reset</button></div>
     <table class="kv">
       <tr><td>Max HP</td><td>${p.max_health}</td></tr><tr><td>Attack (base damage)</td><td>${p.attack_damage}</td></tr>
-      <tr><td>Move range (battle)</td><td>${MC.PLAYER_BASE_MOVE_RANGE + Math.max(0, Math.trunc((p.stat_agility - PC.AGILITY_START) / MC.AGILITY_PER_EXTRA_MOVE)) + Math.trunc(p.talisman_bonus("move_range"))} tiles</td></tr>
+      <tr><td>Move range (battle)</td><td>${MC.PLAYER_BASE_MOVE_RANGE + Math.max(0, Math.trunc((p.stat_agility - PC.AGILITY_START) / MC.AGILITY_PER_EXTRA_MOVE)) + Math.trunc(p.talisman_bonus("move_range")) + Math.trunc(p.armor_trait_value("move_bonus", 0))} tiles</td></tr>
       <tr><td>Stamina (max / start)</td><td>${p.max_stamina} / ${round(p.max_stamina * PC.BATTLE_START_STAMINA_PCT)}</td></tr>
       <tr><td>Crit / Dodge</td><td>${pct(p.crit_chance_total(), 1)} / ${pct(p.dodge_chance_total(), 1)}</td></tr>
       <tr><td>Damage reduction (armor+clothes+shield+res.)</td><td>${pct(Math.min(0.9, p.armor_damage_reduction() + p.resilience_reduction + p.meta_war_chest_reduction + p.shield_damage_reduction_pct()), 1)}</td></tr>
+      <tr><td>Fortitude (vs magical harm)</td><td>${p.fortitude_total()} (${pct(p.fortitude_reduction(), 1)} reduction)</td></tr>
       <tr><td>Talisman slots</td><td>${slotsForLevel(cfg.level)}</td></tr></table>`);
 }
 
@@ -149,7 +151,7 @@ function secWeapon(p) {
 function secGear() {
   const armor = armorById(cfg.armor);
   return section("Armor, clothing & shield", `
-    <div class="row"><label>Armor</label>${selectHtml("armor", D.armor.map((a) => [a.id, `${a.name} (−${pct(a.damage_reduction)})`]), cfg.armor)}</div>
+    <div class="row"><label>Armor</label>${selectHtml("armor", D.armor.map((a) => [a.id, `${a.name} (−${pct(a.damage_reduction)} bodily, ${a.fortitude >= 0 ? "+" : ""}${a.fortitude} Fort${a.recipe ? ", crafted" : ""})`]), cfg.armor)}</div>
     <div class="row"><label>Smithing</label>${numHtml("armor_level", armor && armor.metal ? cfg.armor_level : 0, 0, BS.ARMOR_MAX_LEVEL)} <span class="dim">${armor && armor.metal ? "+2.5% DR per level" : "(metal armor only)"}</span></div>
     ${["head", "body", "feet"].map((slot) => `<div class="row"><label>${capital(slot)}</label>${selectHtml("clothing." + slot, [["", "None"], ...D.clothing.filter((c) => c.slot === slot).map((c) => [c.id, `${c.name} (−${pct(c.damage_reduction)})`])], cfg.clothing[slot])}</div>`).join("")}
     <div class="row"><label>Shield</label>${selectHtml("shield", [["", "None"], ...Object.values(D.shields).map((s) => [s.id, s.name])], cfg.shield)}</div>

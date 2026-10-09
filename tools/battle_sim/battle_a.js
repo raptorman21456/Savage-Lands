@@ -40,6 +40,8 @@ class Sim {
     this.player_concussed_turns = 0; this.player_bleed_turns = 0; this.player_blind_turns = 0;
     this.battle_feared_by_index = -1; this.battle_fear_cascade_depth = 0; this.battle_feared_unreachable = false;
     this.battle_momentum_stacks = 0; this.battle_momentum_chain_stacks = 0;
+    // armour traits (Armor.gd): Bloodrage Hide's stacks, Shadowweave's pending crit, Spellward's one free ward
+    this.battle_bloodrage_stacks = 0; this.battle_bloodrage_turns = 0; this.battle_shadow_crit = false; this.battle_spellward_used = false;
     this.battle_bloodmoon_quiet_turns = 0; this.battle_had_combat_action_this_cycle = false;
     this.battle_first_attack_used = false;
     this.battle_turn = "player";
@@ -71,7 +73,9 @@ class Sim {
     let bonus = Math.max(0, Math.trunc((this.player.stat_agility - PC.AGILITY_START) / MC.AGILITY_PER_EXTRA_MOVE));
     if (this.player.potion_energy_turns > 0) bonus += MC.ENERGY_POTION_MOVE_BONUS;
     bonus += Math.trunc(this.player.talisman_bonus("move_range"));
-    return MC.PLAYER_BASE_MOVE_RANGE + bonus;
+    // Armour: Windrunner's Jerkin +1, Fortress Plate -1.
+    bonus += Math.trunc(this.player.armor_trait_value("move_bonus", 0));
+    return Math.max(1, MC.PLAYER_BASE_MOVE_RANGE + bonus);
   }
 
   _footprint(tile, size) {
@@ -414,7 +418,7 @@ class Sim {
     const rules = member.rules;
     return {
       ref: ++this.ref_counter, tile, hp: member.max_hp(), max_hp: member.max_hp(), name: member.name, kind: member.kind,
-      member, attack: member.attack(), dmg_mult: might_mult, defense_pct: member.defense_pct(),
+      member, attack: member.attack(), dmg_mult: might_mult, defense_pct: member.defense_pct(), fortitude: member.fortitude(),
       move_range: member.move_tiles(), attack_range: rules.attack_range ?? MC.ALLY_ATTACK_RANGE,
       stamina: member.max_stamina(), max_stamina: member.max_stamina(), mana: member.max_mana(), max_mana: member.max_mana(), fainted: false,
     };

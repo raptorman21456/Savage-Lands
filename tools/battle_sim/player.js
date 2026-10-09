@@ -1,7 +1,7 @@
 /* Player model -- a port of the combat-relevant parts of scripts/Player.gd. */
 "use strict";
 
-const STAT_START = { intimidation: 0, strength: 1, vigor: 20, agility: PC.AGILITY_START, might: 0, resilience: 0, reflexes: 0, dexterity: 0 };
+const STAT_START = { intimidation: 0, strength: 1, vigor: 20, agility: PC.AGILITY_START, might: 0, resilience: 0, reflexes: 0, dexterity: 0, fortitude: 0 };
 
 class PartyMemberModel {
   // Port of PartyMember.gd for the battle-relevant maths. `picks_spent` is how many
@@ -11,7 +11,7 @@ class PartyMemberModel {
     this.rules = D.party.kinds[kind];
     this.name = this.rules.name;
     this.level = this.rules.levels ? level : 1;
-    this.bonus = { hp: 0, attack: 0, defense: 0, speed: 0, magic: 0 };
+    this.bonus = { hp: 0, attack: 0, defense: 0, speed: 0, magic: 0, fortitude: 0 };
     const C = D.party.consts;
     if (this.rules.levels) {
       for (let i = 0; i < this.level - 1; i++) {
@@ -34,6 +34,7 @@ class PartyMemberModel {
     if (this.rules.defense_fixed !== undefined) return this.rules.defense_fixed;
     return Math.max(0, this.stat("defense"));
   }
+  fortitude() { return this.stat("fortitude"); }
   is_caster() { return !!this.rules.caster; }
   max_mana() { return this.is_caster() ? round(this.stat("magic") * D.party.consts.MANA_PER_MAGIC) : 0; }
   max_stamina() { return this.rules.stamina || 0; }
@@ -46,7 +47,7 @@ class PartyMemberModel {
     if (mv.per_speed !== undefined) tiles = (mv.base ?? C.BASE_MOVE_TILES) + mv.per_speed * rating;
     else tiles = C.BASE_MOVE_TILES + Math.floor((rating - C.SPEED_START) / C.SPEED_PER_EXTRA_TILE);
     tiles *= (mv.tile_mult ?? 1.0);
-    return Math.max(1, Math.floor(tiles + 0.0001));
+    return Math.max(mv.min ?? 1, Math.floor(tiles + 0.0001));
   }
 }
 
@@ -60,6 +61,7 @@ class Player {
     this.stat_intimidation = 0; this.stat_strength = 1; this.stat_vigor = 20;
     this.stat_agility = PC.AGILITY_START; this.stat_might = 0;
     this.stat_resilience = 0; this.stat_reflexes = 0; this.stat_dexterity = 0;
+    this.stat_fortitude = 0;           // protection against MAGICAL harm (unlocked by Warded Mind)
     this.awaiting_bonus = 0;           // pending level-up stat picks (the game shows a menu)
     this.max_health = 20; this.health = 20; this.attack_damage = 1;
     this.coins = 0;
@@ -81,6 +83,7 @@ class Player {
     this.has_guardian_skill = false; this.has_merchant_prince = false;
     this.meta_dodge_chance = 0; this.meta_crit_chance = 0;
     this.meta_resilience_unlocked = false; this.meta_reflexes_unlocked = false; this.meta_dexterity_unlocked = false;
+    this.meta_fortitude_unlocked = false; this.meta_fortitude_passive_bonus = 0; this.meta_fortitude_pick_doubled = false;
     this.meta_rage_bonus_pct = 0; this.meta_low_hp_damage_bonus_pct = 0; this.meta_bonus_coin_pct = 0;
     this.meta_healing_bonus_pct = 0; this.meta_bonus_levelup_stat = false;
     this.meta_levelup_bonus_strength = 0; this.meta_levelup_bonus_agility = 0;
@@ -127,6 +130,7 @@ class Player {
       if (this.meta_resilience_unlocked) this.stat_resilience += 1;
       if (this.meta_reflexes_unlocked) this.stat_reflexes += 1;
       if (this.meta_dexterity_unlocked) this.stat_dexterity += 1;
+      if (this.meta_fortitude_unlocked) this.stat_fortitude += 1 + this.meta_fortitude_passive_bonus;
     }
     this.xp = 0;
     this.xp_to_next = this.level >= PC.MAX_LEVEL ? 0 : PC.XP_BASE + PC.XP_PER_LEVEL * this.level;
@@ -153,6 +157,9 @@ class Player {
     this.weapon_whisperer_specials = (cfg.whisperer || []).slice(0, 3);
     this.equipped_talismans = (cfg.talismans || []).slice();
     this.real_miss = cfg.real_miss !== false;
+    this._rebuild_talisman_cache();
+    // Max stamina counts talismans and the worn armour (Cinder Mail's heat), as the game's Sandbox does.
+    this.max_stamina = this._base_max_stamina + Math.trunc(this.talisman_bonus("max_stamina")) + this.armor_max_stamina_bonus();
 
     const wsel = cfg.weapon || { base: "club" };
     const weapon = buildWeapon(wsel);
@@ -185,6 +192,7 @@ class Player {
         case "resilience": this.stat_resilience += 1; break;
         case "reflexes": this.stat_reflexes += 1; break;
         case "dexterity": this.stat_dexterity += 1; break;
+        case "fortitude": this.stat_fortitude += this.meta_fortitude_pick_doubled ? 2 : 1; break;
       }
     }
   }
@@ -199,6 +207,10 @@ class Player {
     this.meta_resilience_unlocked = (b.resilience_unlock || 0) > 0;
     this.meta_reflexes_unlocked = (b.reflexes_unlock || 0) > 0;
     this.meta_dexterity_unlocked = (b.dexterity_unlock || 0) > 0;
+    // The magical wing: Warded Mind unlocks Fortitude, Mental Mush grows it every level-up, Smort Savage doubles the pick.
+    this.meta_fortitude_unlocked = (b.warded_mind || 0) > 0;
+    this.meta_fortitude_passive_bonus = Math.trunc(b.mental_mush || 0);
+    this.meta_fortitude_pick_doubled = (b.smort_savage || 0) > 0;
     this.meta_rage_bonus_pct = b.rage || 0;
     this.meta_double_hit_chance = b.berserker_edge || 0;
     this.meta_lifesteal_pct = b.vampiric_grit || 0;
@@ -259,7 +271,7 @@ class Player {
   // ------------------------------------------------------------ derived stats
   total_luck() { return this.luck_bonus + this.talisman_bonus("luck"); }
   block_heal_amount() { return Math.trunc(this.meta_block_heal_amount) + Math.trunc(this.talisman_bonus("block_heal")); }
-  dodge_chance_total() { return this.meta_dodge_chance + this.talisman_bonus("dodge_chance"); }
+  dodge_chance_total() { return this.meta_dodge_chance + this.talisman_bonus("dodge_chance") + this.armor_trait_value("dodge_bonus"); }
   crit_chance_total() { return this.meta_crit_chance + this.talisman_bonus("crit_chance"); }
   stamina_regen_per_turn() { return Math.trunc(this.meta_stamina_regen_per_turn) + Math.trunc(this.talisman_bonus("stamina_regen")); }
   secondary_chance_mult() { return this.talisman_bonus("double_secondary_chance") > 0 ? 2.0 : 1.0; }
@@ -283,6 +295,18 @@ class Player {
     const id = this.equipped_armor.id || "";
     return (this.equipped_armor.damage_reduction || 0) + armorBonus(this.get_armor_upgrade_level(id));
   }
+  // --- Armour traits and Fortitude (Player.gd) ---
+  armor_trait() { return this.equipped_armor.trait || ""; }
+  armor_trait_value(key, dflt = 0.0) { const tp = this.equipped_armor.trait_params || {}; return tp[key] ?? dflt; }
+  armor_max_stamina_bonus() { return Math.trunc(this.armor_trait_value("max_stamina_bonus", 0)); }
+  armor_speed_bonus() { return Math.trunc(this.armor_trait_value("speed_bonus", 0)); }
+  shield_fortitude() {
+    if (isEmpty(this.equipped_shield) || !this._shield_weapon_ok()) return 0.0;
+    return this.equipped_shield.fortitude || 0;
+  }
+  fortitude_total() { return (this.equipped_armor.fortitude || 0) + this.shield_fortitude() + this.stat_fortitude + this.talisman_bonus("fortitude"); }
+  fortitude_reduction() { return clamp(this.fortitude_total() / 100.0, PC.FORTITUDE_NEGATIVE_FLOOR, PC.FORTITUDE_REDUCTION_CAP); }
+
   clothing_damage_reduction() {
     let total = 0;
     for (const slot of D.clothing_slots) {
@@ -312,7 +336,10 @@ class Player {
     if (isEmpty(this.equipped_shield) || !this._shield_weapon_ok()) return dflt;
     return this.equipped_shield[key] ?? dflt;
   }
-  shield_push_immune() { return this._shield_stat("push_immune", false); }
+  shield_push_immune() {
+    if (this.armor_trait_value("push_immune", false)) return true;   // Fortress Plate
+    return this._shield_stat("push_immune", false);
+  }
   shield_defend_threshold_bonus() { return this._shield_stat("defend_threshold_bonus", 0); }
   shield_damage_penalty_pct() { return this._shield_stat("damage_penalty_pct", 0.0); }
   shield_damage_reduction_pct() { return this._shield_stat("damage_reduction_pct", 0.0); }
@@ -515,6 +542,7 @@ class Player {
     if (this.meta_resilience_unlocked) this.stat_resilience += 1;
     if (this.meta_reflexes_unlocked) this.stat_reflexes += 1;
     if (this.meta_dexterity_unlocked) this.stat_dexterity += 1;
+    if (this.meta_fortitude_unlocked) this.stat_fortitude += 1 + this.meta_fortitude_passive_bonus;
     if (this.level >= PC.MAX_LEVEL) { this.xp = 0; this.xp_to_next = 0; }
     else this.xp_to_next = PC.XP_BASE + PC.XP_PER_LEVEL * this.level;
     this._recalc_stats();

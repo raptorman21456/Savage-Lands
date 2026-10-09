@@ -44,7 +44,8 @@ const NOTHINGNESS_ORDER := ["Leviathan", "Lizen Warband", "Elder Oak", "White Dr
 # economy / run-start perks) -- the panel's "combat only" filter and "max combat".
 const COMBAT_UPGRADES := ["strength", "agility", "vigor", "reflexes_unlock", "berserker_edge", "adrenaline", "dexterity_unlock",
 	"battle_hardened", "pack_leader", "prodigy", "warlord", "beastmaster", "pack_bond", "riposte", "momentum", "rage", "hardened",
-	"intimidation", "luck", "silver_tongue", "haggling", "stamina", "resilience_unlock", "herbalism", "vampiric_grit",
+	"intimidation", "luck", "silver_tongue", "haggling", "warded_mind", "mental_mush", "smort_savage",
+	"stamina", "resilience_unlock", "herbalism", "vampiric_grit",
 	"vigilant_defense", "undying", "block_master", "second_breath", "favour", "last_stand", "shield_mastery", "unbreakable_guard",
 	"warband", "battle_medic", "war_chest", "war_profiteer", "windfall"]
 
@@ -63,7 +64,8 @@ static func default_config() -> Dictionary:
 	return {
 		"level": 10, "picks": {}, "upgrades": {}, "difficulty": "normal", "coins": 0, "waves_cleared": 0,
 		"weapon": {"base": "club", "tier": "Fine", "material": "steel"}, "blacksmith": 0, "rune": "", "learn_all": true, "whisperer": [],
-		"armor": "armor_rags", "armor_level": 0, "clothing": {"head": "", "body": "", "feet": ""}, "shield": "",
+		"materials": {},
+	"armor": "armor_rags", "armor_level": 0, "clothing": {"head": "", "body": "", "feet": ""}, "shield": "",
 		"talismans": [], "ignore_slots": false, "arrows": {"flame": 0, "freeze": 0, "bomb": 0},
 		"consumables": [{"id": "potion_health", "n": 2}], "party": [],
 		"enemies": [{"name": "Goblin", "elite": false, "power_tier": 1.0}, {"name": "Goblin", "elite": false, "power_tier": 1.0}],
@@ -168,6 +170,8 @@ static func pickable_stats(player) -> Array:
 		out.append("reflexes")
 	if player.meta_dexterity_unlocked:
 		out.append("dexterity")
+	if player.meta_fortitude_unlocked:
+		out.append("fortitude")
 	return out
 
 # ---------------------------------------------------------------- applying a build
@@ -195,6 +199,7 @@ static func apply_build(main, cfg: Dictionary) -> void:
 	p.stat_resilience = 0
 	p.stat_reflexes = 0
 	p.stat_dexterity = 0
+	p.stat_fortitude = 0
 	p.level = clampi(int(cfg.level), 1, PlayerScript.MAX_LEVEL)
 	p.xp = 0
 	p.xp_to_next = 0 if p.level >= PlayerScript.MAX_LEVEL else PlayerScript.XP_BASE + PlayerScript.XP_PER_LEVEL * p.level
@@ -211,6 +216,8 @@ static func apply_build(main, cfg: Dictionary) -> void:
 			p.stat_reflexes += 1
 		if p.meta_dexterity_unlocked:
 			p.stat_dexterity += 1
+		if p.meta_fortitude_unlocked:
+			p.stat_fortitude += 1 + p.meta_fortitude_passive_bonus
 	var allowed_picks: int = p.level - 1
 	for stat in cfg.picks:
 		for n in int(cfg.picks[stat]):
@@ -233,6 +240,9 @@ static func apply_build(main, cfg: Dictionary) -> void:
 	p.owned_armor = {armor.id: true}
 	p.armor_upgrade_levels = {}
 	p.armor_upgrade_levels[armor.id] = int(cfg.armor_level) if armor.get("metal", false) else 0
+	p.materials = {}
+	for material_id in cfg.get("materials", {}):
+		p.materials[str(material_id)] = int(cfg.materials[material_id])
 	p.equipped_clothing = {"head": str(cfg.clothing.get("head", "")), "body": str(cfg.clothing.get("body", "")), "feet": str(cfg.clothing.get("feet", ""))}
 	var shield_id: String = str(cfg.shield)
 	p.equipped_shield = ShieldsScript.SHIELDS[shield_id].duplicate(true) if ShieldsScript.SHIELDS.has(shield_id) else {}
@@ -260,6 +270,9 @@ static func apply_build(main, cfg: Dictionary) -> void:
 		if str(sid) != "" and p.weapon_whisperer_specials.size() < 3:
 			p.weapon_whisperer_specials.append(str(sid))
 	p._rebuild_talisman_cache()
+	# Max stamina counts talismans and the worn armour (Cinder Mail's heat).
+	p.max_stamina = p._base_max_stamina + int(p.talisman_bonus("max_stamina")) + p.armor_max_stamina_bonus()
+	p.stamina = mini(p.stamina, p.max_stamina)
 
 	# weapon
 	p.learned_specials = {}

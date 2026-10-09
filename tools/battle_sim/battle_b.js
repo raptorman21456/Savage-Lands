@@ -116,6 +116,9 @@ Object.assign(Sim.prototype, {
       if (p.stealth_turns_remaining > 0) { stealth_forced_crit = true; p.stealth_turns_remaining = 0; }
     }
     const bleeding_cut_forced_crit = effect === "bleed_or_crit" && rng.randf() < 0.5;
+    // Shadowweave: the hit after a dodge is a guaranteed crit.
+    const shadow_forced_crit = you && this.battle_shadow_crit;
+    if (shadow_forced_crit) this.battle_shadow_crit = false;
     const base_attack = attack_stat >= 0 ? attack_stat : p.attack_damage;
     let dmg = round(base_attack * (weapon.damage_mult ?? 1.0) * dmg_mult);
     if (attack_stat >= 0) dmg = Math.max(1, dmg);
@@ -154,10 +157,12 @@ Object.assign(Sim.prototype, {
       const ut = TRAITS[u.name] || {};
       if (ut.is_undead || ut.is_boss_tier) dmg = round(dmg * (1.0 + undead_boss_bonus));
     }
-    let is_crit = blind_forced_crit || stealth_forced_crit || bleeding_cut_forced_crit;
+    let is_crit = blind_forced_crit || stealth_forced_crit || bleeding_cut_forced_crit || shadow_forced_crit;
     if (you && !is_crit && p.crit_chance_total() > 0 && rng.randf() < p.crit_chance_total()) is_crit = true;
     if (is_crit) dmg = round(dmg * p.crit_damage_mult());
     if (you && p.potion_attack_turns > 0) dmg = round(dmg * (1.0 + MC.ATTACK_POTION_DAMAGE_BONUS_PCT));
+    // Bloodrage Hide: every hit taken stacks extra damage dealt, for a couple of turns.
+    if (you && this.battle_bloodrage_stacks > 0) dmg = round(dmg * (1.0 + this.battle_bloodrage_stacks * p.armor_trait_value("dmg_per_stack", 0.1)));
     const distance_pct = weapon.passive_damage_per_tile_distance || 0;
     if (you && distance_pct !== 0) {
       const origin = attacker_tile.x >= 0 ? attacker_tile : this.battle_player_tile;
@@ -593,7 +598,7 @@ Object.assign(Sim.prototype, {
   async _battle_player_defend() {
     const p = this.player;
     this.battle_player_defending = true;
-    p.regen_stamina(MC.STAMINA_REGEN_ON_DEFEND);
+    p.regen_stamina(MC.STAMINA_REGEN_ON_DEFEND + Math.trunc(p.armor_trait_value("defend_stamina_bonus", 0)));
     this.log("You brace for impact.");
     this.stat_action("defend");
     if (p.block_heal_amount() > 0) p.heal(p.block_heal_amount());
@@ -603,7 +608,7 @@ Object.assign(Sim.prototype, {
     const p = this.player;
     this.battle_player_defending = true; this.battle_player_taunting = true;
     for (const u of this.battle_units) u.aware_of_player = true;
-    p.regen_stamina(MC.STAMINA_REGEN_ON_DEFEND);
+    p.regen_stamina(MC.STAMINA_REGEN_ON_DEFEND + Math.trunc(p.armor_trait_value("defend_stamina_bonus", 0)));
     this.log("You taunt the enemy, daring them to attack!");
     this.stat_action("taunt");
     if (p.block_heal_amount() > 0) p.heal(p.block_heal_amount());
