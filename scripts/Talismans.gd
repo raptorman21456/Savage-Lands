@@ -73,7 +73,7 @@ class_name Talismans
 #                           weapon, not just something long_range
 #   water_push_prompt       1 = the current can't sweep you off a water tile
 #                           without asking first (Main.gd:_prompt_water_push)
-#   ally_defense_pct        +x% damage reduction for every ally (their only
+#   ally_defense_pct        +x (as a fraction: 0.40 = +40 points) of Defense and Fortitude for every ally (their only
 #                           reduction source -- see _enemy_apply_damage)
 #   taunt_confusion         1 = Taunt enrages instead of drawing focus: each
 #                           enemy attacks whichever combatant (player, ally,
@@ -202,7 +202,7 @@ static var ITEMS := [
 	# now, same as every other talisman, with the updated 40% number.
 	{"id": "guardian_knot", "name": "Guardian Knot", "rarity": "common", "price": 70,
 		"effects": {"ally_defense_pct": 0.40},
-		"description": "Your allies take 40% less damage."},
+		"description": "Your allies gain +40 Defense and Fortitude."},
 	{"id": "iron_will_band", "name": "Iron Will Band", "rarity": "rare", "price": 90,
 		"effects": {"survive_lethal": 0.10}, "description": "10% chance to survive a killing blow with 1 HP (once a battle)."},
 	{"id": "cliffwalkers_bead", "name": "Cliffwalker's Bead", "rarity": "common", "price": 50,

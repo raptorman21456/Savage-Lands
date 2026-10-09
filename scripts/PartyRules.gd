@@ -75,7 +75,10 @@ const KINDS := {
 		"stamina": 100, "caster": false,
 		# Speed is ALWAYS one tile.
 		"move": {"fixed": 1},
-		# Deals 2x damage with a shield (dormant until members can wear shields).
+		# The Guardian is the one member whose protection (Defense and Fortitude) can climb to 90%; everyone
+		# else tops out at Defense.gd:BASE_CAP (80%).
+		"defense_cap": 0.9,
+		# Deals 2x damage while carrying a shield (Main.gd:_apply_single_hit).
 		"shield_damage_mult": 2.0,
 		"attack_range": 1, "tint": Color(0.7, 0.8, 1.0),
 	},

@@ -3,15 +3,17 @@ class_name Armor
 
 # Body armour. Fourteen kinds, each with its own way of playing -- not a ladder any more. Every
 # entry carries:
-#   damage_reduction  the share of BODILY harm (weapons, claws, arrows...) it stops; the key
-#                     other code has always read, plus Blacksmith levels for metal armour.
-#   fortitude         points of protection against MAGICAL harm (1 point = 1%, see
+#   damage_reduction  points of Defense against BODILY harm (weapons, claws, arrows...), written as a
+#                     fraction (0.30 = 30 points); the key other code has always read, plus Blacksmith
+#                     levels for metal armour. Points are pooled with Resilience and the shield and bent
+#                     into a cut by Defense.gd (diminishing returns, never past 80%).
+#   fortitude         points of protection against MAGICAL harm, on the same curve (see
 #                     Player.fortitude_reduction). May be negative: Thornmail's spikes make you
 #                     easier to burn with spells.
 #   fall_damage_mult  scales cliff-fall damage (1.0 normal, 0.0 none).
 #   trait / trait_params  the armour's signature effect and drawback, read at the combat sites
 #                     named next to each trait below (Player.armor_trait / armor_trait_value).
-#   metal             the Blacksmith will upgrade it (+2.5% bodily per level).
+#   metal             the Blacksmith will upgrade it (+2.5 Defense per level).
 #   recipe            pelt armours are crafted, not bought: {"materials": {id: n}, "coins": n}
 #                     (Materials.gd; the Blacksmith's Craft tab). They are the ones with the most
 #                     Fortitude.
@@ -47,7 +49,7 @@ static var TIERS := [
 		"id": "armor_gambeson", "name": "Gambeson", "price": 20,
 		"damage_reduction": 0.15, "fortitude": 5, "fall_damage_mult": 1.0,
 		"trait": "", "trait_params": {},
-		"description": "-15% bodily harm, +5 Fortitude. A quilted coat: nothing fancy, and nothing missing either.",
+		"description": "+15 Defense, +5 Fortitude. A quilted coat: nothing fancy, and nothing missing either.",
 		"shop_description": "A step up from bare skin. Modest, but modest beats dead.",
 		"icon": "armor_leather", "icon_fallback": "armor_leather",
 	},
@@ -55,7 +57,7 @@ static var TIERS := [
 		"id": "armor_thornmail", "name": "Thornmail", "price": 85, "metal": true,
 		"damage_reduction": 0.30, "fortitude": -5, "fall_damage_mult": 1.0,
 		"trait": "thorns", "trait_params": {"reflect_pct": 0.30},
-		"description": "-30% bodily harm, -5 Fortitude. 30% of the damage a melee attacker deals to you is thrown straight back. Ranged and magical attacks sail past the spikes, and spells hurt a little more.",
+		"description": "+30 Defense, -5 Fortitude. 30% of the damage a melee attacker deals to you is thrown straight back. Ranged and magical attacks sail past the spikes, and spells hurt a little more.",
 		"shop_description": "Hit it and you'll wish you hadn't. Spells don't mind it nearly as much.",
 		"icon": "armor_steel", "icon_fallback": "armor_steel",
 	},
@@ -63,7 +65,7 @@ static var TIERS := [
 		"id": "armor_fortress", "name": "Fortress Plate", "price": 90, "metal": true, "high_grade": true,
 		"damage_reduction": 0.55, "fortitude": 0, "fall_damage_mult": 1.5,
 		"trait": "fortress", "trait_params": {"move_bonus": -1, "push_immune": true},
-		"description": "-55% bodily harm, 0 Fortitude. Nothing sweeps you off a water tile -- but you move 1 tile less, and cliff falls deal 50% more damage.",
+		"description": "+55 Defense, 0 Fortitude. Nothing sweeps you off a water tile -- but you move 1 tile less, and cliff falls deal 50% more damage.",
 		"shop_description": "Stops almost anything short. Just don't trip near a cliff wearing it.",
 		"icon": "armor_steel", "icon_fallback": "armor_steel",
 	},
@@ -72,7 +74,7 @@ static var TIERS := [
 		"damage_reduction": 0.45, "fortitude": 35, "fall_damage_mult": 0.0,
 		"trait": "", "trait_params": {},
 		"recipe": {"materials": {"dragon_scale": 8}, "coins": 120},
-		"description": "-45% bodily harm, +35 Fortitude, and cliff falls deal no damage at all. Scaled by hand from something that shouldn't have died so easily.",
+		"description": "+45 Defense, +35 Fortitude, and cliff falls deal no damage at all. Scaled by hand from something that shouldn't have died so easily.",
 		"shop_description": "Don't ask where I got this. Just know it used to be attached to something much bigger than you.",
 		"icon": "armor_dragonskin", "icon_fallback": "armor_dragonskin",
 	},
@@ -80,7 +82,7 @@ static var TIERS := [
 		"id": "armor_stonehide", "name": "Stonehide Mail", "price": 60, "metal": true,
 		"damage_reduction": 0.10, "fortitude": 5, "fall_damage_mult": 1.0,
 		"trait": "stonehide", "trait_params": {"flat_reduction": 3},
-		"description": "-10% bodily harm, +5 Fortitude, and every bodily hit that lands does 3 less damage (never below 1). A wall against goblin packs; a big single blow shrugs it off.",
+		"description": "+10 Defense, +5 Fortitude, and every bodily hit that lands does 3 less damage (never below 1). A wall against goblin packs; a big single blow shrugs it off.",
 		"shop_description": "Small hits just stop mattering. Big ones, well. Let's not talk about the big ones.",
 		"icon": "armor_iron", "icon_fallback": "armor_iron",
 	},
@@ -88,7 +90,7 @@ static var TIERS := [
 		"id": "armor_bastion", "name": "Bastion Mail", "price": 80, "metal": true,
 		"damage_reduction": 0.25, "fortitude": 5, "fall_damage_mult": 1.0,
 		"trait": "bastion", "trait_params": {"defend_threshold_bonus": 8, "defend_stamina_bonus": 10},
-		"description": "-25% bodily harm, +5 Fortitude. Built for bracing: Defend negates hits 8 points bigger than usual, and Defend and Taunt give back 10 more stamina. Nothing special unless you brace.",
+		"description": "+25 Defense, +5 Fortitude. Built for bracing: Defend negates hits 8 points bigger than usual, and Defend and Taunt give back 10 more stamina. Nothing special unless you brace.",
 		"shop_description": "Plant your feet and let them come. It's meant for exactly that.",
 		"icon": "armor_iron", "icon_fallback": "armor_iron",
 	},
@@ -96,7 +98,7 @@ static var TIERS := [
 		"id": "armor_martyr", "name": "Martyr's Mantle", "price": 75,
 		"damage_reduction": 0.05, "fortitude": 10, "fall_damage_mult": 1.0,
 		"trait": "martyr", "trait_params": {"bodily_per_10_missing": 0.03},
-		"description": "-5% bodily harm, +10 Fortitude, and a further -3% bodily harm for every 10% of your HP you're missing. Frail at full health; stubborn when you're not.",
+		"description": "+5 Defense, +10 Fortitude, and a further +3 Defense for every 10% of your HP you're missing. Frail at full health; stubborn when you're not.",
 		"shop_description": "It hardens with every wound. I'd rather not say how I know.",
 		"icon": "armor_rags", "icon_fallback": "armor_rags",
 	},
@@ -104,7 +106,7 @@ static var TIERS := [
 		"id": "armor_cinder", "name": "Cinder Mail", "price": 100, "metal": true,
 		"damage_reduction": 0.25, "fortitude": 10, "fall_damage_mult": 1.0,
 		"trait": "cinder", "trait_params": {"ignite_melee": true, "max_stamina_bonus": -10},
-		"description": "-25% bodily harm, +10 Fortitude. Whatever hits you in melee catches fire. The heat wears you down: -10 max stamina.",
+		"description": "+25 Defense, +10 Fortitude. Whatever hits you in melee catches fire. The heat wears you down: -10 max stamina.",
 		"shop_description": "Still warm from the forge. Stays that way, somehow.",
 		"icon": "armor_iron", "icon_fallback": "armor_iron",
 	},
@@ -113,7 +115,7 @@ static var TIERS := [
 		"damage_reduction": 0.10, "fortitude": 26, "fall_damage_mult": 1.0,
 		"trait": "bloodrage", "trait_params": {"max_stacks": 5, "dmg_per_stack": 0.10, "turns": 2},
 		"recipe": {"materials": {"mage_hair": 3, "bear_pelt": 3}, "coins": 40},
-		"description": "-10% bodily harm, +26 Fortitude. Every hit you take stacks +10% damage dealt (up to 5 stacks, lasting 2 turns). Thin protection for a short temper.",
+		"description": "+10 Defense, +26 Fortitude. Every hit you take stacks +10% damage dealt (up to 5 stacks, lasting 2 turns). Thin protection for a short temper.",
 		"shop_description": "It remembers every blow. And returns them.",
 		"icon": "armor_leather", "icon_fallback": "armor_leather",
 	},
@@ -122,7 +124,7 @@ static var TIERS := [
 		"damage_reduction": 0.05, "fortitude": 30, "fall_damage_mult": 1.0,
 		"trait": "shadowweave", "trait_params": {"dodge_bonus": 0.10},
 		"recipe": {"materials": {"spider_silk": 6}, "coins": 60},
-		"description": "-5% bodily harm, +30 Fortitude, +10% dodge, and a dodge makes your next attack a crit. Anything that does land hurts.",
+		"description": "+5 Defense, +30 Fortitude, +10% dodge, and a dodge makes your next attack a crit. Anything that does land hurts.",
 		"shop_description": "You won't even feel it. Neither will they -- until it's too late.",
 		"icon": "armor_leather", "icon_fallback": "armor_leather",
 	},
@@ -131,7 +133,7 @@ static var TIERS := [
 		"damage_reduction": 0.10, "fortitude": 28, "fall_damage_mult": 0.0,
 		"trait": "windrunner", "trait_params": {"move_bonus": 1, "speed_bonus": 2},
 		"recipe": {"materials": {"feather": 5}, "coins": 50},
-		"description": "-10% bodily harm, +28 Fortitude, +1 move tile, +2 Speed (it will matter for turn order), and cliff falls deal no damage. Very thin.",
+		"description": "+10 Defense, +28 Fortitude, +1 move tile, +2 Speed (it moves you up the turn order), and cliff falls deal no damage. Very thin.",
 		"shop_description": "Light enough to forget you're wearing it. Fast enough to forget they were chasing you.",
 		"icon": "armor_leather", "icon_fallback": "armor_leather",
 	},
@@ -139,7 +141,7 @@ static var TIERS := [
 		"id": "armor_spellward", "name": "Spellward Robes", "price": 120,
 		"damage_reduction": 0.05, "fortitude": 25, "fall_damage_mult": 1.0,
 		"trait": "spellward", "trait_params": {"magic_hit_stamina": 10},
-		"description": "-5% bodily harm, +25 Fortitude. The first magical hit of every battle is negated outright, and each magical hit that reaches you gives back 10 stamina. Almost no protection against steel.",
+		"description": "+5 Defense, +25 Fortitude. The first magical hit of every battle is negated outright, and each magical hit that reaches you gives back 10 stamina. Almost no protection against steel.",
 		"shop_description": "Stitched with wards by someone who clearly hated wizards.",
 		"icon": "armor_rags", "icon_fallback": "armor_rags",
 	},
@@ -147,7 +149,7 @@ static var TIERS := [
 		"id": "armor_warden", "name": "Warden's Aegis", "price": 130, "metal": true,
 		"damage_reduction": 0.20, "fortitude": 5, "fall_damage_mult": 1.0,
 		"trait": "warden", "trait_params": {"ally_reduction": 0.15, "ally_radius": 2},
-		"description": "-20% bodily harm, +5 Fortitude. Allies within 2 tiles of you take 15% less damage.",
+		"description": "+20 Defense, +5 Fortitude. Allies within 2 tiles of you take 15% less damage.",
 		"shop_description": "Made for standing in front of other people.",
 		"icon": "armor_steel", "icon_fallback": "armor_steel",
 	},

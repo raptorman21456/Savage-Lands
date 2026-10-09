@@ -55,6 +55,7 @@ const AttackTimingsScript := preload("res://scripts/AttackTimings.gd")
 const AttackMinigameScript := preload("res://scripts/AttackMinigame.gd")
 const PartyRulesScript := preload("res://scripts/PartyRules.gd")
 const PartyKitsScript := preload("res://scripts/PartyKits.gd")
+const DefenseScript := preload("res://scripts/Defense.gd")
 const MaterialsScript := preload("res://scripts/Materials.gd")
 
 # Phantom Guard's "evasive" special: fired the instant the player picks one
@@ -650,6 +651,20 @@ const ENEMY_TRAITS := {
 	"Archmage": {"harm": "magical", "windup": true, "sweeps": true, "ignore_line": true, "attack_range": 2, "knockback_resist": 0.4, "move_range": 1, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true},
 }
 
+# How fast each enemy acts, in the same rating you see for yourself on the Stats screen (you start at 5
+# and gain 1 a level; party members run 4-5). Turn order is decided by speed alone, so a rating twice
+# another's means two turns to its one. Every number here is a DRAFT for the user to set.
+const ENEMY_SPEED_DEFAULT := 5.0
+const ENEMY_SPEEDS := {
+	"Goblin": 6.0, "Orc": 3.0, "Apprentice Mage": 5.0, "Brute": 2.0, "Shade": 7.0,
+	"Wolf": 8.0, "Traitor Wolf": 8.0, "Centaur Lancer": 7.0, "Centaur Archer": 6.0,
+	"Fae Hut": 3.0, "Fae": 7.0, "Gnome": 5.0,
+	# minibosses
+	"Black Dragonlet": 6.0, "Treant": 2.0, "Iron Construct": 2.0, "Lava Construct": 3.0, "Voidwing": 9.0,
+	# bosses
+	"Leviathan": 3.0, "Lizen Warband": 5.0, "Elder Oak": 2.0, "White Dragon": 4.0, "Red Wyrm": 4.0, "Archmage": 5.0,
+}
+
 # The Nothingness (world index 10, WORLDS.size()-1) is a fixed 6-fight
 # sequential gauntlet, not the normal wave-climbing waterfall -- see
 # _spawn_wave's top-of-function branch and _spawn_nothingness_fight below.
@@ -959,6 +974,17 @@ var battle_hero_buff_turns := 0
 var battle_bloodrage_stacks := 0
 var battle_bloodrage_turns := 0
 var battle_shadow_crit := false
+# Turn order (see "Turn order" below). With battle_use_timeline on -- every real battle -- SPEED decides who
+# acts next; off, the old phases run (hero, then allies, then every enemy), which is how the tests that
+# drive a fight by hand still work.
+var battle_use_timeline := false
+var battle_timeline: Array = []            # [{tid, kind: "hero" | "ally" | "enemy", time}]
+var battle_timeline_clock := 0.0
+var battle_tid_counter := 0
+var battle_timeline_running := false
+var battle_timeline_pending := false
+var battle_hero_turns := 0
+var battle_current_actor: Dictionary = {}  # {kind, tid, unit}: whose turn it is right now
 var battle_spellward_used := false
 # While >= 0, the stat a swing is built on instead of the acting member's attack (Body Slam hits with
 # its DEFENSE). Set and cleared around that one hit.
@@ -1172,6 +1198,7 @@ func start_sandbox_battle(squad: Array, world_index: int) -> void:
 	hud.show_battle(WORLDS[current_world_index].battle_bg)
 	_focus_battle_main_menu()
 	_refresh_battle_display()
+	_timeline_begin()
 
 func _sandbox_battle_finished() -> void:
 	var result: String = sandbox_result if sandbox_result != "" else "victory"
@@ -3376,6 +3403,7 @@ func trigger_battle(initial_enemy) -> void:
 	hud.show_battle(WORLDS[current_world_index].battle_bg)
 	_focus_battle_main_menu()
 	_refresh_battle_display()
+	_timeline_begin()
 
 # How much bigger a squad gets on top of its base size (MAX_BATTLE_ENEMIES_
 # GOBLIN/TOUGH) -- further into the run (wave), stronger (level), and
@@ -3471,6 +3499,7 @@ func _setup_battle_grid(squad: Array) -> void:
 	battle_player_defending = false
 	battle_player_taunting = false
 	battle_ironclad_move_allowed = true
+	battle_use_timeline = false
 	battle_skill_cooldown = 0
 	battle_player_turns_to_skip = 0
 	battle_momentum_stacks = 0
@@ -3719,6 +3748,24 @@ func _make_member_battle_unit(member, tile: Vector2i, might_mult: float) -> Dict
 	if weapon.get("long_range", false):
 		attack_range += 1
 	var stamina_pool: int = member.max_stamina() + (int(mods.get("max_stamina", 0.0)) if member.max_stamina() > 0 else 0)
+	# Armour and shield. Armour adds its Defense points (a Marksman's Defense is always 0, whatever it
+	# wears) and its Fortitude; a shield only counts while a hand is free for it (member.shield_usable())
+	# and adds its passive Defense and Fortitude skew. The signature effects are read from the unit's
+	# "armor" / "shield" in the hit pipeline (_enemy_apply_damage, _apply_single_hit).
+	var armor: Dictionary = member.armor_dict() if member.can_carry_gear() else {}
+	var shield: Dictionary = member.shield_dict() if member.can_carry_gear() and member.shield_usable() else {}
+	var armor_params: Dictionary = armor.get("trait_params", {})
+	var defense_points: float = member.defense_pct() + float(mods.get("damage_reduction", 0.0)) * 100.0
+	if not rules.has("defense_fixed"):
+		defense_points += player.armor_defense_fraction(armor) * 100.0 if not armor.is_empty() else 0.0
+		defense_points += float(shield.get("damage_reduction_pct", 0.0)) * 100.0
+	var fortitude_points: float = member.fortitude() + float(armor.get("fortitude", 0)) + float(shield.get("fortitude", 0))
+	if stamina_pool > 0:
+		stamina_pool = maxi(1, stamina_pool + int(armor_params.get("max_stamina_bonus", 0)))
+	var move_tiles: int = member.move_tiles() + int(mods.get("move_range", 0.0))
+	if not (rules.get("move", {}) as Dictionary).has("fixed"):
+		move_tiles = maxi(1, move_tiles + int(armor_params.get("move_bonus", 0)))
+	var cannot_dodge: bool = bool(rules.get("cannot_dodge", false))
 	return {
 		"tile": tile,
 		"hp": hp_value,
@@ -3731,8 +3778,9 @@ func _make_member_battle_unit(member, tile: Vector2i, might_mult: float) -> Dict
 		"attack": member.attack(),
 		"magic": magic_value,
 		"dmg_mult": might_mult,
-		"defense_pct": minf(90.0, member.defense_pct() + float(mods.get("damage_reduction", 0.0)) * 100.0),
-		"move_range": member.move_tiles() + int(mods.get("move_range", 0.0)),
+		"defense_pct": defense_points,
+		"defense_cap": member.defense_cap(),
+		"move_range": move_tiles,
 		"attack_range": attack_range,
 		"stamina": stamina_pool,
 		"max_stamina": stamina_pool,
@@ -3749,8 +3797,23 @@ func _make_member_battle_unit(member, tile: Vector2i, might_mult: float) -> Dict
 		"survive_used": false,
 		# Kind traits: the Knight cannot dodge (nothing dodges for members yet), and the Necromancer
 		# grows with every kill.
-		"cannot_dodge": bool(rules.get("cannot_dodge", false)),
-		"fortitude": member.fortitude(),
+		"cannot_dodge": cannot_dodge,
+		"fortitude": fortitude_points,
+		"speed": member.speed() + float(armor_params.get("speed_bonus", 0)),
+		# Gear state: the armour (and its trait id), the usable shield and what it does, the dodge the
+		# armour grants (Shadowweave), and the in-battle counters its traits use.
+		"armor": armor,
+		"armor_trait": str(armor.get("trait", "")),
+		"shield": shield,
+		"shield_block": float(shield.get("block_chance", 0.0)),
+		"shield_special": str(shield.get("special", "")),
+		"shield_special_pct": member.shield_special_pct() if not shield.is_empty() else 0.0,
+		"shield_penalty": float(shield.get("damage_penalty_pct", 0.0)),
+		"shield_damage_mult": float(rules.get("shield_damage_mult", 1.0)) if not shield.is_empty() else 1.0,
+		"dodge_chance": 0.0 if cannot_dodge else float(armor_params.get("dodge_bonus", 0.0)),
+		"speed_bonus": int(armor_params.get("speed_bonus", 0)),
+		"bloodrage_stacks": 0, "bloodrage_turns": 0,
+		"shadow_crit": false, "vengeance": false, "spellward_used": false,
 		"unlimited_range": bool(rules.get("unlimited_range", false)),
 		"ignore_cover": bool(rules.get("ignore_cover", false)),
 		"steal_chance": float(rules.get("steal_chance", 0.0)),
@@ -4734,6 +4797,9 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 	var shadow_forced_crit: bool = attacker_label == "You" and battle_shadow_crit
 	if shadow_forced_crit:
 		battle_shadow_crit = false
+	elif _actor_is_ally() and bool(battle_actor.get("shadow_crit", false)):
+		shadow_forced_crit = true
+		battle_actor["shadow_crit"] = false
 	# attack_stat >= 0 is a PartyMember ally swinging on its OWN attack stat (see
 	# _make_member_battle_unit); everyone else builds on the hero's attack_damage.
 	var base_attack: float = attack_stat if attack_stat >= 0.0 else float(player.attack_damage)
@@ -4767,6 +4833,13 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 	# docked for the player's own gear choice.
 	if attacker_label == "You" and player.shield_damage_penalty_pct() > 0.0:
 		dmg = int(round(dmg * (1.0 - player.shield_damage_penalty_pct())))
+	elif _actor_is_ally():
+		# A member's own shield docks its swings the same way; the Guardian, though, hits twice as hard
+		# with one.
+		if float(battle_actor.get("shield_penalty", 0.0)) > 0.0:
+			dmg = int(round(dmg * (1.0 - float(battle_actor.shield_penalty))))
+		if float(battle_actor.get("shield_damage_mult", 1.0)) != 1.0:
+			dmg = int(round(dmg * float(battle_actor.shield_damage_mult)))
 	# Ancient Shrine random event: a temporary blessing/curse on every hit
 	# this function resolves, including the Knight's (it's a shared
 	# synthetic-weapon call into this same function).
@@ -4830,6 +4903,10 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 		dmg = int(round(dmg * (1.0 + player.shield_special_pct())))
 		player.shield_vengeance_active = false
 		hud.battle_log("Your shield's vengeance empowers the blow!")
+	elif _actor_is_ally() and bool(battle_actor.get("vengeance", false)) and effect == "":
+		dmg = int(round(dmg * (1.0 + float(battle_actor.get("shield_special_pct", 0.0)))))
+		battle_actor["vengeance"] = false
+		hud.battle_log("%s's shield vengeance empowers the blow!" % _actor_label())
 	# Bloodreaver's passive_execute_bonus behaves like the explicit execute
 	# effect but with its own bonus amount -- whichever is bigger wins rather
 	# than stacking, so a Mythic Battle Axe's own execute special doesn't
@@ -4898,6 +4975,8 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 	# Bloodrage Hide: every hit taken stacks extra damage dealt, for a couple of turns.
 	if attacker_label == "You" and battle_bloodrage_stacks > 0:
 		dmg = int(round(dmg * (1.0 + battle_bloodrage_stacks * float(player.armor_trait_value("dmg_per_stack", 0.1)))))
+	elif _actor_is_ally() and int(battle_actor.get("bloodrage_stacks", 0)) > 0:
+		dmg = int(round(dmg * (1.0 + int(battle_actor.bloodrage_stacks) * float(battle_actor.get("armor", {}).get("trait_params", {}).get("dmg_per_stack", 0.1)))))
 	# The Looongblade/Aimbot's passive_damage_per_tile_distance: damage scales
 	# with the Manhattan distance between attacker and target -- positive for
 	# the Looongblade (hits harder at range), negative for Aimbot (falls off
@@ -5036,9 +5115,10 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 	if effect == "low_sweep" and u.hp > 0 and randf() < _proc(LOW_SWEEP_CHANCE):
 		u.move_range = max(1, int(u.move_range / 2))
 		hud.battle_log("The %s is swept off its feet, slowed dramatically!" % u.name)
-	# The Wolf's Nipper: a chance to halve the enemy's speed.
+	# The Wolf's Nipper: a chance to halve the enemy's speed (its turns come half as often) for the rest
+	# of the fight.
 	if effect == "nipper" and u.hp > 0 and randf() < _proc(PartyKitsScript.NIPPER_SLOW_CHANCE):
-		u.move_range = max(1, int(u.move_range / 2))
+		u["speed_mult"] = float(u.get("speed_mult", 1.0)) * 0.5
 		hud.battle_log("The %s is nipped and slows to a limp!" % u.name)
 	# The Guardian's Body Slam stuns now and then; the Haymaker always does.
 	if effect == "body_slam" and u.hp > 0 and randf() < _proc(PartyKitsScript.BODY_SLAM_STUN_CHANCE):
@@ -6143,7 +6223,10 @@ func _end_player_turn() -> void:
 		if should_push:
 			battle_player_tile = _apply_water_push(battle_player_tile)
 	_apply_terrain_tick(battle_player_tile)
-	_start_ally_turn()
+	if battle_use_timeline:
+		_timeline_advance()
+	else:
+		_start_ally_turn()
 
 # Bloodmoon Fang (talisman): once per player turn, checks whether anyone --
 # player, ally, or enemy -- landed a hit this cycle
@@ -6202,47 +6285,66 @@ func _advance_ally_queue() -> void:
 		var next = battle_ally_queue.pop_front()
 		if next.hp <= 0:
 			continue
-		# A summoned skeleton needs no orders: it walks at the nearest enemy and hits it.
-		if next.get("auto", false):
-			_auto_ally_act(next)
-			if battle_units.is_empty():
-				battle_commanding_ally = null
-				battle_ally_queue.clear()
-				_remove_fallen_allies()
-				_battle_victory()
-				return
-			continue
-		# A staggered ally (Devastating Slash...) loses its command.
-		if int(next.get("skip_turns", 0)) > 0:
-			next["skip_turns"] = int(next.skip_turns) - 1
-			hud.battle_log("Your %s is recovering and can't act." % next.name)
-			continue
-		_ally_start_of_turn(next)
-		battle_commanding_ally = next
-		battle_ally_moves_left = int(next.move_range)
-		next.defending = false
-		next["stalwart"] = false
-		next["taunting"] = false
-		next["sprint"] = false
-		next["attacked"] = false
-		next["bonus_attack"] = false
-		# The Rogue's Pickpocket buys it a tile on its next turn.
-		battle_ally_moves_left += int(next.get("bonus_move_next", 0))
-		next["bonus_move_next"] = 0
-		battle_ally_pending_action = {}
-		battle_ally_pick_candidates = []
-		battle_actor = {}
-		battle_menu_state = "main"
-		battle_move_trail = []
-		_focus_battle_ally_menu()
-		_refresh_battle_display()
-		return
+		var waiting: bool = _begin_ally_turn(next)
+		# A summoned skeleton acts on its own; if that cleared the field, the fight is over.
+		if next.get("auto", false) and battle_units.is_empty():
+			battle_commanding_ally = null
+			battle_ally_queue.clear()
+			_remove_fallen_allies()
+			_battle_victory()
+			return
+		if waiting:
+			return
 	battle_commanding_ally = null
 	_remove_fallen_allies()
 	if battle_units.is_empty():
 		_battle_victory()
 		return
 	_start_enemy_turn()
+
+# Gives one ally its turn. A summoned skeleton needs no orders (it walks at the nearest enemy and hits
+# it), a staggered ally (Devastating Slash...) loses its command, anyone else opens the command menu.
+# True = the ally is now waiting for the player's orders.
+func _begin_ally_turn(next: Dictionary) -> bool:
+	if next.get("auto", false):
+		_auto_ally_act(next)
+		return false
+	if int(next.get("skip_turns", 0)) > 0:
+		next["skip_turns"] = int(next.skip_turns) - 1
+		hud.battle_log("Your %s is recovering and can't act." % next.name)
+		return false
+	_ally_start_of_turn(next)
+	battle_commanding_ally = next
+	battle_ally_moves_left = int(next.move_range)
+	next.defending = false
+	next["stalwart"] = false
+	next["taunting"] = false
+	next["sprint"] = false
+	next["attacked"] = false
+	next["bonus_attack"] = false
+	# The Rogue's Pickpocket buys it a tile on its next turn.
+	battle_ally_moves_left += int(next.get("bonus_move_next", 0))
+	next["bonus_move_next"] = 0
+	battle_ally_pending_action = {}
+	battle_ally_pick_candidates = []
+	battle_actor = {}
+	battle_menu_state = "main"
+	battle_move_trail = []
+	_focus_battle_ally_menu()
+	_refresh_battle_display()
+	return true
+
+# A member's command is over (it acted, skipped, or fell): on to whoever is next.
+func _ally_command_over() -> void:
+	if not battle_use_timeline:
+		_advance_ally_queue()
+		return
+	battle_commanding_ally = null
+	_remove_fallen_allies()
+	if battle_units.is_empty():
+		_battle_victory()
+		return
+	_timeline_advance()
 
 func _focus_battle_ally_menu() -> void:
 	hud.battle_ally_buttons["move"].grab_focus()
@@ -6251,6 +6353,14 @@ func _focus_battle_ally_menu() -> void:
 # plus its talismans) and HP from regeneration talismans (Moss Charm).
 func _ally_start_of_turn(u: Dictionary) -> void:
 	var mods: Dictionary = u.get("mods", {})
+	# With turn order live a member's timers (charm, empower) count down on its own turns.
+	if battle_use_timeline:
+		_tick_ally_timers(u)
+	# Bloodrage Hide: the stacks fade a couple of its own turns after the last blow that fed them.
+	if int(u.get("bloodrage_turns", 0)) > 0:
+		u["bloodrage_turns"] = int(u.bloodrage_turns) - 1
+		if int(u.bloodrage_turns) == 0:
+			u["bloodrage_stacks"] = 0
 	var stamina_gain: int = player.meta_stamina_regen_per_turn + int(_unit_effect(u, "stamina_regen"))
 	if stamina_gain > 0 and int(u.get("max_stamina", 0)) > 0:
 		u["stamina"] = mini(int(u.max_stamina), int(u.stamina) + stamina_gain)
@@ -6313,7 +6423,7 @@ func _on_battle_ally_action(action: String) -> void:
 			elif int(u.get("max_mana", 0)) > 0:
 				u.mana = mini(int(u.max_mana), int(u.mana) + ALLY_GUARD_MANA)
 			elif int(u.get("max_stamina", 0)) > 0:
-				u.stamina = mini(int(u.max_stamina), int(u.stamina) + STAMINA_REGEN_ON_DEFEND)
+				u.stamina = mini(int(u.max_stamina), int(u.stamina) + STAMINA_REGEN_ON_DEFEND + int(u.get("armor", {}).get("trait_params", {}).get("defend_stamina_bonus", 0)))
 			hud.battle_log("Your %s braces for impact." % u.name)
 			_end_ally_command()
 		"skip":
@@ -6778,7 +6888,7 @@ func _make_skeleton(tile: Vector2i) -> Dictionary:
 		"stamina": 0, "max_stamina": 0, "mana": 0, "max_mana": 0, "hp_as_mana": false,
 		"weapon": {"damage_mult": 1.0}, "mods": {}, "fainted": false, "skip_turns": 0, "charging": {},
 		"disarmed_tile": Vector2i(-1, -1), "pichaku_active": false, "survive_used": false,
-		"summoned": true, "auto": true,
+		"summoned": true, "auto": true, "speed": MERCENARY_SPEED,
 	}
 
 # A summoned unit's own turn: close on the nearest enemy, then hit it if it can reach.
@@ -6962,7 +7072,7 @@ func _resolve_ally_taunt() -> void:
 	u["defending"] = true
 	u["taunting"] = true
 	if int(u.get("max_stamina", 0)) > 0:
-		u["stamina"] = mini(int(u.max_stamina), int(u.get("stamina", 0)) + STAMINA_REGEN_ON_DEFEND)
+		u["stamina"] = mini(int(u.max_stamina), int(u.get("stamina", 0)) + STAMINA_REGEN_ON_DEFEND + int(u.get("armor", {}).get("trait_params", {}).get("defend_stamina_bonus", 0)))
 	hud.battle_log("%s taunts the enemy, daring them to attack!" % _actor_label())
 
 func _taunting_ally():
@@ -7074,7 +7184,7 @@ func _end_ally_command() -> void:
 		_apply_terrain_tick(u.tile, u)
 	battle_menu_state = "main"
 	battle_move_trail = []
-	_advance_ally_queue()
+	_ally_command_over()
 
 # _targetable_indices' equivalent for an arbitrary ally's own tile/attack_range,
 # rather than the hero's battle_player_tile.
@@ -7133,7 +7243,7 @@ func _try_battle_ally_move(dir: Vector2i) -> void:
 		hud.battle_log("Your %s falls and takes %d damage!" % [u.name, dmg])
 		if u.hp <= 0:
 			battle_menu_state = "main"
-			_advance_ally_queue()
+			_ally_command_over()
 
 # Removes every ally at 0 HP from the grid (never mutate battle_allies while an
 # enemy or ally loop is still iterating it -- both callers sweep after their loop).
@@ -7244,10 +7354,15 @@ func _apply_incoming_reductions(dmg: int, traits: Dictionary) -> int:
 		total += _reduce_bodily(bodily_part, traits)
 	if magical_part > 0:
 		total += _reduce_magical(magical_part)
+	# Warden's Aegis worn by a MEMBER: the hero standing near them takes less too.
+	var aura: float = _warden_aura_cut(battle_player_tile, null)
+	if aura > 0.0 and total > 0:
+		total = maxi(1, int(round(total * (1.0 - aura))))
 	return total
 
 # The cuts that apply to either kind of harm: a Resilience Potion, and Last Stand (which scales
-# continuously with how hurt you are -- every 10% HP missing adds another step).
+# continuously with how hurt you are -- every 10% HP missing adds another step). Returned as a
+# fraction (x100 = points of Defense); they pool with the gear's points and bend on the same curve.
 func _generic_reduction() -> float:
 	var generic: float = RESILIENCE_POTION_DAMAGE_REDUCTION_PCT if player.potion_resilience_turns > 0 else 0.0
 	if player.meta_last_stand_pct_per_10 > 0.0:
@@ -7256,26 +7371,25 @@ func _generic_reduction() -> float:
 	return generic
 
 # Bodily harm: rock cover (unless the attacker ignores it), then armour + clothes + Resilience +
-# War Chest + the shield + Martyr's Mantle + the generic cuts (capped at 90%), then Stonehide's
-# flat cut.
+# War Chest + the shield + Martyr's Mantle + the generic cuts, all pooled as points of Defense and bent
+# into a cut by Defense.gd (diminishing returns, 80% ceiling), then Stonehide's flat cut.
 func _reduce_bodily(dmg: int, traits: Dictionary) -> int:
 	var reduced := dmg
 	if not traits.get("ignore_cover", false) and _has_adjacent_rock(battle_player_tile):
 		reduced = int(round(reduced * (1.0 - ROCK_COVER_REDUCTION)))
-	var total_reduction: float = player.armor_damage_reduction() + player.resilience_reduction + player.meta_war_chest_reduction + player.shield_damage_reduction_pct() + _generic_reduction()
+	var points: float = player.bodily_defense_points() + _generic_reduction() * 100.0
 	if player.armor_trait() == "martyr":
 		var missing: float = 1.0 - float(player.health) / float(player.max_health)
-		total_reduction += float(player.armor_trait_value("bodily_per_10_missing", 0.0)) * floor(missing * 10.0)
-	total_reduction = clampf(total_reduction, 0.0, 0.9)
-	reduced = int(round(reduced * (1.0 - total_reduction)))
+		points += float(player.armor_trait_value("bodily_per_10_missing", 0.0)) * floor(missing * 10.0) * 100.0
+	reduced = int(round(reduced * (1.0 - DefenseScript.reduction(points))))
 	var flat_cut: int = int(player.armor_trait_value("flat_reduction", 0))
 	if flat_cut > 0 and reduced > 0:
 		reduced = maxi(1, reduced - flat_cut)
 	return reduced
 
-# Magical harm: Fortitude (armour + shield + the stat) and the generic cuts; a negative total
-# makes it worse (down to +50%). Spellward Robes swallow the first magical hit of a battle and
-# turn every one into stamina.
+# Magical harm: Fortitude (armour + shield + the stat) and the generic cuts pooled as points and bent
+# on the Defense.gd curve; a negative total makes it worse (towards +50%). Spellward Robes swallow the
+# first magical hit of a battle and turn every one into stamina.
 func _reduce_magical(dmg: int) -> int:
 	var reduced := dmg
 	var spellward: bool = player.armor_trait() == "spellward"
@@ -7284,8 +7398,8 @@ func _reduce_magical(dmg: int) -> int:
 		reduced = 0
 		hud.battle_log("Your wards swallow the spell whole!")
 	else:
-		var total_reduction: float = clampf(player.fortitude_reduction() + _generic_reduction(), PlayerScript.FORTITUDE_NEGATIVE_FLOOR, 0.9)
-		reduced = int(round(reduced * (1.0 - total_reduction)))
+		var points: float = player.fortitude_total() + _generic_reduction() * 100.0
+		reduced = int(round(reduced * (1.0 - DefenseScript.reduction(points))))
 	if spellward:
 		player.regen_stamina(int(player.armor_trait_value("magic_hit_stamina", 0)))
 	return reduced
@@ -7314,6 +7428,62 @@ func _armor_on_hit(u: Dictionary, dmg: int, traits: Dictionary) -> void:
 			if melee and not u.get("burning", false):
 				u["burning"] = true
 				hud.battle_log("The %s catches fire from your cinders!" % u.get("name", "attacker"))
+
+# Warden's Aegis worn by a member: friendly units (the hero and the other members) within its radius
+# take that much less. The strongest aura in reach counts; the wearer is not covered by their own.
+func _warden_aura_cut(tile: Vector2i, exclude) -> float:
+	var best := 0.0
+	for a in battle_allies:
+		if a == exclude or int(a.hp) <= 0 or str(a.get("armor_trait", "")) != "warden":
+			continue
+		var params: Dictionary = a.get("armor", {}).get("trait_params", {})
+		if abs(a.tile.x - tile.x) + abs(a.tile.y - tile.y) <= int(params.get("ally_radius", 2)):
+			best = maxf(best, float(params.get("ally_reduction", 0.0)))
+	return best
+
+# What a member's armour does when a blow actually lands on it (after every reduction): the same
+# Bloodrage / Thornmail / Cinder reactions the hero's armour has (_armor_on_hit).
+func _ally_armor_on_hit(ally: Dictionary, u: Dictionary, dmg: int, traits: Dictionary) -> void:
+	var trait_id: String = str(ally.get("armor_trait", ""))
+	if trait_id == "" or dmg <= 0:
+		return
+	var params: Dictionary = ally.get("armor", {}).get("trait_params", {})
+	var melee: bool = int(u.get("attack_range", 1)) <= 1 and str(traits.get("harm", "bodily")) != "magical"
+	match trait_id:
+		"bloodrage":
+			ally["bloodrage_stacks"] = mini(int(params.get("max_stacks", 5)), int(ally.get("bloodrage_stacks", 0)) + 1)
+			ally["bloodrage_turns"] = int(params.get("turns", 2))
+			hud.battle_log("The blow feeds your %s's rage!" % ally.name)
+		"thorns":
+			if melee and u.has("hp"):
+				var reflected: int = maxi(1, int(round(dmg * float(params.get("reflect_pct", 0.0)))))
+				u.hp -= reflected
+				_spawn_battle_damage_number(u.tile, reflected, u.get("size", 1))
+				hud.battle_log("Your %s's thorns throw %d damage back at the %s!" % [ally.name, reflected, u.get("name", "attacker")])
+		"cinder":
+			if melee and not u.get("burning", false):
+				u["burning"] = true
+				hud.battle_log("The %s catches fire from your %s's cinders!" % [u.get("name", "attacker"), ally.name])
+
+# A member's shield special once its block roll succeeds: the same three follow-ups the hero's shield
+# has (Heavy's shove, Bulwark's thorns, Brawler's vengeance). Phantom's dodge-roll is a choice the hero
+# makes; a member has none to make, so it simply blocks.
+func _resolve_ally_shield_block(ally: Dictionary, attacker: Dictionary, dmg: int) -> void:
+	var pct: float = float(ally.get("shield_special_pct", 0.0))
+	match str(ally.get("shield_special", "")):
+		"knockback":
+			play_sfx("shield_knockback")
+			hud.battle_log("Your %s's shield slams the %s back!" % [ally.name, attacker.get("name", "attacker")])
+			_apply_knockback(attacker, _knockback_dir(ally.tile, attacker.tile), true, pct > 0.0)
+		"thorns":
+			var reflected: int = int(round(dmg * pct))
+			if reflected > 0 and attacker.has("hp"):
+				attacker.hp -= reflected
+				_spawn_battle_damage_number(attacker.tile, reflected, attacker.get("size", 1))
+				hud.battle_log("Your %s's shield reflects %d damage back at the %s!" % [ally.name, reflected, attacker.get("name", "attacker")])
+		"vengeance":
+			ally["vengeance"] = true
+			hud.battle_log("Your %s's shield leaves it itching to strike back!" % ally.name)
 
 # Shadowweave: slipping a blow sets up a guaranteed crit on your next hit.
 func _on_hero_dodged() -> void:
@@ -7603,22 +7773,58 @@ func _enemy_apply_damage(u: Dictionary, target_tile: Vector2i, raw_dmg: int, tra
 			target_ally = a
 			break
 	if target_ally != null:
-		# Guardian Knot (talisman): allies have no reduction pipeline of their
-		# own otherwise (unlike the player's _apply_incoming_reductions) --
-		# stacked multiplicatively on top of cover, one flat step.
-		var ally_dr: float = player.talisman_bonus("ally_defense_pct")
-		if ally_dr > 0.0:
-			dmg = int(round(dmg * (1.0 - ally_dr)))
-		# A PartyMember's own defense (a percentage cut, one point = one percent, capped
-		# at 90% like the hero's armour), and never below 1 damage.
-		# Bodily harm is cut by the ally's defense, magical harm by its Fortitude (an attack that is
-		# both, by each in turn, half and half).
-		var ally_cut: float = bodily_share * minf(float(target_ally.get("defense_pct", 0.0)) / 100.0, 0.9) + (1.0 - bodily_share) * clampf(float(target_ally.get("fortitude", 0.0)) / 100.0, PlayerScript.FORTITUDE_NEGATIVE_FLOOR, PlayerScript.FORTITUDE_REDUCTION_CAP)
-		if ally_cut != 0.0:
+		# Shadowweave gives a member a dodge (never the Knight, who cannot dodge), and slipping a blow
+		# sets up a guaranteed crit; a shield blocks outright with its own chance, then does its trick.
+		var ally_dodge: float = float(target_ally.get("dodge_chance", 0.0))
+		if ally_dodge > 0.0 and randf() < ally_dodge:
+			if str(target_ally.get("armor_trait", "")) == "shadowweave":
+				target_ally["shadow_crit"] = true
+			hud.battle_log("Your %s slips the %s's blow!" % [target_ally.name, u.get("name", "attacker")])
+			return {"dmg": 0, "is_player": false, "target_name": target_ally.name, "dodged": false, "ally_avoided": true}
+		var ally_block: float = float(target_ally.get("shield_block", 0.0))
+		if ally_block > 0.0 and randf() < ally_block:
+			play_sfx("shield_block")
+			hud.battle_log("Your %s's shield blocks the %s's attack!" % [target_ally.name, u.get("name", "attacker")])
+			_resolve_ally_shield_block(target_ally, u, dmg)
+			return {"dmg": 0, "is_player": false, "target_name": target_ally.name, "dodged": false, "ally_avoided": true}
+		# Spellward Robes: the first magical hit of the battle is swallowed whole, and every one gives
+		# stamina back. What is left of an attack that was only half magical is cut as bodily harm.
+		var ally_share: float = bodily_share
+		if str(target_ally.get("armor_trait", "")) == "spellward" and bodily_share < 1.0:
+			var ward: Dictionary = target_ally.get("armor", {}).get("trait_params", {})
+			if int(target_ally.get("max_stamina", 0)) > 0:
+				target_ally["stamina"] = mini(int(target_ally.max_stamina), int(target_ally.get("stamina", 0)) + int(ward.get("magic_hit_stamina", 0)))
+			if not bool(target_ally.get("spellward_used", false)):
+				target_ally["spellward_used"] = true
+				hud.battle_log("Your %s's wards swallow the spell whole!" % target_ally.name)
+				dmg = int(round(dmg * bodily_share))
+				ally_share = 1.0
+		if dmg <= 0:
+			return {"dmg": 0, "is_player": false, "target_name": target_ally.name, "dodged": false, "ally_avoided": true}
+		# A PartyMember's own Defense and Fortitude (points, gear included) bend into a cut on the
+		# Defense.gd curve -- an 80% ceiling, 90% for the Guardian -- and never below 1 damage. Bodily
+		# harm is cut by its Defense, magical harm by its Fortitude (an attack that is both, by each
+		# in turn, half and half). Guardian Knot (talisman) and Last Stand (Astral: the more of its HP an
+		# ally has lost, the less damage it takes) are extra points pooled into both.
+		var ally_extra: float = player.talisman_bonus("ally_defense_pct") * 100.0
+		if player.meta_last_stand_pct_per_10 > 0.0:
+			var ally_missing: float = 1.0 - float(target_ally.hp) / float(maxi(1, int(target_ally.max_hp)))
+			ally_extra += player.meta_last_stand_pct_per_10 * floor(ally_missing * 10.0) * 100.0
+		var ally_cap: float = float(target_ally.get("defense_cap", DefenseScript.BASE_CAP))
+		# Martyr's Mantle: points of Defense for every 10% of its HP the wearer is missing.
+		var ally_defense: float = float(target_ally.get("defense_pct", 0.0))
+		if str(target_ally.get("armor_trait", "")) == "martyr":
+			var martyr_missing: float = 1.0 - float(target_ally.hp) / float(maxi(1, int(target_ally.max_hp)))
+			ally_defense += float(target_ally.armor.trait_params.get("bodily_per_10_missing", 0.0)) * floor(martyr_missing * 10.0) * 100.0
+		var ally_cut: float = ally_share * DefenseScript.reduction(ally_defense + ally_extra, ally_cap) + (1.0 - ally_share) * DefenseScript.reduction(float(target_ally.get("fortitude", 0.0)) + ally_extra, ally_cap)
+		if dmg > 0 and ally_cut != 0.0:
 			dmg = maxi(1, int(round(dmg * (1.0 - ally_cut))))
-		# Warden's Aegis: allies standing near the hero take less.
+		# Warden's Aegis: allies standing near the hero take less, and so do the friends of a member wearing it.
 		if player.armor_trait() == "warden" and abs(target_ally.tile.x - battle_player_tile.x) + abs(target_ally.tile.y - battle_player_tile.y) <= int(player.armor_trait_value("ally_radius", 2)):
 			dmg = maxi(1, int(round(dmg * (1.0 - float(player.armor_trait_value("ally_reduction", 0.0))))))
+		var member_aura: float = _warden_aura_cut(target_ally.tile, target_ally)
+		if member_aura > 0.0 and dmg > 0:
+			dmg = maxi(1, int(round(dmg * (1.0 - member_aura))))
 		# Guard (this ally's own commanded action, see _on_battle_ally_action):
 		# same flat reduction Defend gives the hero, cleared at the start of
 		# its next commanded turn. Parry Master (Astral) lets a guarding ally shrug a hit off.
@@ -7634,14 +7840,15 @@ func _enemy_apply_damage(u: Dictionary, target_tile: Vector2i, raw_dmg: int, tra
 			if int(target_ally.get("max_stamina", 0)) > 0:
 				var regained: int = int(round(int(target_ally.max_stamina) * PartyKitsScript.STALWART_STAMINA_PCT))
 				target_ally["stamina"] = mini(int(target_ally.max_stamina), int(target_ally.get("stamina", 0)) + regained)
-		# Last Stand (Astral): the more of its HP an ally has lost, the less damage it takes.
-		if player.meta_last_stand_pct_per_10 > 0.0 and dmg > 0:
-			var ally_missing: float = 1.0 - float(target_ally.hp) / float(maxi(1, int(target_ally.max_hp)))
-			var ally_last_stand: float = clampf(player.meta_last_stand_pct_per_10 * floor(ally_missing * 10.0), 0.0, 0.9)
-			dmg = maxi(1, int(round(dmg * (1.0 - ally_last_stand))))
+		# Stonehide Mail: a flat few points off every bodily hit that lands (never below 1).
+		if str(target_ally.get("armor_trait", "")) == "stonehide" and dmg > 0 and ally_share > 0.0:
+			var stone_cut: int = int(round(float(target_ally.armor.trait_params.get("flat_reduction", 0)) * ally_share))
+			if stone_cut > 0:
+				dmg = maxi(1, dmg - stone_cut)
 		target_ally.hp -= dmg
 		target_name = target_ally.name
 		battle_had_combat_action_this_cycle = true
+		_ally_armor_on_hit(target_ally, u, dmg, traits)
 	else:
 		# Wind Chime (talisman): taunt-confusion (_pick_confused_target_tile)
 		# can point one enemy at another instead of the player or an ally --
@@ -7849,376 +8056,377 @@ func _sweep_targets(u: Dictionary) -> Array:
 			targets.append(a.tile)
 	return targets
 
-func _process_enemy_turn() -> void:
-	# Fae Huts queue a spawn here instead of appending to battle_units
-	# directly -- mutating the array while this exact loop is still
-	# iterating over it would be unsafe, same reason dead units are only
-	# ever removed after the loop (see the sweep below). Processed once,
-	# after the loop, near that same sweep.
-	var fae_spawns_needed: Array = []
-	# Freshly latch anyone newly in range/LOS before targets are assigned,
-	# so a unit that closed the distance over its own last move is spotted
-	# THIS turn's targeting rather than one turn late.
-	_update_enemy_awareness()
-	var assigned_targets: Dictionary = _assign_enemy_targets()
-	for u in battle_units:
-		if not is_instance_valid(u.ref):
-			continue
+# One enemy's whole turn: its statuses tick, then it moves and attacks (or waits, heals, spawns...).
+# With turn order live (_timeline_advance) every enemy takes this on its own turn; the old whole-phase
+# _process_enemy_turn below just runs each of them through it once, in order. Fae Huts queue a spawn
+# into fae_spawns_needed instead of appending to battle_units mid-turn -- mutating the array while a
+# loop might still be iterating over it would be unsafe, same reason dead units are only ever removed
+# afterwards (_finish_enemy_actions).
+func _enemy_take_turn(u: Dictionary, assigned_targets: Dictionary, fae_spawns_needed: Array) -> void:
+	if not is_instance_valid(u.ref):
+		return
 
-		# Burning ticks at the top of every turn regardless of anything else
-		# below -- unlike every other status here it has no turn counter, it
-		# persists until the unit steps onto a water tile (_apply_water_push).
-		if u.get("burning", false):
-			var burn_dmg: int = _burn_tick_damage(u)
-			_decay_ember_burn(u)
-			u.hp -= burn_dmg
-			_spawn_battle_damage_number(u.tile, burn_dmg, u.get("size", 1))
-			hud.battle_log("The %s burns for %d damage!" % [u.name, burn_dmg])
-			if u.hp <= 0:
-				if player.talisman_bonus("wildfire_core") > 0.0:
-					_trigger_wildfire_explosion(u.tile, burn_dmg)
-				continue
-
-		# Poison Bog's lingering DOT (reserved terrain) -- same "ticks
-		# regardless, doesn't skip a turn" shape as burning, just its own
-		# separate counter so the two hazards don't overwrite each other.
-		if u.get("poison_turns", 0) > 0:
-			u.poison_turns -= 1
-			u.hp -= u.poison_dmg
-			_spawn_battle_damage_number(u.tile, u.poison_dmg, u.get("size", 1))
-			hud.battle_log("The %s is poisoned for %d damage!" % [u.name, u.poison_dmg])
-			if u.hp <= 0:
-				continue
-
-		# Curse of Rot (the Necromancer): a share of max HP every turn while it lasts.
-		if u.get("rot_turns", 0) > 0:
-			u.rot_turns -= 1
-			var rot_dmg: int = max(1, int(round(float(u.max_hp) * PartyKitsScript.ROT_DAMAGE_PCT)))
-			u.hp -= rot_dmg
-			_spawn_battle_damage_number(u.tile, rot_dmg, u.get("size", 1))
-			hud.battle_log("The %s rots for %d damage!" % [u.name, rot_dmg])
-			if u.hp <= 0:
-				continue
-
-		# Bleeding: ticks the same way Poison does -- own counter, decremented
-		# here, every tile this unit actually moves (below) lengthens it by a
-		# turn instead of dealing damage on the spot.
-		if u.get("bleed_turns", 0) > 0:
-			u.bleed_turns -= 1
-			var bleed_dmg: int = max(1, int(round(float(u.max_hp) * BLEED_DAMAGE_PCT)))
-			u.hp -= bleed_dmg
-			_spawn_battle_damage_number(u.tile, bleed_dmg, u.get("size", 1))
-			hud.battle_log("The %s bleeds for %d damage!" % [u.name, bleed_dmg])
-			if u.hp <= 0:
-				continue
-
-		if u.get("frozen_turns", 0) > 0:
-			u.frozen_turns -= 1
-			hud.battle_log("The %s is frozen solid and can't act!" % u.name)
-			u.tile = _apply_water_push(u.tile, u)
-			continue
-
-		if u.get("disarmed_tile", Vector2i(-1, -1)) != Vector2i(-1, -1):
-			if u.tile == u.disarmed_tile:
-				u.disarmed_tile = Vector2i(-1, -1)
-			else:
-				# attack_range 0 for the 1x1 path means _can_battle_attack
-				# never stops the walk early -- it just closes the full
-				# distance onto the tile itself, since there's nothing to
-				# attack while disarmed anyway.
-				if u.get("size", 1) > 1:
-					_move_big_unit(u, u.disarmed_tile, u.disarmed_tile)
-				else:
-					_move_enemy_unit(u, 0, u.disarmed_tile, u.disarmed_tile, false)
-				u.tile = _apply_water_push(u.tile, u)
-				continue
-
-		# Whether this turn's attack (if any) redirects onto the concussed
-		# unit itself -- rolled once per turn and consumed wherever the
-		# attack actually resolves below, so pathing/cornering logic (which
-		# reads target_tile long before the attack fires) is never affected.
-		var self_hit_this_turn := false
-		if u.get("concussed_turns", 0) > 0:
-			u.concussed_turns -= 1
-			self_hit_this_turn = randf() < 0.33
-		# Blinded (the Staff): for a couple of turns its attack may simply whiff.
-		var blind_whiff_this_turn := false
-		if u.get("blind_turns", 0) > 0:
-			u.blind_turns -= 1
-			blind_whiff_this_turn = randf() < BLINDNESS_MISS_CHANCE
-
-		# Vulnerable: ticks down on the unit's own turn, same shape as
-		# Concussion above. The +25% damage-taken multiplier itself lives in
-		# _apply_single_hit.
-		if u.get("vulnerable_turns", 0) > 0:
-			u.vulnerable_turns -= 1
-
-		if u.get("stunned", false):
-			u["stunned"] = false
-			hud.battle_log("The %s is stunned and can't act!" % u.name)
-			u.tile = _apply_water_push(u.tile, u)
-			continue
-
-		if u.get("feared", false):
-			u["feared"] = false
-			hud.battle_log("The %s cowers in fear and can't act!" % u.name)
-			u.tile = _apply_water_push(u.tile, u)
-			continue
-
-		var traits: Dictionary = ENEMY_TRAITS.get(u.name, {})
-		var size: int = u.get("size", 1)
-		var attack_range: int = u.get("attack_range", 1)
-		var ignore_line: bool = traits.get("ignore_line", false)
-
-		if traits.get("heals_allies", false):
-			var has_other_allies := false
-			for other in battle_units:
-				if other.ref != u.ref:
-					has_other_allies = true
-					break
-			if has_other_allies:
-				# Refuses to engage at all while anyone else is still up --
-				# heals if it can, otherwise (buffers only) buffs an ally
-				# instead, otherwise just watches and waits.
-				if not _try_heal_ally(u):
-					if not (traits.get("buffs_allies", false) and _try_buff_ally(u)):
-						hud.battle_log("The %s hangs back, waiting for an opening." % u.name)
-				u.tile = _apply_water_push(u.tile, u)
-				continue
-			# Last one standing -- falls through to a normal move+attack.
-
-		# Fae Hut: never moves or attacks (see FaeHut.gd's 0 CONTACT_DAMAGE)
-		# -- every one of its own turns just counts down to its next spawn.
-		if traits.get("spawns_fae", false):
-			u.turns_since_spawn = u.get("turns_since_spawn", 0) + 1
-			if u.turns_since_spawn >= FAE_HUT_SPAWN_INTERVAL:
-				u.turns_since_spawn = 0
-				fae_spawns_needed.append(u.tile)
-			continue
-
-		# Whichever of {the player, a living ally} this enemy is assigned to
-		# threaten this turn -- nearest by default, but see
-		# _assign_enemy_targets for how a genuine tie gets split across
-		# multiple enemies instead of everyone piling onto the same target.
-		# Recomputed fresh every turn rather than remembered, same as the
-		# rest of this function's state.
-		var target_tile: Vector2i = assigned_targets.get(u.ref, _pick_enemy_target_tile(u))
-		# Taunt draws every enemy's attention regardless of awareness --
-		# shouting to be noticed bypasses Stealth entirely. Wind Chime
-		# (talisman): the yelling actually enrages them past reason -- rather
-		# than converging on the player, each one lashes out at whichever
-		# combatant (player, ally, or another enemy) is nearest to IT.
-		if battle_player_taunting:
-			if player.talisman_bonus("taunt_confusion") > 0.0:
-				target_tile = _pick_confused_target_tile(u)
-			else:
-				target_tile = battle_player_tile
-		elif _taunting_ally() != null:
-			# A taunting Guardian draws every enemy onto itself.
-			target_tile = _taunting_ally().tile
-
-		if target_tile == Vector2i(-1, -1):
-			# Unaware, nothing to target (see _pick_enemy_target_tile) --
-			# amble around instead of standing idle.
-			_move_enemy_wander(u)
-			u.tile = _apply_water_push(u.tile, u)
-			continue
-
-		var was_cornered: bool = traits.get("kites", false) and _can_battle_attack(u.tile, target_tile, 1, ignore_line)
-		if was_cornered:
-			# The current target has closed to melee range -- back off before
-			# doing anything else, trading a step of distance to keep sniping.
-			var away_dir := _knockback_dir(target_tile, u.tile)
-			var retreat := _resolve_battle_step(u.tile, away_dir)
-			if retreat.moved:
-				u.tile = retreat.tile
-				if retreat.fell:
-					var fall_dmg := int(round(float(u.max_hp) * CLIFF_FALL_DAMAGE_PCT))
-					u.hp -= fall_dmg
-					hud.battle_log("The %s falls and takes %d damage!" % [u.name, fall_dmg])
-					if u.hp <= 0:
-						continue
-				hud.battle_log("The %s backs away to keep its distance!" % u.name)
-
-		if not was_cornered and traits.get("strafes", false) and _can_battle_attack(u.tile, target_tile, attack_range, ignore_line) and not _can_battle_attack(u.tile, target_tile, 1, ignore_line):
-			# Already lined up for a shot and safe -- shuffle sideways
-			# instead of standing still between shots. Breaks its firing
-			# line for this turn; the chase logic below realigns it after.
-			var diff: Vector2i = target_tile - u.tile
-			var perp_dir := Vector2i.ZERO
-			if diff.x == 0:
-				perp_dir = Vector2i(1 if u.get("strafe_flip", false) else -1, 0)
-			elif diff.y == 0:
-				perp_dir = Vector2i(0, 1 if u.get("strafe_flip", false) else -1)
-			if perp_dir != Vector2i.ZERO:
-				var strafe_result := _resolve_battle_step(u.tile, perp_dir)
-				if strafe_result.moved:
-					u.tile = strafe_result.tile
-					hud.battle_log("The %s strafes to the side!" % u.name)
-					u.tile = _apply_water_push(u.tile, u)
-					continue
-				else:
-					u["strafe_flip"] = not u.get("strafe_flip", false)
-
-		# A flank tile is a diagonal step past the current target, so it's
-		# never actually within melee attack_range once reached -- aim for it
-		# only until it's reached, then fall back to closing the remaining
-		# distance straight at the target. Without this, a unit that arrives
-		# at its own flank tile has nowhere left to go (movement_target ==
-		# its own tile gives it zero step options) and goes permanently idle
-		# every turn after, forever out of range of an attack it can never
-		# line up. Applies regardless of size -- a 2x2 unit corners
-		# the same way the Orc (1x1) already does.
-		var movement_target: Vector2i = target_tile
-		if traits.get("corners", false):
-			var flank_tile := _flank_target_tile(target_tile)
-			if u.tile != flank_tile:
-				movement_target = flank_tile
-
-		# Formation holding: a ranged attacker (ignore_line) that isn't
-		# already in range of its target doesn't push forward past a melee
-		# ally that's already closer to that target -- it holds position and
-		# waits instead of closing the distance itself. heals_allies/
-		# buffs_allies units never reach this point while any ally is alive
-		# (see the "hangs back" branch above, near the top of this loop), so
-		# formation holding only ever matters for the ignore_line kind.
-		var holds_formation := false
-		if ignore_line:
-			var pre_move_can_attack: bool
-			if size > 1:
-				pre_move_can_attack = _footprint_dist(_footprint(u.tile, size), target_tile) <= attack_range
-			else:
-				pre_move_can_attack = _can_battle_attack(u.tile, target_tile, attack_range, ignore_line)
-			if not pre_move_can_attack:
-				var my_dist: int = _footprint_dist(_footprint(u.tile, size), target_tile)
-				for other in battle_units:
-					if other.ref == u.ref or not is_instance_valid(other.ref):
-						continue
-					if ENEMY_TRAITS.get(other.name, {}).get("ignore_line", false):
-						continue
-					var other_dist: int = _footprint_dist(_footprint(other.tile, other.get("size", 1)), target_tile)
-					if other_dist < my_dist:
-						holds_formation = true
-						break
-			if holds_formation:
-				hud.battle_log("The %s holds position behind its ally!" % u.name)
-
-		if size > 1:
-			if not holds_formation:
-				_move_big_unit(u, movement_target, target_tile)
-		else:
-			if not holds_formation:
-				_move_enemy_unit(u, attack_range, movement_target, target_tile, ignore_line)
-
+	# Burning ticks at the top of every turn regardless of anything else
+	# below -- unlike every other status here it has no turn counter, it
+	# persists until the unit steps onto a water tile (_apply_water_push).
+	if u.get("burning", false):
+		var burn_dmg: int = _burn_tick_damage(u)
+		_decay_ember_burn(u)
+		u.hp -= burn_dmg
+		_spawn_battle_damage_number(u.tile, burn_dmg, u.get("size", 1))
+		hud.battle_log("The %s burns for %d damage!" % [u.name, burn_dmg])
 		if u.hp <= 0:
-			continue
+			if player.talisman_bonus("wildfire_core") > 0.0:
+				_trigger_wildfire_explosion(u.tile, burn_dmg)
+			return
 
-		var can_attack: bool
-		if size > 1:
-			can_attack = _footprint_dist(_footprint(u.tile, size), target_tile) <= attack_range
+	# Poison Bog's lingering DOT (reserved terrain) -- same "ticks
+	# regardless, doesn't skip a turn" shape as burning, just its own
+	# separate counter so the two hazards don't overwrite each other.
+	if u.get("poison_turns", 0) > 0:
+		u.poison_turns -= 1
+		u.hp -= u.poison_dmg
+		_spawn_battle_damage_number(u.tile, u.poison_dmg, u.get("size", 1))
+		hud.battle_log("The %s is poisoned for %d damage!" % [u.name, u.poison_dmg])
+		if u.hp <= 0:
+			return
+
+	# Curse of Rot (the Necromancer): a share of max HP every turn while it lasts.
+	if u.get("rot_turns", 0) > 0:
+		u.rot_turns -= 1
+		var rot_dmg: int = max(1, int(round(float(u.max_hp) * PartyKitsScript.ROT_DAMAGE_PCT)))
+		u.hp -= rot_dmg
+		_spawn_battle_damage_number(u.tile, rot_dmg, u.get("size", 1))
+		hud.battle_log("The %s rots for %d damage!" % [u.name, rot_dmg])
+		if u.hp <= 0:
+			return
+
+	# Bleeding: ticks the same way Poison does -- own counter, decremented
+	# here, every tile this unit actually moves (below) lengthens it by a
+	# turn instead of dealing damage on the spot.
+	if u.get("bleed_turns", 0) > 0:
+		u.bleed_turns -= 1
+		var bleed_dmg: int = max(1, int(round(float(u.max_hp) * BLEED_DAMAGE_PCT)))
+		u.hp -= bleed_dmg
+		_spawn_battle_damage_number(u.tile, bleed_dmg, u.get("size", 1))
+		hud.battle_log("The %s bleeds for %d damage!" % [u.name, bleed_dmg])
+		if u.hp <= 0:
+			return
+
+	if u.get("frozen_turns", 0) > 0:
+		u.frozen_turns -= 1
+		hud.battle_log("The %s is frozen solid and can't act!" % u.name)
+		u.tile = _apply_water_push(u.tile, u)
+		return
+
+	if u.get("disarmed_tile", Vector2i(-1, -1)) != Vector2i(-1, -1):
+		if u.tile == u.disarmed_tile:
+			u.disarmed_tile = Vector2i(-1, -1)
 		else:
-			can_attack = _can_battle_attack(u.tile, target_tile, attack_range, ignore_line)
-
-		if can_attack and self_hit_this_turn:
-			# Concussed (Hammer's BONK): the attack goes wrong and lands on
-			# the attacker instead -- a simple, distinct outcome that
-			# bypasses windup/quick-jab/sweep entirely rather than trying to
-			# redirect each of those independently.
-			var self_dmg: int = u.damage
-			u.hp -= self_dmg
-			_spawn_battle_damage_number(u.tile, self_dmg, u.get("size", 1))
-			_flash_battle_tile(u.tile, u.get("size", 1))
-			hud.battle_log("The %s, concussed, strikes itself for %d damage!" % [u.name, self_dmg])
-			u["winding_up"] = false
-		elif can_attack and blind_whiff_this_turn:
-			hud.battle_log("The %s, blinded, swings wildly and misses!" % u.name)
-			u["winding_up"] = false
-		elif can_attack:
-			var already_winding_up: bool = u.get("winding_up", false)
-			var has_windup: bool = traits.get("windup", false)
-			var quick_jab_chance: float = traits.get("quick_jab_chance", 0.0)
-			if has_windup and not already_winding_up and quick_jab_chance > 0.0 and randf() < quick_jab_chance:
-				# A quick, un-telegraphed jab instead of winding up this time.
-				var jab_result: Dictionary = await _enemy_apply_damage(u, target_tile, u.damage, traits, "jab")
-				if jab_result.get("dodged", false):
-					hud.battle_log("You dodge the %s's jab!" % u.name)
-				elif jab_result.get("blocked", false):
-					hud.battle_log(("You parry the %s's jab!" if jab_result.get("minigame", false) else "Your shield blocks the %s's jab!") % u.name)
-				elif jab_result.is_player:
-					hud.battle_log("The %s jabs you for %d damage!" % [u.name, jab_result.dmg])
-					if player.health <= 0:
-						return
-				else:
-					hud.battle_log("The %s jabs your %s for %d damage!" % [u.name, jab_result.target_name, jab_result.dmg])
-			elif has_windup and not already_winding_up:
-				u["winding_up"] = true
-				hud.battle_log("The %s winds up a heavy attack!" % u.name)
+			# attack_range 0 for the 1x1 path means _can_battle_attack
+			# never stops the walk early -- it just closes the full
+			# distance onto the tile itself, since there's nothing to
+			# attack while disarmed anyway.
+			if u.get("size", 1) > 1:
+				_move_big_unit(u, u.disarmed_tile, u.disarmed_tile)
 			else:
-				var dmg: int = u.damage
-				if already_winding_up:
-					dmg = int(round(dmg * ORC_WINDUP_DAMAGE_MULT))
-				u["winding_up"] = false
-				var pack_bonus_mult: float = traits.get("pack_bonus_mult", 1.0)
-				if pack_bonus_mult > 1.0:
-					var has_packmate := false
-					for other in battle_units:
-						if other.ref != u.ref and other.name == u.name:
-							has_packmate = true
-							break
-					if has_packmate:
-						dmg = int(round(dmg * pack_bonus_mult))
-						hud.battle_log("The %s fights fiercely alongside its pack!" % u.name)
-				# Gnome: unlike Goblin's binary pack_bonus_mult, this counts
-				# how many packmates are ALIVE RIGHT NOW (not a one-time
-				# snapshot like their HP bonus in _setup_battle_grid) --
-				# thinning the mob down visibly softens the survivors' punch,
-				# turn by turn, rather than just removing bodies.
-				if u.name == "Gnome":
-					var live_pack_count := 0
-					for other in battle_units:
-						if other.name == "Gnome":
-							live_pack_count += 1
-					if live_pack_count > 1:
-						dmg = int(round(dmg * (1.0 + GNOME_DAMAGE_PCT_PER_PACKMATE * (live_pack_count - 1))))
-						hud.battle_log("The Gnome mob swarms with %d strong!" % live_pack_count)
-				# A buffer's buff (see buffed_dmg_turns) -- decremented here, at
-				# the moment it actually pays off, same "consumed on use"
-				# shape Adrenaline/Momentum-style bonuses use elsewhere.
-				if u.get("buffed_dmg_turns", 0) > 0:
-					dmg = int(round(dmg * (1.0 + u.get("buffed_dmg_pct", 0.0))))
-					u.buffed_dmg_turns -= 1
-				var enrage_threshold: float = traits.get("enrage_threshold", 0.0)
-				if enrage_threshold > 0.0 and float(u.hp) < float(u.max_hp) * enrage_threshold:
-					dmg = int(round(dmg * traits.get("enrage_mult", 1.0)))
-					hud.battle_log("The %s is enraged!" % u.name)
-				# A sweeping boss's sweep hits every occupied tile within range,
-				# not just its chosen target -- dmg is computed once above and
-				# applied in full to each tile struck, not divided. Every
-				# other enemy's sweep_targets is just [target_tile], so this
-				# loop is a no-op wrapper for them (identical single hit,
-				# identical single log line, as before).
-				var sweep_targets: Array = _sweep_targets(u) if traits.get("sweeps", false) else [target_tile]
-				var player_was_hit := false
-				for t in sweep_targets:
-					var hit_result: Dictionary = await _enemy_apply_damage(u, t, dmg, traits, "heavy" if already_winding_up else "normal")
-					if hit_result.get("dodged", false):
-						hud.battle_log("You dodge the %s's attack!" % u.name)
-					elif hit_result.get("blocked", false):
-						hud.battle_log(("You parry the %s's attack!" if hit_result.get("minigame", false) else "Your shield blocks the %s's attack!") % u.name)
-					elif hit_result.is_player:
-						player_was_hit = true
-						hud.battle_log("The %s hits you for %d damage." % [u.name, hit_result.dmg])
-					else:
-						hud.battle_log("The %s hits your %s for %d damage!" % [u.name, hit_result.target_name, hit_result.dmg])
-				if player_was_hit and player.health <= 0:
-					return
-		else:
-			# Lost track of its target -- the telegraph doesn't carry over.
-			u["winding_up"] = false
-		if size == 1:
+				_move_enemy_unit(u, 0, u.disarmed_tile, u.disarmed_tile, false)
 			u.tile = _apply_water_push(u.tile, u)
-			_apply_terrain_tick(u.tile, u)
+			return
 
+	# Whether this turn's attack (if any) redirects onto the concussed
+	# unit itself -- rolled once per turn and consumed wherever the
+	# attack actually resolves below, so pathing/cornering logic (which
+	# reads target_tile long before the attack fires) is never affected.
+	var self_hit_this_turn := false
+	if u.get("concussed_turns", 0) > 0:
+		u.concussed_turns -= 1
+		self_hit_this_turn = randf() < 0.33
+	# Blinded (the Staff): for a couple of turns its attack may simply whiff.
+	var blind_whiff_this_turn := false
+	if u.get("blind_turns", 0) > 0:
+		u.blind_turns -= 1
+		blind_whiff_this_turn = randf() < BLINDNESS_MISS_CHANCE
+
+	# Vulnerable: ticks down on the unit's own turn, same shape as
+	# Concussion above. The +25% damage-taken multiplier itself lives in
+	# _apply_single_hit.
+	if u.get("vulnerable_turns", 0) > 0:
+		u.vulnerable_turns -= 1
+
+	if u.get("stunned", false):
+		u["stunned"] = false
+		hud.battle_log("The %s is stunned and can't act!" % u.name)
+		u.tile = _apply_water_push(u.tile, u)
+		return
+
+	if u.get("feared", false):
+		u["feared"] = false
+		hud.battle_log("The %s cowers in fear and can't act!" % u.name)
+		u.tile = _apply_water_push(u.tile, u)
+		return
+
+	var traits: Dictionary = ENEMY_TRAITS.get(u.name, {})
+	var size: int = u.get("size", 1)
+	var attack_range: int = u.get("attack_range", 1)
+	var ignore_line: bool = traits.get("ignore_line", false)
+
+	if traits.get("heals_allies", false):
+		var has_other_allies := false
+		for other in battle_units:
+			if other.ref != u.ref:
+				has_other_allies = true
+				break
+		if has_other_allies:
+			# Refuses to engage at all while anyone else is still up --
+			# heals if it can, otherwise (buffers only) buffs an ally
+			# instead, otherwise just watches and waits.
+			if not _try_heal_ally(u):
+				if not (traits.get("buffs_allies", false) and _try_buff_ally(u)):
+					hud.battle_log("The %s hangs back, waiting for an opening." % u.name)
+			u.tile = _apply_water_push(u.tile, u)
+			return
+		# Last one standing -- falls through to a normal move+attack.
+
+	# Fae Hut: never moves or attacks (see FaeHut.gd's 0 CONTACT_DAMAGE)
+	# -- every one of its own turns just counts down to its next spawn.
+	if traits.get("spawns_fae", false):
+		u.turns_since_spawn = u.get("turns_since_spawn", 0) + 1
+		if u.turns_since_spawn >= FAE_HUT_SPAWN_INTERVAL:
+			u.turns_since_spawn = 0
+			fae_spawns_needed.append(u.tile)
+		return
+
+	# Whichever of {the player, a living ally} this enemy is assigned to
+	# threaten this turn -- nearest by default, but see
+	# _assign_enemy_targets for how a genuine tie gets split across
+	# multiple enemies instead of everyone piling onto the same target.
+	# Recomputed fresh every turn rather than remembered, same as the
+	# rest of this function's state.
+	var target_tile: Vector2i = assigned_targets.get(u.ref, _pick_enemy_target_tile(u))
+	# Taunt draws every enemy's attention regardless of awareness --
+	# shouting to be noticed bypasses Stealth entirely. Wind Chime
+	# (talisman): the yelling actually enrages them past reason -- rather
+	# than converging on the player, each one lashes out at whichever
+	# combatant (player, ally, or another enemy) is nearest to IT.
+	if battle_player_taunting:
+		if player.talisman_bonus("taunt_confusion") > 0.0:
+			target_tile = _pick_confused_target_tile(u)
+		else:
+			target_tile = battle_player_tile
+	elif _taunting_ally() != null:
+		# A taunting Guardian draws every enemy onto itself.
+		target_tile = _taunting_ally().tile
+
+	if target_tile == Vector2i(-1, -1):
+		# Unaware, nothing to target (see _pick_enemy_target_tile) --
+		# amble around instead of standing idle.
+		_move_enemy_wander(u)
+		u.tile = _apply_water_push(u.tile, u)
+		return
+
+	var was_cornered: bool = traits.get("kites", false) and _can_battle_attack(u.tile, target_tile, 1, ignore_line)
+	if was_cornered:
+		# The current target has closed to melee range -- back off before
+		# doing anything else, trading a step of distance to keep sniping.
+		var away_dir := _knockback_dir(target_tile, u.tile)
+		var retreat := _resolve_battle_step(u.tile, away_dir)
+		if retreat.moved:
+			u.tile = retreat.tile
+			if retreat.fell:
+				var fall_dmg := int(round(float(u.max_hp) * CLIFF_FALL_DAMAGE_PCT))
+				u.hp -= fall_dmg
+				hud.battle_log("The %s falls and takes %d damage!" % [u.name, fall_dmg])
+				if u.hp <= 0:
+					return
+			hud.battle_log("The %s backs away to keep its distance!" % u.name)
+
+	if not was_cornered and traits.get("strafes", false) and _can_battle_attack(u.tile, target_tile, attack_range, ignore_line) and not _can_battle_attack(u.tile, target_tile, 1, ignore_line):
+		# Already lined up for a shot and safe -- shuffle sideways
+		# instead of standing still between shots. Breaks its firing
+		# line for this turn; the chase logic below realigns it after.
+		var diff: Vector2i = target_tile - u.tile
+		var perp_dir := Vector2i.ZERO
+		if diff.x == 0:
+			perp_dir = Vector2i(1 if u.get("strafe_flip", false) else -1, 0)
+		elif diff.y == 0:
+			perp_dir = Vector2i(0, 1 if u.get("strafe_flip", false) else -1)
+		if perp_dir != Vector2i.ZERO:
+			var strafe_result := _resolve_battle_step(u.tile, perp_dir)
+			if strafe_result.moved:
+				u.tile = strafe_result.tile
+				hud.battle_log("The %s strafes to the side!" % u.name)
+				u.tile = _apply_water_push(u.tile, u)
+				return
+			else:
+				u["strafe_flip"] = not u.get("strafe_flip", false)
+
+	# A flank tile is a diagonal step past the current target, so it's
+	# never actually within melee attack_range once reached -- aim for it
+	# only until it's reached, then fall back to closing the remaining
+	# distance straight at the target. Without this, a unit that arrives
+	# at its own flank tile has nowhere left to go (movement_target ==
+	# its own tile gives it zero step options) and goes permanently idle
+	# every turn after, forever out of range of an attack it can never
+	# line up. Applies regardless of size -- a 2x2 unit corners
+	# the same way the Orc (1x1) already does.
+	var movement_target: Vector2i = target_tile
+	if traits.get("corners", false):
+		var flank_tile := _flank_target_tile(target_tile)
+		if u.tile != flank_tile:
+			movement_target = flank_tile
+
+	# Formation holding: a ranged attacker (ignore_line) that isn't
+	# already in range of its target doesn't push forward past a melee
+	# ally that's already closer to that target -- it holds position and
+	# waits instead of closing the distance itself. heals_allies/
+	# buffs_allies units never reach this point while any ally is alive
+	# (see the "hangs back" branch above, near the top of this loop), so
+	# formation holding only ever matters for the ignore_line kind.
+	var holds_formation := false
+	if ignore_line:
+		var pre_move_can_attack: bool
+		if size > 1:
+			pre_move_can_attack = _footprint_dist(_footprint(u.tile, size), target_tile) <= attack_range
+		else:
+			pre_move_can_attack = _can_battle_attack(u.tile, target_tile, attack_range, ignore_line)
+		if not pre_move_can_attack:
+			var my_dist: int = _footprint_dist(_footprint(u.tile, size), target_tile)
+			for other in battle_units:
+				if other.ref == u.ref or not is_instance_valid(other.ref):
+					continue
+				if ENEMY_TRAITS.get(other.name, {}).get("ignore_line", false):
+					continue
+				var other_dist: int = _footprint_dist(_footprint(other.tile, other.get("size", 1)), target_tile)
+				if other_dist < my_dist:
+					holds_formation = true
+					break
+		if holds_formation:
+			hud.battle_log("The %s holds position behind its ally!" % u.name)
+
+	if size > 1:
+		if not holds_formation:
+			_move_big_unit(u, movement_target, target_tile)
+	else:
+		if not holds_formation:
+			_move_enemy_unit(u, attack_range, movement_target, target_tile, ignore_line)
+
+	if u.hp <= 0:
+		return
+
+	var can_attack: bool
+	if size > 1:
+		can_attack = _footprint_dist(_footprint(u.tile, size), target_tile) <= attack_range
+	else:
+		can_attack = _can_battle_attack(u.tile, target_tile, attack_range, ignore_line)
+
+	if can_attack and self_hit_this_turn:
+		# Concussed (Hammer's BONK): the attack goes wrong and lands on
+		# the attacker instead -- a simple, distinct outcome that
+		# bypasses windup/quick-jab/sweep entirely rather than trying to
+		# redirect each of those independently.
+		var self_dmg: int = u.damage
+		u.hp -= self_dmg
+		_spawn_battle_damage_number(u.tile, self_dmg, u.get("size", 1))
+		_flash_battle_tile(u.tile, u.get("size", 1))
+		hud.battle_log("The %s, concussed, strikes itself for %d damage!" % [u.name, self_dmg])
+		u["winding_up"] = false
+	elif can_attack and blind_whiff_this_turn:
+		hud.battle_log("The %s, blinded, swings wildly and misses!" % u.name)
+		u["winding_up"] = false
+	elif can_attack:
+		var already_winding_up: bool = u.get("winding_up", false)
+		var has_windup: bool = traits.get("windup", false)
+		var quick_jab_chance: float = traits.get("quick_jab_chance", 0.0)
+		if has_windup and not already_winding_up and quick_jab_chance > 0.0 and randf() < quick_jab_chance:
+			# A quick, un-telegraphed jab instead of winding up this time.
+			var jab_result: Dictionary = await _enemy_apply_damage(u, target_tile, u.damage, traits, "jab")
+			if jab_result.get("ally_avoided", false):
+				pass  # _enemy_apply_damage already said how the member avoided it
+			elif jab_result.get("dodged", false):
+				hud.battle_log("You dodge the %s's jab!" % u.name)
+			elif jab_result.get("blocked", false):
+				hud.battle_log(("You parry the %s's jab!" if jab_result.get("minigame", false) else "Your shield blocks the %s's jab!") % u.name)
+			elif jab_result.is_player:
+				hud.battle_log("The %s jabs you for %d damage!" % [u.name, jab_result.dmg])
+				if player.health <= 0:
+					return
+			else:
+				hud.battle_log("The %s jabs your %s for %d damage!" % [u.name, jab_result.target_name, jab_result.dmg])
+		elif has_windup and not already_winding_up:
+			u["winding_up"] = true
+			hud.battle_log("The %s winds up a heavy attack!" % u.name)
+		else:
+			var dmg: int = u.damage
+			if already_winding_up:
+				dmg = int(round(dmg * ORC_WINDUP_DAMAGE_MULT))
+			u["winding_up"] = false
+			var pack_bonus_mult: float = traits.get("pack_bonus_mult", 1.0)
+			if pack_bonus_mult > 1.0:
+				var has_packmate := false
+				for other in battle_units:
+					if other.ref != u.ref and other.name == u.name:
+						has_packmate = true
+						break
+				if has_packmate:
+					dmg = int(round(dmg * pack_bonus_mult))
+					hud.battle_log("The %s fights fiercely alongside its pack!" % u.name)
+			# Gnome: unlike Goblin's binary pack_bonus_mult, this counts
+			# how many packmates are ALIVE RIGHT NOW (not a one-time
+			# snapshot like their HP bonus in _setup_battle_grid) --
+			# thinning the mob down visibly softens the survivors' punch,
+			# turn by turn, rather than just removing bodies.
+			if u.name == "Gnome":
+				var live_pack_count := 0
+				for other in battle_units:
+					if other.name == "Gnome":
+						live_pack_count += 1
+				if live_pack_count > 1:
+					dmg = int(round(dmg * (1.0 + GNOME_DAMAGE_PCT_PER_PACKMATE * (live_pack_count - 1))))
+					hud.battle_log("The Gnome mob swarms with %d strong!" % live_pack_count)
+			# A buffer's buff (see buffed_dmg_turns) -- decremented here, at
+			# the moment it actually pays off, same "consumed on use"
+			# shape Adrenaline/Momentum-style bonuses use elsewhere.
+			if u.get("buffed_dmg_turns", 0) > 0:
+				dmg = int(round(dmg * (1.0 + u.get("buffed_dmg_pct", 0.0))))
+				u.buffed_dmg_turns -= 1
+			var enrage_threshold: float = traits.get("enrage_threshold", 0.0)
+			if enrage_threshold > 0.0 and float(u.hp) < float(u.max_hp) * enrage_threshold:
+				dmg = int(round(dmg * traits.get("enrage_mult", 1.0)))
+				hud.battle_log("The %s is enraged!" % u.name)
+			# A sweeping boss's sweep hits every occupied tile within range,
+			# not just its chosen target -- dmg is computed once above and
+			# applied in full to each tile struck, not divided. Every
+			# other enemy's sweep_targets is just [target_tile], so this
+			# loop is a no-op wrapper for them (identical single hit,
+			# identical single log line, as before).
+			var sweep_targets: Array = _sweep_targets(u) if traits.get("sweeps", false) else [target_tile]
+			var player_was_hit := false
+			for t in sweep_targets:
+				var hit_result: Dictionary = await _enemy_apply_damage(u, t, dmg, traits, "heavy" if already_winding_up else "normal")
+				if hit_result.get("ally_avoided", false):
+					pass  # _enemy_apply_damage already said how the member avoided it
+				elif hit_result.get("dodged", false):
+					hud.battle_log("You dodge the %s's attack!" % u.name)
+				elif hit_result.get("blocked", false):
+					hud.battle_log(("You parry the %s's attack!" if hit_result.get("minigame", false) else "Your shield blocks the %s's attack!") % u.name)
+				elif hit_result.is_player:
+					player_was_hit = true
+					hud.battle_log("The %s hits you for %d damage." % [u.name, hit_result.dmg])
+				else:
+					hud.battle_log("The %s hits your %s for %d damage!" % [u.name, hit_result.target_name, hit_result.dmg])
+			if player_was_hit and player.health <= 0:
+				return
+	else:
+		# Lost track of its target -- the telegraph doesn't carry over.
+		u["winding_up"] = false
+	if size == 1:
+		u.tile = _apply_water_push(u.tile, u)
+		_apply_terrain_tick(u.tile, u)
+
+# The housekeeping after enemy turns: sweep anyone who died, add the Fae the huts queued, remove allies
+# that fell, and see whether the fight is over. False = the battle ended (or was left), stop here.
+func _finish_enemy_actions(fae_spawns_needed: Array) -> bool:
 	# Sweep anyone who died mid-turn from self-inflicted cliff-fall damage
 	# (kiting retreat, chasing a target) -- deferred to here rather than
 	# removed on the spot so the loop above never mutates battle_units while
@@ -8269,11 +8477,50 @@ func _process_enemy_turn() -> void:
 
 	if battle_units.is_empty():
 		_battle_victory()
-		return
+		return false
 
 	if not in_battle:
-		return
+		return false
+	return true
 
+# The old phase: every enemy takes one turn in order, then it is the hero's turn again. Real battles now
+# use _timeline_advance instead (speed decides who acts); this stays for anything driving the phases by hand.
+func _process_enemy_turn() -> void:
+	var fae_spawns_needed: Array = []
+	# Freshly latch anyone newly in range/LOS before targets are assigned,
+	# so a unit that closed the distance over its own last move is spotted
+	# THIS turn's targeting rather than one turn late.
+	_update_enemy_awareness()
+	var assigned_targets: Dictionary = _assign_enemy_targets()
+	for u in battle_units:
+		var health_before: int = player.health
+		await _enemy_take_turn(u, assigned_targets, fae_spawns_needed)
+		if player.health <= 0 and health_before > 0:
+			return
+	if not _finish_enemy_actions(fae_spawns_needed):
+		return
+	# The party kits' timers count down once per round in this flow.
+	for ally_unit in battle_allies:
+		_tick_ally_timers(ally_unit)
+	_begin_hero_turn()
+
+# An ally's Shaman charm / Druid empower count down on ITS turns (one per turn it takes).
+func _tick_ally_timers(ally_unit: Dictionary) -> void:
+	if int(ally_unit.get("charm_turns", 0)) > 0:
+		ally_unit["charm_turns"] = int(ally_unit.charm_turns) - 1
+	if int(ally_unit.get("buff_turns", 0)) > 0:
+		ally_unit["buff_turns"] = int(ally_unit.buff_turns) - 1
+
+# The hero lost a turn (reeling): hand play on to whoever is next.
+func _hero_turn_skipped() -> void:
+	if battle_use_timeline:
+		_timeline_advance()
+	else:
+		_start_ally_turn()
+
+# Everything that happens when the hero's turn comes round: the damage-over-time statuses tick, every
+# per-turn buff counts down, then (unless Fear takes the turn over) the main menu opens.
+func _begin_hero_turn() -> void:
 	# Poison Bog's lingering DOT (reserved terrain) -- ticks every round
 	# regardless of battle_player_turns_to_skip below, same "doesn't skip a
 	# turn on its own" shape as the enemy-side burning/poison ticks.
@@ -8353,16 +8600,10 @@ func _process_enemy_turn() -> void:
 		battle_bloodrage_turns -= 1
 		if battle_bloodrage_turns == 0:
 			battle_bloodrage_stacks = 0
-	for ally_unit in battle_allies:
-		if int(ally_unit.get("charm_turns", 0)) > 0:
-			ally_unit["charm_turns"] = int(ally_unit.charm_turns) - 1
-		if int(ally_unit.get("buff_turns", 0)) > 0:
-			ally_unit["buff_turns"] = int(ally_unit.buff_turns) - 1
-
 	if battle_player_turns_to_skip > 0:
 		battle_player_turns_to_skip -= 1
 		hud.battle_log("You're reeling and can't act this turn!")
-		_start_ally_turn()
+		_hero_turn_skipped()
 		return
 
 	battle_turn = "player"
@@ -8400,6 +8641,226 @@ func _process_enemy_turn() -> void:
 	battle_fear_cascade_depth = 0
 	_focus_battle_main_menu()
 	_refresh_battle_display()
+
+# ---------------------------------------------------------------------------
+# Turn order: SPEED decides who acts next.
+#
+# The hero, every ally and every enemy are entries on one timeline. Whoever's next turn comes soonest
+# goes first, so a unit twice as fast takes two turns for each of a slower unit's -- two or three in a
+# row if the gap is wide enough -- and the sides never move in blocks. Taking a turn books the next one
+# TURN_TIME_BASE / speed later. Ties go to the hero, then the allies, then the enemies (in field order).
+# Every "N turns" effect counts the affected unit's OWN turns, whenever those come round.
+# ---------------------------------------------------------------------------
+const TURN_TIME_BASE := 100.0
+const MIN_BATTLE_SPEED := 0.5
+const TURN_ORDER_ROWS := 8            # turns the strip in the corner shows (the one in progress included)
+const MERCENARY_SPEED := 5.0
+
+# Speed is a rating in the same units the Stats screen shows for you (5 at the start, +1 a level).
+func _hero_speed() -> float:
+	var rating: int = 5 + int(player.stat_agility - PlayerScript.AGILITY_START) / PlayerScript.AGILITY_BONUS_PER_LEVEL
+	return maxf(MIN_BATTLE_SPEED, float(rating + player.armor_speed_bonus()))
+
+func _unit_speed(kind: String, u: Dictionary) -> float:
+	var speed: float
+	match kind:
+		"hero":
+			return _hero_speed()
+		"ally":
+			speed = float(u.get("speed", MERCENARY_SPEED))
+		_:
+			speed = float(ENEMY_SPEEDS.get(str(u.get("name", "")), ENEMY_SPEED_DEFAULT))
+	# speed_mult: the Wolf's Nipper halves an enemy's speed for the rest of the fight.
+	return maxf(MIN_BATTLE_SPEED, speed * float(u.get("speed_mult", 1.0)))
+
+func _turn_delay(speed: float) -> float:
+	return TURN_TIME_BASE / maxf(MIN_BATTLE_SPEED, speed)
+
+func _timeline_rank(kind: String) -> int:
+	return 0 if kind == "hero" else (1 if kind == "ally" else 2)
+
+# a before b: sooner, and on a tie hero < ally < enemy, then field order (the unit ids count up).
+func _timeline_before(a: Dictionary, b: Dictionary) -> bool:
+	var ta: float = float(a.time)
+	var tb: float = float(b.time)
+	if absf(ta - tb) > 0.000001:
+		return ta < tb
+	var ra: int = _timeline_rank(str(a.kind))
+	var rb: int = _timeline_rank(str(b.kind))
+	if ra != rb:
+		return ra < rb
+	return int(a.tid) < int(b.tid)
+
+# A real battle starts its clock: everyone's first turn comes one delay in, so the fastest goes first
+# (the tutorial's opening fight always begins with you).
+func _timeline_begin() -> void:
+	battle_use_timeline = true
+	battle_timeline.clear()
+	battle_timeline_clock = 0.0
+	battle_tid_counter = 0
+	battle_timeline_running = false
+	battle_timeline_pending = false
+	battle_hero_turns = 0
+	battle_current_actor = {}
+	_timeline_sync()
+	if tutorial_active:
+		for e in battle_timeline:
+			if e.kind == "hero":
+				e["time"] = -1.0
+	_timeline_advance()
+
+# Makes sure everyone on the field has an entry: units that joined mid-fight (a summoned Fae, a skeleton, a
+# revived member) are booked one delay from now.
+func _timeline_sync() -> void:
+	var present := {}
+	for e in battle_timeline:
+		present[int(e.tid)] = true
+	if not present.has(0):
+		battle_timeline.append({"tid": 0, "kind": "hero", "time": battle_timeline_clock + _turn_delay(_hero_speed())})
+	for pair in [["ally", battle_allies], ["enemy", battle_units]]:
+		for u in pair[1]:
+			if not u.has("tid"):
+				battle_tid_counter += 1
+				u["tid"] = battle_tid_counter
+			if int(u.hp) > 0 and not present.has(int(u.tid)):
+				battle_timeline.append({"tid": int(u.tid), "kind": pair[0], "time": battle_timeline_clock + _turn_delay(_unit_speed(pair[0], u))})
+
+# The unit an entry stands for, or {} when it is gone (dead, fainted, off the field). The hero is {"hero": true}.
+func _timeline_find(entry: Dictionary) -> Dictionary:
+	if entry.kind == "hero":
+		return {"hero": true}
+	var pool: Array = battle_allies if entry.kind == "ally" else battle_units
+	for u in pool:
+		if int(u.get("tid", -1)) == int(entry.tid) and int(u.hp) > 0:
+			return u
+	return {}
+
+# Takes the next turn off the timeline: {kind, tid, unit}, or {} if nobody is left. The entry is booked
+# again right away at the unit's CURRENT speed (so a Nipper's slow or a new armour counts from here on).
+func _timeline_pop() -> Dictionary:
+	_timeline_sync()
+	var i := battle_timeline.size() - 1
+	while i >= 0:
+		if _timeline_find(battle_timeline[i]).is_empty():
+			battle_timeline.remove_at(i)
+		i -= 1
+	var best := -1
+	for k in battle_timeline.size():
+		if best < 0 or _timeline_before(battle_timeline[k], battle_timeline[best]):
+			best = k
+	if best < 0:
+		return {}
+	var entry: Dictionary = battle_timeline[best]
+	var unit: Dictionary = _timeline_find(entry)
+	battle_timeline_clock = float(entry.time)
+	entry["time"] = float(entry.time) + _turn_delay(_unit_speed(str(entry.kind), unit))
+	return {"kind": entry.kind, "tid": entry.tid, "unit": unit}
+
+# The next `count` turns after the one in progress, as they will fall if speeds hold: [{kind, unit}].
+func _timeline_preview(count: int) -> Array:
+	_timeline_sync()
+	var sim: Array = []
+	for e in battle_timeline:
+		var unit: Dictionary = _timeline_find(e)
+		if not unit.is_empty():
+			sim.append({"kind": e.kind, "tid": e.tid, "time": float(e.time), "unit": unit})
+	var result: Array = []
+	for n in count:
+		var best := -1
+		for k in sim.size():
+			if best < 0 or _timeline_before(sim[k], sim[best]):
+				best = k
+		if best < 0:
+			break
+		var s: Dictionary = sim[best]
+		result.append({"kind": s.kind, "unit": s.unit})
+		s["time"] = float(s.time) + _turn_delay(_unit_speed(str(s.kind), s.unit))
+	return result
+
+# Runs the battle forward until somebody needs the player: an enemy simply takes its turn, then the loop
+# goes round again; the hero's turn (or an ally awaiting orders) stops it, and it starts again from
+# _end_player_turn / _ally_command_over. Asked to advance while already running (a forced attack that
+# ends the turn at once), it just notes it and the running loop carries on.
+func _timeline_advance() -> void:
+	if battle_timeline_running:
+		battle_timeline_pending = true
+		return
+	battle_timeline_running = true
+	while in_battle and not game_over:
+		battle_timeline_pending = false
+		var next: Dictionary = _timeline_pop()
+		if next.is_empty():
+			break
+		battle_current_actor = next
+		match str(next.kind):
+			"hero":
+				battle_turn = "player"
+				battle_hero_turns += 1
+				if battle_hero_turns == 1:
+					_open_first_hero_turn()
+				else:
+					_begin_hero_turn()
+				if not battle_timeline_pending:
+					break
+			"ally":
+				battle_turn = "player"
+				if _begin_ally_turn(next.unit):
+					if not battle_timeline_pending:
+						break
+				else:
+					# a skeleton acted on its own / a staggered ally lost its turn
+					if battle_units.is_empty():
+						battle_commanding_ally = null
+						_remove_fallen_allies()
+						_battle_victory()
+						break
+					_remove_fallen_allies()
+			_:
+				battle_turn = "enemy"
+				_refresh_battle_display()
+				await _run_enemy_actor(next.unit)
+				if player.health <= 0:
+					break
+	battle_timeline_running = false
+
+# The very first hero turn: nothing has ticked yet, the menu simply opens.
+func _open_first_hero_turn() -> void:
+	battle_turn = "player"
+	battle_menu_state = "main"
+	battle_move_trail = []
+	battle_player_moves_left = _battle_player_move_range()
+	_focus_battle_main_menu()
+	_refresh_battle_display()
+
+# One enemy's turn on the timeline: latch who sees whom, let it act, then the usual housekeeping.
+func _run_enemy_actor(u: Dictionary) -> void:
+	u["turns_taken"] = int(u.get("turns_taken", 0)) + 1
+	var fae_spawns_needed: Array = []
+	_update_enemy_awareness()
+	var assigned_targets: Dictionary = _assign_enemy_targets()
+	await _enemy_take_turn(u, assigned_targets, fae_spawns_needed)
+	if player.health <= 0:
+		return
+	_finish_enemy_actions(fae_spawns_needed)
+
+# What the turn-order strip in the corner shows: the turn in progress, then the next ones.
+func _turn_order_rows() -> Array:
+	if not battle_use_timeline or not in_battle:
+		return []
+	var rows: Array = []
+	if not battle_current_actor.is_empty() and not _timeline_find({"kind": battle_current_actor.kind, "tid": battle_current_actor.tid}).is_empty():
+		rows.append(_turn_order_row(str(battle_current_actor.kind), battle_current_actor.unit, true))
+	for s in _timeline_preview(TURN_ORDER_ROWS - rows.size()):
+		rows.append(_turn_order_row(str(s.kind), s.unit, false))
+	return rows
+
+func _turn_order_row(kind: String, u: Dictionary, current: bool) -> Dictionary:
+	if kind == "hero":
+		return {"side": "hero", "name": "You", "current": current, "hp_frac": clampf(float(player.health) / float(maxi(1, player.max_health)), 0.0, 1.0)}
+	var row := {"side": kind, "name": str(u.get("name", "?")), "current": current, "hp_frac": clampf(float(u.hp) / float(maxi(1, int(u.max_hp))), 0.0, 1.0), "kind": str(u.get("kind", ""))}
+	if u.has("member"):
+		row["tint"] = u.member.rules().get("tint", Color(1, 1, 1))
+	return row
 
 # The enemy whose own attack range currently reaches the player, among any
 # with ENEMY_TRAITS["inflicts_fear"] -- mirrors _sweep_targets' footprint/
@@ -8666,6 +9127,7 @@ func _refresh_battle_display() -> void:
 	var display_target_index: int = _ally_effective_target_index(battle_commanding_ally) if battle_commanding_ally != null else _effective_target_index()
 	var commanding_ally_name: String = battle_commanding_ally.name if battle_commanding_ally != null else ""
 	hud.update_battle_grid(BATTLE_GRID_W, BATTLE_GRID_H, battle_terrain, battle_player_tile, battle_units, display_hp, display_max_hp, player.level, battle_turn, display_target_index, display_moves_left, player.stamina, player.max_stamina, player.current_weapon, battle_menu_state, player.healing_items, battle_move_trail, display_allies, player.has_guardian_skill, battle_skill_cooldown, player.disarmed_tile != Vector2i(-1, -1), player.owned_arrows, battle_awaiting_evasion, can_mine, player.equipped_shield.get("name", ""), player.shield_block_chance(), player.berserk_turns_remaining, player.stealth_turns_remaining, STEALTH_STAMINA_COST, battle_evasion_options, battle_feared_unreachable, battle_awaiting_water_confirm, commanding_ally_name)
+	hud.set_turn_order(_turn_order_rows())
 	if tutorial_active and battle_turn == "player":
 		hud.show_battle_hint(_tutorial_hint_text(), _tutorial_hint_target_button())
 	else:

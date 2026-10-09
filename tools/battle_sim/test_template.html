@@ -10,6 +10,7 @@ const P = (s) => out.push(s);
 
 async function fuzzPlay(sim, rnd) {
   sim.promptHandler = async (type, data) => (type === "evasion" ? Object.keys(data.options)[Math.floor(rnd() * Object.keys(data.options).length)] : rnd() < 0.5);
+  await sim.timeline_begin();   // speed decides who acts first
   let guard = 0;
   while (sim.in_battle && !sim.over && guard++ < 400) {
     const p = sim.player;

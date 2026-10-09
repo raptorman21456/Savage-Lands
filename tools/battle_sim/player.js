@@ -35,6 +35,7 @@ class PartyMemberModel {
     return Math.max(0, this.stat("defense"));
   }
   fortitude() { return this.stat("fortitude"); }
+  speed() { return this.stat("speed"); }
   is_caster() { return !!this.rules.caster; }
   max_mana() { return this.is_caster() ? round(this.stat("magic") * D.party.consts.MANA_PER_MAGIC) : 0; }
   max_stamina() { return this.rules.stamina || 0; }
@@ -305,7 +306,10 @@ class Player {
     return this.equipped_shield.fortitude || 0;
   }
   fortitude_total() { return (this.equipped_armor.fortitude || 0) + this.shield_fortitude() + this.stat_fortitude + this.talisman_bonus("fortitude"); }
-  fortitude_reduction() { return clamp(this.fortitude_total() / 100.0, PC.FORTITUDE_NEGATIVE_FLOOR, PC.FORTITUDE_REDUCTION_CAP); }
+  fortitude_reduction() { return defense_reduction(this.fortitude_total()); }
+  // Points of Defense against BODILY harm from gear and stats (a point is the old 1%), and the cut they make alone.
+  bodily_defense_points() { return (this.armor_damage_reduction() + this.resilience_reduction + this.meta_war_chest_reduction + this.shield_damage_reduction_pct()) * 100.0; }
+  bodily_reduction() { return defense_reduction(this.bodily_defense_points()); }
 
   clothing_damage_reduction() {
     let total = 0;
@@ -566,7 +570,7 @@ class Player {
     if (this.talisman_bonus("lock_hp_to_one") > 0) { this.max_health = 1; this.health = Math.min(this.health, 1); }
     this.attack_damage = this.meta_worldwalker ? round(this.stat_strength * (1.0 + PC.WORLDWALKER_DAMAGE_BONUS_PCT)) : this.stat_strength;
     this.move_speed = this.stat_agility * (1.0 + this.talisman_bonus("move_speed_pct") + this.bloodmoon_stacks * PC.BLOODMOON_SPEED_PCT_PER_STACK);
-    this.resilience_reduction = Math.min(PC.RESILIENCE_REDUCTION_CAP, this.stat_resilience * PC.RESILIENCE_PCT_PER_POINT);
+    this.resilience_reduction = this.stat_resilience * PC.RESILIENCE_PCT_PER_POINT;
     this.meta_dodge_chance = Math.min(PC.REFLEXES_DODGE_CAP, this.stat_reflexes * PC.REFLEXES_PCT_PER_POINT);
     this.meta_crit_chance = Math.min(PC.DEXTERITY_CRIT_CAP, this.stat_dexterity * PC.DEXTERITY_PCT_PER_POINT);
   }

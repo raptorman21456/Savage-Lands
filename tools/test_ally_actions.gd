@@ -106,7 +106,7 @@ func _init() -> void:
 	var labels := []
 	for s in info.specials:
 		labels.append(s.label)
-	print("Her special list shows each cost in her own currency -- her three spells, then the Staff's: %s (expected [Heal (30 MP), Empower (30 MP), Hasten (40 MP), I CAST FIREBALL (40 MP), Landfall (60 MP), Channel (20 MP)])" % [labels])
+	print("Her special list shows each cost in her own currency -- her three spells, then the Staff's: %s (expected [Restore (40 MP), Empower (30 MP), Vitalize (40 MP), I CAST FIREBALL (40 MP), Landfall (60 MP), Channel (20 MP)])" % [labels])
 	print("The Special button is available, Attack reads plain: has_specials=%s attack_label=%s (expected true, Attack)" % [info.has_specials, info.attack_label])
 	main._on_battle_ally_action("special")
 	print("Special opens the list: state=%s (expected ally_special)" % [main.battle_menu_state])

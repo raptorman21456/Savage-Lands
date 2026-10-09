@@ -63,8 +63,8 @@ func _init() -> void:
 	print("both owned weapons show up: club=%s spear=%s (expected true, true)" % [
 		weapons_text.contains("Club"), weapons_text.contains("Masterwork") and weapons_text.contains("Spear")
 	])
-	print("the equipped armor's info card shows its name and damage reduction: %s (expected true)" % [
-		weapons_text.contains(armor_script.TIERS[2].name) and weapons_text.contains("-%d%%" % int(armor_script.TIERS[2].damage_reduction * 100))
+	print("the equipped armor's info card shows its name and Defense: %s (expected true)" % [
+		weapons_text.contains(armor_script.TIERS[2].name) and weapons_text.contains("+%d Def" % int(round(armor_script.TIERS[2].damage_reduction * 100.0)))
 	])
 	print("the owned shield shows up with its block chance: %s (expected true)" % [
 		weapons_text.contains("Heavy Shield") and weapons_text.contains("%d%% block" % int(shields_script.SHIELDS.shield_heavy.block_chance * 100))

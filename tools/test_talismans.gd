@@ -201,7 +201,7 @@ func _init() -> void:
 	player.equipped_shield = {}
 	player.potion_resilience_turns = 0
 	main.battle_player_defending = false
-	print("...through the real damage path, still capped at 90%% total: 100 -> %d (expected 10)" % [main._apply_incoming_reductions(100, {})])
+	print("...through the real damage path, still short of the 80%% ceiling: 100 -> %d (expected 25, 1000 points)" % [main._apply_incoming_reductions(100, {})])
 
 	# The attack side lands through the real damage formula too -- and only
 	# for the player's own hits, not an ally's.
@@ -353,7 +353,7 @@ func _init() -> void:
 	ally.hp = 200
 	_wear(player, ["guardian_knot"])
 	main._enemy_apply_damage({"ref": null, "tile": Vector2i(5, 6)}, Vector2i(5, 5), 100, {})
-	print("Guardian Knot: allies take 40%% less: hp=%d (expected 140)" % [ally.hp])
+	print("Guardian Knot: allies gain 40 Defense, so a 100 hit does 68: hp=%d (expected 132)" % [ally.hp])
 	main.battle_allies = []
 	_reset(player)
 

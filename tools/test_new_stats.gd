@@ -77,7 +77,7 @@ func _init() -> void:
 	player2.stat_reflexes = 999
 	player2.stat_dexterity = 999
 	player2._recalc_stats()
-	print("Resilience reduction caps at 20%%: %.4f (expected 0.20)" % [player2.resilience_reduction])
+	print("Resilience no longer caps (the Defense curve bends it): %.4f (expected 9.99, 999 points)" % [player2.resilience_reduction])
 	print("Reflexes dodge caps at 15%%: %.4f (expected 0.15)" % [player2.meta_dodge_chance])
 	print("Dexterity crit caps at 15%%: %.4f (expected 0.15)" % [player2.meta_crit_chance])
 

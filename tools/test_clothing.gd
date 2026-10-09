@@ -80,16 +80,16 @@ func _init() -> void:
 	player.equipped_shield = {}
 	player.potion_resilience_turns = 0
 	main.battle_player_defending = false
-	print("100 damage into 30%% armour + 18%% clothes lands as: %d (expected 52)" % [main._apply_incoming_reductions(100, {})])
+	print("100 damage into 30%% armour + 18%% clothes lands as: %d (expected 64, 48 points on the curve)" % [main._apply_incoming_reductions(100, {})])
 	player.equipped_clothing = {"head": "", "body": "", "feet": ""}
-	print("...and as 70 with the clothes off: %d (expected 70)" % [main._apply_incoming_reductions(100, {})])
-	# The combined cap (0.9) still holds.
+	print("...and as 73 with the clothes off: %d (expected 73, 30 points)" % [main._apply_incoming_reductions(100, {})])
+	# The ceiling (80%) is approached but never reached.
 	player.equipped_armor = armor.TIERS[4]
 	player.equip_clothing("cloth_pelt_hood")
 	player.equip_clothing("cloth_cloak")
 	player.equip_clothing("cloth_trail_boots")
-	player.resilience_reduction = 0.5
-	print("the 90%% cap still holds however much is stacked: %d (expected 10)" % [main._apply_incoming_reductions(100, {})])
+	player.resilience_reduction = 100.0
+	print("the 80%% ceiling is never reached however much is stacked: %d (expected 20)" % [main._apply_incoming_reductions(100, {})])
 	player.resilience_reduction = 0.0
 	main.in_battle = false
 

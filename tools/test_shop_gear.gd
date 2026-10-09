@@ -69,7 +69,7 @@ func _init() -> void:
 	}]
 	player.health = player.max_health
 	main._process_enemy_turn()
-	var expected_dmg: int = int(round(10 * (1.0 - 0.15)))
+	var expected_dmg: int = int(round(10 * (1.0 - 0.8 * 15.0 / (15.0 + 60.0))))  # 15 points of Defense on the curve
 	print("gambeson reduces incoming damage: player_health=%d (expected max_health-%d = %d)" % [
 		player.health, expected_dmg, player.max_health - expected_dmg
 	])

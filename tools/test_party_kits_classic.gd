@@ -169,11 +169,11 @@ func _init() -> void:
 		var biter := _make_goblin(main, Vector2i(3, 4), 999)
 		main.battle_units = [biter]
 		await _cast(main, w4, "Nipper")
-		if biter.move_range < 4:
+		if float(biter.get("speed_mult", 1.0)) < 1.0:
 			slowed += 1
 		else:
 			untouched += 1
-	print("Nipper halves an enemy's speed about half the time (40 tries): slowed=%s untouched=%s (expected both > 0)" % [slowed > 0, untouched > 0])
+	print("Nipper halves an enemy's speed (its turns come half as often) about half the time (40 tries): slowed=%s untouched=%s (expected both > 0)" % [slowed > 0, untouched > 0])
 
 	# =========================================================
 	# Druid
@@ -191,13 +191,13 @@ func _init() -> void:
 	var dl := []
 	for s in main._ally_specials(d1):
 		dl.append(s.name + main._ally_cost_text(d1, int(s.stamina_cost)))
-	print("Druid's spells: %s (expected the three spells, then no weapon specials when bare-handed)" % [dl])
+	print("Druid's spells: %s (expected Restore (40 MP), Empower (30 MP), Vitalize (40 MP), then no weapon specials when bare-handed)" % [dl])
 	main.battle_units = [_make_goblin(main, Vector2i(6, 6), 999)]
-	await _cast(main, d1, "Heal", t1)
-	print("Heal = 25%% of 40 max HP + magic 12 / 3 = 14: HP 5 -> %d (expected 19); costs 30 mana: %d left (expected %d)" % [t1.hp, d1.mana, d1.max_mana - 30])
+	await _cast(main, d1, "Restore", t1)
+	print("Restore = 25%% of 40 max HP + magic 12 / 3 = 14: HP 5 -> %d (expected 19); costs 40 mana: %d left (expected %d)" % [t1.hp, d1.mana, d1.max_mana - 40])
 	player.health = 100
 	d1.mana = d1.max_mana
-	await _cast(main, d1, "Heal", "hero")
+	await _cast(main, d1, "Restore", "hero")
 	print("...on the hero: 25%% of 500 + 4 = 129: %d (expected 229)" % [player.health])
 	d1.upgraded_flag_probe = true
 	druid.upgraded_spells["druid_heal"] = true

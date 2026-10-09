@@ -12,6 +12,7 @@ const OUT_PATH := "res://tools/battle_sim/sim_data.json"
 
 const MainScript := preload("res://scripts/Main.gd")
 const PlayerScript := preload("res://scripts/Player.gd")
+const DefenseScript := preload("res://scripts/Defense.gd")
 
 const ENEMY_SCRIPTS := [
 	"Enemy", "Orc", "Archer", "Brute", "Shade", "Wolf", "Centaur", "FaeHut", "Fae", "Gnome",
@@ -55,6 +56,7 @@ func _initialize() -> void:
 	}
 	data["main_consts"] = _consts(MainScript)
 	data["player_consts"] = _consts(PlayerScript)
+	data["defense"] = _consts(DefenseScript)
 	data["traits"] = MainScript.ENEMY_TRAITS
 	data["exported"] = Time.get_datetime_string_from_system()
 	data["worlds"] = _worlds()

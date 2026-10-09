@@ -25,6 +25,9 @@ class Sim {
     this.battle_fainted_members = [];
     this.battle_commanding_ally = null;
     this.battle_ally_queue = [];
+    // turn order: with battle_use_timeline on (every real battle) speed decides who acts next
+    this.battle_use_timeline = false; this.battle_timeline = []; this.battle_timeline_clock = 0.0; this.battle_tid_counter = 0;
+    this.battle_timeline_running = false; this.battle_timeline_pending = false; this.battle_hero_turns = 0; this.battle_current_actor = null;
     this.battle_ally_moves_left = 0;
     this.battle_ally_move_undo = null;
     this.battle_player_tile = V(0, 0);
@@ -409,7 +412,7 @@ class Sim {
       const max_hp = Math.max(1, round(p.max_health * entry.max_hp_pct));
       this.battle_allies.push({
         ref: ++this.ref_counter, tile, hp: max_hp, max_hp, dmg_mult: entry.dmg_mult * might_mult,
-        name: entry.name, kind: "mercenary", defense_pct: 0.0, move_range: entry.move_range, attack_range: MC.ALLY_ATTACK_RANGE,
+        name: entry.name, kind: "mercenary", defense_pct: 0.0, move_range: entry.move_range, attack_range: MC.ALLY_ATTACK_RANGE, speed: MC.MERCENARY_SPEED,
       });
     });
   }
@@ -418,8 +421,8 @@ class Sim {
     const rules = member.rules;
     return {
       ref: ++this.ref_counter, tile, hp: member.max_hp(), max_hp: member.max_hp(), name: member.name, kind: member.kind,
-      member, attack: member.attack(), dmg_mult: might_mult, defense_pct: member.defense_pct(), fortitude: member.fortitude(),
-      move_range: member.move_tiles(), attack_range: rules.attack_range ?? MC.ALLY_ATTACK_RANGE,
+      member, attack: member.attack(), dmg_mult: might_mult, defense_pct: member.defense_pct(), defense_cap: rules.defense_cap ?? DEF.BASE_CAP, fortitude: member.fortitude(),
+      move_range: member.move_tiles(), attack_range: rules.attack_range ?? MC.ALLY_ATTACK_RANGE, speed: member.speed(),
       stamina: member.max_stamina(), max_stamina: member.max_stamina(), mana: member.max_mana(), max_mana: member.max_mana(), fainted: false,
     };
   }

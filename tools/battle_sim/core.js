@@ -10,6 +10,14 @@
 const D = SIM_DATA;
 const MC = D.main_consts;     // Main.gd constants
 const PC = D.player_consts;   // Player.gd constants
+const DEF = D.defense;        // Defense.gd constants
+
+// Defense.gd:reduction -- points of Defense/Fortitude bent into a cut (diminishing returns, ceiling `cap`).
+function defense_reduction(points, cap = DEF.BASE_CAP) {
+  if (points >= 0) return cap * points / (points + DEF.HALF_POINTS);
+  const p = -points;
+  return DEF.NEGATIVE_FLOOR * p / (p + DEF.HALF_POINTS);
+}
 const TRAITS = D.traits;      // Main.gd ENEMY_TRAITS
 
 // ---------------------------------------------------------------- RNG

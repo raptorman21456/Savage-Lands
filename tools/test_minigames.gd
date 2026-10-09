@@ -348,7 +348,7 @@ func _init() -> void:
 	player.equipped_armor = {"damage_reduction": 0.5}
 	DefenseMinigame.forced_results = ["block"]
 	var b5: Dictionary = await main._enemy_apply_damage(attacker, main.battle_player_tile, 40, {})
-	print("Armour still stacks on a held guard (50%% shield x 50%% armour of 40): dmg=%d (expected 10)" % [b5.dmg])
+	print("Armour still stacks on a held guard (50%% shield, then 50 points of armour on the curve, of 40): dmg=%d (expected 13)" % [b5.dmg])
 	player.equipped_armor = {"damage_reduction": 0.0}
 
 	# A parry also fires the shield's special (Heavy Shield: knockback).

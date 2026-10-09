@@ -19,47 +19,47 @@ static var PIECES := [
 	{
 		"id": "cloth_cap", "name": "Cloth Cap", "slot": "head", "price": 10,
 		"damage_reduction": 0.02, "icon": "cloth_head",
-		"description": "-2% damage taken.",
+		"description": "+2 Defense.",
 	},
 	{
 		"id": "cloth_hood", "name": "Leather Hood", "slot": "head", "price": 22,
 		"damage_reduction": 0.04, "icon": "cloth_head",
-		"description": "-4% damage taken.",
+		"description": "+4 Defense.",
 	},
 	{
 		"id": "cloth_pelt_hood", "name": "Wolf-Pelt Hood", "slot": "head", "price": 40,
 		"damage_reduction": 0.06, "icon": "cloth_head",
-		"description": "-6% damage taken.",
+		"description": "+6 Defense.",
 	},
 	{
 		"id": "cloth_tunic", "name": "Traveler's Tunic", "slot": "body", "price": 12,
 		"damage_reduction": 0.03, "icon": "cloth_body",
-		"description": "-3% damage taken.",
+		"description": "+3 Defense.",
 	},
 	{
 		"id": "cloth_jerkin", "name": "Padded Jerkin", "slot": "body", "price": 28,
 		"damage_reduction": 0.05, "icon": "cloth_body",
-		"description": "-5% damage taken.",
+		"description": "+5 Defense.",
 	},
 	{
 		"id": "cloth_cloak", "name": "Fur Cloak", "slot": "body", "price": 50,
 		"damage_reduction": 0.07, "icon": "cloth_body",
-		"description": "-7% damage taken.",
+		"description": "+7 Defense.",
 	},
 	{
 		"id": "cloth_sandals", "name": "Sturdy Sandals", "slot": "feet", "price": 8,
 		"damage_reduction": 0.02, "icon": "cloth_feet",
-		"description": "-2% damage taken.",
+		"description": "+2 Defense.",
 	},
 	{
 		"id": "cloth_boots", "name": "Leather Boots", "slot": "feet", "price": 20,
 		"damage_reduction": 0.03, "icon": "cloth_feet",
-		"description": "-3% damage taken.",
+		"description": "+3 Defense.",
 	},
 	{
 		"id": "cloth_trail_boots", "name": "Trail Boots", "slot": "feet", "price": 36,
 		"damage_reduction": 0.05, "icon": "cloth_feet",
-		"description": "-5% damage taken.",
+		"description": "+5 Defense.",
 	},
 ]
 

@@ -157,10 +157,15 @@ func _init() -> void:
 	main.battle_allies = [tough_ally]
 	main._enemy_apply_damage(attacker, Vector2i(0, 0), 100, {})
 	print("20%% defense cuts a 100 hit to: %d (expected 80)" % [1000 - tough_ally.hp])
-	tough_ally.defense_pct = 200.0
+	tough_ally.defense_pct = 100000.0
 	tough_ally.hp = 1000
 	main._enemy_apply_damage(attacker, Vector2i(0, 0), 100, {})
-	print("defense is capped at 90%%, so even absurd defense takes: %d (expected 10)" % [1000 - tough_ally.hp])
+	print("defense never reaches the 80%% ceiling, so even absurd defense takes: %d (expected 20)" % [1000 - tough_ally.hp])
+	tough_ally["defense_cap"] = 0.9
+	tough_ally.hp = 1000
+	main._enemy_apply_damage(attacker, Vector2i(0, 0), 100, {})
+	print("...and a unit with a 90%% cap (the Guardian's) takes: %d (expected 10)" % [1000 - tough_ally.hp])
+	tough_ally.erase("defense_cap")
 	tough_ally.defense_pct = 5.0
 	tough_ally.hp = 1000
 	main._enemy_apply_damage(attacker, Vector2i(0, 0), 1, {})

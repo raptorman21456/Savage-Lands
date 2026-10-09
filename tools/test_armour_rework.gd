@@ -86,23 +86,23 @@ func _init() -> void:
 	_wear(player, "armor_rags")
 	print("Bare, both kinds of harm land in full: bodily=%d magical=%d both=%d (expected 100 100 100)" % [main._apply_incoming_reductions(100, {}), main._apply_incoming_reductions(100, {"harm": "magical"}), main._apply_incoming_reductions(100, {"harm": "both"})])
 	_wear(player, "armor_gambeson")
-	print("Gambeson: -15%% bodily, +5 Fortitude: bodily=%d magical=%d (expected 85, 95)" % [main._apply_incoming_reductions(100, {}), main._apply_incoming_reductions(100, {"harm": "magical"})])
-	print("...a blast of both is half and half: %d (expected 91 = 42.5 -> 43 bodily + 47.5 -> 48 magical)" % [main._apply_incoming_reductions(100, {"harm": "both"})])
+	print("Gambeson: +15 Defense, +5 Fortitude (cuts of 16%% and 6%% on the curve): bodily=%d magical=%d (expected 84, 94)" % [main._apply_incoming_reductions(100, {}), main._apply_incoming_reductions(100, {"harm": "magical"})])
+	print("...a blast of both is half and half: %d (expected 89 = 42 bodily + 47 magical)" % [main._apply_incoming_reductions(100, {"harm": "both"})])
 	player.resilience_reduction = 0.20
-	print("Resilience cuts BODILY harm only: bodily=%d magical=%d (expected 65, 95)" % [main._apply_incoming_reductions(100, {}), main._apply_incoming_reductions(100, {"harm": "magical"})])
+	print("Resilience cuts BODILY harm only (20 more points: 35 on the curve): bodily=%d magical=%d (expected 71, 94)" % [main._apply_incoming_reductions(100, {}), main._apply_incoming_reductions(100, {"harm": "magical"})])
 	player.resilience_reduction = 0.0
-	player.stat_fortitude = 70
-	print("Fortitude is capped at 75%%: 5 + 70 points = %.2f reduction, magical hit of 100 = %d (expected 0.75, 25)" % [player.fortitude_reduction(), main._apply_incoming_reductions(100, {"harm": "magical"})])
+	player.stat_fortitude = 9995
+	print("Fortitude bends towards 80%% and never reaches it: 5 + 9995 points = %.3f reduction, magical hit of 100 = %d (expected 0.795, 20)" % [player.fortitude_reduction(), main._apply_incoming_reductions(100, {"harm": "magical"})])
 	player.stat_fortitude = 0
 	_wear(player, "armor_thornmail")
-	print("Thornmail's -5 Fortitude makes spells hurt more: reduction %.2f, magical hit of 100 = %d (expected -0.05, 105); bodily = %d (expected 70)" % [player.fortitude_reduction(), main._apply_incoming_reductions(100, {"harm": "magical"}), main._apply_incoming_reductions(100, {})])
+	print("Thornmail's -5 Fortitude makes spells hurt more: reduction %.2f, magical hit of 100 = %d (expected -0.04, 104); bodily = %d (expected 73, 30 points)" % [player.fortitude_reduction(), main._apply_incoming_reductions(100, {"harm": "magical"}), main._apply_incoming_reductions(100, {})])
 	print("A potion of resilience and Last Stand cut BOTH kinds: potion on, Gambeson magical: (set below)")
 	_wear(player, "armor_gambeson")
 	player.potion_resilience_turns = 2
-	print("...a Resilience Potion (-20%%): bodily=%d magical=%d (expected 65, 75)" % [main._apply_incoming_reductions(100, {}), main._apply_incoming_reductions(100, {"harm": "magical"})])
+	print("...a Resilience Potion (+20 Defense and Fortitude): bodily=%d magical=%d (expected 71, 76)" % [main._apply_incoming_reductions(100, {}), main._apply_incoming_reductions(100, {"harm": "magical"})])
 	player.potion_resilience_turns = 0
 	main.battle_player_defending = true
-	print("Defend halves either kind (when it's not small enough to negate): bodily=%d magical=%d (expected 43, 48)" % [main._apply_incoming_reductions(100, {}), main._apply_incoming_reductions(100, {"harm": "magical"})])
+	print("Defend halves either kind (when it's not small enough to negate): bodily=%d magical=%d (expected 42, 47)" % [main._apply_incoming_reductions(100, {}), main._apply_incoming_reductions(100, {"harm": "magical"})])
 	main.battle_player_defending = false
 	print("Enemies are tagged: Apprentice Mage=%s Archmage=%s Black Dragonlet=%s Lava Construct=%s Goblin=%s (expected magical magical both both bodily)" % [
 		main.ENEMY_TRAITS["Apprentice Mage"].get("harm", "bodily"), main.ENEMY_TRAITS["Archmage"].get("harm", "bodily"),
@@ -114,19 +114,19 @@ func _init() -> void:
 	# =========================================================
 	_reset(main, player)
 	_wear(player, "armor_stonehide")
-	print("Stonehide Mail: -10%% then -3 flat: a hit of 100 = %d (expected 87); a hit of 3 = %d (expected 1, never 0); magical 100 = %d (expected 95, flat cut is bodily only)" % [main._apply_incoming_reductions(100, {}), main._apply_incoming_reductions(3, {}), main._apply_incoming_reductions(100, {"harm": "magical"})])
+	print("Stonehide Mail: +10 Defense then -3 flat: a hit of 100 = %d (expected 86); a hit of 3 = %d (expected 1, never 0); magical 100 = %d (expected 94, flat cut is bodily only)" % [main._apply_incoming_reductions(100, {}), main._apply_incoming_reductions(3, {}), main._apply_incoming_reductions(100, {"harm": "magical"})])
 
 	_wear(player, "armor_martyr")
 	player.max_health = 100
 	player.health = 100
 	var martyr_full: int = main._apply_incoming_reductions(100, {})
 	player.health = 50
-	print("Martyr's Mantle at full health: %d (expected 95); at half health (-5%% +15%%): %d (expected 80)" % [martyr_full, main._apply_incoming_reductions(100, {})])
+	print("Martyr's Mantle at full health: %d (expected 94); at half health (5 + 15 points): %d (expected 80)" % [martyr_full, main._apply_incoming_reductions(100, {})])
 	player.health = 100
 
 	_wear(player, "armor_bastion")
 	main.battle_player_defending = true
-	print("Bastion Mail: Defend negates hits up to 17 (usual threshold 10 + 8): 17 -> %d (expected 0), 18 -> %d (expected 9 after Defend's halving, then -25%% = 7)" % [main._apply_incoming_reductions(17, {}), main._apply_incoming_reductions(18, {})])
+	print("Bastion Mail: Defend negates hits up to 17 (usual threshold 10 + 8): 17 -> %d (expected 0), 18 -> %d (expected 7: Defend halves it to 9, then 25 points cut a bit more)" % [main._apply_incoming_reductions(17, {}), main._apply_incoming_reductions(18, {})])
 	main.battle_player_defending = false
 	player.stamina = 10
 	player.regen_stamina(main.STAMINA_REGEN_ON_DEFEND + int(player.armor_trait_value("defend_stamina_bonus", 0)))
@@ -210,8 +210,8 @@ func _init() -> void:
 	player.stamina = 10
 	var first: int = main._apply_incoming_reductions(100, {"harm": "magical"})
 	var second: int = main._apply_incoming_reductions(100, {"harm": "magical"})
-	print("Spellward Robes swallow the first magical hit of a battle (%d, expected 0), then 30 Fortitude cuts the next (%d, expected 70); each gave 10 stamina: %d (expected 30)" % [first, second, player.stamina])
-	print("Their bodily protection is slight: %d (expected 95)" % [main._apply_incoming_reductions(100, {})])
+	print("Spellward Robes swallow the first magical hit of a battle (%d, expected 0), then 25 Fortitude cuts the next (%d, expected 76); each gave 10 stamina: %d (expected 30)" % [first, second, player.stamina])
+	print("Their bodily protection is slight: %d (expected 94)" % [main._apply_incoming_reductions(100, {})])
 
 	# Warden's Aegis on an ally
 	_reset(main, player)
@@ -240,7 +240,7 @@ func _init() -> void:
 	var magical_taken: int = 100 - member.hp
 	member.hp = 100
 	await main._enemy_apply_damage(attacker, member.tile, 100, {"harm": "both"})
-	print("An ally's defense cuts bodily harm and its Fortitude magical harm: bodily=%d (expected 70), magical=%d (expected 90), both=%d (expected 80)" % [bodily_taken, magical_taken, 100 - member.hp])
+	print("An ally's defense cuts bodily harm and its Fortitude magical harm: bodily=%d (expected 73), magical=%d (expected 89), both=%d (expected 81)" % [bodily_taken, magical_taken, 100 - member.hp])
 
 	# =========================================================
 	# Shields lean towards Fortitude
@@ -251,7 +251,7 @@ func _init() -> void:
 	player.equipped_shield = shields.SHIELDS["shield_phantom"].duplicate(true)
 	player.current_weapon = load("res://scripts/Weapons.gd").CLUB
 	print("The Phantom Guard leans furthest towards Fortitude: +%d (expected +12); it blocks magic too (block chance %.2f for any hit, expected 0.18)" % [int(player.shield_fortitude()), player.shield_block_chance()])
-	print("...so magical harm drops by it: %d (expected 88)" % [main._apply_incoming_reductions(100, {"harm": "magical"})])
+	print("...so magical harm drops by it: %d (expected 87)" % [main._apply_incoming_reductions(100, {"harm": "magical"})])
 	player.equipped_shield = {}
 
 	# =========================================================

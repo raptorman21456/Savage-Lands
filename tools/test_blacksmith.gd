@@ -152,7 +152,7 @@ func _init() -> void:
 	player.equipped_shield = {}
 	player.potion_resilience_turns = 0
 	main.battle_player_defending = false
-	print("100 damage into +2 Iron (35%%) and a Fur Cloak (7%%): %d (expected 58)" % [main._apply_incoming_reductions(100, {})])
+	print("100 damage into +2 Iron (35 Defense) and a Fur Cloak (7): %d (expected 67, 42 points on the curve)" % [main._apply_incoming_reductions(100, {})])
 	main.in_battle = false
 
 	# --- The panel ---------------------------------------------------------------------

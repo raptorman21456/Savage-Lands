@@ -203,7 +203,7 @@ func _init() -> void:
 	player.health = 100
 	print("Last Stand does nothing at full HP: dmg=%d (expected 100)" % [main._apply_incoming_reductions(100, {})])
 	player.health = 45  # 55% missing -> 5 steps of 10% -> 5 * 5% = 25%
-	print("Last Stand scales with missing HP: dmg=%d (expected 75, 25%% reduction at 55%% missing)" % [main._apply_incoming_reductions(100, {})])
+	print("Last Stand scales with missing HP: dmg=%d (expected 76, 25 points of Defense at 55%% missing)" % [main._apply_incoming_reductions(100, {})])
 	player.meta_last_stand_pct_per_10 = 0.0
 	player.health = 100
 

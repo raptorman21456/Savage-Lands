@@ -10,6 +10,7 @@ const WeaponsScript := preload("res://scripts/Weapons.gd")
 const ArmorScript := preload("res://scripts/Armor.gd")
 const ClothingScript := preload("res://scripts/Clothing.gd")
 const ShieldsScript := preload("res://scripts/Shields.gd")
+const DefenseScript := preload("res://scripts/Defense.gd")
 const PotionsScript := preload("res://scripts/Potions.gd")
 const FoodsScript := preload("res://scripts/Foods.gd")
 const EnchantmentsScript := preload("res://scripts/Enchantments.gd")
@@ -347,7 +348,7 @@ func _build_character(box: VBoxContainer) -> void:
 		"Max HP: %d" % p.max_health, "Attack (base damage): %d" % p.attack_damage, "Battle move range: %d tiles" % move_range,
 		"Stamina: %d (battle start: %d)" % [p.max_stamina, int(round(p.max_stamina * PlayerScriptConst().BATTLE_START_STAMINA_PCT))],
 		"Crit chance: %.1f%%   Dodge chance: %.1f%%" % [p.crit_chance_total() * 100.0, p.dodge_chance_total() * 100.0],
-		"Bodily harm reduction (armor + clothes + shield + resilience): %.1f%%   Magical harm reduction (Fortitude %d): %.1f%%" % [minf(0.9, p.armor_damage_reduction() + p.resilience_reduction + p.meta_war_chest_reduction + p.shield_damage_reduction_pct()) * 100.0, int(p.fortitude_total()), p.fortitude_reduction() * 100.0],
+		"Bodily harm reduction (Defense %d: armor + clothes + shield + resilience): %.1f%%   Magical harm reduction (Fortitude %d): %.1f%%   (diminishing returns, never past 80%%)" % [int(round(p.bodily_defense_points())), p.bodily_reduction() * 100.0, int(p.fortitude_total()), p.fortitude_reduction() * 100.0],
 		"Talisman slots: %d" % TalismansScript.slots_for_level(p.level),
 	]
 	_note(box, "\n".join(lines), Color(0.8, 0.85, 0.9))
@@ -437,7 +438,7 @@ func _build_gear(box: VBoxContainer) -> void:
 	_heading(box, "Armor")
 	var armor_items := []
 	for a in ArmorScript.TIERS:
-		armor_items.append([a.id, "%s (-%d%% bodily, %+d Fortitude%s)" % [a.name, int(round(a.damage_reduction * 100.0)), int(a.fortitude), ", crafted" if a.has("recipe") else ""]])
+		armor_items.append([a.id, "%s (%+d Defense, %+d Fortitude%s)" % [a.name, int(round(a.damage_reduction * 100.0)), int(a.fortitude), ", crafted" if a.has("recipe") else ""]])
 	_option(_row(box, "Armor"), armor_items, cfg.armor, func(v):
 		cfg.armor = v
 		_changed(["Gear", "Character"]))
@@ -446,7 +447,7 @@ func _build_gear(box: VBoxContainer) -> void:
 		cfg.armor_level = int(v)
 		_changed(["Character"]))
 	smith.editable = armor.get("metal", false)
-	_note(box, "+2.5% damage reduction per level (metal armor only).")
+	_note(box, "+2.5 Defense per level (metal armor only).")
 	_note(box, str(armor.get("description", "")), Color(0.8, 0.85, 0.9))
 	_heading(box, "Crafting materials")
 	if not cfg.has("materials"):
@@ -651,7 +652,7 @@ func _build_party(box: VBoxContainer) -> void:
 			for stat in picks:
 				for n in int(picks[stat]):
 					pm.spend_pick(str(stat))
-		card.add_child(_make_label("HP %d | ATK %.1f | DEF %.1f%% | MAG %.1f | move %d | range %d" % [pm.max_hp(), pm.attack(), pm.defense_pct(), pm.magic(), pm.move_tiles(), int(rules.get("attack_range", 1))], 12, Color(0.7, 0.75, 0.8)))
+		card.add_child(_make_label("HP %d | ATK %.1f | DEF %.1f (-%d%%) | MAG %.1f | move %d | range %d" % [pm.max_hp(), pm.attack(), pm.defense_pct(), int(round(DefenseScript.reduction(pm.defense_pct(), pm.defense_cap()) * 100.0)), pm.magic(), pm.move_tiles(), int(rules.get("attack_range", 1))], 12, Color(0.7, 0.75, 0.8)))
 		if PartyRulesScript.can_carry_gear(str(entry.kind)):
 			_party_gear_rows(card, index)
 		if rules.get("levels", true):
@@ -676,7 +677,7 @@ func _build_party(box: VBoxContainer) -> void:
 	_button(add_row, "Add member", func():
 		cfg.party.append({"kind": kind_pick.get_item_metadata(kind_pick.selected), "level": 1, "picks": {}})
 		_changed(["Party"]))
-	_note(box, "Members can carry any weapon (the Staff is for party members only) and talismans from their own slots (1/2/3/4 at levels 1/4/8/12). Each item goes to one unit at a time.")
+	_note(box, "Members can carry any weapon (the Staff is for party members only), armour, a shield (it only works while a hand is free) and 2 talismans (4 for the Shaman). Each item goes to one unit at a time.")
 
 # A member's weapon (base, quality, material) and talismans, kept in cfg.party[index].
 func _party_gear_rows(card: VBoxContainer, index: int) -> void:
@@ -707,6 +708,25 @@ func _party_gear_rows(card: VBoxContainer, index: int) -> void:
 			_option(weapon_row, mat_items, str(wsel.get("material", "steel")), func(v):
 				cfg.party[index].weapon["material"] = v
 				_changed(["Party"]))
+	# Armour and shield.
+	var gear_row := HBoxContainer.new()
+	gear_row.add_theme_constant_override("separation", 8)
+	card.add_child(gear_row)
+	gear_row.add_child(_inline("Armour", 12))
+	var armor_pick_items := [["", "(none)"]]
+	for a in ArmorScript.TIERS:
+		if a.id != "armor_rags":
+			armor_pick_items.append([a.id, "%s (%+d Def, %+d Fort)" % [a.name, int(round(a.damage_reduction * 100.0)), int(a.fortitude)]])
+	_option(gear_row, armor_pick_items, str(entry.get("armor", "")), func(v):
+		cfg.party[index]["armor"] = v
+		_changed(["Party"]))
+	gear_row.add_child(_inline("Shield", 12))
+	var shield_pick_items := [["", "(none)"]]
+	for sid in ShieldsScript.SHIELD_IDS:
+		shield_pick_items.append([sid, ShieldsScript.SHIELDS[sid].name])
+	_option(gear_row, shield_pick_items, str(entry.get("shield", "")), func(v):
+		cfg.party[index]["shield"] = v
+		_changed(["Party"]))
 	var slots: int = PartyRulesScript.talisman_slots(str(entry.kind), int(entry.level))
 	var worn: Array = entry.get("talismans", [])
 	var talisman_row := HBoxContainer.new()

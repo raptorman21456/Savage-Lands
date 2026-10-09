@@ -655,7 +655,8 @@ Object.assign(Sim.prototype, {
     this._apply_terrain_tick(this.battle_player_tile);
     this._check_player_dead();
     if (this.over) return;
-    await this._start_ally_turn();
+    if (this.battle_use_timeline) await this._timeline_advance();
+    else await this._start_ally_turn();
   },
 
   _advance_bloodmoon_quiet_turn() {
@@ -720,7 +721,7 @@ Object.assign(Sim.prototype, {
     const u = this.battle_commanding_ally;
     if (u && u.hp > 0) { u.tile = this._apply_water_push(u.tile, u); this._apply_terrain_tick(u.tile, u); }
     this.battle_menu_state = "main"; this.battle_move_trail = [];
-    await this._advance_ally_queue();
+    await this._ally_command_over();
   },
   async _battle_ally_attack() {
     const u = this.battle_commanding_ally;

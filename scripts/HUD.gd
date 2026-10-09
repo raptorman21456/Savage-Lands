@@ -145,6 +145,9 @@ var menu_beastiary_button: Button
 var menu_inventory_button: Button
 var menu_settings_button: Button
 var battle_beastiary_button: Button
+# The turn-order strip in the top-right corner of a battle (Main.gd:_turn_order_rows): who acts now and
+# who is next, fastest first. Rebuilt on every refresh.
+var turn_order_box: VBoxContainer
 var settings_panel: ColorRect
 var settings_master_slider: HSlider
 var settings_sfx_slider: HSlider
@@ -395,8 +398,8 @@ static var UI_TEXT := {
 	"levelup.vigor": "+1 max HP per point.",
 	"levelup.agility": "+1 overworld speed per point, a faster attack cooldown, and +1 battle move tile every 20 points.",
 	"levelup.might": "Better weapons require higher Might to equip; boosts recruited party/wolf damage.",
-	"levelup.resilience": "1% damage reduction per point, capped at 20%, stacking with armor.",
-	"levelup.fortitude": "1% less damage from MAGICAL harm per point, capped at 75%, on top of your armour's Fortitude.",
+	"levelup.resilience": "+1 Defense per point, pooled with your armour and bent into less BODILY harm with diminishing returns (never past 80%).",
+	"levelup.fortitude": "+1 Fortitude per point, on top of your armour's, bent into less MAGICAL harm with diminishing returns (never past 80%).",
 	"levelup.reflexes": "0.75% dodge chance per point, capped at 15%.",
 	"levelup.dexterity": "0.75% crit chance per point (double damage, ignores cover), capped at 15%.",
 }
@@ -1600,6 +1603,14 @@ func _build_battle_ui() -> void:
 	_style_standard_button(battle_beastiary_button)
 	battle_panel.add_child(battle_beastiary_button)
 
+	turn_order_box = VBoxContainer.new()
+	turn_order_box.position = Vector2(get_viewport().get_visible_rect().size.x - 214, 104)
+	turn_order_box.custom_minimum_size = Vector2(198, 0)
+	turn_order_box.add_theme_constant_override("separation", 3)
+	turn_order_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	turn_order_box.visible = false
+	battle_panel.add_child(turn_order_box)
+
 # Wires up the shared hover/focus behavior every clickable menu button uses
 # across the whole HUD: a yellow highlight and a description shown in
 # whichever label belongs to that screen, for both mouse hover and (when
@@ -2792,6 +2803,91 @@ func battle_log(msg: String) -> void:
 	if battle_log_lines.size() > 4:
 		battle_log_lines.pop_front()
 	battle_log_label.text = "\n".join(battle_log_lines)
+
+# The turn-order strip: rows = [{side: "hero"|"ally"|"enemy", name, current, hp_frac, kind?, tint?}], the one
+# in progress first. Hero rows are gold-blue, allies green, enemies red; whoever acts now is lit up.
+func set_turn_order(rows: Array) -> void:
+	if turn_order_box == null:
+		return
+	for child in turn_order_box.get_children():
+		turn_order_box.remove_child(child)
+		child.queue_free()
+	turn_order_box.visible = not rows.is_empty()
+	if rows.is_empty():
+		return
+	var title := Label.new()
+	title.text = "TURN ORDER"
+	title.add_theme_font_size_override("font_size", 12)
+	title.add_theme_color_override("font_color", Color(0.75, 0.72, 0.6))
+	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	turn_order_box.add_child(title)
+	for r in rows:
+		turn_order_box.add_child(_make_turn_order_row(r))
+
+func _make_turn_order_row(r: Dictionary) -> Control:
+	var side: String = str(r.get("side", "enemy"))
+	var accent := Color(0.95, 0.5, 0.45)
+	if side == "hero":
+		accent = Color(0.45, 0.72, 1.0)
+	elif side == "ally":
+		accent = Color(0.5, 0.9, 0.55)
+	var current: bool = bool(r.get("current", false))
+	var panel := PanelContainer.new()
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var border: Color = Color(1.0, 0.9, 0.3) if current else accent * Color(1, 1, 1, 0.55)
+	var bg: Color = Color(0.2, 0.17, 0.08, 0.97) if current else PANEL_BG
+	panel.add_theme_stylebox_override("panel", _make_stylebox(bg, border, 3 if current else 1, 0, 3))
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_child(row)
+	# The unit's picture: the hero is the blue "@", everyone else wears the icon the battle grid gives them.
+	var icon_holder := Control.new()
+	icon_holder.custom_minimum_size = Vector2(28, 28)
+	icon_holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(icon_holder)
+	if side == "hero":
+		var at := Label.new()
+		at.text = "@"
+		at.add_theme_font_size_override("font_size", 22)
+		at.add_theme_color_override("font_color", accent)
+		at.position = Vector2(5, -3)
+		at.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		icon_holder.add_child(at)
+	else:
+		var icon := TextureRect.new()
+		var is_wolf: bool = str(r.get("kind", "")) == "wolf"
+		icon.texture = ENEMY_ICONS.get("Wolf", null) if is_wolf else (BLADE_ALLY_ICON if side == "ally" else ENEMY_ICONS.get(str(r.get("name", "")), null))
+		icon.modulate = r.get("tint", Color(1, 1, 1)) if side == "ally" and not is_wolf else Color(1, 1, 1)
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		icon.size = Vector2(28, 28)
+		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		icon_holder.add_child(icon)
+	var text_box := VBoxContainer.new()
+	text_box.add_theme_constant_override("separation", 1)
+	text_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	text_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(text_box)
+	var name_label := Label.new()
+	name_label.text = str(r.get("name", "?"))
+	name_label.add_theme_font_size_override("font_size", 14 if current else 13)
+	name_label.add_theme_color_override("font_color", Color(1.0, 0.95, 0.7) if current else Color(0.88, 0.88, 0.85))
+	name_label.clip_text = true
+	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	text_box.add_child(name_label)
+	var bar_bg := ColorRect.new()
+	bar_bg.color = Color(0.15, 0.15, 0.15)
+	bar_bg.custom_minimum_size = Vector2(0, 4)
+	bar_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	text_box.add_child(bar_bg)
+	var bar_fill := ColorRect.new()
+	bar_fill.color = accent
+	bar_fill.size = Vector2(150.0 * clampf(float(r.get("hp_frac", 1.0)), 0.0, 1.0), 4)
+	bar_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bar_bg.add_child(bar_fill)
+	return panel
 
 func hide_battle() -> void:
 	battle_panel.visible = false

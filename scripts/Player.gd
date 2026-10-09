@@ -15,6 +15,7 @@ const DojoScript := preload("res://scripts/Dojo.gd")
 const TalismansScript := preload("res://scripts/Talismans.gd")
 const PartyRulesScript := preload("res://scripts/PartyRules.gd")
 const PartyMemberScript := preload("res://scripts/PartyMember.gd")
+const DefenseScript := preload("res://scripts/Defense.gd")
 
 signal health_changed(current: int, max_health: int)
 signal xp_changed(current: int, needed: int)
@@ -86,7 +87,7 @@ var stat_might := 0
 var stat_resilience := 0
 var stat_reflexes := 0
 var stat_dexterity := 0
-# Fortitude: protection against MAGICAL harm (1 point = 1%, see fortitude_reduction). Locked at 0 until
+# Fortitude: protection against MAGICAL harm (points on the Defense.gd curve, see fortitude_reduction). Locked at 0 until
 # the Church's magical wing unlocks it (meta_fortitude_unlocked). Mental Mush adds extra points
 # every level-up; Smort Savage doubles the bonus pick put into it.
 var stat_fortitude := 0
@@ -167,11 +168,13 @@ var exhausted := false
 # stat: Fortune biases shop weapon-tier rolls.
 var luck_bonus := 0.0
 # Resilience (core stat, unlocked via the "resilience_unlock" skill node --
-# see _level_up/apply_bonus_stat): 1% damage reduction per point, capped at
-# 20%, stacking with armor. Derived fresh in _recalc_stats from
-# stat_resilience, not set directly from a skill-tree bonus.
+# see _level_up/apply_bonus_stat): each point is one point of Defense, pooled
+# with the armour's, clothes', shield's and War Chest's and bent into a cut by
+# Defense.gd (diminishing returns, 80% ceiling). resilience_reduction holds those
+# points as a fraction (points / 100) so it adds up with the other sources; it is
+# NOT the cut itself. Derived fresh in _recalc_stats from stat_resilience, not set
+# directly from a skill-tree bonus.
 const RESILIENCE_PCT_PER_POINT := 0.01
-const RESILIENCE_REDUCTION_CAP := 0.20
 var resilience_reduction := 0.0
 # The active save slot's locked-in difficulty (SaveData.gd:DIFFICULTIES) --
 # read by Main.gd:_setup_battle_grid to scale enemy HP/damage. Set in
@@ -449,13 +452,91 @@ func unequip_ally_talisman(member: RefCounted, talisman_id: String) -> bool:
 	member.gear.talismans.erase(talisman_id)
 	return true
 
+# --- Party armour and shields: the same one-holder rule. Rags (no armour at all) are never held, and the
+# free Wooden Buckler -- like the Club -- is always on offer to everyone, so neither can run out.
+
+func armor_holder(armor_id: String) -> RefCounted:
+	for m in party:
+		if m.armor_id() == armor_id:
+			return m
+	return null
+
+func shield_holder(shield_id: String) -> RefCounted:
+	for m in party:
+		if m.shield_id() == shield_id:
+			return m
+	return null
+
+# A shield with no price is a free fallback anyone may carry.
+func _shield_is_free(shield_id: String) -> bool:
+	return int(ShieldsScript.SHIELDS.get(shield_id, {}).get("price", 1)) == 0
+
+func ally_armor_block_reason(member: RefCounted, armor_id: String) -> String:
+	if member == null or not member.can_carry_gear():
+		return "This member can't carry gear."
+	if armor_id == "armor_rags" or not ArmorScript.TIERS.any(func(a): return a.id == armor_id):
+		return "That isn't armour."
+	if not owned_armor.has(armor_id):
+		return "You don't own that armour."
+	if str(equipped_armor.get("id", "")) == armor_id:
+		return "You are wearing it."
+	var holder: RefCounted = armor_holder(armor_id)
+	if holder != null and holder != member:
+		return "%s is wearing it." % holder.name
+	return ""
+
+func equip_ally_armor(member: RefCounted, armor_id: String) -> bool:
+	if ally_armor_block_reason(member, armor_id) != "":
+		return false
+	member.gear.armor = armor_id
+	return true
+
+func unequip_ally_armor(member: RefCounted) -> void:
+	if member != null:
+		member.gear.armor = ""
+
+func ally_shield_block_reason(member: RefCounted, shield_id: String) -> String:
+	if member == null or not member.can_carry_gear():
+		return "This member can't carry gear."
+	if not ShieldsScript.SHIELDS.has(shield_id):
+		return "That isn't a shield."
+	if not owned_shields.has(shield_id) and not _shield_is_free(shield_id):
+		return "You don't own that shield."
+	if _shield_is_free(shield_id):
+		return ""
+	if str(equipped_shield.get("id", "")) == shield_id:
+		return "You are using it."
+	var holder: RefCounted = shield_holder(shield_id)
+	if holder != null and holder != member:
+		return "%s is using it." % holder.name
+	return ""
+
+func equip_ally_shield(member: RefCounted, shield_id: String) -> bool:
+	if ally_shield_block_reason(member, shield_id) != "":
+		return false
+	member.gear.shield = shield_id
+	return true
+
+func unequip_ally_shield(member: RefCounted) -> void:
+	if member != null:
+		member.gear.shield = ""
+
+# You put on a shield: it comes off whichever member had it (the free Buckler can be in both hands).
+func equip_shield(shield: Dictionary) -> void:
+	equipped_shield = shield
+	_strip_from_allies("", "", "", str(shield.get("id", "")))
+
 # You took an item a member was holding: it comes off them (you have the final say).
-func _strip_from_allies(weapon_id: String, talisman_id: String) -> void:
+func _strip_from_allies(weapon_id: String, talisman_id: String, armor_id: String = "", shield_id: String = "") -> void:
 	for m in party:
 		if weapon_id != "" and weapon_id != "club" and m.weapon_id() == weapon_id:
 			m.gear.weapon = ""
 		if talisman_id != "":
 			m.gear.talismans.erase(talisman_id)
+		if armor_id != "" and armor_id != "armor_rags" and m.armor_id() == armor_id:
+			m.gear.armor = ""
+		if shield_id != "" and not _shield_is_free(shield_id) and m.shield_id() == shield_id:
+			m.gear.shield = ""
 
 # A level-appropriate slot cap can shrink if a member is ever re-levelled; trim any surplus.
 func trim_ally_talismans(member: RefCounted) -> void:
@@ -1416,6 +1497,7 @@ func try_buy_armor(armor: Dictionary) -> bool:
 	var id: String = armor.id
 	if owned_armor.has(id):
 		equipped_armor = armor
+		_strip_from_allies("", "", id)
 		refresh_armor_effects()
 		return true
 	# Pelt armours are crafted at the Blacksmith, never bought.
@@ -1428,6 +1510,7 @@ func try_buy_armor(armor: Dictionary) -> bool:
 	coins_changed.emit(coins)
 	owned_armor[id] = true
 	equipped_armor = armor
+	_strip_from_allies("", "", id)
 	refresh_armor_effects()
 	return true
 
@@ -1464,6 +1547,11 @@ func armor_tier_damage_reduction() -> float:
 	var armor_id: String = equipped_armor.get("id", "")
 	return equipped_armor.get("damage_reduction", 0.0) + BlacksmithScript.armor_bonus(get_armor_upgrade_level(armor_id))
 
+# The Defense an armour gives as a fraction (x100 = points), Blacksmith levels included -- for a
+# member wearing it; the hero's own goes through armor_tier_damage_reduction.
+func armor_defense_fraction(armor: Dictionary) -> float:
+	return float(armor.get("damage_reduction", 0.0)) + BlacksmithScript.armor_bonus(get_armor_upgrade_level(str(armor.get("id", ""))))
+
 # --- Armour traits and Fortitude -------------------------------------------------------------
 # The worn armour's signature effect (Armor.gd lists the ids) and its numbers.
 func armor_trait() -> String:
@@ -1484,13 +1572,20 @@ func armor_speed_bonus() -> int:
 func fortitude_total() -> float:
 	return float(equipped_armor.get("fortitude", 0)) + shield_fortitude() + float(stat_fortitude) + talisman_bonus("fortitude")
 
-# Magical harm cut by Fortitude alone: 1% a point, capped at 75%, and a negative total (Thornmail)
-# makes spells hurt more, down to +50%.
+# Magical harm cut by Fortitude alone, on the Defense.gd curve (diminishing returns towards 80%); a
+# negative total (Thornmail) makes spells hurt more, towards +50%.
 func fortitude_reduction() -> float:
-	return clampf(fortitude_total() / 100.0, FORTITUDE_NEGATIVE_FLOOR, FORTITUDE_REDUCTION_CAP)
+	return DefenseScript.reduction(fortitude_total())
 
-const FORTITUDE_REDUCTION_CAP := 0.75
-const FORTITUDE_NEGATIVE_FLOOR := -0.5
+# Points of Defense against BODILY harm from worn gear and stats: armour (with clothes, talismans and
+# Blacksmith levels), Resilience, War Chest and the shield. A point is the old 1%. Main.gd adds the
+# situational ones (Martyr, a Resilience Potion, Last Stand) on top before bending the total.
+func bodily_defense_points() -> float:
+	return (armor_damage_reduction() + resilience_reduction + meta_war_chest_reduction + shield_damage_reduction_pct()) * 100.0
+
+# Bodily harm cut by the above alone (what the Inventory shows).
+func bodily_reduction() -> float:
+	return DefenseScript.reduction(bodily_defense_points())
 
 # A shield's skew towards Fortitude (Phantom Guard); only while it is actually usable.
 func shield_fortitude() -> float:
@@ -1533,6 +1628,7 @@ func try_craft_armor(armor: Dictionary) -> bool:
 	coins_changed.emit(coins)
 	owned_armor[armor.id] = true
 	equipped_armor = armor
+	_strip_from_allies("", "", str(armor.id))
 	refresh_armor_effects()
 	return true
 
@@ -1587,7 +1683,7 @@ func get_shield_price(shield: Dictionary) -> int:
 func try_buy_shield(shield: Dictionary) -> bool:
 	var id: String = shield.id
 	if owned_shields.has(id):
-		equipped_shield = shield
+		equip_shield(shield)
 		return true
 	var price := get_shield_price(shield)
 	if coins < price:
@@ -1595,7 +1691,7 @@ func try_buy_shield(shield: Dictionary) -> bool:
 	coins -= price
 	coins_changed.emit(coins)
 	owned_shields[id] = true
-	equipped_shield = shield
+	equip_shield(shield)
 	return true
 
 # Weapon-compat gate shared by every shield helper below -- normally just
@@ -2027,7 +2123,7 @@ func _recalc_stats() -> void:
 	# bloodmoon_stacks directly -- see _apply_single_hit/_on_enemy_died).
 	move_speed = stat_agility * (1.0 + talisman_bonus("move_speed_pct") + bloodmoon_stacks * BLOODMOON_SPEED_PCT_PER_STACK)
 	attack_cooldown_max = max(MIN_ATTACK_COOLDOWN, BASE_ATTACK_COOLDOWN - COOLDOWN_REDUCTION_PER_AGILITY * (stat_agility - AGILITY_START))
-	resilience_reduction = min(RESILIENCE_REDUCTION_CAP, stat_resilience * RESILIENCE_PCT_PER_POINT)
+	resilience_reduction = stat_resilience * RESILIENCE_PCT_PER_POINT
 	meta_dodge_chance = min(REFLEXES_DODGE_CAP, stat_reflexes * REFLEXES_PCT_PER_POINT)
 	meta_crit_chance = min(DEXTERITY_CRIT_CAP, stat_dexterity * DEXTERITY_PCT_PER_POINT)
 	health_changed.emit(health, max_health)

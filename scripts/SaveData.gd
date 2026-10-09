@@ -116,11 +116,11 @@ static var UPGRADES := {
 	# Renamed from "Fortitude" -- no longer a %/level damage-reduction node
 	# itself, just the unlock gate for the new Resilience level-up stat
 	# (Player.gd:stat_resilience / resilience_reduction). A single purchase.
-	"resilience_unlock": {"name": "Resilience", "stat_bonus": 1, "base_cost": 18, "cost_step": 10, "max_level": 1, "description": "Unlocks Resilience as a level-up choice -- 1% damage reduction per point owned, capped at 20%, stacking with armor.", "prereqs": [{"id": "stamina", "min_level": 1}]},
+	"resilience_unlock": {"name": "Resilience", "stat_bonus": 1, "base_cost": 18, "cost_step": 10, "max_level": 1, "description": "Unlocks Resilience as a level-up choice -- +1 Defense per point owned, pooled with your armour. Defense has diminishing returns and never passes 80% reduction.", "prereqs": [{"id": "stamina", "min_level": 1}]},
 	# --- The magical wing: Fortitude, protection against MAGICAL harm (Player.gd:stat_fortitude). Warded Mind
 	# unlocks it as a level-up stat; Mental Mush grows it by more every level-up; Smort Savage doubles the
 	# bonus pick put into it. (Names are the user's working titles; costs are drafts.) ---
-	"warded_mind": {"name": "Warded Mind", "stat_bonus": 1, "base_cost": 20, "cost_step": 12, "max_level": 1, "description": "Unlocks Fortitude as a level-up choice -- 1% less damage from MAGICAL harm per point, capped at 75%, on top of your armour's Fortitude."},
+	"warded_mind": {"name": "Warded Mind", "stat_bonus": 1, "base_cost": 20, "cost_step": 12, "max_level": 1, "description": "Unlocks Fortitude as a level-up choice -- +1 Fortitude per point, on top of your armour's. Fortitude has diminishing returns and never passes 80% reduction of MAGICAL harm."},
 	"mental_mush": {"name": "Mental Mush", "stat_bonus": 1, "base_cost": 30, "cost_step": 18, "max_level": 3, "description": "Fortitude grows by +1 more per level owned on every level-up.", "prereqs": [{"id": "warded_mind", "min_level": 1}]},
 	"smort_savage": {"name": "Smort Savage", "stat_bonus": 1, "base_cost": 40, "cost_step": 0, "max_level": 1, "description": "The bonus pick you put into Fortitude counts double.", "prereqs": [{"id": "mental_mush", "min_level": 1}]},
 	"potions": {"name": "Provisions", "stat_bonus": 1, "base_cost": 25, "cost_step": 15, "description": "+1 healing item at the start of every run.", "prereqs": [{"id": "resilience_unlock", "min_level": 1}]},
@@ -141,7 +141,7 @@ static var UPGRADES := {
 	# now a %/level chance (Player.gd:meta_favour_chance) on ANY hit that
 	# would drop you to 0 HP, still only ever once per battle.
 	"favour": {"name": "Favour", "stat_bonus": 0.01, "base_cost": 250, "cost_step": 100, "max_level": 5, "description": "1% chance per level, on any hit that would drop you to 0 HP, to survive with 1 HP instead (once per battle), capped at 5%.", "prereqs": [{"id": "undying", "min_level": 1}]},
-	"last_stand": {"name": "Last Stand", "stat_bonus": 0.01, "base_cost": 50, "cost_step": 30, "max_level": 5, "description": "+1% damage reduction per level for every 10% HP you're missing -- the more hurt you are, the tankier you get.", "prereqs": [{"id": "resilience_unlock", "min_level": 1}]},
+	"last_stand": {"name": "Last Stand", "stat_bonus": 0.01, "base_cost": 50, "cost_step": 30, "max_level": 5, "description": "+1 Defense and Fortitude per level for every 10% HP you're missing -- the more hurt you are, the tankier you get.", "prereqs": [{"id": "resilience_unlock", "min_level": 1}]},
 	"shield_mastery": {"name": "Shield Mastery", "stat_bonus": 0.08, "base_cost": 35, "cost_step": 20, "max_level": 3, "description": "+8% shield block chance per level, on any shield you carry.", "prereqs": [{"id": "resilience_unlock", "min_level": 1}]},
 	"unbreakable_guard": {"name": "Unbreakable Guard", "stat_bonus": 1, "base_cost": 250, "cost_step": 0, "max_level": 1, "description": "Your equipped shield stays active even with a two-handed weapon equipped.", "prereqs": [{"id": "shield_mastery", "min_level": 3}]},
 	# Gated on a LIFETIME flag (survives permadeath, see

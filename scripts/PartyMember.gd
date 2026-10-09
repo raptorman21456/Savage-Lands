@@ -2,6 +2,9 @@ extends RefCounted
 class_name PartyMember
 
 const PartyRulesScript := preload("res://scripts/PartyRules.gd")
+const DefenseScript := preload("res://scripts/Defense.gd")
+const ArmorScript := preload("res://scripts/Armor.gd")
+const ShieldsScript := preload("res://scripts/Shields.gd")
 
 # One recruited party member for the length of a run: who they are, how far they
 # have levelled, what they wear and (for a wolf) how many battles of loyalty are
@@ -46,6 +49,40 @@ func weapon_id() -> String:
 
 func talisman_ids() -> Array:
 	return gear.get("talismans", [])
+
+func armor_id() -> String:
+	return str(gear.get("armor", ""))
+
+func shield_id() -> String:
+	return str(gear.get("shield", ""))
+
+# The armour it wears, as the full Armor.gd entry ({} = none).
+func armor_dict() -> Dictionary:
+	return ArmorScript.find(armor_id()) if armor_id() != "" else {}
+
+# The shield it carries, as the full Shields.gd entry ({} = none).
+func shield_dict() -> Dictionary:
+	return ShieldsScript.SHIELDS.get(shield_id(), {}) if shield_id() != "" else {}
+
+# A shield only does anything while a hand is free for it: bare hands or a one-handed weapon
+# (Shields.COMPATIBLE_WEAPONS). The Knight is the exception -- it can hold a shield alongside a
+# two-handed weapon.
+func shield_usable() -> bool:
+	if shield_dict().is_empty():
+		return false
+	if bool(rules().get("shield_with_two_handed", false)):
+		return true
+	return weapon_id() == "" or ShieldsScript.is_weapon_compatible(weapon_id())
+
+# The shield special's power (thorns / vengeance / knockback flag), stronger with the weapon the
+# shield was designed around -- the same rule the hero's shield follows.
+func shield_special_pct() -> float:
+	var sh: Dictionary = shield_dict()
+	if sh.is_empty():
+		return 0.0
+	if ShieldsScript.base_weapon_id(weapon_id()) == str(sh.get("synergy_weapon", "")):
+		return float(sh.get("synergy_special_pct", 0.0))
+	return float(sh.get("special_pct", 0.0))
 
 func talisman_slot_count() -> int:
 	return PartyRulesScript.talisman_slots(kind, level)
@@ -107,12 +144,16 @@ func max_hp() -> int:
 func attack() -> float:
 	return stat("attack")
 
-# Defense is a percentage cut to incoming damage: one point is one percent.
+# Points of Defense against bodily harm (Defense.gd bends them into a cut with diminishing returns).
 func defense_pct() -> float:
 	var r := rules()
 	if r.has("defense_fixed"):
 		return float(r.defense_fixed)
 	return maxf(0.0, stat("defense"))
+
+# The most of its bodily and magical harm this member can ever shrug off.
+func defense_cap() -> float:
+	return float(rules().get("defense_cap", DefenseScript.BASE_CAP))
 
 func speed() -> float:
 	return stat("speed")

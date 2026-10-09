@@ -102,7 +102,7 @@ function secCharacter(p) {
       <tr><td>Move range (battle)</td><td>${MC.PLAYER_BASE_MOVE_RANGE + Math.max(0, Math.trunc((p.stat_agility - PC.AGILITY_START) / MC.AGILITY_PER_EXTRA_MOVE)) + Math.trunc(p.talisman_bonus("move_range")) + Math.trunc(p.armor_trait_value("move_bonus", 0))} tiles</td></tr>
       <tr><td>Stamina (max / start)</td><td>${p.max_stamina} / ${round(p.max_stamina * PC.BATTLE_START_STAMINA_PCT)}</td></tr>
       <tr><td>Crit / Dodge</td><td>${pct(p.crit_chance_total(), 1)} / ${pct(p.dodge_chance_total(), 1)}</td></tr>
-      <tr><td>Damage reduction (armor+clothes+shield+res.)</td><td>${pct(Math.min(0.9, p.armor_damage_reduction() + p.resilience_reduction + p.meta_war_chest_reduction + p.shield_damage_reduction_pct()), 1)}</td></tr>
+      <tr><td>Damage reduction (Defense ${Math.round(p.bodily_defense_points())}: armor+clothes+shield+res.)</td><td>${pct(p.bodily_reduction(), 1)}</td></tr>
       <tr><td>Fortitude (vs magical harm)</td><td>${p.fortitude_total()} (${pct(p.fortitude_reduction(), 1)} reduction)</td></tr>
       <tr><td>Talisman slots</td><td>${slotsForLevel(cfg.level)}</td></tr></table>`);
 }
@@ -151,9 +151,9 @@ function secWeapon(p) {
 function secGear() {
   const armor = armorById(cfg.armor);
   return section("Armor, clothing & shield", `
-    <div class="row"><label>Armor</label>${selectHtml("armor", D.armor.map((a) => [a.id, `${a.name} (−${pct(a.damage_reduction)} bodily, ${a.fortitude >= 0 ? "+" : ""}${a.fortitude} Fort${a.recipe ? ", crafted" : ""})`]), cfg.armor)}</div>
+    <div class="row"><label>Armor</label>${selectHtml("armor", D.armor.map((a) => [a.id, `${a.name} (+${Math.round(a.damage_reduction * 100)} Def, ${a.fortitude >= 0 ? "+" : ""}${a.fortitude} Fort${a.recipe ? ", crafted" : ""})`]), cfg.armor)}</div>
     <div class="row"><label>Smithing</label>${numHtml("armor_level", armor && armor.metal ? cfg.armor_level : 0, 0, BS.ARMOR_MAX_LEVEL)} <span class="dim">${armor && armor.metal ? "+2.5% DR per level" : "(metal armor only)"}</span></div>
-    ${["head", "body", "feet"].map((slot) => `<div class="row"><label>${capital(slot)}</label>${selectHtml("clothing." + slot, [["", "None"], ...D.clothing.filter((c) => c.slot === slot).map((c) => [c.id, `${c.name} (−${pct(c.damage_reduction)})`])], cfg.clothing[slot])}</div>`).join("")}
+    ${["head", "body", "feet"].map((slot) => `<div class="row"><label>${capital(slot)}</label>${selectHtml("clothing." + slot, [["", "None"], ...D.clothing.filter((c) => c.slot === slot).map((c) => [c.id, `${c.name} (+${Math.round(c.damage_reduction * 100)} Def)`])], cfg.clothing[slot])}</div>`).join("")}
     <div class="row"><label>Shield</label>${selectHtml("shield", [["", "None"], ...Object.values(D.shields).map((s) => [s.id, s.name])], cfg.shield)}</div>
     ${cfg.shield ? `<div class="dim">${esc(D.shields[cfg.shield].description)}</div>` : ""}`);
 }
@@ -216,7 +216,7 @@ function secParty(p) {
     const picks = r.levels ? pickable.map((s) => `<span class="stepper">${s}<button data-act="mpick" data-i="${i}" data-s="${s}" data-d="-1">−</button><span>${(m.picks || {})[s] || 0}</span><button data-act="mpick" data-i="${i}" data-s="${s}" data-d="1">+</button></span>`).join(" ") : "";
     const pm = new PartyMemberModel(m.kind, m.level, m.picks);
     return `<div class="list-row"><b class="grow">${esc(r.name)}</b>${r.levels ? `Lv <input type="number" data-act="mlevel" data-i="${i}" value="${m.level}" min="1" max="99" style="width:56px">` : ""}<button data-act="mdel" data-i="${i}">✕</button>
-      <div style="width:100%" class="dim">HP ${pm.max_hp()} · ATK ${pm.attack().toFixed(1)} · DEF ${pm.defense_pct().toFixed(1)}% · move ${pm.move_tiles()} · range ${r.attack_range}</div>
+      <div style="width:100%" class="dim">HP ${pm.max_hp()} · ATK ${pm.attack().toFixed(1)} · DEF ${pm.defense_pct().toFixed(1)} (−${Math.round(defense_reduction(pm.defense_pct(), r.defense_cap ?? DEF.BASE_CAP) * 100)}%) · move ${pm.move_tiles()} · range ${r.attack_range}</div>
       ${picks ? `<div style="width:100%">${picks} <span class="${left < 0 ? "warn" : "dim"}">(${left} pts left)</span></div>` : ""}</div>`;
   }).join("");
   return section("Party", `
@@ -361,13 +361,15 @@ function onConfigEvent(e) {
 }
 
 // ================================================================== battle: start / refresh
-function startBattle(seed) {
+async function startBattle(seed) {
   if (cfg.enemies.length === 0) { alert("Add at least one enemy to the encounter."); return; }
   if (cfg.enforce_gates) { /* reserved */ }
   autoRunning = false; busy = false; uiMenu = "main"; hoverDesc = "";
   try { sim = createSim(battleCfg(), seed ?? cfg.seed); }
   catch (e) { alert("Could not start battle: " + e.message); console.error(e); return; }
   sim.promptHandler = uiPrompt;
+  try { await sim.timeline_begin(); }   // speed decides who acts first -- a fast enemy may open the fight
+  catch (e) { alert("Could not start battle: " + e.message); console.error(e); return; }
   $("#seedBox").value = cfg.seed; $("#seedBoxSetup").value = cfg.seed;
   showView("battle");
   refresh();
@@ -471,7 +473,7 @@ function renderSide() {
     <tr><td>Items left</td><td>${p.potion_queue.length}${p.potion_queue.length ? " (next: " + esc(consumableById(p.potion_queue[0]).name) + ")" : ""}</td></tr>
     <tr><td>Arrows F/Z/B</td><td>${p.owned_arrows.flame}/${p.owned_arrows.freeze}/${p.owned_arrows.bomb}</td></tr><tr><td>Coins</td><td>${p.coins}</td></tr>
     <tr><td>XP</td><td>${p.xp}/${p.xp_to_next || "max"}</td></tr></table></div>`;
-  const allies = sim.battle_allies.length ? `<div class="panel"><h2>Allies</h2>${sim.battle_allies.map((a) => `<div class="ecard${sim.battle_commanding_ally === a ? " sel" : ""}"><span class="nm">${esc(a.name)}</span> <small class="dim">ATK ${a.attack !== undefined ? a.attack.toFixed(1) : "—"} · DEF ${a.defense_pct || 0}% · mv ${a.move_range}</small>${hpBar(a.hp, a.max_hp, "hp")}</div>`).join("")}</div>` : "";
+  const allies = sim.battle_allies.length ? `<div class="panel"><h2>Allies</h2>${sim.battle_allies.map((a) => `<div class="ecard${sim.battle_commanding_ally === a ? " sel" : ""}"><span class="nm">${esc(a.name)}</span> <small class="dim">ATK ${a.attack !== undefined ? a.attack.toFixed(1) : "—"} · DEF ${(a.defense_pct || 0).toFixed(0)} (−${Math.round(defense_reduction(a.defense_pct || 0, a.defense_cap ?? DEF.BASE_CAP) * 100)}%) · mv ${a.move_range}</small>${hpBar(a.hp, a.max_hp, "hp")}</div>`).join("")}</div>` : "";
   const targetIdx = currentActor() ? sim._ally_effective_target_index(currentActor()) : sim._effective_target_index();
   const enemies = `<div class="panel"><h2>Enemies (${sim.battle_units.length})</h2>${sim.battle_units.map((u, i) => {
     const tr = TRAITS[u.name] || {};
@@ -483,7 +485,17 @@ function renderSide() {
   }).join("") || '<div class="dim">All enemies defeated.</div>'}</div>`;
   const st = sim.stats;
   const stats = `<div class="panel"><h2>Battle stats</h2><table class="kv"><tr><td>Rounds</td><td>${st.turns}</td></tr><tr><td>Damage dealt</td><td>${st.damage_dealt}</td></tr><tr><td>Damage taken</td><td>${st.damage_taken}</td></tr><tr><td>Kills</td><td>${st.kills}</td></tr><tr><td>XP gained</td><td>${st.xp_gained}</td></tr><tr><td>Items used</td><td>${st.potions_used}</td></tr></table></div>`;
-  s.innerHTML = players + allies + enemies + stats;
+  // who acts now and who is next (speed decides): the turn in progress first
+  let order = "";
+  if (sim.battle_use_timeline) {
+    const rows = [];
+    const cur = sim.battle_current_actor && sim._timeline_find({ kind: sim.battle_current_actor.kind, tid: sim.battle_current_actor.tid });
+    if (cur) rows.push({ kind: sim.battle_current_actor.kind, unit: sim.battle_current_actor.unit, current: true });
+    for (const r of sim._timeline_preview(8 - rows.length)) rows.push(r);
+    const col = { hero: "#7ab8ff", ally: "#80e68c", enemy: "#f08078" };
+    order = `<div class="panel"><h2>Turn order</h2>${rows.map((r) => `<div class="ecard${r.current ? " sel" : ""}" style="border-left:4px solid ${col[r.kind]}"><span class="nm">${r.kind === "hero" ? "You" : esc(r.unit.name)}</span> <small class="dim">speed ${sim._unit_speed(r.kind, r.unit).toFixed(1)}${r.current ? " · acting" : ""}</small></div>`).join("")}</div>`;
+  }
+  s.innerHTML = players + order + allies + enemies + stats;
 }
 
 function renderLog() {

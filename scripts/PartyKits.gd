@@ -126,13 +126,12 @@ const KITS := {
 			"description": "A quick nip at 80% damage with a 50% chance to halve the enemy's speed."},
 	],
 	"druid": [
-		# The doc names three spells -- a heal, a buff and a movement spell -- but not their names or the
-		# first two costs. DRAFT: Heal 30 and Empower 30 mana; Hasten is the doc's 40.
-		{"id": "druid_heal", "name": "Heal", "stamina_cost": 30, "dmg_mult": 0.0, "effect": "druid_heal",
+		# The doc's names and costs (2026-10-09): Restore 40 mana, Empower 30 mana, Vitalize 40 mana.
+		{"id": "druid_heal", "name": "Restore", "stamina_cost": 40, "dmg_mult": 0.0, "effect": "druid_heal",
 			"description": "Heal an ally for 25% of their max HP plus a third of the Druid's magic (a half once upgraded at the Wizard's Tower)."},
 		{"id": "druid_buff", "name": "Empower", "stamina_cost": 30, "dmg_mult": 0.0, "effect": "druid_buff",
 			"description": "An ally deals 1.5x damage for 3 turns."},
-		{"id": "druid_sprint", "name": "Hasten", "stamina_cost": 40, "dmg_mult": 0.0, "effect": "sprint", "keeps_turn": true,
+		{"id": "druid_sprint", "name": "Vitalize", "stamina_cost": 40, "dmg_mult": 0.0, "effect": "sprint", "keeps_turn": true,
 			"description": "Doesn't end the turn: double the Druid's movement, but her attack drops to a flat (attack / 2) + 5."},
 	],
 	"guardian": [

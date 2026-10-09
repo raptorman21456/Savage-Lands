@@ -246,11 +246,10 @@ func _build_weapons_tab(container: VBoxContainer) -> void:
 		var bodily_pct: int = int(round((float(armor.damage_reduction) + BlacksmithScript.armor_bonus(armor_level)) * 100.0))
 		armor_grid.add_child(_make_grid_cell(
 			ArmorScript.icon_path(armor), armor_title,
-			"-%d%% bodily  %+d Fort" % [bodily_pct, int(armor.fortitude)], armor.id == worn_id,
+			"+%d Def  %+d Fort" % [bodily_pct, int(armor.fortitude)], armor.id == worn_id,
 			armor.get("description", ""), _on_armor_picked.bind(armor)
 		))
-	var bodily_total: float = minf(0.9, _player.armor_damage_reduction() + _player.resilience_reduction + _player.meta_war_chest_reduction + _player.shield_damage_reduction_pct())
-	_add_plain_label(container, "Bodily harm: -%d%% (armour, clothes, Resilience and shield).   Magical harm: -%d%% (Fortitude %d)." % [int(round(bodily_total * 100.0)), int(round(_player.fortitude_reduction() * 100.0)), int(round(_player.fortitude_total()))])
+	_add_plain_label(container, "Bodily harm: -%d%% (Defense %d: armour, clothes, Resilience and shield).   Magical harm: -%d%% (Fortitude %d).   Diminishing returns, never past 80%%." % [int(round(_player.bodily_reduction() * 100.0)), int(round(_player.bodily_defense_points())), int(round(_player.fortitude_reduction() * 100.0)), int(round(_player.fortitude_total()))])
 
 	# Clothes: light extra armour pieces from the Flea Market tailor, one
 	# worn per slot -- click any owned piece to wear it (see Player.equip_clothing).
@@ -269,7 +268,7 @@ func _build_weapons_tab(container: VBoxContainer) -> void:
 			var worn: bool = _player.equipped_clothing.get(piece.slot, "") == piece.id
 			clothes_grid.add_child(_make_grid_cell(
 				"res://assets/%s.png" % piece.icon, piece.name,
-				"%s  -%d%%" % [ClothingScript.SLOT_LABELS[piece.slot], int(round(piece.damage_reduction * 100))], worn,
+				"%s  +%d Def" % [ClothingScript.SLOT_LABELS[piece.slot], int(round(piece.damage_reduction * 100))], worn,
 				piece.description, func(): _on_clothing_cell_pressed(piece.id)
 			))
 
@@ -485,7 +484,7 @@ func _on_clothing_cell_pressed(piece_id: String) -> void:
 func _on_shield_cell_pressed(shield: Dictionary) -> void:
 	if shield.get("id", "") == _player.equipped_shield.get("id", ""):
 		return
-	_player.equipped_shield = shield
+	_player.equip_shield(shield)
 	_play_sfx("purchase")
 	_refresh()
 
@@ -633,7 +632,7 @@ func _build_party_gear(container: VBoxContainer) -> void:
 	if carriers.is_empty():
 		return
 	_add_section_heading(container, "PARTY GEAR")
-	_add_plain_label(container, "Members use weapons and talismans from your own collection -- each item can only be with one of you at a time.")
+	_add_plain_label(container, "Members use weapons, armour, shields and talismans from your own collection -- each item can only be with one of you at a time.")
 	for member in carriers:
 		_add_member_gear_rows(container, member)
 
@@ -671,6 +670,63 @@ func _add_member_gear_rows(container: VBoxContainer, member) -> void:
 			weapon_pick.select(idx)
 	weapon_pick.item_selected.connect(func(i): _on_member_weapon_picked(member, str(weapon_pick.get_item_metadata(i))))
 	weapon_row.add_child(weapon_pick)
+
+	# Armour and shield come from your collection too (one wearer at a time; the free Buckler can be shared).
+	var armor_row := HBoxContainer.new()
+	armor_row.add_theme_constant_override("separation", 10)
+	container.add_child(armor_row)
+	var armor_label := Label.new()
+	armor_label.text = "Armour"
+	armor_label.custom_minimum_size = Vector2(100, 0)
+	armor_row.add_child(armor_label)
+	var armor_pick := OptionButton.new()
+	armor_pick.custom_minimum_size = Vector2(330, 0)
+	armor_pick.add_item("(none)")
+	armor_pick.set_item_metadata(0, "")
+	for armor in ArmorScript.TIERS:
+		if armor.id == "armor_rags" or not _player.owned_armor.has(armor.id):
+			continue
+		var armor_reason: String = _player.ally_armor_block_reason(member, armor.id)
+		var armor_idx: int = armor_pick.item_count
+		var armor_text: String = "%s  (+%d Def, %+d Fort)" % [armor.name, int(round(_player.armor_defense_fraction(armor) * 100.0)), int(armor.fortitude)]
+		armor_pick.add_item(armor_text if armor_reason == "" else "%s  (%s)" % [armor.name, armor_reason])
+		armor_pick.set_item_metadata(armor_idx, armor.id)
+		armor_pick.set_item_disabled(armor_idx, armor_reason != "")
+		if armor.id == member.armor_id():
+			armor_pick.select(armor_idx)
+	armor_pick.item_selected.connect(func(i): _on_member_armor_picked(member, str(armor_pick.get_item_metadata(i))))
+	armor_pick.tooltip_text = "Defense is bent into a damage cut with diminishing returns. Fortitude does the same against magic."
+	armor_row.add_child(armor_pick)
+
+	var shield_row := HBoxContainer.new()
+	shield_row.add_theme_constant_override("separation", 10)
+	container.add_child(shield_row)
+	var shield_label := Label.new()
+	shield_label.text = "Shield"
+	shield_label.custom_minimum_size = Vector2(100, 0)
+	shield_row.add_child(shield_label)
+	var shield_pick := OptionButton.new()
+	shield_pick.custom_minimum_size = Vector2(330, 0)
+	shield_pick.add_item("(none)")
+	shield_pick.set_item_metadata(0, "")
+	for shield_id in ShieldsScript.SHIELD_IDS:
+		var shield_reason: String = _player.ally_shield_block_reason(member, shield_id)
+		if shield_reason == "You don't own that shield.":
+			continue
+		var shield_data: Dictionary = ShieldsScript.SHIELDS[shield_id]
+		var shield_idx: int = shield_pick.item_count
+		shield_pick.add_item(str(shield_data.name) if shield_reason == "" else "%s  (%s)" % [shield_data.name, shield_reason])
+		shield_pick.set_item_metadata(shield_idx, shield_id)
+		shield_pick.set_item_disabled(shield_idx, shield_reason != "")
+		if shield_id == member.shield_id():
+			shield_pick.select(shield_idx)
+	shield_pick.item_selected.connect(func(i): _on_member_shield_picked(member, str(shield_pick.get_item_metadata(i))))
+	shield_row.add_child(shield_pick)
+	if member.shield_id() != "" and not member.shield_usable():
+		var inert_label := Label.new()
+		inert_label.text = "(needs a free hand -- it does nothing with this weapon)"
+		inert_label.add_theme_color_override("font_color", Color(0.85, 0.6, 0.45))
+		shield_row.add_child(inert_label)
 
 	var talisman_row := HBoxContainer.new()
 	talisman_row.add_theme_constant_override("separation", 8)
@@ -710,6 +766,24 @@ func _on_member_weapon_picked(member, weapon_id: String) -> void:
 		_player.unequip_ally_weapon(member)
 	else:
 		ok = _player.equip_ally_weapon(member, weapon_id)
+	_play_sfx("purchase" if ok else "error")
+	_refresh()
+
+func _on_member_armor_picked(member, armor_id: String) -> void:
+	var ok := true
+	if armor_id == "":
+		_player.unequip_ally_armor(member)
+	else:
+		ok = _player.equip_ally_armor(member, armor_id)
+	_play_sfx("purchase" if ok else "error")
+	_refresh()
+
+func _on_member_shield_picked(member, shield_id: String) -> void:
+	var ok := true
+	if shield_id == "":
+		_player.unequip_ally_shield(member)
+	else:
+		ok = _player.equip_ally_shield(member, shield_id)
 	_play_sfx("purchase" if ok else "error")
 	_refresh()
 

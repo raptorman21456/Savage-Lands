@@ -333,6 +333,18 @@ static func _apply_party_gear(p, member, entry: Dictionary) -> void:
 			p.owned_weapons[weapon.id] = true
 			if weapon.id == "club" or (p.weapon_holder(weapon.id) == null and p.current_weapon_base.get("id", "") != weapon.id):
 				member.gear.weapon = weapon.id
+	# Armour and shield: any, free of the ownership rules, but still one holder per item (the free
+	# Buckler excepted), so one you or an earlier member already has is skipped.
+	var armor_id: String = str(entry.get("armor", ""))
+	if armor_id != "" and armor_id != "armor_rags" and not ArmorScript.find(armor_id).is_empty():
+		p.owned_armor[armor_id] = true
+		if str(p.equipped_armor.get("id", "")) != armor_id and p.armor_holder(armor_id) == null:
+			member.gear.armor = armor_id
+	var shield_id: String = str(entry.get("shield", ""))
+	if shield_id != "" and ShieldsScript.SHIELDS.has(shield_id):
+		p.owned_shields[shield_id] = true
+		if p._shield_is_free(shield_id) or (str(p.equipped_shield.get("id", "")) != shield_id and p.shield_holder(shield_id) == null):
+			member.gear.shield = shield_id
 	member.gear.talismans = []
 	for id in entry.get("talismans", []):
 		if member.gear.talismans.size() >= member.talisman_slot_count():

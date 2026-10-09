@@ -73,7 +73,7 @@ Object.assign(Sim.prototype, {
       const dmg = round(u.max_hp * MC.CLIFF_FALL_DAMAGE_PCT);
       u.hp -= dmg;
       this.log(`Your ${u.name} falls and takes ${dmg} damage!`, "bad");
-      if (u.hp <= 0) { this.battle_menu_state = "main"; this._advance_ally_queue(); }
+      if (u.hp <= 0) { this.battle_menu_state = "main"; this._ally_command_over(); }
     }
   },
 
@@ -135,13 +135,12 @@ Object.assign(Sim.prototype, {
     const p = this.player;
     let reduced = dmg;
     if (!traits.ignore_cover && this._has_adjacent_rock(this.battle_player_tile)) reduced = round(reduced * (1.0 - MC.ROCK_COVER_REDUCTION));
-    let total = p.armor_damage_reduction() + p.resilience_reduction + p.meta_war_chest_reduction + p.shield_damage_reduction_pct() + this._generic_reduction();
+    let points = p.bodily_defense_points() + this._generic_reduction() * 100.0;
     if (p.armor_trait() === "martyr") {
       const missing = 1.0 - p.health / p.max_health;
-      total += p.armor_trait_value("bodily_per_10_missing", 0.0) * Math.floor(missing * 10.0);
+      points += p.armor_trait_value("bodily_per_10_missing", 0.0) * Math.floor(missing * 10.0) * 100.0;
     }
-    total = clamp(total, 0.0, 0.9);
-    reduced = round(reduced * (1.0 - total));
+    reduced = round(reduced * (1.0 - defense_reduction(points)));
     const flat_cut = Math.trunc(p.armor_trait_value("flat_reduction", 0));
     if (flat_cut > 0 && reduced > 0) reduced = Math.max(1, reduced - flat_cut);
     return reduced;
@@ -156,8 +155,8 @@ Object.assign(Sim.prototype, {
       reduced = 0;
       this.log("Your wards swallow the spell whole!");
     } else {
-      const total = clamp(p.fortitude_reduction() + this._generic_reduction(), PC.FORTITUDE_NEGATIVE_FLOOR, 0.9);
-      reduced = round(reduced * (1.0 - total));
+      const points = p.fortitude_total() + this._generic_reduction() * 100.0;
+      reduced = round(reduced * (1.0 - defense_reduction(points)));
     }
     if (spellward) p.regen_stamina(Math.trunc(p.armor_trait_value("magic_hit_stamina", 0)));
     return reduced;
@@ -345,10 +344,15 @@ Object.assign(Sim.prototype, {
     let target_ally = null;
     for (const a of this.battle_allies) if (veq(a.tile, target_tile)) { target_ally = a; break; }
     if (target_ally) {
-      const ally_dr = p.talisman_bonus("ally_defense_pct");
-      if (ally_dr > 0) dmg = round(dmg * (1.0 - ally_dr));
-      // Bodily harm is cut by the ally's defense, magical harm by its Fortitude (both: half and half).
-      const ally_cut = bodily_share * Math.min((target_ally.defense_pct || 0) / 100.0, 0.9) + (1.0 - bodily_share) * clamp((target_ally.fortitude || 0) / 100.0, PC.FORTITUDE_NEGATIVE_FLOOR, PC.FORTITUDE_REDUCTION_CAP);
+      // Defense and Fortitude bend on the Defense.gd curve (80% ceiling, the Guardian's 90%); Guardian Knot and
+      // Last Stand are extra points pooled into both. Bodily harm uses Defense, magical harm Fortitude (both: half and half).
+      let ally_extra = p.talisman_bonus("ally_defense_pct") * 100.0;
+      if (p.meta_last_stand_pct_per_10 > 0) {
+        const ally_missing = 1.0 - target_ally.hp / Math.max(1, target_ally.max_hp);
+        ally_extra += p.meta_last_stand_pct_per_10 * Math.floor(ally_missing * 10.0) * 100.0;
+      }
+      const ally_cap = target_ally.defense_cap ?? DEF.BASE_CAP;
+      const ally_cut = bodily_share * defense_reduction((target_ally.defense_pct || 0) + ally_extra, ally_cap) + (1.0 - bodily_share) * defense_reduction((target_ally.fortitude || 0) + ally_extra, ally_cap);
       if (ally_cut !== 0) dmg = Math.max(1, round(dmg * (1.0 - ally_cut)));
       // Warden's Aegis: allies standing near the hero take less.
       if (p.armor_trait() === "warden" && abs(target_ally.tile.x - this.battle_player_tile.x) + abs(target_ally.tile.y - this.battle_player_tile.y) <= Math.trunc(p.armor_trait_value("ally_radius", 2))) dmg = Math.max(1, round(dmg * (1.0 - p.armor_trait_value("ally_reduction", 0.0))));
@@ -380,186 +384,186 @@ Object.assign(Sim.prototype, {
     await this._process_enemy_turn();
   },
 
-  async _process_enemy_turn() {
+  // One enemy's whole turn (Main.gd:_enemy_take_turn): statuses tick, then it moves and attacks. The old whole-phase
+  // _process_enemy_turn below runs each enemy through it once; with turn order live each takes it on its own turn.
+  async _enemy_take_turn(u, assigned, fae_spawns) {
     const p = this.player;
     const rng = this.rng;
-    const fae_spawns = [];
-    this._update_enemy_awareness();
-    const assigned = this._assign_enemy_targets();
-    for (let ui = 0; ui < this.battle_units.length; ui++) {
-      const u = this.battle_units[ui];
-      if (u.burning) {
-        const burn_dmg = this._burn_tick_damage(u);
-        this._decay_ember_burn(u);
-        u.hp -= burn_dmg;
-        this.log(`The ${u.name} burns for ${burn_dmg} damage!`);
-        if (u.hp <= 0) { if (p.talisman_bonus("wildfire_core") > 0) this._trigger_wildfire_explosion(u.tile, burn_dmg); if (this.over) return; continue; }
-      }
-      if ((u.poison_turns || 0) > 0) {
-        u.poison_turns -= 1; u.hp -= u.poison_dmg;
-        this.log(`The ${u.name} is poisoned for ${u.poison_dmg} damage!`);
-        if (u.hp <= 0) continue;
-      }
-      if ((u.bleed_turns || 0) > 0) {
-        u.bleed_turns -= 1;
-        const bleed_dmg = Math.max(1, round(u.max_hp * MC.BLEED_DAMAGE_PCT));
-        u.hp -= bleed_dmg;
-        this.log(`The ${u.name} bleeds for ${bleed_dmg} damage!`);
-        if (u.hp <= 0) continue;
-      }
-      if ((u.frozen_turns || 0) > 0) {
-        u.frozen_turns -= 1;
-        this.log(`The ${u.name} is frozen solid and can't act!`);
+    if (u.burning) {
+      const burn_dmg = this._burn_tick_damage(u);
+      this._decay_ember_burn(u);
+      u.hp -= burn_dmg;
+      this.log(`The ${u.name} burns for ${burn_dmg} damage!`);
+      if (u.hp <= 0) { if (p.talisman_bonus("wildfire_core") > 0) this._trigger_wildfire_explosion(u.tile, burn_dmg); if (this.over) return; return; }
+    }
+    if ((u.poison_turns || 0) > 0) {
+      u.poison_turns -= 1; u.hp -= u.poison_dmg;
+      this.log(`The ${u.name} is poisoned for ${u.poison_dmg} damage!`);
+      if (u.hp <= 0) return;
+    }
+    if ((u.bleed_turns || 0) > 0) {
+      u.bleed_turns -= 1;
+      const bleed_dmg = Math.max(1, round(u.max_hp * MC.BLEED_DAMAGE_PCT));
+      u.hp -= bleed_dmg;
+      this.log(`The ${u.name} bleeds for ${bleed_dmg} damage!`);
+      if (u.hp <= 0) return;
+    }
+    if ((u.frozen_turns || 0) > 0) {
+      u.frozen_turns -= 1;
+      this.log(`The ${u.name} is frozen solid and can't act!`);
+      u.tile = this._apply_water_push(u.tile, u);
+      return;
+    }
+    if (u.disarmed_tile && !veq(u.disarmed_tile, NONE)) {
+      if (veq(u.tile, u.disarmed_tile)) u.disarmed_tile = vclone(NONE);
+      else {
+        if ((u.size ?? 1) > 1) this._move_big_unit(u, u.disarmed_tile, u.disarmed_tile);
+        else this._move_enemy_unit(u, 0, u.disarmed_tile, u.disarmed_tile, false);
         u.tile = this._apply_water_push(u.tile, u);
-        continue;
+        return;
       }
-      if (u.disarmed_tile && !veq(u.disarmed_tile, NONE)) {
-        if (veq(u.tile, u.disarmed_tile)) u.disarmed_tile = vclone(NONE);
-        else {
-          if ((u.size ?? 1) > 1) this._move_big_unit(u, u.disarmed_tile, u.disarmed_tile);
-          else this._move_enemy_unit(u, 0, u.disarmed_tile, u.disarmed_tile, false);
-          u.tile = this._apply_water_push(u.tile, u);
-          continue;
-        }
-      }
-      let self_hit_this_turn = false;
-      if ((u.concussed_turns || 0) > 0) { u.concussed_turns -= 1; self_hit_this_turn = rng.randf() < 0.33; }
-      if ((u.vulnerable_turns || 0) > 0) u.vulnerable_turns -= 1;
-      if (u.stunned) { u.stunned = false; this.log(`The ${u.name} is stunned and can't act!`); u.tile = this._apply_water_push(u.tile, u); continue; }
-      if (u.feared) { u.feared = false; this.log(`The ${u.name} cowers in fear and can't act!`); u.tile = this._apply_water_push(u.tile, u); continue; }
-      const traits = TRAITS[u.name] || {};
-      const size = u.size ?? 1;
-      const attack_range = u.attack_range ?? 1;
-      const ignore_line = !!traits.ignore_line;
+    }
+    let self_hit_this_turn = false;
+    if ((u.concussed_turns || 0) > 0) { u.concussed_turns -= 1; self_hit_this_turn = rng.randf() < 0.33; }
+    if ((u.vulnerable_turns || 0) > 0) u.vulnerable_turns -= 1;
+    if (u.stunned) { u.stunned = false; this.log(`The ${u.name} is stunned and can't act!`); u.tile = this._apply_water_push(u.tile, u); return; }
+    if (u.feared) { u.feared = false; this.log(`The ${u.name} cowers in fear and can't act!`); u.tile = this._apply_water_push(u.tile, u); return; }
+    const traits = TRAITS[u.name] || {};
+    const size = u.size ?? 1;
+    const attack_range = u.attack_range ?? 1;
+    const ignore_line = !!traits.ignore_line;
 
-      if (traits.heals_allies) {
-        const has_other = this.battle_units.some((o) => o.ref !== u.ref);
-        if (has_other) {
-          if (!this._try_heal_ally(u)) {
-            if (!(traits.buffs_allies && this._try_buff_ally(u))) this.log(`The ${u.name} hangs back, waiting for an opening.`);
-          }
-          u.tile = this._apply_water_push(u.tile, u);
-          continue;
+    if (traits.heals_allies) {
+      const has_other = this.battle_units.some((o) => o.ref !== u.ref);
+      if (has_other) {
+        if (!this._try_heal_ally(u)) {
+          if (!(traits.buffs_allies && this._try_buff_ally(u))) this.log(`The ${u.name} hangs back, waiting for an opening.`);
         }
-      }
-      if (traits.spawns_fae) {
-        u.turns_since_spawn = (u.turns_since_spawn || 0) + 1;
-        if (u.turns_since_spawn >= MC.FAE_HUT_SPAWN_INTERVAL) { u.turns_since_spawn = 0; fae_spawns.push(vclone(u.tile)); }
-        continue;
-      }
-
-      let target_tile = assigned.has(u.ref) ? assigned.get(u.ref) : this._pick_enemy_target_tile(u);
-      if (this.battle_player_taunting) {
-        if (p.talisman_bonus("taunt_confusion") > 0) target_tile = this._pick_confused_target_tile(u);
-        else target_tile = this.battle_player_tile;
-      }
-      if (veq(target_tile, NONE)) {
-        this._move_enemy_wander(u);
         u.tile = this._apply_water_push(u.tile, u);
-        continue;
+        return;
       }
-      const was_cornered = !!traits.kites && this._can_battle_attack(u.tile, target_tile, 1, ignore_line);
-      if (was_cornered) {
-        const away = this._knockback_dir(target_tile, u.tile);
-        const retreat = this._resolve_battle_step(u.tile, away);
-        if (retreat.moved) {
-          u.tile = retreat.tile;
-          if (retreat.fell) {
-            const fd = round(u.max_hp * MC.CLIFF_FALL_DAMAGE_PCT);
-            u.hp -= fd;
-            this.log(`The ${u.name} falls and takes ${fd} damage!`);
-            if (u.hp <= 0) continue;
-          }
-          this.log(`The ${u.name} backs away to keep its distance!`);
-        }
-      }
-      if (!was_cornered && traits.strafes && this._can_battle_attack(u.tile, target_tile, attack_range, ignore_line) && !this._can_battle_attack(u.tile, target_tile, 1, ignore_line)) {
-        const diff = vsub(target_tile, u.tile);
-        let perp = V(0, 0);
-        if (diff.x === 0) perp = V(u.strafe_flip ? 1 : -1, 0);
-        else if (diff.y === 0) perp = V(0, u.strafe_flip ? 1 : -1);
-        if (perp.x !== 0 || perp.y !== 0) {
-          const sr = this._resolve_battle_step(u.tile, perp);
-          if (sr.moved) { u.tile = sr.tile; this.log(`The ${u.name} strafes to the side!`); u.tile = this._apply_water_push(u.tile, u); continue; }
-          else u.strafe_flip = !u.strafe_flip;
-        }
-      }
-      let movement_target = target_tile;
-      if (traits.corners) {
-        const flank = this._flank_target_tile(target_tile);
-        if (!veq(u.tile, flank)) movement_target = flank;
-      }
-      let holds_formation = false;
-      if (ignore_line) {
-        let pre;
-        if (size > 1) pre = this._footprint_dist(this._footprint(u.tile, size), target_tile) <= attack_range;
-        else pre = this._can_battle_attack(u.tile, target_tile, attack_range, ignore_line);
-        if (!pre) {
-          const my_dist = this._footprint_dist(this._footprint(u.tile, size), target_tile);
-          for (const o of this.battle_units) {
-            if (o.ref === u.ref) continue;
-            if ((TRAITS[o.name] || {}).ignore_line) continue;
-            const od = this._footprint_dist(this._footprint(o.tile, o.size ?? 1), target_tile);
-            if (od < my_dist) { holds_formation = true; break; }
-          }
-        }
-        if (holds_formation) this.log(`The ${u.name} holds position behind its ally!`);
-      }
-      if (size > 1) { if (!holds_formation) this._move_big_unit(u, movement_target, target_tile); }
-      else if (!holds_formation) this._move_enemy_unit(u, attack_range, movement_target, target_tile, ignore_line);
-      if (u.hp <= 0) continue;
-
-      let can_attack;
-      if (size > 1) can_attack = this._footprint_dist(this._footprint(u.tile, size), target_tile) <= attack_range;
-      else can_attack = this._can_battle_attack(u.tile, target_tile, attack_range, ignore_line);
-
-      if (can_attack && self_hit_this_turn) {
-        u.hp -= u.damage;
-        this.log(`The ${u.name}, concussed, strikes itself for ${u.damage} damage!`);
-        u.winding_up = false;
-      } else if (can_attack) {
-        const already = !!u.winding_up;
-        const has_windup = !!traits.windup;
-        const jab = traits.quick_jab_chance || 0;
-        if (has_windup && !already && jab > 0 && rng.randf() < jab) {
-          const jr = await this._enemy_apply_damage(u, target_tile, u.damage, traits);
-          if (jr.dodged) this.log(`You dodge the ${u.name}'s jab!`, "good");
-          else if (jr.blocked) this.log(`Your shield blocks the ${u.name}'s jab!`, "good");
-          else if (jr.is_player) { this.log(`The ${u.name} jabs you for ${jr.dmg} damage!`, "bad"); if (p.health <= 0) { this._check_player_dead(); return; } }
-          else this.log(`The ${u.name} jabs your ${jr.target_name} for ${jr.dmg} damage!`);
-        } else if (has_windup && !already) {
-          u.winding_up = true;
-          this.log(`The ${u.name} winds up a heavy attack!`);
-        } else {
-          let dmg = u.damage;
-          if (already) dmg = round(dmg * MC.ORC_WINDUP_DAMAGE_MULT);
-          u.winding_up = false;
-          const pack = traits.pack_bonus_mult || 1.0;
-          if (pack > 1.0) {
-            if (this.battle_units.some((o) => o.ref !== u.ref && o.name === u.name)) { dmg = round(dmg * pack); this.log(`The ${u.name} fights fiercely alongside its pack!`); }
-          }
-          if (u.name === "Gnome") {
-            const live = this.battle_units.filter((o) => o.name === "Gnome").length;
-            if (live > 1) { dmg = round(dmg * (1.0 + MC.GNOME_DAMAGE_PCT_PER_PACKMATE * (live - 1))); this.log(`The Gnome mob swarms with ${live} strong!`); }
-          }
-          if ((u.buffed_dmg_turns || 0) > 0) { dmg = round(dmg * (1.0 + (u.buffed_dmg_pct || 0))); u.buffed_dmg_turns -= 1; }
-          const enrage = traits.enrage_threshold || 0;
-          if (enrage > 0 && u.hp < u.max_hp * enrage) { dmg = round(dmg * (traits.enrage_mult ?? 1.0)); this.log(`The ${u.name} is enraged!`, "bad"); }
-          const sweep_targets = traits.sweeps ? this._sweep_targets(u) : [target_tile];
-          let player_was_hit = false;
-          for (const t of sweep_targets) {
-            const hr = await this._enemy_apply_damage(u, t, dmg, traits);
-            if (hr.dodged) this.log(`You dodge the ${u.name}'s attack!`, "good");
-            else if (hr.blocked) this.log(`Your shield blocks the ${u.name}'s attack!`, "good");
-            else if (hr.is_player) { player_was_hit = true; this.log(`The ${u.name} hits you for ${hr.dmg} damage.`, "bad"); }
-            else this.log(`The ${u.name} hits your ${hr.target_name} for ${hr.dmg} damage!`);
-          }
-          if (player_was_hit && p.health <= 0) { this._check_player_dead(); return; }
-        }
-      } else u.winding_up = false;
-      if (size === 1) { u.tile = this._apply_water_push(u.tile, u); this._apply_terrain_tick(u.tile, u); }
+    }
+    if (traits.spawns_fae) {
+      u.turns_since_spawn = (u.turns_since_spawn || 0) + 1;
+      if (u.turns_since_spawn >= MC.FAE_HUT_SPAWN_INTERVAL) { u.turns_since_spawn = 0; fae_spawns.push(vclone(u.tile)); }
+      return;
     }
 
+    let target_tile = assigned.has(u.ref) ? assigned.get(u.ref) : this._pick_enemy_target_tile(u);
+    if (this.battle_player_taunting) {
+      if (p.talisman_bonus("taunt_confusion") > 0) target_tile = this._pick_confused_target_tile(u);
+      else target_tile = this.battle_player_tile;
+    }
+    if (veq(target_tile, NONE)) {
+      this._move_enemy_wander(u);
+      u.tile = this._apply_water_push(u.tile, u);
+      return;
+    }
+    const was_cornered = !!traits.kites && this._can_battle_attack(u.tile, target_tile, 1, ignore_line);
+    if (was_cornered) {
+      const away = this._knockback_dir(target_tile, u.tile);
+      const retreat = this._resolve_battle_step(u.tile, away);
+      if (retreat.moved) {
+        u.tile = retreat.tile;
+        if (retreat.fell) {
+          const fd = round(u.max_hp * MC.CLIFF_FALL_DAMAGE_PCT);
+          u.hp -= fd;
+          this.log(`The ${u.name} falls and takes ${fd} damage!`);
+          if (u.hp <= 0) return;
+        }
+        this.log(`The ${u.name} backs away to keep its distance!`);
+      }
+    }
+    if (!was_cornered && traits.strafes && this._can_battle_attack(u.tile, target_tile, attack_range, ignore_line) && !this._can_battle_attack(u.tile, target_tile, 1, ignore_line)) {
+      const diff = vsub(target_tile, u.tile);
+      let perp = V(0, 0);
+      if (diff.x === 0) perp = V(u.strafe_flip ? 1 : -1, 0);
+      else if (diff.y === 0) perp = V(0, u.strafe_flip ? 1 : -1);
+      if (perp.x !== 0 || perp.y !== 0) {
+        const sr = this._resolve_battle_step(u.tile, perp);
+        if (sr.moved) { u.tile = sr.tile; this.log(`The ${u.name} strafes to the side!`); u.tile = this._apply_water_push(u.tile, u); return; }
+        else u.strafe_flip = !u.strafe_flip;
+      }
+    }
+    let movement_target = target_tile;
+    if (traits.corners) {
+      const flank = this._flank_target_tile(target_tile);
+      if (!veq(u.tile, flank)) movement_target = flank;
+    }
+    let holds_formation = false;
+    if (ignore_line) {
+      let pre;
+      if (size > 1) pre = this._footprint_dist(this._footprint(u.tile, size), target_tile) <= attack_range;
+      else pre = this._can_battle_attack(u.tile, target_tile, attack_range, ignore_line);
+      if (!pre) {
+        const my_dist = this._footprint_dist(this._footprint(u.tile, size), target_tile);
+        for (const o of this.battle_units) {
+          if (o.ref === u.ref) continue;
+          if ((TRAITS[o.name] || {}).ignore_line) continue;
+          const od = this._footprint_dist(this._footprint(o.tile, o.size ?? 1), target_tile);
+          if (od < my_dist) { holds_formation = true; break; }
+        }
+      }
+      if (holds_formation) this.log(`The ${u.name} holds position behind its ally!`);
+    }
+    if (size > 1) { if (!holds_formation) this._move_big_unit(u, movement_target, target_tile); }
+    else if (!holds_formation) this._move_enemy_unit(u, attack_range, movement_target, target_tile, ignore_line);
+    if (u.hp <= 0) return;
+
+    let can_attack;
+    if (size > 1) can_attack = this._footprint_dist(this._footprint(u.tile, size), target_tile) <= attack_range;
+    else can_attack = this._can_battle_attack(u.tile, target_tile, attack_range, ignore_line);
+
+    if (can_attack && self_hit_this_turn) {
+      u.hp -= u.damage;
+      this.log(`The ${u.name}, concussed, strikes itself for ${u.damage} damage!`);
+      u.winding_up = false;
+    } else if (can_attack) {
+      const already = !!u.winding_up;
+      const has_windup = !!traits.windup;
+      const jab = traits.quick_jab_chance || 0;
+      if (has_windup && !already && jab > 0 && rng.randf() < jab) {
+        const jr = await this._enemy_apply_damage(u, target_tile, u.damage, traits);
+        if (jr.dodged) this.log(`You dodge the ${u.name}'s jab!`, "good");
+        else if (jr.blocked) this.log(`Your shield blocks the ${u.name}'s jab!`, "good");
+        else if (jr.is_player) { this.log(`The ${u.name} jabs you for ${jr.dmg} damage!`, "bad"); if (p.health <= 0) { this._check_player_dead(); return; } }
+        else this.log(`The ${u.name} jabs your ${jr.target_name} for ${jr.dmg} damage!`);
+      } else if (has_windup && !already) {
+        u.winding_up = true;
+        this.log(`The ${u.name} winds up a heavy attack!`);
+      } else {
+        let dmg = u.damage;
+        if (already) dmg = round(dmg * MC.ORC_WINDUP_DAMAGE_MULT);
+        u.winding_up = false;
+        const pack = traits.pack_bonus_mult || 1.0;
+        if (pack > 1.0) {
+          if (this.battle_units.some((o) => o.ref !== u.ref && o.name === u.name)) { dmg = round(dmg * pack); this.log(`The ${u.name} fights fiercely alongside its pack!`); }
+        }
+        if (u.name === "Gnome") {
+          const live = this.battle_units.filter((o) => o.name === "Gnome").length;
+          if (live > 1) { dmg = round(dmg * (1.0 + MC.GNOME_DAMAGE_PCT_PER_PACKMATE * (live - 1))); this.log(`The Gnome mob swarms with ${live} strong!`); }
+        }
+        if ((u.buffed_dmg_turns || 0) > 0) { dmg = round(dmg * (1.0 + (u.buffed_dmg_pct || 0))); u.buffed_dmg_turns -= 1; }
+        const enrage = traits.enrage_threshold || 0;
+        if (enrage > 0 && u.hp < u.max_hp * enrage) { dmg = round(dmg * (traits.enrage_mult ?? 1.0)); this.log(`The ${u.name} is enraged!`, "bad"); }
+        const sweep_targets = traits.sweeps ? this._sweep_targets(u) : [target_tile];
+        let player_was_hit = false;
+        for (const t of sweep_targets) {
+          const hr = await this._enemy_apply_damage(u, t, dmg, traits);
+          if (hr.dodged) this.log(`You dodge the ${u.name}'s attack!`, "good");
+          else if (hr.blocked) this.log(`Your shield blocks the ${u.name}'s attack!`, "good");
+          else if (hr.is_player) { player_was_hit = true; this.log(`The ${u.name} hits you for ${hr.dmg} damage.`, "bad"); }
+          else this.log(`The ${u.name} hits your ${hr.target_name} for ${hr.dmg} damage!`);
+        }
+        if (player_was_hit && p.health <= 0) { this._check_player_dead(); return; }
+      }
+    } else u.winding_up = false;
+    if (size === 1) { u.tile = this._apply_water_push(u.tile, u); this._apply_terrain_tick(u.tile, u); }
+  },
+
+  // The housekeeping after enemy turns (Main.gd:_finish_enemy_actions): false = the battle ended, stop here.
+  _finish_enemy_actions(fae_spawns) {
+    const p = this.player;
     // deferred removal of anything that died this enemy turn
     for (let i = this.battle_units.length - 1; i >= 0; i--) {
       if (this.battle_units[i].hp <= 0) {
@@ -586,9 +590,34 @@ Object.assign(Sim.prototype, {
     }
 
     this._remove_fallen_allies();
-    if (this.battle_units.length === 0) { this._battle_victory(); return; }
-    if (!this.in_battle) return;
+    if (this.battle_units.length === 0) { this._battle_victory(); return false; }
+    if (!this.in_battle) return false;
+    return true;
+  },
 
+  async _process_enemy_turn() {
+    const fae_spawns = [];
+    this._update_enemy_awareness();
+    const assigned = this._assign_enemy_targets();
+    for (let ui = 0; ui < this.battle_units.length; ui++) {
+      const health_before = this.player.health;
+      await this._enemy_take_turn(this.battle_units[ui], assigned, fae_spawns);
+      if (this.over || (this.player.health <= 0 && health_before > 0)) return;
+    }
+    if (!this._finish_enemy_actions(fae_spawns)) return;
+    await this._begin_hero_turn();
+  },
+
+  // The hero lost a turn (reeling): hand play on to whoever is next.
+  async _hero_turn_skipped() {
+    if (this.battle_use_timeline) await this._timeline_advance();
+    else await this._start_ally_turn();
+  },
+
+  // The hero's turn comes round (Main.gd:_begin_hero_turn): damage-over-time ticks, per-turn buffs count down, the menu opens.
+  async _begin_hero_turn() {
+    const p = this.player;
+    const rng = this.rng;
     // end-of-round statuses on the player
     if (this.player_poison_turns > 0) {
       this.player_poison_turns -= 1; p.take_battle_damage(this.player_poison_dmg);
@@ -629,7 +658,7 @@ Object.assign(Sim.prototype, {
     if (this.battle_player_turns_to_skip > 0) {
       this.battle_player_turns_to_skip -= 1;
       this.log("You're reeling and can't act this turn!", "bad");
-      await this._start_ally_turn();
+      await this._hero_turn_skipped();
       return;
     }
     this.battle_turn = "player";
@@ -652,6 +681,127 @@ Object.assign(Sim.prototype, {
       return;
     }
     this.battle_fear_cascade_depth = 0;
+  },
+
+  // ---------------------------------------------------------------- turn order (Main.gd "Turn order")
+  // SPEED decides who acts next: the hero, every ally and every enemy are entries on one timeline; taking a turn books
+  // the next one TURN_TIME_BASE / speed later. Ties go hero, then allies, then enemies (in field order).
+  _hero_speed() {
+    const rating = 5 + Math.trunc((this.player.stat_agility - PC.AGILITY_START) / PC.AGILITY_BONUS_PER_LEVEL);
+    return Math.max(MC.MIN_BATTLE_SPEED, rating + this.player.armor_speed_bonus());
+  },
+  _unit_speed(kind, u) {
+    if (kind === "hero") return this._hero_speed();
+    const base = kind === "ally" ? (u.speed ?? MC.MERCENARY_SPEED) : (MC.ENEMY_SPEEDS[u.name] ?? MC.ENEMY_SPEED_DEFAULT);
+    return Math.max(MC.MIN_BATTLE_SPEED, base * (u.speed_mult ?? 1.0));
+  },
+  _turn_delay(speed) { return MC.TURN_TIME_BASE / Math.max(MC.MIN_BATTLE_SPEED, speed); },
+  _timeline_rank(kind) { return kind === "hero" ? 0 : (kind === "ally" ? 1 : 2); },
+  _timeline_before(a, b) {
+    if (Math.abs(a.time - b.time) > 0.000001) return a.time < b.time;
+    const ra = this._timeline_rank(a.kind), rb = this._timeline_rank(b.kind);
+    if (ra !== rb) return ra < rb;
+    return a.tid < b.tid;
+  },
+  async timeline_begin() {
+    this.battle_use_timeline = true;
+    this.battle_timeline = []; this.battle_timeline_clock = 0.0; this.battle_tid_counter = 0;
+    this.battle_timeline_running = false; this.battle_timeline_pending = false; this.battle_hero_turns = 0; this.battle_current_actor = null;
+    this._timeline_sync();
+    await this._timeline_advance();
+  },
+  _timeline_sync() {
+    const present = new Set(this.battle_timeline.map((e) => e.tid));
+    if (!present.has(0)) this.battle_timeline.push({ tid: 0, kind: "hero", time: this.battle_timeline_clock + this._turn_delay(this._hero_speed()) });
+    for (const [kind, pool] of [["ally", this.battle_allies], ["enemy", this.battle_units]]) {
+      for (const u of pool) {
+        if (u.tid === undefined) u.tid = ++this.battle_tid_counter;
+        if (u.hp > 0 && !present.has(u.tid)) this.battle_timeline.push({ tid: u.tid, kind, time: this.battle_timeline_clock + this._turn_delay(this._unit_speed(kind, u)) });
+      }
+    }
+  },
+  _timeline_find(e) {
+    if (e.kind === "hero") return { hero: true };
+    const pool = e.kind === "ally" ? this.battle_allies : this.battle_units;
+    return pool.find((u) => u.tid === e.tid && u.hp > 0) || null;
+  },
+  _timeline_pop() {
+    this._timeline_sync();
+    this.battle_timeline = this.battle_timeline.filter((e) => this._timeline_find(e));
+    let best = null;
+    for (const e of this.battle_timeline) if (!best || this._timeline_before(e, best)) best = e;
+    if (!best) return null;
+    const unit = this._timeline_find(best);
+    this.battle_timeline_clock = best.time;
+    best.time += this._turn_delay(this._unit_speed(best.kind, unit));
+    return { kind: best.kind, tid: best.tid, unit };
+  },
+  _timeline_preview(count) {
+    this._timeline_sync();
+    const sim = [];
+    for (const e of this.battle_timeline) { const unit = this._timeline_find(e); if (unit) sim.push({ kind: e.kind, tid: e.tid, time: e.time, unit }); }
+    const result = [];
+    for (let n = 0; n < count; n++) {
+      let best = null;
+      for (const s of sim) if (!best || this._timeline_before(s, best)) best = s;
+      if (!best) break;
+      result.push({ kind: best.kind, unit: best.unit });
+      best.time += this._turn_delay(this._unit_speed(best.kind, best.unit));
+    }
+    return result;
+  },
+  async _timeline_advance() {
+    if (this.battle_timeline_running) { this.battle_timeline_pending = true; return; }
+    this.battle_timeline_running = true;
+    try {
+      while (this.in_battle && !this.over) {
+        this.battle_timeline_pending = false;
+        const next = this._timeline_pop();
+        if (!next) break;
+        this.battle_current_actor = next;
+        if (next.kind === "hero") {
+          this.battle_turn = "player";
+          this.battle_hero_turns += 1;
+          if (this.battle_hero_turns === 1) this._open_first_hero_turn();
+          else await this._begin_hero_turn();
+          if (!this.battle_timeline_pending) break;
+        } else if (next.kind === "ally") {
+          this.battle_turn = "player";
+          this._begin_ally_turn(next.unit);
+          if (!this.battle_timeline_pending) break;
+        } else {
+          this.battle_turn = "enemy";
+          await this._run_enemy_actor(next.unit);
+          if (this.over || this.player.health <= 0) break;
+        }
+      }
+    } finally { this.battle_timeline_running = false; }
+  },
+  _open_first_hero_turn() {
+    this.battle_turn = "player"; this.battle_menu_state = "main"; this.battle_move_trail = [];
+    this.battle_player_moves_left = this._battle_player_move_range();
+  },
+  async _run_enemy_actor(u) {
+    u.turns_taken = (u.turns_taken || 0) + 1;
+    const fae_spawns = [];
+    this._update_enemy_awareness();
+    const assigned = this._assign_enemy_targets();
+    await this._enemy_take_turn(u, assigned, fae_spawns);
+    if (this.over || this.player.health <= 0) return;
+    this._finish_enemy_actions(fae_spawns);
+  },
+  _begin_ally_turn(next) {
+    this.battle_commanding_ally = next;
+    this.battle_ally_moves_left = Math.trunc(next.move_range);
+    next.defending = false;
+    this.battle_menu_state = "main"; this.battle_move_trail = [];
+  },
+  async _ally_command_over() {
+    if (!this.battle_use_timeline) { await this._advance_ally_queue(); return; }
+    this.battle_commanding_ally = null;
+    this._remove_fallen_allies();
+    if (this.battle_units.length === 0) { this._battle_victory(); return; }
+    await this._timeline_advance();
   },
 
   _find_fear_target() {

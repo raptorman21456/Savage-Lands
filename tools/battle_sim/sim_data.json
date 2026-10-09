@@ -15,7 +15,7 @@
 		},
 		{
 			"damage_reduction": 0.15,
-			"description": "-15% bodily harm, +5 Fortitude. A quilted coat: nothing fancy, and nothing missing either.",
+			"description": "+15 Defense, +5 Fortitude. A quilted coat: nothing fancy, and nothing missing either.",
 			"fall_damage_mult": 1.0,
 			"fortitude": 5,
 			"icon": "armor_leather",
@@ -29,7 +29,7 @@
 		},
 		{
 			"damage_reduction": 0.3,
-			"description": "-30% bodily harm, -5 Fortitude. 30% of the damage a melee attacker deals to you is thrown straight back. Ranged and magical attacks sail past the spikes, and spells hurt a little more.",
+			"description": "+30 Defense, -5 Fortitude. 30% of the damage a melee attacker deals to you is thrown straight back. Ranged and magical attacks sail past the spikes, and spells hurt a little more.",
 			"fall_damage_mult": 1.0,
 			"fortitude": -5,
 			"icon": "armor_steel",
@@ -46,7 +46,7 @@
 		},
 		{
 			"damage_reduction": 0.55,
-			"description": "-55% bodily harm, 0 Fortitude. Nothing sweeps you off a water tile -- but you move 1 tile less, and cliff falls deal 50% more damage.",
+			"description": "+55 Defense, 0 Fortitude. Nothing sweeps you off a water tile -- but you move 1 tile less, and cliff falls deal 50% more damage.",
 			"fall_damage_mult": 1.5,
 			"fortitude": 0,
 			"high_grade": true,
@@ -65,7 +65,7 @@
 		},
 		{
 			"damage_reduction": 0.45,
-			"description": "-45% bodily harm, +35 Fortitude, and cliff falls deal no damage at all. Scaled by hand from something that shouldn't have died so easily.",
+			"description": "+45 Defense, +35 Fortitude, and cliff falls deal no damage at all. Scaled by hand from something that shouldn't have died so easily.",
 			"fall_damage_mult": 0.0,
 			"fortitude": 35,
 			"high_grade": true,
@@ -86,7 +86,7 @@
 		},
 		{
 			"damage_reduction": 0.1,
-			"description": "-10% bodily harm, +5 Fortitude, and every bodily hit that lands does 3 less damage (never below 1). A wall against goblin packs; a big single blow shrugs it off.",
+			"description": "+10 Defense, +5 Fortitude, and every bodily hit that lands does 3 less damage (never below 1). A wall against goblin packs; a big single blow shrugs it off.",
 			"fall_damage_mult": 1.0,
 			"fortitude": 5,
 			"icon": "armor_iron",
@@ -103,7 +103,7 @@
 		},
 		{
 			"damage_reduction": 0.25,
-			"description": "-25% bodily harm, +5 Fortitude. Built for bracing: Defend negates hits 8 points bigger than usual, and Defend and Taunt give back 10 more stamina. Nothing special unless you brace.",
+			"description": "+25 Defense, +5 Fortitude. Built for bracing: Defend negates hits 8 points bigger than usual, and Defend and Taunt give back 10 more stamina. Nothing special unless you brace.",
 			"fall_damage_mult": 1.0,
 			"fortitude": 5,
 			"icon": "armor_iron",
@@ -121,7 +121,7 @@
 		},
 		{
 			"damage_reduction": 0.05,
-			"description": "-5% bodily harm, +10 Fortitude, and a further -3% bodily harm for every 10% of your HP you're missing. Frail at full health; stubborn when you're not.",
+			"description": "+5 Defense, +10 Fortitude, and a further +3 Defense for every 10% of your HP you're missing. Frail at full health; stubborn when you're not.",
 			"fall_damage_mult": 1.0,
 			"fortitude": 10,
 			"icon": "armor_rags",
@@ -137,7 +137,7 @@
 		},
 		{
 			"damage_reduction": 0.25,
-			"description": "-25% bodily harm, +10 Fortitude. Whatever hits you in melee catches fire. The heat wears you down: -10 max stamina.",
+			"description": "+25 Defense, +10 Fortitude. Whatever hits you in melee catches fire. The heat wears you down: -10 max stamina.",
 			"fall_damage_mult": 1.0,
 			"fortitude": 10,
 			"icon": "armor_iron",
@@ -155,7 +155,7 @@
 		},
 		{
 			"damage_reduction": 0.1,
-			"description": "-10% bodily harm, +26 Fortitude. Every hit you take stacks +10% damage dealt (up to 5 stacks, lasting 2 turns). Thin protection for a short temper.",
+			"description": "+10 Defense, +26 Fortitude. Every hit you take stacks +10% damage dealt (up to 5 stacks, lasting 2 turns). Thin protection for a short temper.",
 			"fall_damage_mult": 1.0,
 			"fortitude": 26,
 			"icon": "armor_leather",
@@ -180,7 +180,7 @@
 		},
 		{
 			"damage_reduction": 0.05,
-			"description": "-5% bodily harm, +30 Fortitude, +10% dodge, and a dodge makes your next attack a crit. Anything that does land hurts.",
+			"description": "+5 Defense, +30 Fortitude, +10% dodge, and a dodge makes your next attack a crit. Anything that does land hurts.",
 			"fall_damage_mult": 1.0,
 			"fortitude": 30,
 			"icon": "armor_leather",
@@ -202,7 +202,7 @@
 		},
 		{
 			"damage_reduction": 0.1,
-			"description": "-10% bodily harm, +28 Fortitude, +1 move tile, +2 Speed (it will matter for turn order), and cliff falls deal no damage. Very thin.",
+			"description": "+10 Defense, +28 Fortitude, +1 move tile, +2 Speed (it moves you up the turn order), and cliff falls deal no damage. Very thin.",
 			"fall_damage_mult": 0.0,
 			"fortitude": 28,
 			"icon": "armor_leather",
@@ -225,7 +225,7 @@
 		},
 		{
 			"damage_reduction": 0.05,
-			"description": "-5% bodily harm, +25 Fortitude. The first magical hit of every battle is negated outright, and each magical hit that reaches you gives back 10 stamina. Almost no protection against steel.",
+			"description": "+5 Defense, +25 Fortitude. The first magical hit of every battle is negated outright, and each magical hit that reaches you gives back 10 stamina. Almost no protection against steel.",
 			"fall_damage_mult": 1.0,
 			"fortitude": 25,
 			"icon": "armor_rags",
@@ -241,7 +241,7 @@
 		},
 		{
 			"damage_reduction": 0.2,
-			"description": "-20% bodily harm, +5 Fortitude. Allies within 2 tiles of you take 15% less damage.",
+			"description": "+20 Defense, +5 Fortitude. Allies within 2 tiles of you take 15% less damage.",
 			"fall_damage_mult": 1.0,
 			"fortitude": 5,
 			"icon": "armor_steel",
@@ -280,7 +280,7 @@
 	"clothing": [
 		{
 			"damage_reduction": 0.02,
-			"description": "-2% damage taken.",
+			"description": "+2 Defense.",
 			"icon": "cloth_head",
 			"id": "cloth_cap",
 			"name": "Cloth Cap",
@@ -289,7 +289,7 @@
 		},
 		{
 			"damage_reduction": 0.04,
-			"description": "-4% damage taken.",
+			"description": "+4 Defense.",
 			"icon": "cloth_head",
 			"id": "cloth_hood",
 			"name": "Leather Hood",
@@ -298,7 +298,7 @@
 		},
 		{
 			"damage_reduction": 0.06,
-			"description": "-6% damage taken.",
+			"description": "+6 Defense.",
 			"icon": "cloth_head",
 			"id": "cloth_pelt_hood",
 			"name": "Wolf-Pelt Hood",
@@ -307,7 +307,7 @@
 		},
 		{
 			"damage_reduction": 0.03,
-			"description": "-3% damage taken.",
+			"description": "+3 Defense.",
 			"icon": "cloth_body",
 			"id": "cloth_tunic",
 			"name": "Traveler's Tunic",
@@ -316,7 +316,7 @@
 		},
 		{
 			"damage_reduction": 0.05,
-			"description": "-5% damage taken.",
+			"description": "+5 Defense.",
 			"icon": "cloth_body",
 			"id": "cloth_jerkin",
 			"name": "Padded Jerkin",
@@ -325,7 +325,7 @@
 		},
 		{
 			"damage_reduction": 0.07,
-			"description": "-7% damage taken.",
+			"description": "+7 Defense.",
 			"icon": "cloth_body",
 			"id": "cloth_cloak",
 			"name": "Fur Cloak",
@@ -334,7 +334,7 @@
 		},
 		{
 			"damage_reduction": 0.02,
-			"description": "-2% damage taken.",
+			"description": "+2 Defense.",
 			"icon": "cloth_feet",
 			"id": "cloth_sandals",
 			"name": "Sturdy Sandals",
@@ -343,7 +343,7 @@
 		},
 		{
 			"damage_reduction": 0.03,
-			"description": "-3% damage taken.",
+			"description": "+3 Defense.",
 			"icon": "cloth_feet",
 			"id": "cloth_boots",
 			"name": "Leather Boots",
@@ -352,7 +352,7 @@
 		},
 		{
 			"damage_reduction": 0.05,
-			"description": "-5% damage taken.",
+			"description": "+5 Defense.",
 			"icon": "cloth_feet",
 			"id": "cloth_trail_boots",
 			"name": "Trail Boots",
@@ -365,6 +365,12 @@
 		"body",
 		"feet"
 	],
+	"defense": {
+		"BASE_CAP": 0.8,
+		"GUARDIAN_CAP": 0.9,
+		"HALF_POINTS": 60.0,
+		"NEGATIVE_FLOOR": -0.5
+	},
 	"enemies": [
 		{
 			"contact_damage": 1,
@@ -528,7 +534,7 @@
 			"xp_reward": 715
 		}
 	],
-	"exported": "2026-10-08T19:20:16",
+	"exported": "2026-10-08T20:22:37",
 	"foods": [
 		{
 			"description": "Heals 5 HP and restores 15 stamina.",
@@ -726,6 +732,32 @@
 		},
 		"ENEMY_SIGHT_RANGE": 4,
 		"ENEMY_SPAWN_CLEARANCE": 100.0,
+		"ENEMY_SPEEDS": {
+			"Apprentice Mage": 5.0,
+			"Archmage": 5.0,
+			"Black Dragonlet": 6.0,
+			"Brute": 2.0,
+			"Centaur Archer": 6.0,
+			"Centaur Lancer": 7.0,
+			"Elder Oak": 2.0,
+			"Fae": 7.0,
+			"Fae Hut": 3.0,
+			"Gnome": 5.0,
+			"Goblin": 6.0,
+			"Iron Construct": 2.0,
+			"Lava Construct": 3.0,
+			"Leviathan": 3.0,
+			"Lizen Warband": 5.0,
+			"Orc": 3.0,
+			"Red Wyrm": 4.0,
+			"Shade": 7.0,
+			"Traitor Wolf": 8.0,
+			"Treant": 2.0,
+			"Voidwing": 9.0,
+			"White Dragon": 4.0,
+			"Wolf": 8.0
+		},
+		"ENEMY_SPEED_DEFAULT": 5.0,
 		"ENEMY_TRAITS": {
 			"Apprentice Mage": {
 				"attack_range": 4,
@@ -938,6 +970,7 @@
 		"MAX_BATTLE_ENEMIES_TOUGH": 4,
 		"MAX_BATTLE_SQUAD_SIZE_CEILING": 6,
 		"MAX_BATTLE_TOUGH_UNITS": 2,
+		"MERCENARY_SPEED": 5.0,
 		"MERCHANT_EVENT_DISCOUNT": 0.6,
 		"MIGHT_ALLY_DAMAGE_PCT_PER_POINT": 0.005,
 		"MINIGAME_BLOCK_HELD_REDUCTION": 0.5,
@@ -947,6 +980,7 @@
 		"MINIGAME_DODGE_WINDOW_CAP": 1.6,
 		"MINIGAME_PARRY_BONUS_CAP_MS": 30.0,
 		"MINIGAME_PARRY_BONUS_MS_PER_CHANCE": 60.0,
+		"MIN_BATTLE_SPEED": 0.5,
 		"MOMENTUM_CHAIN_PCT_PER_STACK": 0.08,
 		"NOTHINGNESS_BOSSES": [
 			null,
@@ -1337,6 +1371,8 @@
 		"TOWN_WALL_THICKNESS": 48.0,
 		"TRAITOR_WOLF_CHANCE": 0.15,
 		"TRAITOR_WOLF_RECRUIT_CHANCE": 0.25,
+		"TURN_ORDER_ROWS": 8,
+		"TURN_TIME_BASE": 100.0,
 		"VULNERABLE_DAMAGE_TAKEN_BONUS_PCT": 0.25,
 		"VULNERABLE_TURNS": 2,
 		"WANDER_DIRS": [
@@ -1478,6 +1514,7 @@
 						"speed": 5.0
 					},
 					"caster": false,
+					"defense_cap": 0.9,
 					"growth": {
 						"attack": 1.0,
 						"defense": 2.0,
@@ -1908,6 +1945,7 @@
 					"speed": 5.0
 				},
 				"caster": false,
+				"defense_cap": 0.9,
 				"growth": {
 					"attack": 1.0,
 					"defense": 2.0,
@@ -2224,8 +2262,6 @@
 		"EXHAUSTED_CLEAR_STAMINA_PCT": 0.5,
 		"EXHAUSTED_STAMINA_REGEN_MULT": 0.5,
 		"FLASH_DURATION": 0.15,
-		"FORTITUDE_NEGATIVE_FLOOR": -0.5,
-		"FORTITUDE_REDUCTION_CAP": 0.75,
 		"INVINCIBILITY_TIME": 0.9,
 		"ITEM_HEAL_AMOUNT": 5,
 		"MAX_LEVEL": 99,
@@ -2236,7 +2272,6 @@
 		"REFLEXES_DODGE_CAP": 0.15,
 		"REFLEXES_PCT_PER_POINT": 0.0075,
 		"RESILIENCE_PCT_PER_POINT": 0.01,
-		"RESILIENCE_REDUCTION_CAP": 0.2,
 		"WORLDWALKER_DAMAGE_BONUS_PCT": 0.1,
 		"WORLDWALKER_HP_BONUS_PCT": 0.15,
 		"XP_BASE": 20,
@@ -2264,7 +2299,7 @@
 			"shop_description": "Feel that? That's your arm asking permission to hit harder. Say yes."
 		},
 		{
-			"description": "No healing, but shrugs off 20% of incoming damage for your next 3 turns.",
+			"description": "No healing, but adds +20 Defense and Fortitude for your next 3 turns.",
 			"effect": "resilience_buff",
 			"heal_amount": 0,
 			"icon": "potion",
@@ -2368,7 +2403,7 @@
 			"damage_penalty_pct": 0.1,
 			"damage_reduction_pct": 0.08,
 			"defend_threshold_bonus": 2,
-			"description": "Strapped to the forearm, built to punish -- a blocked hit only feeds the fire behind your next punch. Vengeance: a successful block empowers your very next attack for +50% damage (+75% with Knuckle Gloves). Passively soaks 8% off every hit that lands. Fighting one-handed costs 10% of your own damage.",
+			"description": "Strapped to the forearm, built to punish -- a blocked hit only feeds the fire behind your next punch. Vengeance: a successful block empowers your very next attack for +50% damage (+75% with Knuckle Gloves). Passively adds +8 Defense. Fighting one-handed costs 10% of your own damage.",
 			"fortitude": 4,
 			"icon": "shield_brawler",
 			"id": "shield_brawler",
@@ -2399,7 +2434,7 @@
 			"damage_penalty_pct": 0.15,
 			"damage_reduction_pct": 0.15,
 			"defend_threshold_bonus": 8,
-			"description": "A slab of iron built to eat a blow head-on and throw it right back -- a Hammer-wielder's whole philosophy, in shield form. Thorns: a successful block reflects 25% of the blocked hit back at the attacker (40% with a Hammer). Passively soaks 15% off every hit that lands, and the best Defend threshold in the game on top. This much dead weight costs 15% of your own damage.",
+			"description": "A slab of iron built to eat a blow head-on and throw it right back -- a Hammer-wielder's whole philosophy, in shield form. Thorns: a successful block reflects 25% of the blocked hit back at the attacker (40% with a Hammer). Passively adds +15 Defense, and the best Defend threshold in the game on top. This much dead weight costs 15% of your own damage.",
 			"fortitude": 0,
 			"icon": "shield_bulwark",
 			"id": "shield_bulwark",
@@ -2416,7 +2451,7 @@
 			"damage_penalty_pct": 0.1,
 			"damage_reduction_pct": 0.1,
 			"defend_threshold_bonus": 4,
-			"description": "A slab too solid to move -- you can't be pushed while it's raised, water current included. A successful block shoves the attacker back a tile (two, with a Spear to brace against). Passively soaks 10% off every hit that lands, and Defend alone shrugs off a bigger blow before falling back to halving it. Bracing this much steel behind you costs 10% of your own damage.",
+			"description": "A slab too solid to move -- you can't be pushed while it's raised, water current included. A successful block shoves the attacker back a tile (two, with a Spear to brace against). Passively adds +10 Defense, and Defend alone shrugs off a bigger blow before falling back to halving it. Bracing this much steel behind you costs 10% of your own damage.",
 			"fortitude": 0,
 			"icon": "shield_round",
 			"id": "shield_heavy",
@@ -2433,7 +2468,7 @@
 			"block_chance": 0.18,
 			"damage_penalty_pct": 0.08,
 			"damage_reduction_pct": 0.05,
-			"description": "Barely more than a bracer -- less about blocking a blow than never being where it lands. A dodge earns you a single dodge-roll: back, left, or right, whichever way isn't blocked. Passively soaks a light 5% off every hit that lands. Even this light a shield costs 8% of your own damage.",
+			"description": "Barely more than a bracer -- less about blocking a blow than never being where it lands. A dodge earns you a single dodge-roll: back, left, or right, whichever way isn't blocked. Passively adds +5 Defense. Even this light a shield costs 8% of your own damage.",
 			"fortitude": 12,
 			"icon": "shield_phantom",
 			"id": "shield_phantom",
@@ -2546,7 +2581,7 @@
 				"rarity": "uncommon"
 			},
 			{
-				"description": "Your allies take 40% less damage.",
+				"description": "Your allies gain +40 Defense and Fortitude.",
 				"effects": {
 					"ally_defense_pct": 0.4
 				},
@@ -3328,7 +3363,7 @@
 			"last_stand": {
 				"base_cost": 50,
 				"cost_step": 30,
-				"description": "+1% damage reduction per level for every 10% HP you're missing -- the more hurt you are, the tankier you get.",
+				"description": "+1 Defense and Fortitude per level for every 10% HP you're missing -- the more hurt you are, the tankier you get.",
 				"max_level": 5,
 				"name": "Last Stand",
 				"prereqs": [
@@ -3466,7 +3501,7 @@
 			"resilience_unlock": {
 				"base_cost": 18,
 				"cost_step": 10,
-				"description": "Unlocks Resilience as a level-up choice -- 1% damage reduction per point owned, capped at 20%, stacking with armor.",
+				"description": "Unlocks Resilience as a level-up choice -- +1 Defense per point owned, pooled with your armour. Defense has diminishing returns and never passes 80% reduction.",
 				"max_level": 1,
 				"name": "Resilience",
 				"prereqs": [
@@ -3703,7 +3738,7 @@
 			"warded_mind": {
 				"base_cost": 20,
 				"cost_step": 12,
-				"description": "Unlocks Fortitude as a level-up choice -- 1% less damage from MAGICAL harm per point, capped at 75%, on top of your armour's Fortitude.",
+				"description": "Unlocks Fortitude as a level-up choice -- +1 Fortitude per point, on top of your armour's. Fortitude has diminishing returns and never passes 80% reduction of MAGICAL harm.",
 				"max_level": 1,
 				"name": "Warded Mind",
 				"stat_bonus": 1

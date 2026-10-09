@@ -299,7 +299,7 @@ func _build_armor_detail(armor: Dictionary) -> void:
 func _build_recipe_detail(armor: Dictionary) -> void:
 	var lines: Array = [
 		["Made from what enemies leave behind", TownUIScript.DIM, 14],
-		["-%d%% bodily harm   |   %+d Fortitude" % [int(round(float(armor.get("damage_reduction", 0.0)) * 100.0)), int(armor.get("fortitude", 0))], TownUIScript.GOOD, 13],
+		["%+d Defense   |   %+d Fortitude" % [int(round(float(armor.get("damage_reduction", 0.0)) * 100.0)), int(armor.get("fortitude", 0))], TownUIScript.GOOD, 13],
 	]
 	if armor.get("description", "") != "":
 		lines.append([armor.description, Color(0.6, 0.6, 0.64), 12])

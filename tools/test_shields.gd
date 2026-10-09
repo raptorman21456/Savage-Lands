@@ -290,9 +290,9 @@ func _init() -> void:
 	player.equipped_shield.block_chance = 0.0
 	player.equipped_armor = {"damage_reduction": 0.0}
 	main.battle_player_defending = false
-	print("Heavy Shield passively soaks 10%% off a landed hit: dmg=%d (expected 90)" % [main._apply_incoming_reductions(100, {})])
+	print("Heavy Shield passively adds 10 Defense: dmg=%d (expected 89)" % [main._apply_incoming_reductions(100, {})])
 	player.equipped_armor = {"damage_reduction": 0.2}
-	print("...and stacks additively with Armor's own reduction (20%%+10%%=30%%): dmg=%d (expected 70)" % [main._apply_incoming_reductions(100, {})])
+	print("...and pools with Armor's own points (20+10=30 on the curve): dmg=%d (expected 73)" % [main._apply_incoming_reductions(100, {})])
 	player.equipped_armor = {"damage_reduction": 0.0}
 	print("...the free Wooden Buckler has no such reduction either: %.2f (expected 0.0)" % [buckler.get("damage_reduction_pct", 0.0)])
 

@@ -47,7 +47,7 @@ func _init() -> void:
 	var marksman: RefCounted = PartyMemberScript.create(3, "marksman")
 	var rogue: RefCounted = PartyMemberScript.create(4, "rogue")
 	print("starting HP: guardian=%d marksman=%d rogue=%d druid=%d (expected 25, 10, 20, 10)" % [guardian.max_hp(), marksman.max_hp(), rogue.max_hp(), PartyMemberScript.create(9, "druid").max_hp()])
-	print("Guardian starts with 5 defense = a 5%% cut: %.1f (expected 5.0)" % [guardian.defense_pct()])
+	print("Guardian starts with 5 points of Defense: %.1f (expected 5.0)" % [guardian.defense_pct()])
 
 	# --- Growth multipliers ---
 	var g3: RefCounted = _levelled("guardian", 3, "hp")

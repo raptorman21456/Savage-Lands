@@ -37,7 +37,7 @@ static var TIERS := [
 	{
 		"id": "potion_resilience", "name": "Resilience Potion", "price": 20, "heal_amount": 0,
 		"effect": "resilience_buff",
-		"description": "No healing, but shrugs off 20% of incoming damage for your next 3 turns.",
+		"description": "No healing, but adds +20 Defense and Fortitude for your next 3 turns.",
 		"shop_description": "Won't stop a blade. Just stops it from mattering quite so much.",
 		"icon": "potion",
 	},

@@ -179,6 +179,7 @@ async function autoAllyTurn(sim) {
 async function autoPlay(sim, policy, onStep) {
   policy = Object.assign({}, DEFAULT_POLICY, policy || {});
   sim.promptHandler = async (type, data) => (type === "evasion" ? Object.keys(data.options)[0] : type === "water_push" ? false : data.default);
+  if (!sim.battle_use_timeline) await sim.timeline_begin();   // speed decides who acts first
   let guard = 0;
   while (sim.in_battle && !sim.over && guard++ < 5000) {
     if (sim.stats.turns >= policy.max_turns) { sim.over = true; sim.in_battle = false; sim.result = "timeout"; break; }
