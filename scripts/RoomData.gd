@@ -558,6 +558,76 @@ const ROOMS := {
 		"shape": [["ell", 1527, 1082, 1350, 900], ["path", 640, 1527, 0, 1527, 1082]],
 		"decor": [],
 	},
+	# ------------------------------------------------------------------ Sandy Shores and Pesca
+	# The shore rooms have no solid ground of their own: the sea is the wall. The shape only says where the walkable beach is.
+	# Driftwood Shore: a long strand under the swamp, driftwood stacked where the tide left it.
+	"0,8": {
+		"name": "Driftwood Shore",
+		"mass": "",
+		"shape": [["box", 1527, 560, 1450, 520, 0]],
+		"props": [["fallen_logs", 900, 640], ["fallen_logs", 2100, 700]],
+		"decor": [["row", "stone", 400, 900, 2700, 900, 300], ["row", "ground", 400, 440, 2700, 440, 150]],
+		"target": 4,
+	},
+	# Tidal pools: two pools in the sand, a row of stones between the strand and the water.
+	"1,8": {
+		"mass": "",
+		"shape": [["box", 1527, 560, 1450, 520, 0]],
+		"props": [["pond", 900, 620, "water"], ["pond", 2150, 540, "water"]],
+		"decor": [["row", "stone", 400, 920, 2700, 920, 300]],
+		"target": 4,
+	},
+	# Pesca: the dock town on its headland. Its streets and docks are the landmark's own (no scattered decoration).
+	"2,8": {
+		"name": "Pesca",
+		"span": [2, 2],
+		"decor": [],
+	},
+	# The south shore: a strand curving round the bay, a bed of reeds at the water's edge and driftwood.
+	"4,9": {
+		"mass": "",
+		"shape": [["box", 1527, 1082, 1450, 1000, 0]],
+		"props": [["fallen_logs", 1900, 520], ["pond", 2350, 1400, "water"]],
+		"decor": [["boulders", 2300, 700, 3, 2, 140]],
+		"target": 4,
+	},
+	# ------------------------------------------------------------------ The Frozen Wastes
+	# The south road runs on into the snow as packed snow, down through a gate of pines to the White Spire.
+	# Frostbitten Pines: a trail winding through a pine wood, a clearing where it bends.
+	"5,9": {
+		"mass": "pines",
+		"shape": [["path", 600, 1527, 0, 1527, 600, 900, 1082, 1527, 1500, 1527, 2164], ["disc", 900, 1082, 520], ["disc", 1527, 1500, 460], ["path", 500, 900, 1082, 0, 1082], ["path", 500, 1527, 1500, 3055, 1500]],
+		"decor": [["ring", "tall", 900, 1082, 380, 10], ["pair", "tall", 1527, 400, 260, 0]],
+		"target": 4,
+	},
+	# The Ice Pillars: a field of towering ice, the way winding between the pillars.
+	"6,9": {
+		"mass": "ice",
+		"shape": [
+			["box", 1527, 1082, 1450, 1000, 0],
+			["-disc", 700, 600, 190], ["-disc", 1150, 450, 190], ["-disc", 2300, 650, 190],
+			["-disc", 1000, 1100, 190], ["-disc", 1900, 1050, 190],
+			["-disc", 600, 1600, 190], ["-disc", 1150, 1700, 190], ["-disc", 2350, 1550, 190],
+		],
+		"decor": [],
+		"target": 4,
+	},
+	# The White Spire: the white dragon's arena, a round plain with a pillar of ice at each corner.
+	"5,10": {
+		"name": "The White Spire",
+		"mass": "ice",
+		"shape": [["ell", 1527, 1082, 1300, 880], ["path", 600, 1527, 0, 1527, 1082], ["-disc", 520, 380, 200], ["-disc", 2540, 380, 200], ["-disc", 520, 1780, 200], ["-disc", 2540, 1780, 200]],
+		"decor": [],
+	},
+	# The ice cave: a canyon into the glacier, the cave mouth at its end.
+	"6,10": {
+		"mass": "ice",
+		"shape": [["path", 700, 0, 1082, 2000, 1082], ["ell", 2200, 1082, 760, 560], ["path", 500, 1527, 1082, 1527, 0]],
+		"props": [["mouth", 2200, 900]],
+		"decor": [["row", "stone", 300, 800, 1700, 800, 260], ["row", "stone", 300, 1364, 1700, 1364, 260]],
+		"enemies": [["wolf", 4], ["brute", 3], ["shade", 2]],
+		"target": 5,
+	},
 }
 
 const EDGES := {
@@ -705,6 +775,15 @@ const EDGES := {
 	"9,6|10,6": [[1082, 520]],
 	"9,6|9,7": "closed",
 	"10,6|10,7": "closed",
+	# --- the Frozen Wastes
+	"5,9|6,9": [[1500, 600]],
+	"5,9|5,10": [[1527, 700]],
+	"5,10|6,10": [[1082, 700]],
+	"6,9|6,10": [[1527, 600]],
+	"4,9|5,9": [[1082, 600]],
+	"4,10|5,10": [[1082, 600]],
+	"6,9|7,9": "closed",
+	"6,10|7,10": "closed",
 }
 
 # ROADS: dirt roads drawn on the ground, from the town's four gates out across the land. Each is a stroke of `width`
@@ -715,7 +794,8 @@ const ROADS := [
 	{"width": 90.0, "points": [[4.23, 3.5], [5.5, 3.5]]},                                                    # from where you woke to the crossroads
 	{"width": 90.0, "points": [[5.5, 5.2], [5.5, 3.5], [5.5, 2.5], [5.5, 1.0], [5.2, 0.7], [5.0, 0.55]]},     # the north road: town, crossroads, the ruins
 	{"width": 90.0, "points": [[5.8, 5.5], [6.5, 5.5], [7.5, 5.5], [8.5, 5.5], [9.5, 5.5], [10.5, 5.5], [10.5, 6.3]]},   # the east road, through the long pass to the caves
-	{"width": 90.0, "points": [[5.5, 5.8], [5.5, 6.5], [5.5, 7.5], [5.5, 8.5], [5.5, 9.1]]},                  # the south road
+	{"width": 90.0, "points": [[5.5, 5.8], [5.5, 6.5], [5.5, 7.5], [5.5, 8.5], [5.5, 9.0]]},                  # the south road, to the edge of the snow
+	{"width": 90.0, "style": "snow", "points": [[5.5, 9.0], [5.5, 9.28], [5.295, 9.5], [5.5, 9.693], [5.5, 10.0], [5.5, 10.35]]},   # on through the pines to the White Spire
 	{"width": 90.0, "points": [[5.2, 5.5], [4.5, 5.5], [3.5, 5.5], [2.5, 5.5], [1.5, 5.5], [1.0, 5.5], [0.7, 5.62], [0.5, 5.76]]},   # the west road, to the Lizen fort's south gate
 	{"width": 70.0, "points": [[6.5, 5.5], [6.5, 6.5]]},                                                     # the lane down to the ranch
 	{"width": 90.0, "style": "ash", "points": [[5.5, 3.5], [6.5, 3.5], [7.5, 3.5], [7.5, 3.0], [7.5, 2.6]]},                  # the mountain road, to the crater's south gate

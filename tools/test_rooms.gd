@@ -179,7 +179,7 @@ func _init() -> void:
 
 	# --- the hand-made rooms (RoomData.gd)
 	var authored: Array = RM.rooms.filter(func(r): return r.authored)
-	print("Hand-made rooms are in the world: %d (expected 20 or more), each with its own shape: %s (expected true)" % [authored.size(), authored.all(func(r): return r.layout == "authored")])
+	print("Hand-made rooms are in the world: %d (expected 70 or more), almost all with a shape of their own: %d (expected all but Pesca)" % [authored.size(), authored.filter(func(r): return r.layout == "authored").size()])
 	var bad_pairs := []
 	for key in RM.RoomDataScript.EDGES:
 		var halves: PackedStringArray = str(key).split("|")

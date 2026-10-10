@@ -295,6 +295,9 @@ const ROAD_EDGE := Color(0.32, 0.25, 0.17)
 const FLAT_ROADS := {
 	"boards": {"fill": Color(0.5, 0.37, 0.22), "edge": Color(0.26, 0.18, 0.1)},
 	"ash": {"fill": Color(0.34, 0.28, 0.27), "edge": Color(0.14, 0.1, 0.1)},
+	"snow": {"fill": Color(0.84, 0.9, 0.94), "edge": Color(0.52, 0.62, 0.74)},
+	"sand": {"fill": Color(0.85, 0.74, 0.5), "edge": Color(0.55, 0.43, 0.25)},
+	"crystal": {"fill": Color(0.3, 0.16, 0.48), "edge": Color(0.1, 0.04, 0.2)},
 }
 
 static func _cell_to_px(p: Array) -> Vector2:
