@@ -291,6 +291,8 @@ func _unload_room(id: String) -> void:
 
 const ROAD_TEXTURE := preload("res://assets/ground_track.png")
 const ROAD_EDGE := Color(0.32, 0.25, 0.17)
+const BOARDS_COLOR := Color(0.5, 0.37, 0.22)
+const BOARDS_EDGE := Color(0.26, 0.18, 0.1)
 
 static func _cell_to_px(p: Array) -> Vector2:
 	var cx := float(p[0])
@@ -312,6 +314,7 @@ func _build_roads(state: Dictionary) -> void:
 		for p in road.points:
 			pts.append(_cell_to_px(p))
 		var half: float = float(road.width) * 0.5
+		var boards: bool = str(road.get("style", "dirt")) == "boards"
 		for layer in 2:
 			var radius: float = half + (11.0 if layer == 0 else 0.0)
 			for stroke in Geometry2D.offset_polyline(pts, radius, Geometry2D.JOIN_ROUND, Geometry2D.END_ROUND):
@@ -320,7 +323,9 @@ func _build_roads(state: Dictionary) -> void:
 					poly.polygon = piece
 					poly.z_index = -9
 					if layer == 0:
-						poly.color = ROAD_EDGE
+						poly.color = BOARDS_EDGE if boards else ROAD_EDGE
+					elif boards:
+						poly.color = BOARDS_COLOR
 					else:
 						poly.texture = ROAD_TEXTURE
 						poly.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED

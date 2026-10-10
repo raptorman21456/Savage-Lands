@@ -365,6 +365,70 @@ const ROOMS := {
 		"decor": [["bed", 1900, 900, 8, 5], ["orchard", 2100, 3100, 5, 3, 140]],
 		"target": 4,
 	},
+	# ------------------------------------------------------------------ The Lizen Encampment and the Toxic Mire
+	# The Lizen Encampment: the warband's palisaded fort in a wide yard, entered by its north and south gates.
+	"0,5": {
+		"name": "The Lizen Encampment",
+		"mass": "rock",
+		"shape": [["ell", 1527, 1082, 1350, 900], ["path", 640, 1527, 0, 1527, 1082, 1527, 2164], ["-ell", 480, 420, 240, 170], ["-ell", 2580, 1750, 240, 170]],
+		"decor": [["row", "small", 700, 1600, 1100, 1600, 90], ["row", "small", 2000, 600, 2300, 600, 90]],
+	},
+	# The Lizen fields: the warband's yards outside the fort, a camp at either end and a ditch of rock between.
+	"1,5": {
+		"mass": "rock",
+		"shape": [["box", 1527, 1082, 1450, 1000, 0], ["-ell", 500, 450, 280, 180], ["-ell", 2550, 1750, 280, 180], ["-path", 120, 1000, 1400, 2100, 1400]],
+		"props": [["camp", 700, 1550], ["camp", 2350, 1550]],
+		"decor": [["row", "tall", 300, 852, 2700, 852, 240]],
+		"enemies": [["orc", 4], ["brute", 2], ["archer", 2], ["goblin", 2]],
+		"target": 5,
+	},
+	# The Sunken Village: three islands of bog-logged huts joined by causeways.
+	"0,6": {
+		"name": "The Sunken Village",
+		"span": [1, 2],
+		"mass": "bog",
+		"shape": [
+			["ell", 1000, 1000, 720, 520], ["ell", 2100, 2200, 800, 600], ["ell", 900, 3500, 700, 520],
+			["path", 280, 1000, 1000, 2100, 2200], ["path", 280, 2100, 2200, 900, 3500], ["path", 300, 1527, 0, 1000, 1000], ["path", 300, 900, 3500, 1527, 4327],
+		],
+		"props": [["camp", 2100, 2200]],
+		"decor": [["ring", "tall", 1000, 1000, 380, 10], ["ring", "tall", 900, 3500, 380, 10], ["ring", "ground", 2100, 2200, 440, 12]],
+		"enemies": [["fae_hut", 3], ["shade", 3], ["gnome_pack", 2]],
+		"target": 5,
+	},
+	# The reed maze: a path doubling back on itself through the dead trees.
+	"1,6": {
+		"mass": "dead_forest",
+		"shape": [["path", 420, 0, 1082, 800, 1082, 800, 500, 1700, 500, 1700, 1700, 2400, 1700, 2400, 1082, 3055, 1082]],
+		"decor": [["row", "ground", 900, 500, 1600, 500, 80]],
+		"target": 4,
+	},
+	# The boardwalk: planks across the bog, a platform in the middle.
+	"2,6": {
+		"mass": "bog",
+		"shape": [["path", 300, 0, 1082, 3055, 1082], ["box", 1527, 1082, 520, 380, 60], ["path", 300, 1527, 1082, 1527, 2164], ["path", 300, 1527, 1082, 1527, 0]],
+		"decor": [["row", "tall", 200, 950, 1100, 950, 300], ["row", "tall", 200, 1214, 1100, 1214, 300], ["row", "tall", 2000, 950, 2850, 950, 300], ["row", "tall", 2000, 1214, 2850, 1214, 300]],
+		"enemies": [["shade", 3], ["fae_hut", 2], ["wolf", 2]],
+		"target": 4,
+	},
+	# Stilt huts: two islands with a hut each.
+	"1,7": {
+		"mass": "bog",
+		"shape": [["ell", 800, 1000, 550, 420], ["ell", 2250, 1150, 600, 450], ["path", 300, 800, 1000, 2250, 1150], ["path", 300, 0, 1082, 800, 1000]],
+		"props": [["camp", 2250, 1150]],
+		"decor": [["ring", "small", 800, 1000, 380, 8]],
+		"enemies": [["fae_hut", 4], ["shade", 2]],
+		"target": 4,
+	},
+	# The Black Pool: a ring of firm ground round a pool of black water.
+	"2,7": {
+		"name": "The Black Pool",
+		"mass": "bog",
+		"shape": [["box", 1527, 1082, 1450, 1000, 200], ["-ell", 1527, 1082, 800, 520]],
+		"decor": [["row", "tall", 600, 450, 2450, 450, 230], ["row", "tall", 600, 1714, 2450, 1714, 230], ["row", "tall", 500, 700, 500, 1460, 230], ["row", "tall", 2550, 700, 2550, 1460, 230]],
+		"enemies": [["shade", 5], ["fae_hut", 1]],
+		"target": 5,
+	},
 }
 
 const EDGES := {
@@ -463,6 +527,19 @@ const EDGES := {
 	"2,5|2,6": [[1527, 520]],
 	"3,6|3,7": "open",
 	"3,7|3,8": [[1527, 520]],
+	# --- the Lizen Encampment and the Toxic Mire
+	"0,5|1,5": [[1082, 900]],
+	"0,5|0,6": [[1527, 700]],
+	"1,5|1,6": [[1527, 520]],
+	"0,6|1,6": [[1082, 600]],
+	"0,7|1,7": [[1082, 560]],
+	"1,6|2,6": [[1082, 560]],
+	"1,7|2,7": [[1082, 520]],
+	"1,6|1,7": [[1527, 500]],
+	"2,6|2,7": [[1527, 500]],
+	"0,7|0,8": [[1527, 700]],
+	"1,7|1,8": [[1527, 520]],
+	"2,7|2,8": [[1527, 520]],
 }
 
 # ROADS: dirt roads drawn on the ground, from the town's four gates out across the land. Each is a stroke of `width`
@@ -474,6 +551,7 @@ const ROADS := [
 	{"width": 90.0, "points": [[5.5, 5.2], [5.5, 3.5], [5.5, 2.5], [5.5, 1.0], [5.2, 0.7], [5.0, 0.55]]},     # the north road: town, crossroads, the ruins
 	{"width": 90.0, "points": [[5.8, 5.5], [6.5, 5.5], [7.5, 5.5], [8.5, 5.5], [9.2, 5.5]]},                  # the east road, up to the mountains
 	{"width": 90.0, "points": [[5.5, 5.8], [5.5, 6.5], [5.5, 7.5], [5.5, 8.5], [5.5, 9.1]]},                  # the south road
-	{"width": 90.0, "points": [[5.2, 5.5], [4.5, 5.5], [3.5, 5.5], [2.5, 5.5], [1.5, 5.5], [0.7, 5.5]]},      # the west road, to the Lizen
+	{"width": 90.0, "points": [[5.2, 5.5], [4.5, 5.5], [3.5, 5.5], [2.5, 5.5], [1.5, 5.5], [1.0, 5.5], [0.7, 5.62], [0.5, 5.76]]},   # the west road, to the Lizen fort's south gate
 	{"width": 70.0, "points": [[6.5, 5.5], [6.5, 6.5]]},                                                     # the lane down to the ranch
+	{"width": 140.0, "style": "boards", "points": [[2.0, 6.5], [3.0, 6.5]]},                                          # the boardwalk across the bog
 ]
