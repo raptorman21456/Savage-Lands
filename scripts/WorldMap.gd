@@ -28,12 +28,31 @@ const MAP_SEED := 20261009
 const EDGE_JITTER := 420.0
 const EDGE_STEP := 560.0
 
-# Where the player wakes: the inner edge of the woods, toward the middle of the map.
-const SPAWN_N := Vector2(0.372, 0.352)
+# The continent is cut into rooms (Rooms.gd): an 11 x 11 grid of big rooms, a few merged into bigger ones. The
+# landmarks sit in the middle of "their" room, so each is the centrepiece of a room of its own.
+const ROOM_COLS := 11
+const ROOM_ROWS := 11
+
+# Where the player wakes: the inner edge of the woods, toward the middle of the map -- in the west half of room
+# (4,3), so there is forest behind you and open ground ahead.
+const SPAWN_N := Vector2(0.3845, 0.3182)
 
 # How hard each danger tier hits. Multiplies enemy HP and damage on top of the usual level scaling
 # (Main.gd:_setup_battle_grid). Index = tier (0 unused). A DRAFT.
 const TIER_POWER := [1.0, 1.0, 1.25, 1.55, 1.9, 2.35, 2.9, 3.5, 4.2]
+
+# The pixel column / row lines of the room grid (index 0..ROOM_COLS / 0..ROOM_ROWS).
+static func col_x(i: int) -> int:
+	return int(round(float(i) * SIZE.x / float(ROOM_COLS)))
+
+static func row_y(j: int) -> int:
+	return int(round(float(j) * SIZE.y / float(ROOM_ROWS)))
+
+# The centre of the block of room cells starting at (col,row) and `w` x `h` cells big, as a fraction of the map.
+static func cell_center_n(col: int, row: int, w: int = 1, h: int = 1) -> Vector2:
+	var x := float(col_x(col) + col_x(col + w)) / 2.0
+	var y := float(row_y(row) + row_y(row + h)) / 2.0
+	return Vector2(x / SIZE.x, y / SIZE.y)
 
 # Cached build (see ensure_built).
 static var regions: Array = []
@@ -68,19 +87,19 @@ static func ensure_built() -> void:
 		[["goblin", 5], ["wolf", 2], ["gnome_pack", 1], ["orc", 1]], false))
 	list.append(_region("woods", "Central Lexia", woods_poly, "grass", Color(0.62, 0.85, 0.62), 2, "forest", true, "woods",
 		[["wolf", 4], ["goblin", 3], ["fae_hut", 1], ["gnome_pack", 2], ["archer", 1]], false))
-	list.append(_region("heartwood_grove", "The HeartWood", _wobble(_circle_n(Vector2(0.17, 0.18), 3300.0), noise, 0.7), "grass", Color(0.5, 0.78, 0.55), 3, "forest", true, "heartwood",
+	list.append(_region("heartwood_grove", "The HeartWood", _wobble(_circle_n(cell_center_n(1, 1, 2, 2), 3300.0), noise, 0.7), "grass", Color(0.5, 0.78, 0.55), 3, "forest", true, "heartwood",
 		[["wolf", 4], ["fae_hut", 2], ["gnome_pack", 2], ["brute", 1]], false, "treant"))
-	list.append(_region("ruins", "The Ruined Settlement", _wobble(_circle_n(Vector2(0.45, 0.085), 2300.0), noise, 0.8), "grass", Color(0.72, 0.74, 0.66), 2, "plains", true, "ruins",
+	list.append(_region("ruins", "The Ruined Settlement", _wobble(_circle_n(cell_center_n(4, 0, 2, 1), 2300.0), noise, 0.8), "grass", Color(0.72, 0.74, 0.66), 2, "plains", true, "ruins",
 		[["shade", 3], ["orc", 2], ["goblin", 2]], false))
 	list.append(_region("desert", "Arahas Desert", _wobble(_poly_n([
 		Vector2(0.835, 0.05), Vector2(1, 0), Vector2(1, 0.395), Vector2(0.90, 0.375), Vector2(0.835, 0.34), Vector2(0.81, 0.20)]), noise, 1.0),
 		"sand", Color(1.3, 1.05, 0.7), 4, "desert", true, "desert",
 		[["centaur_pack", 2], ["orc", 3], ["brute", 2], ["archer", 1]], false, "iron_construct"))
-	list.append(_region("volcano_hills", "Death Mountain", _wobble(_circle_n(Vector2(0.69, 0.17), 5500.0), noise, 1.0), "rock", Color(0.85, 0.8, 0.78), 5, "mountains", true, "hills",
+	list.append(_region("volcano_hills", "Death Mountain", _wobble(_circle_n(cell_center_n(7, 1, 1, 2), 5500.0), noise, 1.0), "rock", Color(0.85, 0.8, 0.78), 5, "mountains", true, "hills",
 		[["brute", 3], ["orc", 3], ["centaur_pack", 1], ["shade", 1]], false))
-	list.append(_region("volcano_slopes", "Death Mountain", _wobble(_circle_n(Vector2(0.69, 0.17), 3600.0), noise, 1.0), "ash", Color(1.15, 0.8, 0.7), 6, "volcano", true, "volcano",
+	list.append(_region("volcano_slopes", "Death Mountain", _wobble(_circle_n(cell_center_n(7, 1, 1, 2), 3600.0), noise, 1.0), "ash", Color(1.15, 0.8, 0.7), 6, "volcano", true, "volcano",
 		[["brute", 3], ["shade", 3], ["archer", 1]], false, "lava_construct"))
-	list.append(_region("crater", "The Crater", _wobble(_circle_n(Vector2(0.69, 0.17), 1600.0), noise, 0.8), "ash", Color(1.35, 0.55, 0.4), 7, "volcano", true, "crater",
+	list.append(_region("crater", "The Crater", _wobble(_circle_n(cell_center_n(7, 1, 1, 2), 1600.0), noise, 0.8), "ash", Color(1.35, 0.55, 0.4), 7, "volcano", true, "crater",
 		[["shade", 3], ["brute", 2]], false))
 	list.append(_region("mountains", "Lexian Peaks", _wobble(_poly_n([
 		Vector2(0.835, 0.40), Vector2(0.90, 0.37), Vector2(1, 0.38), Vector2(1, 0.78), Vector2(0.90, 0.72), Vector2(0.84, 0.62), Vector2(0.80, 0.50)]), noise, 1.0),
@@ -116,7 +135,7 @@ static func ensure_built() -> void:
 		Vector2(0.665, 1.0), Vector2(0.67, 0.92), Vector2(0.675, 0.83), Vector2(0.72, 0.755), Vector2(0.80, 0.69), Vector2(0.90, 0.665), Vector2(1, 0.66), Vector2(1, 1.0)]), noise, 1.0),
 		"void", Color(0.6, 0.55, 0.85), 8, "voidlands", true, "void",
 		[["shade", 4], ["archer", 2], ["brute", 2], ["centaur_pack", 1]], false, "voidwing"))
-	list.append(_region("ranch", "The Ranch", _wobble(_circle_n(Vector2(0.585, 0.585), 1500.0), noise, 0.4), "grass", Color(0.95, 1.05, 0.85), 1, "plains", true, "ranch", [], false))
+	list.append(_region("ranch", "The Ranch", _wobble(_circle_n(cell_center_n(6, 6), 1500.0), noise, 0.4), "grass", Color(0.95, 1.05, 0.85), 1, "plains", true, "ranch", [], false))
 	regions = list
 
 	_by_id.clear()
@@ -125,17 +144,17 @@ static func ensure_built() -> void:
 
 	landmarks = [
 		_landmark("spawn", "Where you woke", "spawn", SPAWN_N, 220.0),
-		_landmark("town", "The Castle Town", "town", Vector2(0.5, 0.5), 900.0),
-		_landmark("ranch", "The Ranch", "ranch", Vector2(0.585, 0.585), 900.0),
-		_landmark("heartwood", "The HeartWood", "boss", Vector2(0.17, 0.18), 700.0, "elder_oak"),
-		_landmark("ruins", "The Ruined Settlement", "ruins", Vector2(0.45, 0.085), 700.0),
-		_landmark("lizen_encampment", "The Lizen Encampment", "boss", Vector2(0.055, 0.51), 700.0, "lizen_warband"),
+		_landmark("town", "The Castle Town", "town", cell_center_n(5, 5), 900.0),
+		_landmark("ranch", "The Ranch", "ranch", cell_center_n(6, 6), 900.0),
+		_landmark("heartwood", "The HeartWood", "boss", cell_center_n(1, 1, 2, 2), 700.0, "elder_oak"),
+		_landmark("ruins", "The Ruined Settlement", "ruins", cell_center_n(4, 0, 2, 1), 700.0),
+		_landmark("lizen_encampment", "The Lizen Encampment", "boss", cell_center_n(0, 5), 700.0, "lizen_warband"),
 		_landmark("pesca", "Pesca", "town", Vector2(0.222, 0.86), 600.0),
 		_landmark("leviathan_shore", "Leviathan's Shore", "boss", Vector2(0.395, 0.915), 700.0, "leviathan"),
-		_landmark("frozen_spire", "The White Spire", "boss", Vector2(0.55, 0.935), 700.0, "white_dragon"),
-		_landmark("crater", "The Crater", "boss", Vector2(0.69, 0.17), 700.0, "red_wyrm"),
-		_landmark("void_throne", "The Void Throne", "boss", Vector2(0.86, 0.84), 700.0, "archmage"),
-		_landmark("caves", "The Caves", "cave", Vector2(0.93, 0.55), 500.0),
+		_landmark("frozen_spire", "The White Spire", "boss", cell_center_n(5, 10), 700.0, "white_dragon"),
+		_landmark("crater", "The Crater", "boss", cell_center_n(7, 1, 1, 2), 700.0, "red_wyrm"),
+		_landmark("void_throne", "The Void Throne", "boss", cell_center_n(9, 9), 700.0, "archmage"),
+		_landmark("caves", "The Caves", "cave", cell_center_n(10, 6), 500.0),
 	]
 	_landmark_by_id.clear()
 	for l in landmarks:

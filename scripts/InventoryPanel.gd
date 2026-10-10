@@ -25,6 +25,7 @@ const BlacksmithScript := preload("res://scripts/Blacksmith.gd")
 const TalismansScript := preload("res://scripts/Talismans.gd")
 const WeaponIconsScript := preload("res://scripts/WeaponIcons.gd")
 const WorldMapScript := preload("res://scripts/WorldMap.gd")
+const RoomsScript := preload("res://scripts/Rooms.gd")
 const MiniMapScript := preload("res://scripts/MiniMap.gd")
 const PartyScreenScript := preload("res://scripts/PartyScreen.gd")
 
@@ -674,7 +675,9 @@ func _build_map_tab(container: VBoxContainer) -> void:
 	map_canvas.draw.connect(_on_map_draw)
 	container.add_child(map_canvas)
 	var legend := Label.new()
-	legend.text = "White dot: you. Red dots: bosses. Gold squares: the castle town, the ranch and the ruins. Numbered gold dots: shops and services you've found so far."
+	legend.text = "White dot: you. Red dots: bosses. Gold squares: the castle town, the ranch and the ruins. The land is made of rooms: the one you are in is outlined, the ones you haven't been in are dimmed. Numbered gold dots: shops and services you've found so far."
+	legend.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	legend.custom_minimum_size = Vector2(780, 0)
 	legend.add_theme_font_size_override("font_size", 12)
 	legend.add_theme_color_override("font_color", Color(0.7, 0.7, 0.65))
 	container.add_child(legend)
@@ -709,6 +712,15 @@ func _on_map_draw() -> void:
 				pts.append(to_map.call(p))
 			if pts.size() >= 3 and not Geometry2D.triangulate_polygon(pts).is_empty():
 				map_canvas.draw_colored_polygon(pts, MiniMapScript.region_color(r))
+		# The rooms: rooms you have not been in yet are dimmed (Pathfinder's Compass shows them all), the one you stand in is lit.
+		var all_seen: bool = _player.talisman_bonus("reveal_all_locations") > 0.0
+		for rm in RoomsScript.rooms:
+			var rect := Rect2(to_map.call(rm.rect.position), rm.rect.size * scale_factor)
+			if not all_seen and not main.visited_rooms.has(rm.id):
+				map_canvas.draw_rect(rect, Color(0, 0, 0, 0.42))
+			map_canvas.draw_rect(rect, Color(0, 0, 0, 0.28), false, 1.0)
+		var here: Dictionary = RoomsScript.room_at(_player.global_position)
+		map_canvas.draw_rect(Rect2(to_map.call(here.rect.position), here.rect.size * scale_factor), Color(1.0, 0.95, 0.5, 0.95), false, 2.0)
 		for r in WorldMapScript.regions:
 			if r.id in ["great_expanse", "woods", "volcano_hills", "swamp", "ocean", "frozen_wastes", "voidlands", "desert", "mountains"]:
 				var centre: Vector2 = to_map.call(r.bounds.get_center() if r.id != "great_expanse" else Vector2(WorldMapScript.SIZE.x * 0.62, WorldMapScript.SIZE.y * 0.42))

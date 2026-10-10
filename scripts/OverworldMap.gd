@@ -2,21 +2,21 @@ extends Node2D
 class_name OverworldMap
 
 # Draws WorldMap.gd's geography as the overworld: every region painted as a textured polygon (soft-edged where it
-# meets its neighbours), deep water that actually blocks you, the landmark structures, and the scenery -- trees,
-# rocks, cacti and so on -- streamed in chunk by chunk around the player so a 33,600 x 23,800 map never has to
-# hold all of it at once. Scenery is generated from the chunk's coordinates, so leaving and coming back always
-# shows the same trees.
+# meets its neighbours) and deep water that actually blocks you. Everything ELSE -- the scenery, the set pieces
+# (ponds, camps, standing stones...), the barriers along room edges and the landmark structures -- belongs to a ROOM
+# (Rooms.gd) and exists only while that room is near you: the room you stand in is built at once, the ones around
+# it a little at a time as you approach, and each is freed again once you have left it far behind. A room's contents
+# come from its own seed, so leaving and coming back always shows the same trees.
 #
-# The landmark structures (the HeartWood, the Lizen palisade, Pesca's docks...) are PLACEHOLDERS built from
-# simple shapes and the existing sprites, until the user's own art replaces them.
+# The landmark structures (the HeartWood, the Lizen palisade, Pesca's docks...) and the set pieces are PLACEHOLDERS
+# built from simple shapes and the existing sprites, until the user's own art replaces them.
 
 const WorldMapScript := preload("res://scripts/WorldMap.gd")
+const RoomsScript := preload("res://scripts/Rooms.gd")
 
-const CHUNK := 1024.0
-const CHUNK_RADIUS := 2               # chunks kept alive on each side of the player's chunk
-const CANDIDATES_PER_CHUNK := 90
-const MIN_SPACING := 70.0
-const DECO_SCALE := 2.5
+const ROOM_LOAD_MARGIN := 1600.0      # a room starts to be built when you come within this of it...
+const ROOM_UNLOAD_MARGIN := 2600.0    # ...and is freed once you are further than this
+const SCATTER_PER_FRAME := 400        # tree-wall lattice points handled per frame for a room that is loading in the background
 const PLAYER_CLEARANCE := 260.0       # nothing is dropped right on the spawn
 # A feathered edge: the region's own ground is painted a few times, each a little larger and fainter, so it
 # fades into its neighbour instead of ending on a hard line.
@@ -42,71 +42,21 @@ const DEAD_TREE := preload("res://assets/deco_dead_tree.png")
 const PINE := preload("res://assets/deco_pine_tree.png")
 const CRYSTAL := preload("res://assets/deco_crystal.png")
 
-# Scenery per region ("decor" in WorldMap.gd): each entry gets `chance` of being the thing dropped at a candidate
-# spot (the chances of one region add up to under 1). `solid` = a trunk-sized body that blocks movement.
-# `scale` is a multiple of DECO_SCALE.
-const DECOR := {
-	"plains": [
-		{"tex": TREE, "chance": 0.035, "solid": true}, {"tex": BUSH, "chance": 0.06}, {"tex": TUFT, "chance": 0.2}, {"tex": ROCK, "chance": 0.012},
-	],
-	"woods_edge": [
-		{"tex": TREE, "chance": 0.2, "solid": true}, {"tex": BUSH, "chance": 0.1}, {"tex": TUFT, "chance": 0.12},
-	],
-	"woods": [
-		{"tex": TREE, "chance": 0.46, "solid": true}, {"tex": BUSH, "chance": 0.12}, {"tex": TUFT, "chance": 0.09},
-	],
-	"heartwood": [
-		{"tex": TREE, "chance": 0.5, "solid": true}, {"tex": TREE, "chance": 0.04, "solid": true, "scale": 1.7}, {"tex": BUSH, "chance": 0.1},
-	],
-	"ruins": [
-		{"tex": DEAD_TREE, "chance": 0.07, "solid": true}, {"tex": ROCK, "chance": 0.13}, {"tex": TUFT, "chance": 0.06}, {"tex": BUSH, "chance": 0.03},
-	],
-	"desert": [
-		{"tex": CACTUS, "chance": 0.07, "solid": true}, {"tex": ROCK, "chance": 0.06}, {"tex": ROCK, "chance": 0.008, "solid": true, "scale": 3.0},
-	],
-	"hills": [
-		{"tex": ROCK, "chance": 0.15}, {"tex": ROCK, "chance": 0.02, "solid": true, "scale": 2.4}, {"tex": DEAD_TREE, "chance": 0.02, "solid": true},
-	],
-	"volcano": [
-		{"tex": ROCK, "chance": 0.14}, {"tex": DEAD_TREE, "chance": 0.05, "solid": true},
-	],
-	"crater": [
-		{"tex": ROCK, "chance": 0.1}, {"tex": CRYSTAL, "chance": 0.03},
-	],
-	"mountains": [
-		{"tex": ROCK, "chance": 0.16}, {"tex": ROCK, "chance": 0.03, "solid": true, "scale": 3.0}, {"tex": PINE, "chance": 0.03, "solid": true},
-	],
-	"lizen": [
-		{"tex": ROCK, "chance": 0.05}, {"tex": TUFT, "chance": 0.05}, {"tex": DEAD_TREE, "chance": 0.02, "solid": true},
-	],
-	"swamp": [
-		{"tex": DEAD_TREE, "chance": 0.14, "solid": true}, {"tex": ROCK, "chance": 0.04}, {"tex": BUSH, "chance": 0.06}, {"tex": TUFT, "chance": 0.04},
-	],
-	"beach": [
-		{"tex": ROCK, "chance": 0.03}, {"tex": TUFT, "chance": 0.025}, {"tex": BUSH, "chance": 0.01},
-	],
-	"frozen": [
-		{"tex": PINE, "chance": 0.1, "solid": true}, {"tex": ROCK, "chance": 0.06},
-	],
-	"void": [
-		{"tex": CRYSTAL, "chance": 0.12}, {"tex": ROCK, "chance": 0.04},
-	],
-	"ranch": [
-		{"tex": TUFT, "chance": 0.05}, {"tex": BUSH, "chance": 0.015},
-	],
-}
-
 var protected_check: Callable = Callable()   # Main: pos -> bool, true where scenery must stay out (the town, the pond...)
-var _chunks: Dictionary = {}                 # Vector2i -> Node2D holding that chunk's scenery
-var _last_chunk := Vector2i(-99999, -99999)
+var _rooms: Dictionary = {}                  # room id -> state (see _start_room)
+var _pending: Array = []                     # ids of rooms waiting to be built, nearest first
+var _work: Array = []                        # ids of rooms whose scenery is still being scattered
+var _wanted: Dictionary = {}                 # ids of the rooms that should be built right now
+var _current_id := ""
+var _last_center := Vector2(-1.0e9, -1.0e9)
 var _ground_nodes: Array = []                # [{node, key}] so the animated textures can be swapped in later
 var _landmark_clearings: Array = []          # [pos, radius]
 
 func build() -> void:
 	WorldMapScript.ensure_built()
+	RoomsScript.ensure_built()
 	_paint_regions()
 	_add_water_collision()
-	_build_landmarks()
 	for l in WorldMapScript.landmarks:
 		if l.kind in ["boss", "ruins", "ranch", "town", "cave"]:
 			_landmark_clearings.append([l.pos, float(l.radius) + 650.0])
@@ -157,91 +107,577 @@ func _add_water_collision() -> void:
 		body.add_child(shape)
 	add_child(body)
 
-# --- scenery chunks --------------------------------------------------------------------------
+# --- rooms: loading, shape, scenery -----------------------------------------------------------
 
-# Keeps the chunks around `center` loaded and frees the far ones. Cheap when the player has not changed chunk.
-func update_chunks(center: Vector2) -> void:
-	var here := Vector2i(floori(center.x / CHUNK), floori(center.y / CHUNK))
-	if here == _last_chunk:
+# Keeps the room around `center` built, queues the ones within reach and lets go of the far ones. Cheap when you have
+# not gone anywhere (Main calls it every frame).
+func update_rooms(center: Vector2) -> void:
+	RoomsScript.ensure_built()
+	var here: Dictionary = RoomsScript.room_at(center)
+	if here.id == _current_id and center.distance_squared_to(_last_center) < 2500.0:
 		return
-	_last_chunk = here
-	var wanted := {}
-	var max_x: int = int(ceil(WorldMapScript.SIZE.x / CHUNK))
-	var max_y: int = int(ceil(WorldMapScript.SIZE.y / CHUNK))
-	for dx in range(-CHUNK_RADIUS, CHUNK_RADIUS + 1):
-		for dy in range(-CHUNK_RADIUS, CHUNK_RADIUS + 1):
-			var c := Vector2i(here.x + dx, here.y + dy)
-			if c.x < 0 or c.y < 0 or c.x >= max_x or c.y >= max_y:
-				continue
-			wanted[c] = true
-			if not _chunks.has(c):
-				_load_chunk(c)
-	for c in _chunks.keys():
-		if not wanted.has(c):
-			_chunks[c].queue_free()
-			_chunks.erase(c)
+	_last_center = center
+	_current_id = here.id
+	_wanted = {here.id: true}
+	for r in RoomsScript.rooms_near(center, ROOM_LOAD_MARGIN):
+		_wanted[r.id] = true
+	var keep := {here.id: true}
+	for r in RoomsScript.rooms_near(center, ROOM_UNLOAD_MARGIN):
+		keep[r.id] = true
+	# the room you stand in is finished before you can see an unfinished one
+	if not _rooms.has(here.id):
+		_start_room(here, true)
+	elif not _rooms[here.id].done:
+		_finish(_rooms[here.id])
+	var queue: Array = []
+	for id in _wanted:
+		if not _rooms.has(id) and not (id in _pending):
+			queue.append(RoomsScript.by_id(id))
+	queue.sort_custom(func(a, b): return _rect_distance(a.rect, center) < _rect_distance(b.rect, center))
+	for r in queue:
+		_pending.append(r.id)
+	for id in _rooms.keys():
+		if not keep.has(id):
+			_unload_room(id)
+	_pending = _pending.filter(func(id): return _wanted.has(id))
 
-func loaded_chunk_count() -> int:
-	return _chunks.size()
+static func _rect_distance(rect: Rect2, p: Vector2) -> float:
+	var dx := maxf(maxf(rect.position.x - p.x, 0.0), p.x - rect.end.x)
+	var dy := maxf(maxf(rect.position.y - p.y, 0.0), p.y - rect.end.y)
+	return sqrt(dx * dx + dy * dy)
 
-func _load_chunk(coord: Vector2i) -> void:
-	var container := Node2D.new()
-	container.name = "Chunk_%d_%d" % [coord.x, coord.y]
-	container.z_index = -5
-	add_child(container)
-	_chunks[coord] = container
+func _process(_delta: float) -> void:
+	_pump()
+
+# One slice of background loading: the next stage of the room in progress, else the start of the next queued room.
+# False when there is nothing left to do.
+func _pump() -> bool:
+	if not _work.is_empty():
+		var id: String = _work[0]
+		if not _rooms.has(id):
+			_work.pop_front()
+			return true
+		var state: Dictionary = _rooms[id]
+		_advance(state, SCATTER_PER_FRAME)
+		if state.done:
+			_work.pop_front()
+		return true
+	while not _pending.is_empty():
+		var next_id: String = _pending.pop_front()
+		if _rooms.has(next_id) or not _wanted.has(next_id):
+			continue
+		_start_room(RoomsScript.by_id(next_id), false)
+		return true
+	return false
+
+# Finishes every room that is queued or half-built (used at the start of a run and by the tests).
+func flush() -> void:
+	while _pump():
+		pass
+
+func loaded_room_count() -> int:
+	return _rooms.size()
+
+func loaded_room_ids() -> Array:
+	return _rooms.keys()
+
+func is_room_loaded(id: String) -> bool:
+	return _rooms.has(id)
+
+func is_room_complete(id: String) -> bool:
+	return _rooms.has(id) and bool(_rooms[id].done)
+
+func pending_room_count() -> int:
+	return _pending.size() + _work.size()
+
+# How many scenery sprites a loaded room holds on its floor (tests compare a room before and after being unloaded).
+func scenery_count(id: String) -> int:
+	return _rooms[id].scenery.get_child_count() if _rooms.has(id) else 0
+
+# How many sprites make up the room's solid ground (the trees of a forest wall...).
+func mass_sprite_count(id: String) -> int:
+	return _rooms[id].mass_sprites.get_child_count() if _rooms.has(id) else 0
+
+# How many of the room's set pieces found a place to stand (a room's features can fail to fit).
+func features_placed(id: String) -> int:
+	return int(_rooms[id].placed) if _rooms.has(id) else 0
+
+# Is this spot inside a set piece of a loaded room? (Enemies are not dropped there.)
+func in_feature(pos: Vector2, margin: float = 0.0) -> bool:
+	for id in _rooms:
+		for c in _rooms[id].clearings:
+			if pos.distance_to(c[0]) < float(c[1]) + margin:
+				return true
+	return false
+
+func _start_room(r: Dictionary, immediate: bool) -> void:
+	var root := Node2D.new()
+	root.name = "Room_%s" % r.id
+	add_child(root)
+	var mass_sprites := Node2D.new()
+	mass_sprites.name = "MassSprites"
+	mass_sprites.z_index = -8
+	mass_sprites.y_sort_enabled = true
+	root.add_child(mass_sprites)
+	var scenery := Node2D.new()
+	scenery.name = "Scenery"
+	scenery.z_index = -5
+	scenery.y_sort_enabled = true
+	root.add_child(scenery)
+	var structures := Node2D.new()
+	structures.name = "Structures"
+	structures.z_index = -4
+	root.add_child(structures)
 	var rng := RandomNumberGenerator.new()
-	rng.seed = hash(Vector3i(coord.x, coord.y, WorldMapScript.MAP_SEED))
-	var placed: Array = []
-	var spawn: Vector2 = WorldMapScript.spawn_position()
-	for i in CANDIDATES_PER_CHUNK:
-		var pos := Vector2(coord.x * CHUNK + rng.randf() * CHUNK, coord.y * CHUNK + rng.randf() * CHUNK)
-		var roll: float = rng.randf()          # always drawn, so what lands where never depends on what was skipped
-		var scale_roll: float = rng.randf()
-		if pos.x < 40.0 or pos.y < 40.0 or pos.x > WorldMapScript.SIZE.x - 40.0 or pos.y > WorldMapScript.SIZE.y - 40.0:
+	rng.seed = int(r.seed)
+	var style: Dictionary = MASS_STYLES.get(str(r.mass), {})
+	var spacing: float = float(style.get("spacing", 64.0))
+	# the lattice the solid ground's sprites sit on: world-anchored rows, every other row shifted half a step
+	var mass_state := {"mi0": 0, "mj0": 0, "mcols": 1, "mn": 0}
+	if not style.is_empty() and not style.sprites.is_empty():
+		var row_step := spacing * 0.82
+		mass_state.mi0 = floori(r.rect.position.x / spacing) - 1
+		mass_state.mj0 = floori(r.rect.position.y / row_step) - 1
+		mass_state.mcols = ceili(r.rect.size.x / spacing) + 3
+		mass_state.mn = mass_state.mcols * (ceili(r.rect.size.y / row_step) + 3)
+	var state := {
+		"room": r, "root": root, "scenery": scenery, "structures": structures, "mass_sprites": mass_sprites,
+		"rng": rng, "stage": 0, "layout": null, "style": style, "done": false, "clearings": [], "placed": 0,
+		"mi": 0, "mn": 0, "mi0": 0, "mj0": 0, "mcols": 1,
+	}
+	state.merge(mass_state, true)
+	_rooms[r.id] = state
+	if immediate:
+		_finish(state)
+	else:
+		_work.append(r.id)
+
+func _finish(state: Dictionary) -> void:
+	while not state.done:
+		_advance(state, 1 << 30)
+
+# The stages of building a room, one per call (so a room loading in the background costs a little each frame):
+# its shape, its solid ground and set pieces, the sprites of the solid ground, the scenery on the floor.
+func _advance(state: Dictionary, budget: int) -> void:
+	match int(state.stage):
+		0:
+			state.layout = RoomsScript.layout(state.room)
+			state.stage = 1
+		1:
+			_build_mass(state)
+			# the doorways stay clear of scenery
+			for ex in RoomsScript.exits(state.room):
+				state.clearings.append([Vector2(ex.pos) + Vector2(ex.n) * 150.0, minf(float(ex.width) * 0.5, 320.0)])
+			_place_features(state)
+			_build_room_landmarks(state)
+			state.stage = 2
+		2:
+			_scatter_mass(state, budget)
+			if int(state.mi) >= int(state.mn):
+				state.stage = 3
+		_:
+			_arrange(state)
+
+func _unload_room(id: String) -> void:
+	if not _rooms.has(id):
+		return
+	_rooms[id].root.queue_free()
+	_rooms.erase(id)
+	_work.erase(id)
+
+# --- the solid ground of a room ---------------------------------------------------------------
+
+# What a room's solid ground looks like: its colours (the picture is drawn by a shader from the layout's field), and
+# the sprites scattered over it near the floor (trees of a forest wall, boulders of a cliff...): [texture, scale,
+# weight, tint]. depth = how far from the floor the sprites go (further in it is plain colour).
+const MASS_STYLES := {
+	"forest": {"fill": Color(0.07, 0.2, 0.08), "deep": Color(0.03, 0.1, 0.04), "rim": Color(0.12, 0.3, 0.1), "spacing": 56.0, "depth": 420.0,
+		"sprites": [[TREE, 3.4, 1.0, Color(0.62, 0.86, 0.62)], [BUSH, 3.2, 0.25, Color(0.6, 0.85, 0.55)]]},
+	"thicket": {"fill": Color(0.13, 0.3, 0.11), "deep": Color(0.07, 0.18, 0.07), "rim": Color(0.22, 0.4, 0.15), "spacing": 60.0, "depth": 340.0,
+		"sprites": [[BUSH, 4.0, 1.0, Color(0.72, 0.95, 0.62)], [TREE, 2.6, 0.3, Color(0.72, 0.95, 0.66)]]},
+	"pines": {"fill": Color(0.1, 0.22, 0.2), "deep": Color(0.05, 0.12, 0.12), "rim": Color(0.55, 0.72, 0.75), "spacing": 58.0, "depth": 420.0,
+		"sprites": [[PINE, 3.3, 1.0, Color(0.85, 0.95, 1.1)]]},
+	"dead_forest": {"fill": Color(0.15, 0.17, 0.1), "deep": Color(0.08, 0.1, 0.06), "rim": Color(0.25, 0.3, 0.16), "spacing": 64.0, "depth": 380.0,
+		"sprites": [[DEAD_TREE, 3.2, 1.0, Color(0.7, 0.8, 0.6)], [BUSH, 2.6, 0.2, Color(0.55, 0.65, 0.4)]]},
+	"rock": {"fill": Color(0.33, 0.31, 0.33), "deep": Color(0.2, 0.19, 0.21), "rim": Color(0.55, 0.53, 0.55), "spacing": 84.0, "depth": 380.0,
+		"sprites": [[ROCK, 6.5, 1.0, Color(0.75, 0.72, 0.7)]]},
+	"sandstone": {"fill": Color(0.62, 0.46, 0.28), "deep": Color(0.45, 0.32, 0.18), "rim": Color(0.8, 0.64, 0.4), "spacing": 84.0, "depth": 380.0,
+		"sprites": [[ROCK, 6.5, 1.0, Color(1.1, 0.9, 0.65)]]},
+	"volcanic": {"fill": Color(0.16, 0.09, 0.08), "deep": Color(0.08, 0.04, 0.04), "rim": Color(0.4, 0.2, 0.14), "spacing": 84.0, "depth": 380.0,
+		"sprites": [[ROCK, 6.5, 1.0, Color(0.55, 0.4, 0.36)]]},
+	"crystal_rock": {"fill": Color(0.12, 0.06, 0.2), "deep": Color(0.06, 0.03, 0.12), "rim": Color(0.4, 0.2, 0.6), "spacing": 90.0, "depth": 340.0,
+		"sprites": [[CRYSTAL, 5.0, 1.0, Color(0.75, 0.5, 1.2)], [ROCK, 5.0, 0.5, Color(0.5, 0.4, 0.6)]]},
+	"water": {"fill": Color(0.17, 0.4, 0.7), "deep": Color(0.1, 0.25, 0.52), "rim": Color(0.62, 0.84, 0.94), "spacing": 64.0, "depth": 0.0, "sprites": []},
+	"bog": {"fill": Color(0.2, 0.27, 0.14), "deep": Color(0.1, 0.15, 0.08), "rim": Color(0.35, 0.42, 0.2), "spacing": 64.0, "depth": 0.0, "sprites": []},
+	"ice": {"fill": Color(0.6, 0.82, 0.95), "deep": Color(0.4, 0.65, 0.85), "rim": Color(0.92, 0.97, 1.0), "spacing": 64.0, "depth": 0.0, "sprites": []},
+	"lava": {"fill": Color(0.95, 0.4, 0.08), "deep": Color(0.75, 0.2, 0.05), "rim": Color(0.25, 0.08, 0.05), "spacing": 64.0, "depth": 0.0, "sprites": []},
+	"abyss": {"fill": Color(0.05, 0.02, 0.1), "deep": Color(0.01, 0.0, 0.03), "rim": Color(0.45, 0.2, 0.7), "spacing": 64.0, "depth": 0.0, "sprites": []},
+}
+const MASS_SHADER_CODE := """
+shader_type canvas_item;
+uniform vec4 fill_color : source_color;
+uniform vec4 deep_color : source_color;
+uniform vec4 rim_color : source_color;
+uniform vec2 texel;
+void fragment() {
+	vec2 lo = 0.5 * texel;
+	if (UV.x < lo.x || UV.y < lo.y || UV.x > 1.0 - lo.x || UV.y > 1.0 - lo.y) {
+		discard;
+	}
+	float v = texture(TEXTURE, UV).r;
+	float inside = 1.0 - smoothstep(0.494, 0.506, v);
+	float depth = clamp((0.5 - v) * 2.0, 0.0, 1.0);
+	vec3 c = mix(rim_color.rgb, fill_color.rgb, smoothstep(0.0, 0.1, depth));
+	c = mix(c, deep_color.rgb, smoothstep(0.25, 0.9, depth));
+	COLOR = vec4(c, inside);
+}
+"""
+static var _mass_shader: Shader = null
+
+# The picture of the solid ground (a shader over the layout's field, so the outline is smooth) and its collision (the
+# outline of the floor, as line segments).
+func _build_mass(state: Dictionary) -> void:
+	var r: Dictionary = state.room
+	var layout = state.layout
+	var style: Dictionary = state.style
+	if style.is_empty():
+		return
+	var sprite := Sprite2D.new()
+	sprite.name = "MassFill"
+	sprite.centered = false
+	var image: Image = layout.to_image()
+	sprite.texture = ImageTexture.create_from_image(image)
+	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	sprite.position = r.rect.position - layout.step * 0.5
+	sprite.scale = layout.step
+	sprite.z_index = -9
+	if _mass_shader == null:
+		_mass_shader = Shader.new()
+		_mass_shader.code = MASS_SHADER_CODE
+	var material := ShaderMaterial.new()
+	material.shader = _mass_shader
+	material.set_shader_parameter("fill_color", style.fill)
+	material.set_shader_parameter("deep_color", style.deep)
+	material.set_shader_parameter("rim_color", style.rim)
+	material.set_shader_parameter("texel", Vector2(1.0 / float(image.get_width()), 1.0 / float(image.get_height())))
+	sprite.material = material
+	state.root.add_child(sprite)
+	var segments: PackedVector2Array = layout.segments()
+	if segments.size() >= 2:
+		var body := StaticBody2D.new()
+		body.name = "MassWalls"
+		var shape := ConcavePolygonShape2D.new()
+		shape.segments = segments
+		var collision := CollisionShape2D.new()
+		collision.shape = shape
+		body.add_child(collision)
+		state.root.add_child(body)
+
+# The sprites of the solid ground within reach of the floor, on a regular lattice anchored to the world (so a forest
+# wall lines up from one room to the next): rows of trees, every other one in the deeper rows, all the same size.
+func _scatter_mass(state: Dictionary, budget: int) -> void:
+	var style: Dictionary = state.style
+	if style.is_empty() or int(state.mn) == 0:
+		return
+	var layout = state.layout
+	var rect: Rect2 = state.room.rect
+	var spacing: float = float(style.get("spacing", 64.0))
+	var row_step: float = spacing * 0.82
+	var depth_max: float = float(style.get("depth", 0.0))
+	var sprites: Array = style.sprites
+	var cols: int = state.mcols
+	var end: int = mini(int(state.mi) + budget, int(state.mn))
+	while int(state.mi) < end:
+		var index: int = state.mi
+		state.mi += 1
+		var gj: int = int(state.mj0) + index / cols
+		var gi: int = int(state.mi0) + index % cols
+		var pos := Vector2((float(gi) + 0.5 * float(gj & 1)) * spacing, float(gj) * row_step)
+		if not rect.has_point(pos):
 			continue
-		if pos.distance_to(spawn) < PLAYER_CLEARANCE:
+		var depth: float = -layout.sample(pos)
+		if depth < 4.0 or depth > depth_max:
 			continue
-		var region: Dictionary = WorldMapScript.region_at(pos)
-		if not region.walkable:
+		if depth > depth_max * 0.85 and not (gi % 2 == 0 and gj % 2 == 0):
 			continue
-		var specs: Array = DECOR.get(region.decor, [])
-		if specs.is_empty():
+		if depth > depth_max * 0.6 and (gi + gj) % 2 != 0:
 			continue
-		if protected_check.is_valid() and protected_check.call(pos):
-			continue
-		if _in_clearing(pos):
-			continue
-		var chosen: Dictionary = {}
-		var acc := 0.0
-		for spec in specs:
-			acc += float(spec.chance)
-			if roll < acc:
-				chosen = spec
-				break
-		if chosen.is_empty():
-			continue
-		var too_close := false
-		for q in placed:
-			if pos.distance_to(q) < MIN_SPACING:
-				too_close = true
-				break
-		if too_close:
-			continue
-		placed.append(pos)
-		var s: float = DECO_SCALE * float(chosen.get("scale", 1.0)) * (0.85 + scale_roll * 0.3)
+		var chosen: Array = sprites[0]
+		if sprites.size() > 1 and gi % 5 == 2 and gj % 3 == 1:
+			chosen = sprites[1]
+		var s: float = float(chosen[1])
 		var sprite := Sprite2D.new()
-		sprite.texture = chosen.tex
+		sprite.texture = chosen[0]
 		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		sprite.position = pos
 		sprite.scale = Vector2(s, s)
-		sprite.modulate = Color.WHITE.lerp(region.tint, 0.55)
-		container.add_child(sprite)
-		if bool(chosen.get("solid", false)):
-			container.add_child(_trunk_body(pos, s))
+		sprite.modulate = Color(chosen[3]).darkened(clampf(depth / maxf(depth_max, 1.0), 0.0, 1.0) * 0.3)
+		state.mass_sprites.add_child(sprite)
 
-func _in_clearing(pos: Vector2) -> bool:
+# --- the decoration of the floor: arranged, never sprinkled ----------------------------------------
+
+# What each country is dressed with: a tall thing (a tree...), a small one (a bush...), ground cover and a stone.
+const PALETTES := {
+	"plains": {"tall": TREE, "small": BUSH, "ground": TUFT, "stone": ROCK},
+	"woods_edge": {"tall": TREE, "small": BUSH, "ground": TUFT, "stone": ROCK},
+	"woods": {"tall": TREE, "small": BUSH, "ground": TUFT, "stone": ROCK},
+	"heartwood": {"tall": TREE, "small": BUSH, "ground": TUFT, "stone": ROCK},
+	"ruins": {"tall": DEAD_TREE, "small": ROCK, "ground": TUFT, "stone": ROCK},
+	"desert": {"tall": CACTUS, "small": ROCK, "stone": ROCK},
+	"hills": {"tall": DEAD_TREE, "small": ROCK, "ground": TUFT, "stone": ROCK},
+	"volcano": {"tall": DEAD_TREE, "small": ROCK, "stone": ROCK},
+	"crater": {"tall": CRYSTAL, "small": ROCK, "stone": ROCK},
+	"mountains": {"tall": PINE, "small": ROCK, "stone": ROCK},
+	"lizen": {"tall": DEAD_TREE, "small": ROCK, "ground": TUFT},
+	"swamp": {"tall": DEAD_TREE, "small": BUSH, "ground": TUFT},
+	"beach": {"small": ROCK, "ground": TUFT, "stone": ROCK},
+	"frozen": {"tall": PINE, "small": ROCK, "stone": ROCK},
+	"void": {"tall": CRYSTAL, "small": ROCK, "stone": ROCK},
+	"ranch": {"small": BUSH, "ground": TUFT},
+}
+# Neat blocks of decoration set down on the floor: an orchard of trees in rows, a flower bed, a boulder garden, a
+# hedge, a ring of trees. cols / rows are in items, spacing in px. A room's own "decor" multipliers (a meadow has
+# more flower beds...) scale how often each is chosen.
+const STANDS := {
+	"orchard": {"item": "tall", "cols": [3, 6], "rows": [2, 4], "spacing": 112.0, "scale": 2.6, "solid": true, "weight": 3.0, "decor": ["tree", "pine", "dead_tree", "cactus"]},
+	"flowerbed": {"item": "ground", "cols": [4, 7], "rows": [3, 4], "spacing": 52.0, "scale": 2.2, "solid": false, "weight": 2.0, "decor": ["tuft"]},
+	"boulders": {"item": "stone", "cols": [2, 4], "rows": [2, 3], "spacing": 130.0, "scale": 3.2, "solid": true, "weight": 2.0, "decor": ["rock"]},
+	"hedge": {"item": "small", "cols": [6, 12], "rows": [1, 1], "spacing": 60.0, "scale": 3.0, "solid": false, "weight": 2.0, "decor": ["bush"]},
+	"ring": {"item": "tall", "ring": 8, "radius": 170.0, "scale": 2.6, "solid": true, "weight": 1.0, "decor": ["tree", "pine", "dead_tree"]},
+}
+# What lines the foot of each kind of solid ground, at even intervals: [palette item, ...] alternating.
+const FRINGES := {
+	"forest": {"every": 96.0, "inset": 70.0, "items": ["small", "ground"]},
+	"thicket": {"every": 96.0, "inset": 62.0, "items": ["ground", "ground"]},
+	"pines": {"every": 110.0, "inset": 66.0, "items": ["stone", "ground"]},
+	"dead_forest": {"every": 104.0, "inset": 66.0, "items": ["small", "ground"]},
+	"rock": {"every": 120.0, "inset": 56.0, "items": ["stone", "ground"]},
+	"sandstone": {"every": 120.0, "inset": 56.0, "items": ["stone"]},
+	"volcanic": {"every": 120.0, "inset": 56.0, "items": ["stone"]},
+	"crystal_rock": {"every": 130.0, "inset": 56.0, "items": ["stone"]},
+	"water": {"every": 76.0, "inset": 30.0, "items": ["ground"]},
+	"bog": {"every": 76.0, "inset": 30.0, "items": ["ground"]},
+}
+const GRID := 64.0                    # stands sit on a grid of this size
+
+# One decoration, if the spot is ordinary walkable ground that nothing else claims.
+func _decor_item(state: Dictionary, tex: Texture2D, pos: Vector2, scale: float, solid: bool) -> bool:
+	var region: Dictionary = WorldMapScript.region_at(pos)
+	if not region.walkable or (protected_check.is_valid() and protected_check.call(pos)):
+		return false
+	var sprite := Sprite2D.new()
+	sprite.texture = tex
+	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	sprite.position = pos
+	sprite.scale = Vector2(scale, scale)
+	sprite.modulate = Color.WHITE.lerp(region.tint, 0.55)
+	state.scenery.add_child(sprite)
+	if solid:
+		var body := StaticBody2D.new()
+		var collision := CollisionShape2D.new()
+		var shape := CircleShape2D.new()
+		if tex == ROCK:
+			body.position = pos
+			shape.radius = 6.0 * scale
+		else:
+			body.position = pos + Vector2(0, 10) * scale
+			shape.radius = 8.0 * scale
+		collision.shape = shape
+		body.add_child(collision)
+		state.scenery.add_child(body)
+	return true
+
+# The floor of a room is dressed once its shape and set pieces are in: posts either side of each doorway, a row of
+# small things along the foot of the walls, and a few neat stands.
+func _arrange(state: Dictionary) -> void:
+	var r: Dictionary = state.room
+	var layout = state.layout
+	var palette: Dictionary = PALETTES.get(str(WorldMapScript.region(r.region).decor), PALETTES["plains"])
+	_gate_posts(state, palette)
+	_fringe(state, palette)
+	if r.stands != null:                                 # hand-made: exactly the arrangements the room lists
+		_arrange_authored(state, palette)
+		state.done = true
+		return
+	var floor_area: float = r.rect.get_area() * layout.floor_fraction
+	for i in clampi(int(round(floor_area / 2.2e6)), 1, 7):
+		_place_stand(state, palette)
+	state.done = true
+
+# The arrangements a hand-made room lists (RoomData.gd "decor"), placed exactly where it says.
+func _arrange_authored(state: Dictionary, palette: Dictionary) -> void:
+	var o: Vector2 = state.room.rect.position
+	for op in state.room.stands:
+		var kind := str(op[0])
+		match kind:
+			"orchard":
+				_authored_block(state, palette, "tall", o + Vector2(float(op[1]), float(op[2])), int(op[3]), int(op[4]), float(op[5]) if op.size() > 5 else 112.0)
+			"bed":
+				_authored_block(state, palette, "ground", o + Vector2(float(op[1]), float(op[2])), int(op[3]), int(op[4]), 52.0)
+			"boulders":
+				_authored_block(state, palette, "stone", o + Vector2(float(op[1]), float(op[2])), int(op[3]), int(op[4]), float(op[5]) if op.size() > 5 else 130.0)
+			"row":
+				var a := o + Vector2(float(op[2]), float(op[3]))
+				var b := o + Vector2(float(op[4]), float(op[5]))
+				var gap := maxf(float(op[6]), 20.0)
+				var n := int(a.distance_to(b) / gap)
+				for i in n + 1:
+					_authored_item(state, palette, str(op[1]), a.lerp(b, float(i) / float(maxi(n, 1))))
+			"ring":
+				var c := o + Vector2(float(op[2]), float(op[3]))
+				var count := int(op[5])
+				for i in count:
+					var ang := TAU * float(i) / float(count)
+					_authored_item(state, palette, str(op[1]), c + Vector2(cos(ang), sin(ang)) * float(op[4]))
+			"pair":
+				var m := o + Vector2(float(op[2]), float(op[3]))
+				var d := Vector2(float(op[4]), float(op[5]))
+				_authored_item(state, palette, str(op[1]), m - d)
+				_authored_item(state, palette, str(op[1]), m + d)
+
+func _authored_block(state: Dictionary, palette: Dictionary, item: String, centre: Vector2, cols: int, rows: int, spacing: float) -> void:
+	var size := Vector2(float(cols - 1) * spacing, float(rows - 1) * spacing)
+	for ix in cols:
+		for iy in rows:
+			_authored_item(state, palette, item, centre - size * 0.5 + Vector2(float(ix) * spacing, float(iy) * spacing))
+
+# One decoration by what it is (tall, small, ground, stone), sized and made solid as a stand would.
+func _authored_item(state: Dictionary, palette: Dictionary, item: String, pos: Vector2) -> void:
+	if not palette.has(item):
+		return
+	var item_scale := 2.6
+	var solid := false
+	match item:
+		"tall": item_scale = 2.6; solid = true
+		"small": item_scale = 3.0
+		"ground": item_scale = 2.2
+		"stone": item_scale = 3.2; solid = true
+	_decor_item(state, palette[item], pos, item_scale, solid)
+
+# Two tall things framing each narrow doorway.
+func _gate_posts(state: Dictionary, palette: Dictionary) -> void:
+	if not palette.has("tall"):
+		return
+	for ex in RoomsScript.exits(state.room):
+		var width: float = float(ex.width)
+		if width > 1300.0:
+			continue
+		var n: Vector2 = ex.n
+		var across := Vector2(-n.y, n.x)
+		for side in [-1.0, 1.0]:
+			_decor_item(state, palette.tall, Vector2(ex.pos) + n * 80.0 + across * side * (width * 0.5 - 60.0), 3.0, true)
+
+# Small things at even intervals along the foot of the walls (bushes under a forest wall, reeds along a shore...).
+func _fringe(state: Dictionary, palette: Dictionary) -> void:
+	var spec: Dictionary = FRINGES.get(str(state.room.mass), {})
+	if spec.is_empty():
+		return
+	var layout = state.layout
+	var every: float = float(spec.every)
+	var inset: float = float(spec.inset)
+	var keys: Array = spec["items"]
+	var index := 0
+	for chain in layout.contours():
+		var carry := every * 0.5
+		for i in chain.size() - 1:
+			var a: Vector2 = chain[i]
+			var b: Vector2 = chain[i + 1]
+			var seg_len: float = a.distance_to(b)
+			var d := carry
+			while d <= seg_len:
+				var p: Vector2 = a.lerp(b, d / seg_len)
+				var pos: Vector2 = p + layout.toward_floor(p) * inset
+				var key: String = keys[index % keys.size()]
+				index += 1
+				if palette.has(key) and layout.sample(pos) > 20.0 and not _in_clearing(pos, state):
+					_decor_item(state, palette[key], pos, 2.4, false)
+				d += every
+			carry = d - seg_len
+
+# One stand (see STANDS) on a spot of the floor that fits it whole.
+func _place_stand(state: Dictionary, palette: Dictionary) -> void:
+	var r: Dictionary = state.room
+	var layout = state.layout
+	var rng: RandomNumberGenerator = state.rng
+	var kinds: Array = []
+	var total := 0.0
+	for k in STANDS:
+		var spec: Dictionary = STANDS[k]
+		if not palette.has(spec.item):
+			continue
+		var boost := 1.0
+		for dk in spec.decor:
+			boost = maxf(boost, float(r.decor.get(dk, 1.0)))
+		kinds.append([k, float(spec.weight) * boost])
+		total += float(spec.weight) * boost
+	if kinds.is_empty():
+		return
+	var roll: float = rng.randf() * total
+	var kind: String = kinds[0][0]
+	for k in kinds:
+		roll -= float(k[1])
+		if roll <= 0.0:
+			kind = k[0]
+			break
+	var spec: Dictionary = STANDS[kind]
+	var spacing: float = float(spec.get("spacing", 100.0))
+	var cols := 1
+	var rows := 1
+	if spec.has("ring"):
+		cols = 3
+		rows = 3
+	else:
+		cols = rng.randi_range(int(spec.cols[0]), int(spec.cols[1]))
+		rows = rng.randi_range(int(spec.rows[0]), int(spec.rows[1]))
+		if kind == "hedge" and rng.randf() < 0.5:
+			rows = cols
+			cols = 1
+	var size := Vector2(float(cols - 1) * spacing, float(rows - 1) * spacing)
+	if spec.has("ring"):
+		size = Vector2(float(spec.radius), float(spec.radius)) * 2.0
+	var half := size * 0.5 + Vector2(70.0, 70.0)
+	var radius := half.length()
+	var rect: Rect2 = r.rect.grow(-300.0)
+	var spawn: Vector2 = WorldMapScript.spawn_position()
+	for attempt in 40:
+		var c := Vector2(snappedf(rect.position.x + rng.randf() * rect.size.x, GRID), snappedf(rect.position.y + rng.randf() * rect.size.y, GRID))
+		# the whole footprint on the floor: corners, edge middles and centre
+		var fits := true
+		for off in [Vector2(-1, -1), Vector2(1, -1), Vector2(-1, 1), Vector2(1, 1), Vector2(0, -1), Vector2(0, 1), Vector2(-1, 0), Vector2(1, 0), Vector2.ZERO]:
+			var q: Vector2 = c + Vector2(half.x * off.x, half.y * off.y)
+			if layout.sample(q) < 70.0 or not WorldMapScript.region_at(q).walkable or (protected_check.is_valid() and protected_check.call(q)):
+				fits = false
+				break
+		if not fits:
+			continue
+		for cl in _landmark_clearings:
+			if c.distance_to(cl[0]) < float(cl[1]) + radius:
+				fits = false
+		for cl in state.clearings:
+			if c.distance_to(cl[0]) < float(cl[1]) + radius:
+				fits = false
+		if c.distance_to(spawn) < radius + PLAYER_CLEARANCE:
+			fits = false
+		if not fits:
+			continue
+		var tex: Texture2D = palette[spec.item]
+		var s: float = float(spec.scale)
+		if spec.has("ring"):
+			for k in int(spec.ring):
+				var a := TAU * float(k) / float(spec.ring)
+				_decor_item(state, tex, c + Vector2(cos(a), sin(a)) * float(spec.radius), s, bool(spec.solid))
+		else:
+			for ix in cols:
+				for iy in rows:
+					_decor_item(state, tex, c - size * 0.5 + Vector2(float(ix) * spacing, float(iy) * spacing), s, bool(spec.solid))
+		state.clearings.append([c, radius + 30.0])
+		return
+
+func _in_clearing(pos: Vector2, state: Dictionary) -> bool:
 	for c in _landmark_clearings:
+		if pos.distance_to(c[0]) < float(c[1]):
+			return true
+	for c in state.clearings:
 		if pos.distance_to(c[0]) < float(c[1]):
 			return true
 	return false
@@ -257,25 +693,238 @@ func _trunk_body(pos: Vector2, s: float) -> StaticBody2D:
 	body.add_child(collision)
 	return body
 
-# --- landmark structures (placeholders) ------------------------------------------------------
+# --- set pieces -------------------------------------------------------------------------------
 
-func _build_landmarks() -> void:
-	var holder := Node2D.new()
-	holder.name = "Landmarks"
-	holder.z_index = -4
-	add_child(holder)
+# How much room each kind of set piece needs (also how far apart pieces are kept).
+const POOL_COLORS := {
+	"water": {"rim": Color(0.3, 0.5, 0.45), "fill": Color(0.2, 0.45, 0.75), "solid": true},
+	"lava": {"rim": Color(0.25, 0.08, 0.05), "fill": Color(1.0, 0.45, 0.1), "solid": true},
+	"bog": {"rim": Color(0.2, 0.25, 0.12), "fill": Color(0.28, 0.36, 0.16), "solid": false},
+	"ice": {"rim": Color(0.75, 0.9, 1.0), "fill": Color(0.55, 0.8, 0.95), "solid": false},
+	"void": {"rim": Color(0.1, 0.03, 0.2), "fill": Color(0.35, 0.1, 0.6), "solid": true},
+}
+
+func _place_features(state: Dictionary) -> void:
+	var r: Dictionary = state.room
 	var rng := RandomNumberGenerator.new()
-	rng.seed = WorldMapScript.MAP_SEED + 7
-	_heartwood(holder, WorldMapScript.landmark("heartwood").pos, rng)
-	_ruins(holder, WorldMapScript.landmark("ruins").pos, rng)
-	_lizen(holder, WorldMapScript.landmark("lizen_encampment").pos, rng)
-	_pesca(holder, WorldMapScript.landmark("pesca").pos, rng)
-	_ranch(holder, WorldMapScript.landmark("ranch").pos, rng)
-	_wreck(holder, WorldMapScript.landmark("leviathan_shore").pos, rng)
-	_spire(holder, WorldMapScript.landmark("frozen_spire").pos, rng)
-	_crater(holder, WorldMapScript.landmark("crater").pos, rng)
-	_throne(holder, WorldMapScript.landmark("void_throne").pos, rng)
-	_caves(holder, WorldMapScript.landmark("caves").pos, rng)
+	rng.seed = int(r.seed) + 11
+	if r.props != null:                                  # a hand-made room says exactly where each piece stands
+		for p in r.props:
+			var kind := str(p[0])
+			var radius: float = float(RoomsScript.FEATURE_RADIUS.get(kind, 260.0))
+			var at: Vector2 = r.rect.position + Vector2(float(p[1]), float(p[2]))
+			state.clearings.append([at, radius + 40.0])
+			state.placed += 1
+			_build_feature(state.structures, kind, str(p[3]) if p.size() > 3 else "water", at, radius, rng)
+		return
+	for entry in r.features:
+		var kind := str(entry[0])
+		var flavour := str(entry[2]) if entry.size() > 2 else "water"
+		for i in int(entry[1]):
+			var radius: float = float(RoomsScript.FEATURE_RADIUS.get(kind, 260.0))
+			var at: Vector2 = _feature_spot(state, rng, radius)
+			if at.x < 0.0:
+				continue                                  # nowhere to put it (all water, the town...)
+			state.clearings.append([at, radius + 40.0])
+			state.placed += 1
+			_build_feature(state.structures, kind, flavour, at, radius, rng)
+
+func _feature_spot(state: Dictionary, rng: RandomNumberGenerator, radius: float) -> Vector2:
+	var rect: Rect2 = state.room.rect
+	var inner: Rect2 = rect.grow(-(radius + 100.0))
+	var layout = state.layout
+	for attempt in 150:
+		var p: Vector2 = inner.position + Vector2(rng.randf(), rng.randf()) * inner.size
+		var ok: bool = layout.sample(p) >= radius + 60.0   # the whole set piece stands on the floor
+		if not ok:
+			continue
+		for off in [Vector2.ZERO, Vector2(radius * 0.8, 0), Vector2(-radius * 0.8, 0), Vector2(0, radius * 0.8), Vector2(0, -radius * 0.8)]:
+			var q: Vector2 = p + off
+			if not WorldMapScript.region_at(q).walkable or (protected_check.is_valid() and protected_check.call(q)):
+				ok = false
+				break
+		if not ok:
+			continue
+		for c in _landmark_clearings:
+			if p.distance_to(c[0]) < float(c[1]) + radius:
+				ok = false
+		for c in state.clearings:
+			if p.distance_to(c[0]) < radius + float(c[1]):
+				ok = false
+		if p.distance_to(WorldMapScript.spawn_position()) < radius + PLAYER_CLEARANCE:
+			ok = false
+		if ok:
+			return p
+	return Vector2(-1.0, -1.0)
+
+func _build_feature(parent: Node, kind: String, flavour: String, at: Vector2, radius: float, rng: RandomNumberGenerator) -> void:
+	match kind:
+		"clearing": _f_clearing(parent, at, radius, rng)
+		"standing_stones": _f_standing_stones(parent, at, radius, rng)
+		"farm": _f_farm(parent, at, rng)
+		"pond": _f_pond(parent, at, radius, flavour, rng)
+		"rock_formation": _f_rocks(parent, at, radius, rng)
+		"camp": _f_camp(parent, at, radius, rng)
+		"fallen_logs": _f_logs(parent, at, radius, rng)
+		"ruin_walls": _f_ruin_walls(parent, at, radius, rng)
+		"graves": _f_graves(parent, at, rng)
+		"cliff_ridge": _f_ridge(parent, at, radius, rng)
+		"mouth": _f_mouth(parent, at)
+		"crystals": _f_crystals(parent, at, radius, rng)
+
+func _f_clearing(parent: Node, at: Vector2, radius: float, _rng: RandomNumberGenerator) -> void:
+	_disc(parent, at, radius, Color(1.0, 0.98, 0.7, 0.10), -2, 28)
+	for i in 8:                                       # a ring of flowers round one in the middle
+		var a := TAU * float(i) / 8.0
+		_sprite(parent, TUFT, at + Vector2(cos(a), sin(a)) * radius * 0.7, 2.5, Color(1.0, 0.95, 0.6))
+	_sprite(parent, TUFT, at, 3.2, Color(1.0, 0.9, 0.5))
+
+func _f_standing_stones(parent: Node, at: Vector2, radius: float, _rng: RandomNumberGenerator) -> void:
+	_disc(parent, at, radius * 0.7, Color(0.1, 0.12, 0.1, 0.18), -2, 24)
+	for i in 8:
+		var a := TAU * float(i) / 8.0
+		_box(parent, at + Vector2(cos(a), sin(a)) * radius * 0.62, Vector2(24, 76), Color(0.5, 0.5, 0.52), 0.0, true, 1)
+	_box(parent, at, Vector2(70, 46), Color(0.42, 0.42, 0.45), 0.0, true, 1)
+
+# A fenced yard gone to ruin: a square of fence with a gate on the south side, the walls of the old house, haystacks in
+# a row.
+func _f_farm(parent: Node, at: Vector2, _rng: RandomNumberGenerator) -> void:
+	var half := 300.0
+	var step := 78.0
+	for side in 4:
+		for i in int(2.0 * half / step):
+			var t: float = -half + step * float(i) + step / 2.0
+			var p := Vector2.ZERO
+			match side:
+				0: p = Vector2(t, -half)
+				1: p = Vector2(half, t)
+				2: p = Vector2(-t, half)
+				3: p = Vector2(-half, -t)
+			if side == 2 and absf(t) < step:
+				continue                                  # the gate
+			_box(parent, at + p, Vector2(10, 26), Color(0.4, 0.28, 0.15), 0.0, true, 1)
+			_box(parent, at + p, Vector2(step, 6), Color(0.52, 0.38, 0.2), 0.0 if side % 2 == 0 else PI / 2.0, false, 0)
+	var wall := Color(0.45, 0.4, 0.34)
+	_box(parent, at + Vector2(-130, -150), Vector2(150, 16), wall, 0.0, true, 1)
+	_box(parent, at + Vector2(-205, -100), Vector2(16, 100), wall, 0.0, true, 1)
+	_box(parent, at + Vector2(-55, -100), Vector2(16, 100), wall, 0.0, true, 1)
+	for i in 3:
+		_disc(parent, at + Vector2(60 + 70 * i, 120), 22.0, Color(0.85, 0.72, 0.3), 0, 12)
+
+func _blob(radius: float, rng: RandomNumberGenerator, count: int = 22, low: float = 0.7) -> PackedVector2Array:
+	var pts := PackedVector2Array()
+	for i in count:
+		var a := TAU * float(i) / float(count)
+		pts.append(Vector2(cos(a), sin(a)) * radius * (low + rng.randf() * (1.0 - low)))
+	return pts
+
+func _scaled(pts: PackedVector2Array, k: float) -> PackedVector2Array:
+	var out := PackedVector2Array()
+	for p in pts:
+		out.append(p * k)
+	return out
+
+# A pool of water / lava / bog / ice / void. The deep kinds (water, lava, void) block the way.
+func _f_pond(parent: Node, at: Vector2, radius: float, flavour: String, rng: RandomNumberGenerator) -> void:
+	var look: Dictionary = POOL_COLORS.get(flavour, POOL_COLORS["water"])
+	var blob := _blob(radius, rng, 22, 0.82)
+	var holder := Node2D.new()
+	holder.position = at
+	parent.add_child(holder)
+	_poly(holder, _scaled(blob, 1.18), look.rim, -1)
+	_poly(holder, blob, look.fill, 0)
+	_poly(holder, _scaled(blob, 0.6), Color(look.fill).lightened(0.18), 0)
+	if bool(look.solid):
+		var body := StaticBody2D.new()
+		var shape := CollisionPolygon2D.new()
+		shape.polygon = _scaled(blob, 0.92)
+		body.add_child(shape)
+		holder.add_child(body)
+	if flavour == "water" or flavour == "bog":
+		for i in 10:                                      # reeds at even spacing round the edge
+			var a := TAU * float(i) / 10.0
+			_sprite(parent, TUFT, at + Vector2(cos(a), sin(a)) * radius * 1.12, 2.5, Color(0.6, 0.9, 0.5))
+
+# Boulders in a neat cluster: a big one with two smaller either side and two more behind it.
+func _f_rocks(parent: Node, at: Vector2, _radius: float, _rng: RandomNumberGenerator) -> void:
+	for entry in [[Vector2(0, 0), 7.0], [Vector2(-150, 50), 5.0], [Vector2(150, 50), 5.0], [Vector2(-70, -110), 4.0], [Vector2(70, -110), 4.0]]:
+		_sprite(parent, ROCK, at + entry[0], entry[1], Color(0.72, 0.7, 0.68), 7.0 * float(entry[1]), 0)
+
+# Three tents at even angles round a fire, a log beside each.
+func _f_camp(parent: Node, at: Vector2, radius: float, _rng: RandomNumberGenerator) -> void:
+	_disc(parent, at + Vector2(0, 30), radius * 0.6, Color(0.25, 0.2, 0.1, 0.25), -2, 20)
+	_disc(parent, at, 44.0, Color(0.1, 0.07, 0.04, 0.5), 0, 14)
+	_disc(parent, at, 22.0, Color(0.95, 0.5, 0.12), 1, 12)
+	for i in 3:
+		var a := -PI / 2.0 + TAU * float(i) / 3.0
+		var c := at + Vector2(cos(a), sin(a)) * radius * 0.62
+		_poly(parent, PackedVector2Array([c + Vector2(0, -52), c + Vector2(48, 30), c + Vector2(-48, 30)]), Color(0.45, 0.4, 0.28), 1)
+		_poly(parent, PackedVector2Array([c + Vector2(0, -10), c + Vector2(14, 30), c + Vector2(-14, 30)]), Color(0.12, 0.1, 0.08), 2)
+		_box(parent, at + Vector2(cos(a + PI / 3.0), sin(a + PI / 3.0)) * 80.0, Vector2(54, 14), Color(0.32, 0.22, 0.12), a + PI / 3.0 + PI / 2.0, false, 0)
+
+# A stack of logs, side by side.
+func _f_logs(parent: Node, at: Vector2, _radius: float, _rng: RandomNumberGenerator) -> void:
+	for i in 4:
+		_box(parent, at + Vector2(0, (float(i) - 1.5) * 38.0), Vector2(220, 28), Color(0.3, 0.2, 0.1), 0.0, true, 0)
+
+# Two ruined buildings: four broken walls each, with a doorway on the south side, and rubble at the corners.
+func _f_ruin_walls(parent: Node, at: Vector2, _radius: float, _rng: RandomNumberGenerator) -> void:
+	var wall := Color(0.42, 0.4, 0.37)
+	for building in [[Vector2(-130, 0), Vector2(230, 170)], [Vector2(150, 40), Vector2(150, 120)]]:
+		var c: Vector2 = at + building[0]
+		var hx: float = float(building[1].x) * 0.5
+		var hy: float = float(building[1].y) * 0.5
+		_box(parent, c + Vector2(0, -hy), Vector2(hx * 2.0, 16), wall, 0.0, true, 0)
+		_box(parent, c + Vector2(-hx, 0), Vector2(16, hy * 2.0), wall, 0.0, true, 0)
+		_box(parent, c + Vector2(hx, 0), Vector2(16, hy * 1.2), wall, 0.0, true, 0)
+		_box(parent, c + Vector2(-hx * 0.55, hy), Vector2(hx * 0.9, 16), wall, 0.0, true, 0)
+		for corner in [Vector2(-1, -1), Vector2(1, -1), Vector2(-1, 1), Vector2(1, 1)]:
+			_sprite(parent, ROCK, c + Vector2(hx * corner.x, hy * corner.y) * 1.15, 2.4, Color(0.7, 0.68, 0.64))
+
+func _f_graves(parent: Node, at: Vector2, _rng: RandomNumberGenerator) -> void:
+	for ix in 5:
+		for iy in 3:
+			_box(parent, at + Vector2((ix - 2) * 70.0, (iy - 1) * 70.0), Vector2(14, 30), Color(0.34, 0.34, 0.38), 0.0, false, 0)
+	_sprite(parent, DEAD_TREE, at + Vector2(0, -150), 2.6, Color(0.75, 0.72, 0.68), 8.0 * 2.6)
+
+# A straight line of boulders across part of the room, with a gap in the middle to walk through.
+func _f_ridge(parent: Node, at: Vector2, radius: float, rng: RandomNumberGenerator) -> void:
+	var dir := Vector2.RIGHT if rng.randf() < 0.5 else Vector2.DOWN
+	var length := radius * 2.0
+	var t := 0.0
+	while t <= length:
+		if absf(t - length * 0.5) > 150.0:
+			_sprite(parent, ROCK, at - dir * radius + dir * t, 6.5, Color(0.6, 0.58, 0.56), 7.0 * 6.5, 0)
+		t += 78.0
+
+func _f_mouth(parent: Node, at: Vector2) -> void:
+	_sprite(parent, ROCK, at, 12.0, Color(0.7, 0.68, 0.66), 7.0 * 12.0, 0)
+	_poly(parent, PackedVector2Array([at + Vector2(-46, 84), at + Vector2(-30, 20), at + Vector2(0, 0), at + Vector2(30, 20), at + Vector2(46, 84)]), Color(0.03, 0.03, 0.04), 1)
+
+# Crystals in an even row, alternately tall and short.
+func _f_crystals(parent: Node, at: Vector2, _radius: float, _rng: RandomNumberGenerator) -> void:
+	for i in 5:
+		var s := 5.0 if i % 2 == 0 else 4.0
+		_sprite(parent, CRYSTAL, at + Vector2((float(i) - 2.0) * 110.0, 0), s, Color(0.8, 0.5, 1.3), 4.0 * s, 1)
+
+func _build_room_landmarks(state: Dictionary) -> void:
+	var r: Dictionary = state.room
+	for lid in r.landmarks:
+		var l: Dictionary = WorldMapScript.landmark(lid)
+		var rng := RandomNumberGenerator.new()
+		rng.seed = hash(lid) ^ WorldMapScript.MAP_SEED
+		var parent: Node2D = state.structures
+		match lid:
+			"heartwood": _heartwood(parent, l.pos, rng)
+			"ruins": _ruins(parent, l.pos, rng)
+			"lizen_encampment": _lizen(parent, l.pos, rng)
+			"pesca": _pesca(parent, l.pos, rng)
+			"ranch": _ranch(parent, l.pos, rng)
+			"leviathan_shore": _wreck(parent, l.pos, rng)
+			"frozen_spire": _spire(parent, l.pos, rng)
+			"crater": _crater(parent, l.pos, rng)
+			"void_throne": _throne(parent, l.pos, rng)
+			"caves": _caves(parent, l.pos, rng)
 
 func _poly(parent: Node, points: PackedVector2Array, color: Color, z: int = 0) -> Polygon2D:
 	var p := Polygon2D.new()
@@ -332,36 +981,48 @@ func _sprite(parent: Node, tex: Texture2D, pos: Vector2, s: float, tint: Color =
 	return sp
 
 # The HeartWood: one colossal tree the whole wood grows around, in a dark clearing.
-func _heartwood(parent: Node, pos: Vector2, rng: RandomNumberGenerator) -> void:
+func _heartwood(parent: Node, pos: Vector2, _rng: RandomNumberGenerator) -> void:
 	_disc(parent, pos, 1050.0, Color(0.05, 0.12, 0.06, 0.45), -2, 36)
 	_disc(parent, pos, 620.0, Color(0.08, 0.2, 0.1, 0.4), -2, 30)
-	# roots
+	# eight roots spreading evenly from the trunk
 	for i in 8:
-		var a := TAU * float(i) / 8.0 + rng.randf() * 0.3
+		var a := TAU * float(i) / 8.0
 		_box(parent, pos + Vector2(cos(a), sin(a)) * 330.0 + Vector2(0, 260), Vector2(380, 46), Color(0.22, 0.14, 0.08), a, false, -1)
 	_sprite(parent, TREE, pos, 32.0, Color(0.7, 0.95, 0.7), 8.0 * 32.0 * 0.62, 2)
-	for i in 14:
-		var a := TAU * float(i) / 14.0 + rng.randf() * 0.2
-		_sprite(parent, TREE, pos + Vector2(cos(a), sin(a)) * (1250.0 + rng.randf() * 200.0), 7.0 + rng.randf() * 3.0, Color(0.6, 0.9, 0.62), 8.0 * 7.0, 1)
+	# two rings of guardian trees, evenly spaced
+	for i in 16:
+		var a := TAU * float(i) / 16.0
+		_sprite(parent, TREE, pos + Vector2(cos(a), sin(a)) * 1300.0, 7.5, Color(0.6, 0.9, 0.62), 8.0 * 7.5, 1)
+	for i in 8:
+		var a := TAU * (float(i) + 0.5) / 8.0
+		_sprite(parent, TREE, pos + Vector2(cos(a), sin(a)) * 900.0, 5.0, Color(0.65, 0.92, 0.66), 8.0 * 5.0, 1)
 
 # A settlement where everyone is dead: broken walls, rubble, bare trees and a few grave markers. Sized for a
 # 32 px player: a ruined house is ~150 px across.
-func _ruins(parent: Node, pos: Vector2, rng: RandomNumberGenerator) -> void:
+func _ruins(parent: Node, pos: Vector2, _rng: RandomNumberGenerator) -> void:
 	_disc(parent, pos, 1100.0, Color(0.2, 0.2, 0.18, 0.3), -2, 32)
-	for i in 34:
-		var a := rng.randf() * TAU
-		var d := 60.0 + rng.randf() * 900.0
-		var wall := Vector2(50.0 + rng.randf() * 110.0, 16.0 + rng.randf() * 12.0)
-		_box(parent, pos + Vector2(cos(a), sin(a)) * d, wall, Color(0.42 + rng.randf() * 0.1, 0.4, 0.37), rng.randf() * PI, true, 0)
-	for i in 14:
-		var a := rng.randf() * TAU
-		_sprite(parent, ROCK, pos + Vector2(cos(a), sin(a)) * (120.0 + rng.randf() * 950.0), 2.4, Color(0.7, 0.68, 0.64))
-	for i in 8:
-		var a := rng.randf() * TAU
-		_sprite(parent, DEAD_TREE, pos + Vector2(cos(a), sin(a)) * (250.0 + rng.randf() * 800.0), 2.6, Color(0.75, 0.72, 0.68), 8.0 * 2.6)
-	for i in 10:
-		var a := rng.randf() * TAU
-		_box(parent, pos + Vector2(cos(a), sin(a)) * (150.0 + rng.randf() * 600.0), Vector2(12, 28), Color(0.3, 0.3, 0.32), 0.0, false, 0)
+	var wall := Color(0.42, 0.4, 0.37)
+	# four ruined houses round a well: three standing walls each and a doorway facing the well
+	for corner in [Vector2(-1, -1), Vector2(1, -1), Vector2(-1, 1), Vector2(1, 1)]:
+		var c: Vector2 = pos + Vector2(corner.x * 480.0, corner.y * 300.0)
+		var hx := 150.0
+		var hy := 105.0
+		_box(parent, c + Vector2(0, corner.y * hy), Vector2(hx * 2.0, 16), wall, 0.0, true, 0)           # the far wall
+		_box(parent, c + Vector2(-hx, 0), Vector2(16, hy * 2.0), wall, 0.0, true, 0)
+		_box(parent, c + Vector2(hx, 0), Vector2(16, hy * 2.0), wall, 0.0, true, 0)
+		_box(parent, c + Vector2(-corner.x * hx * 0.6, -corner.y * hy), Vector2(hx * 0.8, 16), wall, 0.0, true, 0)   # the wall facing the well, with a doorway beside it
+		for k in [Vector2(-1, -1), Vector2(1, -1), Vector2(-1, 1), Vector2(1, 1)]:
+			_sprite(parent, ROCK, c + Vector2(hx * k.x, hy * k.y) * 1.1, 2.4, Color(0.7, 0.68, 0.64))
+	# the well
+	_disc(parent, pos, 54.0, Color(0.3, 0.3, 0.33), 0, 18)
+	_disc(parent, pos, 34.0, Color(0.1, 0.12, 0.2), 1, 14)
+	# graves in two neat rows north of the well, a bare tree at each end
+	for ix in 6:
+		for iy in 2:
+			_box(parent, pos + Vector2((float(ix) - 2.5) * 80.0, -560.0 - float(iy) * 80.0), Vector2(14, 30), Color(0.3, 0.3, 0.32), 0.0, false, 0)
+	for side in [-1.0, 1.0]:
+		_sprite(parent, DEAD_TREE, pos + Vector2(side * 380.0, -600.0), 2.6, Color(0.75, 0.72, 0.68), 8.0 * 2.6)
+		_sprite(parent, DEAD_TREE, pos + Vector2(side * 800.0, 0.0), 2.6, Color(0.75, 0.72, 0.68), 8.0 * 2.6)
 
 # The Lizen Encampment: a palisade ring with a gate north and south, tents, towers and a fire.
 func _lizen(parent: Node, pos: Vector2, rng: RandomNumberGenerator) -> void:

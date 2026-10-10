@@ -4,6 +4,7 @@ extends SceneTree
 # scenery streaming, the HUD that follows you.
 
 const WM := preload("res://scripts/WorldMap.gd")
+const RM := preload("res://scripts/Rooms.gd")
 
 func _names(nodes: Array) -> Array:
 	var out := []
@@ -29,11 +30,20 @@ func _init() -> void:
 	print("You wake at the woods' edge: %s (expected %s), region %s (expected woods_edge)" % [player.global_position, WM.spawn_position(), main.current_region_id])
 	print("...so the battle backdrop is the forest's: world %s (expected forest)" % [main.WORLDS[main.current_world_index].id])
 	print("The label shows where you are, not a wave: '%s' (expected Central Lexia), danger pips lit: %d (expected 1)" % [main.hud.world_label.text, main.hud.danger_pips.filter(func(p): return p.color.g > 0.5 and p.color.r < 0.9 and p.color.a > 0.95).size()])
-	print("Scenery is streamed around you: %d chunks (expected 25)" % [main.overworld_map.loaded_chunk_count()])
+	var spawn_room: Dictionary = RM.room_at(player.global_position)
+	print("You wake in the room '%s' (expected Where You Woke), and it is the room the game says you are in: %s (expected %s)" % [spawn_room.name, main.current_room_id, spawn_room.id])
+	print("...the HUD names it under the region: '%s' (expected Where You Woke), and the room was announced: visited=%s (expected true)" % [main.hud.room_label.text, main.visited_rooms.has(spawn_room.id)])
+	var built: Array = main.overworld_map.loaded_room_ids()
+	built.sort()
+	print("The room you wake in and the ones within reach are built: %d rooms %s (expected 6: the spawn room, its west, north and south neighbours, and the two corners west)" % [built.size(), built])
 	var group_enemies: Array = main.get_tree().get_nodes_in_group("enemies")
-	print("A ring of enemies waits nearby: %d (expected 12), none on top of you: %s (expected true)" % [group_enemies.size(), group_enemies.all(func(e): return e.global_position.distance_to(player.global_position) >= main.SPAWN_RING_MIN - 1.0)])
-	var allowed := ["Goblin", "Wolf", "Gnome", "Orc", "Traitor Wolf"]
-	print("...and only what lives in the woods' edge: %s (expected all in %s)" % [_names(group_enemies).filter(func(n): return not (n in allowed)), allowed])
+	print("Each nearby room has its own roaming enemies: %d (expected 10-35), none within %d px of you: %s (expected true)" % [group_enemies.size(), int(main.ROOM_SPAWN_MIN), group_enemies.all(func(e): return e.global_position.distance_to(player.global_position) >= main.ROOM_SPAWN_MIN - 1.0)])
+	print("...every one stands in a room that has wild enemies (not the sea, not a safe room): %s (expected true)" % [group_enemies.all(func(e): return RM.room_at(e.global_position).target > 0)])
+	var per_room_ok := true
+	for r in RM.rooms_near(player.global_position, main.ROOM_ACTIVE_MARGIN):
+		if int(r.target) > 0 and main._enemies_in_room(r) < int(r.target):
+			per_room_ok = false
+	print("...and every room within reach has at least as many as it should: %s (expected true)" % [per_room_ok])
 
 	# --- the map follows you
 	var tests := {
@@ -61,9 +71,9 @@ func _init() -> void:
 		var spot: Dictionary = main._regional_spawn_spot()
 		if spot.is_empty():
 			continue
-		if main._in_protected_zone(spot.pos, 150.0) or not spot.region.walkable or spot.region.enemies.is_empty():
+		if main._in_protected_zone(spot.pos, 150.0) or not spot.region.walkable or spot.table.is_empty() or spot.room.target <= 0 or spot.room.kind in ["safe", "sea"]:
 			bad_spot += 1
-	print("Spawn spots (200 tries from the town) are never in the town, water or a safe region: bad=%d (expected 0)" % [bad_spot])
+	print("Spawn spots (200 tries from the town) are never in the town, water or a safe room: bad=%d (expected 0)" % [bad_spot])
 
 	# --- tiers scale the enemy and its reward
 	_clear_enemies(main)
@@ -91,8 +101,15 @@ func _init() -> void:
 	main._release_far_enemies()
 	await process_frame
 	print("Enemies you have left far behind are let go (not killed): near alive=%s (expected true), far alive=%s (expected false), count=%d (expected 1)" % [is_instance_valid(near) and not near.is_queued_for_deletion(), is_instance_valid(far) and not far.is_queued_for_deletion(), main.enemies_alive])
-	main._fill_ambient_population(main.AMBIENT_TARGET)
-	print("...and the ring is topped back up: %d near you (expected about 12)" % [main._enemies_near(player.global_position, main.AMBIENT_RADIUS)])
+	main._fill_ambient_population(99)
+	var refilled := true
+	for r in RM.rooms_near(player.global_position, main.ROOM_ACTIVE_MARGIN):
+		if int(r.target) > 0 and main._enemies_in_room(r) < int(r.target):
+			refilled = false
+	print("...and the rooms near you are topped back up: every room has its share again: %s (expected true), %d enemies near you (expected 8-35)" % [refilled, main._enemies_near(player.global_position, 3500.0)])
+	_clear_enemies(main)
+	main._fill_ambient_population(2)
+	print("A top-up adds only a few at a time (limit 2): %d (expected 2-6, clusters may overshoot)" % [main.get_tree().get_nodes_in_group("enemies").size()])
 
 	# --- bosses stand on their landmarks
 	_clear_enemies(main)
@@ -131,18 +148,124 @@ func _init() -> void:
 				enemies_ok = false
 	print("Every miniboss and every enemy a region names exists: %s, %s (expected true, true)" % [minis_ok, enemies_ok])
 
-	# --- scenery is the same every time
-	var chunk_a: int = main.overworld_map.get_child_count()
+	# --- rooms are built as you come near, and let go when you leave
+	var overworld = main.overworld_map
 	player.global_position = Vector2(0.6, 0.3) * WM.SIZE
-	main.overworld_map.update_chunks(player.global_position)
-	var children_here: int = main.overworld_map._chunks[Vector2i(int(player.global_position.x / 1024.0), int(player.global_position.y / 1024.0))].get_child_count()
-	player.global_position = Vector2(0.3, 0.3) * WM.SIZE
-	main.overworld_map.update_chunks(player.global_position)
-	player.global_position = Vector2(0.6, 0.3) * WM.SIZE
-	main.overworld_map.update_chunks(player.global_position)
+	overworld.update_rooms(player.global_position)
+	var room_here: Dictionary = RM.room_at(player.global_position)
+	print("The room you step into is built at once: complete=%s (expected true); the ones around it wait their turn: %d pending (expected > 0)" % [overworld.is_room_complete(room_here.id), overworld.pending_room_count()])
+	var frames := 0
+	while overworld.pending_room_count() > 0 and frames < 300:
+		await process_frame
+		frames += 1
+	print("...and they are built one after another over a few frames: %d frames (expected 1-120), nothing left pending: %s (expected true)" % [frames, overworld.pending_room_count() == 0])
+	var children_here: int = overworld.scenery_count(room_here.id)
+	player.global_position = Vector2(0.3, 0.6) * WM.SIZE
+	overworld.update_rooms(player.global_position)
+	overworld.flush()
 	await process_frame
-	var children_again: int = main.overworld_map._chunks[Vector2i(int(player.global_position.x / 1024.0), int(player.global_position.y / 1024.0))].get_child_count()
-	print("A chunk you leave and come back to has exactly the same scenery: %d then %d (expected equal and > 0), chunks loaded %d (expected 25)" % [children_here, children_again, main.overworld_map.loaded_chunk_count()])
+	print("A room you have left far behind is let go: loaded=%s (expected false)" % [overworld.is_room_loaded(room_here.id)])
+	player.global_position = Vector2(0.6, 0.3) * WM.SIZE
+	overworld.update_rooms(player.global_position)
+	overworld.flush()
+	await process_frame
+	var children_again: int = overworld.scenery_count(room_here.id)
+	print("A room you leave and come back to has exactly the same scenery: %d then %d (expected equal and > 0), rooms loaded %d (expected 1-9)" % [children_here, children_again, overworld.loaded_room_count()])
+
+	# --- crossing from one room to the next
+	_clear_enemies(main)
+	var crossing: Dictionary = {}
+	for r in RM.rooms:
+		if r.kind != "wild" or r.land < 0.99 or not r.landmarks.is_empty():
+			continue
+		for ex in RM.exits(r):
+			var beyond: Dictionary = RM.room_at(Vector2(ex.pos) - Vector2(ex.n) * 10.0)
+			if ex.side == "e" and beyond.kind == "wild" and beyond.land >= 0.99 and beyond.landmarks.is_empty():
+				crossing = {"room": r, "other": beyond, "exit": ex}
+				break
+		if not crossing.is_empty():
+			break
+	var ex: Dictionary = crossing.exit
+	player.global_position = Vector2(ex.pos) + Vector2(ex.n) * 700.0
+	main._track_player_room()
+	overworld.update_rooms(player.global_position)
+	var first_room: String = main.current_room_id
+	overworld.flush()
+	print("Walk toward a doorway: the room beyond is already built before you reach it: %s (expected true), you are in %s (expected %s)" % [overworld.is_room_loaded(crossing.other.id), first_room, crossing.room.id])
+	player.global_position = Vector2(ex.pos) - Vector2(ex.n) * 60.0
+	main._track_player_room()
+	overworld.update_rooms(player.global_position)
+	print("Cross it: you are in the next room at once, no loading: %s (expected %s), the HUD shows its name '%s' (expected '%s', blank when it has none), it counts as visited: %s (expected true)" % [main.current_room_id, crossing.other.id, main.hud.room_label.text, crossing.other.name, main.visited_rooms.has(crossing.other.id)])
+	overworld.flush()
+	print("...and the room you left is still built behind you: %s (expected true)" % [overworld.is_room_loaded(crossing.room.id)])
+
+	# Solid ground: a wall of trees, rock or water follows the outline of a room's floor, with the doorways open.
+	var shaped: Dictionary = {}
+	for r in RM.rooms:
+		if r.kind == "wild" and r.land >= 0.99 and r.mass != "" and RM.layout(r).segments().size() >= 40 and RM.layout(r).floor_fraction < 0.75:
+			shaped = r
+			break
+	var layout = RM.layout(shaped)
+	overworld.update_rooms(shaped.rect.get_center())
+	overworld.flush()
+	var segs: PackedVector2Array = layout.segments()
+	var wall_mid := Vector2.ZERO
+	var toward_floor := Vector2.ZERO
+	for k in range(0, segs.size() - 1, 2):
+		var a: Vector2 = segs[k]
+		var b: Vector2 = segs[k + 1]
+		var m: Vector2 = (a + b) * 0.5
+		var tangent: Vector2 = (b - a).normalized()
+		var normal := Vector2(-tangent.y, tangent.x)
+		if a.distance_to(b) < 30.0 or not shaped.rect.grow(-400.0).has_point(m):
+			continue
+		for sign_n in [1.0, -1.0]:
+			if layout.sample(m + normal * sign_n * 60.0) > 30.0 and layout.sample(m - normal * sign_n * 60.0) < -30.0:
+				wall_mid = m
+				toward_floor = normal * sign_n
+		if wall_mid != Vector2.ZERO:
+			break
+	player.global_position = wall_mid + toward_floor * 50.0
+	_clear_enemies(main)
+	await physics_frame
+	await physics_frame
+	print("Room '%s' (%s, solid ground: %s): the wall at the edge of the floor refuses a step into it: %s (expected true)" % [shaped.id, shaped.layout, shaped.mass, player.test_move(player.global_transform, -toward_floor * 120.0)])
+	print("...while a step along the floor is free: %s (expected true)" % [not player.test_move(player.global_transform, toward_floor * 30.0)])
+	var door: Dictionary = RM.exits(shaped)[0]
+	player.global_position = Vector2(door.pos) + Vector2(door.n) * 150.0
+	await physics_frame
+	await physics_frame
+	print("...and the doorway '%s' is open: walking straight out through it is free: %s (expected true)" % [door.side, not player.test_move(player.global_transform, -Vector2(door.n) * 260.0)])
+
+	# --- a room's own enemies
+	var den: Dictionary = {}
+	for r in RM.rooms:
+		if r.kind == "wild" and r.land > 0.99 and not r.enemies.is_empty() and r.landmarks.is_empty() and WM.region(r.region).miniboss == "":
+			den = r
+			break
+	if not den.is_empty():
+		_clear_enemies(main)
+		player.global_position = den.rect.get_center()
+		main.in_battle = false
+		overworld.update_rooms(player.global_position)
+		main._track_player_room()
+		main._fill_ambient_population(99)
+		var keys := []
+		for entry in den.enemies:
+			keys.append(str(entry[0]))
+		var allowed_names := []
+		for k in keys:
+			var probe_enemy = main.REGION_ENEMY_SCRIPTS[k].new()
+			allowed_names.append(probe_enemy.get_display_name())
+			probe_enemy.free()
+		var inside := []
+		for e in main.get_tree().get_nodes_in_group("enemies"):
+			if den.rect.has_point(e.global_position):
+				inside.append(e.get_display_name())
+		var strangers := inside.filter(func(n): return not (n in allowed_names))
+		print("'%s' has its own residents (%s): %d inside, outsiders=%s (expected [] and at least %d inside)" % [den.name, allowed_names, inside.size(), strangers, int(den.target)])
+	else:
+		print("(no room with its own enemy table found)")
 
 	# --- the sea blocks the way
 	var water: Node = main.overworld_map.get_node("DeepWater")

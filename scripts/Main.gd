@@ -3,6 +3,7 @@ extends Node2D
 const PlayerScript := preload("res://scripts/Player.gd")
 const WorldMapScript := preload("res://scripts/WorldMap.gd")
 const OverworldMapScript := preload("res://scripts/OverworldMap.gd")
+const RoomsScript := preload("res://scripts/Rooms.gd")
 const EnemyScript := preload("res://scripts/Enemy.gd")
 const OrcScript := preload("res://scripts/Orc.gd")
 const ArcherScript := preload("res://scripts/Archer.gd")
@@ -847,6 +848,9 @@ var ground: TextureRect
 var regional_world := true
 var overworld_map: Node2D = null
 var current_region_id := ""
+var current_room_id := ""                       # the room (Rooms.gd) the player is in
+var visited_rooms: Dictionary = {}              # room id -> true, for this run
+var _region_toast_frame := -1                   # the frame a "Entering <region>" toast was last shown on
 var region_check_timer := 0.0
 var ambient_spawn_timer := 0.0
 var defeated_landmark_bosses: Dictionary = {}   # landmark id -> true, for this run
@@ -1181,6 +1185,8 @@ func _ready() -> void:
 		overworld_map.apply_animated_textures(hud.grass_animated_texture, HUDScript.water_animated_texture)
 		current_region_id = ""
 		_track_player_region()
+		current_room_id = ""
+		_track_player_room()
 	_apply_world_visuals()
 	_build_camera()
 	_build_sfx()
@@ -1598,6 +1604,9 @@ func _place_building(pos: Vector2, texture: Texture2D, kind: String) -> void:
 	# up to the front is what opens it, not merely grazing the roof.
 	var door_pos := pos + Vector2(0, texture.get_height() * 0.5 * TOWN_BUILDING_SCALE + 6.0)
 	var door_size: Vector2 = TOWN_LAYOUT.get(kind, {}).get("door", Vector2(90, 60))
+	if InteriorScript.has(kind):                       # most buildings have a room of their own
+		_make_door_trigger(door_pos, door_size, func(): _enter_interior(kind, door_pos))
+		return
 	match kind:
 		"shop":
 			_make_door_trigger(door_pos, door_size, func(): _try_open_shop("gear"))
@@ -1795,7 +1804,8 @@ func _place_flea_market(pos: Vector2) -> void:
 		stall.z_index = -5
 		add_child(stall)
 	var door_size: Vector2 = TOWN_LAYOUT.flea_market.door
-	_make_door_trigger(pos + Vector2(0, stall_texture.get_height() * 0.5 * TOWN_BUILDING_SCALE + 6.0), door_size, func(): _try_open_panel("flea_market"))
+	var market_door: Vector2 = pos + Vector2(0, stall_texture.get_height() * 0.5 * TOWN_BUILDING_SCALE + 6.0)
+	_make_door_trigger(market_door, door_size, func(): _enter_interior("flea_market", market_door))
 
 # A wall segment's collision AND its visible sprite together -- the town's
 # perimeter used to be collision-only with no sprite at all, which read as
@@ -1818,6 +1828,108 @@ func _add_town_wall(pos: Vector2, size: Vector2) -> void:
 	# that happens to sit near a building's footprint never draws over it.
 	wall_sprite.z_index = -6
 	add_child(wall_sprite)
+
+# --- Building interiors ------------------------------------------------------------------------
+# Most town buildings have a room of their own (Interior.gd), parked off the east edge of the map. The door in town
+# fades out and puts you inside; the shopkeeper's counter opens the same menu the door used to; the doorway at the
+# bottom of the room takes you back out. Nothing outside moves while you are in there.
+
+const InteriorScript := preload("res://scripts/Interior.gd")
+const INTERIOR_ORIGIN := Vector2(WorldMapScript.SIZE.x + 2400.0, 0.0)
+const INTERIOR_SLOT := 2600.0
+
+var in_interior := false
+var interior_kind := ""
+var interior_return := Vector2.ZERO
+var interiors: Dictionary = {}              # venue kind -> its built Interior node
+var _fade_layer: CanvasLayer = null
+var _fade_rect: ColorRect = null
+var _interior_busy := false
+
+func _interior_origin(kind: String) -> Vector2:
+	return INTERIOR_ORIGIN + Vector2(float(InteriorScript.DEFS.keys().find(kind)) * INTERIOR_SLOT, 0.0)
+
+func _get_interior(kind: String) -> Node2D:
+	if not interiors.has(kind) or not is_instance_valid(interiors[kind]):
+		var node: Node2D = InteriorScript.new()
+		add_child(node)
+		node.setup(kind, _interior_origin(kind), func(): _interior_trade(kind), _leave_interior)
+		interiors[kind] = node
+	return interiors[kind]
+
+# What walking up to the counter does: the same menu the building's door opened before it had an inside.
+func _interior_trade(kind: String) -> void:
+	match kind:
+		"shop": _try_open_shop("gear")
+		"enchanter": _try_open_shop("enchant")
+		"healer": _try_open_healer()
+		"beastiary": _try_open_beastiary()
+		"tavern": _try_open_tavern()
+		_: _try_open_panel(kind)
+
+func _fade(to_black: bool, seconds: float = 0.2) -> void:
+	if _fade_layer == null:
+		_fade_layer = CanvasLayer.new()
+		_fade_layer.layer = 90
+		_fade_layer.process_mode = Node.PROCESS_MODE_ALWAYS
+		_fade_rect = ColorRect.new()
+		_fade_rect.color = Color(0, 0, 0, 0)
+		_fade_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_fade_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+		_fade_layer.add_child(_fade_rect)
+		add_child(_fade_layer)
+	var tween := create_tween()
+	tween.tween_property(_fade_rect, "color:a", 1.0 if to_black else 0.0, seconds)
+	await tween.finished
+
+func _enter_interior(kind: String, door_pos: Vector2) -> void:
+	if in_interior or _interior_busy or _town_door_blocked():
+		return
+	_interior_busy = true
+	player.discovered_locations[kind] = true
+	interior_kind = kind
+	interior_return = door_pos + Vector2(0, 120.0)
+	await _fade(true)
+	var room: Node2D = _get_interior(kind)
+	in_interior = true
+	player.global_position = room.entry_point()
+	player_trail.clear()
+	for e in get_tree().get_nodes_in_group("enemies"):
+		e.set_physics_process(false)
+	var bounds: Rect2 = room.rect()
+	camera.limit_left = int(bounds.position.x)
+	camera.limit_top = int(bounds.position.y)
+	camera.limit_right = int(bounds.end.x)
+	camera.limit_bottom = int(bounds.end.y)
+	camera.reset_smoothing()
+	hud.update_world(str(room.def.name))
+	hud.update_room("")
+	hud.set_danger(0)
+	await _fade(false)
+	_interior_busy = false
+
+func _leave_interior() -> void:
+	if not in_interior or _interior_busy:
+		return
+	_interior_busy = true
+	await _fade(true)
+	in_interior = false
+	player.global_position = interior_return
+	player_trail.clear()
+	for e in get_tree().get_nodes_in_group("enemies"):
+		e.set_physics_process(true)
+	camera.limit_left = 0
+	camera.limit_top = 0
+	camera.limit_right = int(WORLD_SIZE.x)
+	camera.limit_bottom = int(WORLD_SIZE.y)
+	camera.reset_smoothing()
+	was_in_town = true
+	current_room_id = ""
+	_apply_world_visuals()
+	hud.update_world("Town")
+	hud.set_danger(0)
+	await _fade(false)
+	_interior_busy = false
 
 # Same Area2D + body_entered + is_in_group("player") shape as Pickup.gd --
 # the closer analog for "walk into X" than the enemy contact-distance check
@@ -2120,7 +2232,7 @@ func _size_overworld_enemy(enemy: Node2D) -> void:
 # last roll landed rather than risk a hang on a cramped map.
 func _random_enemy_spawn_position() -> Vector2:
 	if regional_world:
-		var ring: Dictionary = _regional_spawn_spot()
+		var ring: Dictionary = _regional_spawn_spot(true)
 		if not ring.is_empty():
 			return ring.pos
 	var pos := Vector2.ZERO
@@ -2133,15 +2245,16 @@ func _random_enemy_spawn_position() -> Vector2:
 	return pos
 
 # --- The regional overworld -------------------------------------------------------------------
-# What spawns where is the REGION's business (WorldMap.gd): every region has a danger tier and a table of the
-# enemies that live there. Enemies are kept topped up in a ring around the player -- close enough to find, far
-# enough off screen -- and let go once you have left them far behind. The six bosses stand on their landmarks
-# (the HeartWood, the Lizen Encampment...) and the five minibosses roam their own regions now and then.
+# The land is cut into ROOMS (Rooms.gd). Every region has a danger tier and a table of the enemies that live there;
+# every room has its own personality on top (a wolf den, a bandit camp...), which can change who lives there and how
+# many. The rooms near you are kept topped up with their own roaming enemies -- never dropped right next to you --
+# and enemies are let go once you have left them far behind. The six bosses stand on their landmarks (the HeartWood,
+# the Lizen Encampment...) and the five minibosses roam their own regions now and then.
 
-const AMBIENT_TARGET := 12            # roaming enemies kept near you
-const AMBIENT_RADIUS := 2800.0        # "near you"
-const SPAWN_RING_MIN := 900.0
-const SPAWN_RING_MAX := 1900.0
+const ROOM_ACTIVE_MARGIN := 1400.0    # a room's enemies are kept up once you are within this of it
+const ROOM_SPAWN_MIN := 800.0         # ...and are never dropped closer to you than this
+const ROOM_SPAWN_CLEARANCE := 150.0   # ...and stand at least this far inside the floor of a room's shape
+const ROOM_TOP_UP := 3               # most enemies added per tick (the start of a run fills every room at once)
 const DESPAWN_DISTANCE := 4300.0
 const AMBIENT_SPAWN_INTERVAL := 1.6
 const MINIBOSS_CHANCE := 0.04
@@ -2170,7 +2283,9 @@ func _build_regional_world() -> void:
 	_add_wall(Vector2(WORLD_SIZE.x / 2, WORLD_SIZE.y + thickness / 2), Vector2(WORLD_SIZE.x, thickness))
 	_add_wall(Vector2(-thickness / 2, WORLD_SIZE.y / 2), Vector2(thickness, WORLD_SIZE.y))
 	_add_wall(Vector2(WORLD_SIZE.x + thickness / 2, WORLD_SIZE.y / 2), Vector2(thickness, WORLD_SIZE.y))
-	overworld_map.update_chunks(PLAYER_SPAWN_POSITION)
+	# The room you wake in, and the ones around it, are built before the first frame.
+	overworld_map.update_rooms(PLAYER_SPAWN_POSITION)
+	overworld_map.flush()
 
 func _world_index_for_world_id(world_id: String) -> int:
 	for i in WORLDS.size():
@@ -2195,22 +2310,40 @@ func _track_player_region() -> void:
 		_apply_world_visuals()
 		if previous_name != "" and previous_name != region.name and not in_battle:
 			hud.show_message("Entering %s" % region.name)
+			_region_toast_frame = Engine.get_process_frames()
+
+# Which room (Rooms.gd) you are in: shown under the region's name, and the first time you enter one this run its
+# name is announced (unless you have just been told you entered a new region).
+func _track_player_room() -> void:
+	if player == null:
+		return
+	var room: Dictionary = RoomsScript.room_at(player.global_position)
+	if room.id == current_room_id:
+		return
+	current_room_id = room.id
+	var first_visit := not visited_rooms.has(room.id)
+	visited_rooms[room.id] = true
+	if hud != null:
+		hud.update_room(str(room.name))
+		if first_visit and str(room.name) != "" and not in_battle and _region_toast_frame != Engine.get_process_frames():
+			hud.show_message(str(room.name))
 
 # Called every frame the overworld is live (see _process).
 func _update_regional_world(delta: float) -> void:
 	if not regional_world or player == null or overworld_map == null:
 		return
-	overworld_map.update_chunks(player.global_position)
+	overworld_map.update_rooms(player.global_position)
 	hud.update_minimap(player.global_position)
 	region_check_timer -= delta
 	if region_check_timer <= 0.0:
 		region_check_timer = 0.25
 		_track_player_region()
+		_track_player_room()
 	ambient_spawn_timer -= delta
 	if ambient_spawn_timer <= 0.0:
 		ambient_spawn_timer = AMBIENT_SPAWN_INTERVAL
 		_release_far_enemies()
-		_fill_ambient_population(AMBIENT_TARGET)
+		_fill_ambient_population(ROOM_TOP_UP)
 	_update_landmark_bosses()
 
 func _enemies_near(center: Vector2, radius: float) -> int:
@@ -2220,41 +2353,78 @@ func _enemies_near(center: Vector2, radius: float) -> int:
 			n += 1
 	return n
 
-# A spot in the ring around the player that is walkable ground in a region with wild enemies, off the town's
-# doorstep. {} when none turned up.
-func _regional_spawn_spot() -> Dictionary:
+func _enemies_in_room(room: Dictionary) -> int:
+	var n := 0
+	for e in get_tree().get_nodes_in_group("enemies"):
+		if is_instance_valid(e) and not e.is_queued_for_deletion() and room.rect.has_point(e.global_position):
+			n += 1
+	return n
+
+# A spot for a wild enemy: in a room near the player that wants more of them (or in any room near, when `any_room`),
+# on walkable ground that something lives on, off the town's doorstep and not on top of the player. {} when none.
+# {pos, region, room, table}: `table` is who may live there (the room's own, else the region's).
+func _regional_spawn_spot(any_room: bool = false) -> Dictionary:
 	if player == null:
 		return {}
+	var candidates: Array = []
+	var weights: Array = []
+	var total := 0.0
+	for r in RoomsScript.rooms_near(player.global_position, ROOM_ACTIVE_MARGIN):
+		if int(r.target) <= 0:
+			continue
+		var want: int = int(r.target) if any_room else int(r.target) - _enemies_in_room(r)
+		if want <= 0:
+			continue
+		candidates.append(r)
+		weights.append(float(want))
+		total += float(want)
+	if candidates.is_empty():
+		return {}
 	for attempt in 18:
-		var angle: float = randf() * TAU
-		var dist: float = randf_range(SPAWN_RING_MIN, SPAWN_RING_MAX)
-		var pos: Vector2 = player.global_position + Vector2(cos(angle), sin(angle)) * dist
-		if pos.x < 80.0 or pos.y < 80.0 or pos.x > WORLD_SIZE.x - 80.0 or pos.y > WORLD_SIZE.y - 80.0:
+		var roll: float = randf() * total
+		var room: Dictionary = candidates[0]
+		for i in candidates.size():
+			roll -= float(weights[i])
+			if roll <= 0.0:
+				room = candidates[i]
+				break
+		var area: Rect2 = RoomsScript.spawn_rect(room)
+		var pos: Vector2 = area.position + Vector2(randf(), randf()) * area.size
+		if pos.distance_to(player.global_position) < ROOM_SPAWN_MIN:
 			continue
+		if RoomsScript.layout(room).sample(pos) < ROOM_SPAWN_CLEARANCE:
+			continue                                   # in a wall of trees, a lake...
 		var region: Dictionary = WorldMapScript.region_at(pos)
-		if not region.walkable or region.enemies.is_empty() or _in_protected_zone(pos, 150.0):
+		var table: Array = RoomsScript.enemy_table(room, pos)
+		if not region.walkable or table.is_empty() or _in_protected_zone(pos, 150.0):
 			continue
-		return {"pos": pos, "region": region}
+		if overworld_map != null and overworld_map.in_feature(pos, 20.0):
+			continue
+		return {"pos": pos, "region": region, "room": room, "table": table}
 	return {}
 
-func _pick_region_enemy(region: Dictionary) -> String:
+# One enemy key out of a table of [key, weight] entries.
+func _pick_from_table(table: Array) -> String:
 	var total := 0.0
-	for entry in region.enemies:
+	for entry in table:
 		total += float(entry[1])
 	var roll: float = randf() * total
-	for entry in region.enemies:
+	for entry in table:
 		roll -= float(entry[1])
 		if roll <= 0.0:
 			return str(entry[0])
-	return str(region.enemies[0][0])
+	return str(table[0][0])
 
-# Tops the ring up to `target` roaming enemies: each spawn picks a spot, then an enemy that lives there.
-func _fill_ambient_population(target: int, extra_goblins: int = 0, force_elite: bool = false) -> void:
+func _pick_region_enemy(region: Dictionary) -> String:
+	return _pick_from_table(region.enemies)
+
+# Tops up the rooms near you: each room that has fewer roaming enemies than it should gets one more (up to `limit`
+# in this call), picked from the table of who lives in it.
+func _fill_ambient_population(limit: int = 99, extra_goblins: int = 0, force_elite: bool = false) -> void:
 	if in_battle or game_over:
 		return
-	var needed: int = target - _enemies_near(player.global_position, AMBIENT_RADIUS)
 	var spawned := 0
-	while spawned < needed and enemies_alive < MAX_AMBIENT_ENEMIES:
+	while spawned < limit and enemies_alive < MAX_AMBIENT_ENEMIES:
 		var spot: Dictionary = _regional_spawn_spot()
 		if spot.is_empty():
 			break
@@ -2263,7 +2433,7 @@ func _fill_ambient_population(target: int, extra_goblins: int = 0, force_elite: 
 			_spawn_roaming_miniboss(region, spot.pos)
 			spawned += 1
 			continue
-		var key: String = _pick_region_enemy(region)
+		var key: String = _pick_from_table(spot.table)
 		var script = REGION_ENEMY_SCRIPTS[key]
 		var count := 1
 		var cluster := 0.0
@@ -2279,7 +2449,7 @@ func _fill_ambient_population(target: int, extra_goblins: int = 0, force_elite: 
 		spawned += count
 	# Goblin Swarm (a random event): a few extra goblins rush in on top.
 	for i in extra_goblins:
-		var spot: Dictionary = _regional_spawn_spot()
+		var spot: Dictionary = _regional_spawn_spot(true)
 		if spot.is_empty():
 			break
 		_spawn_one_enemy(EnemyScript, spot.pos)
@@ -2290,7 +2460,7 @@ func _spawn_regional_wave() -> void:
 	var force_elite := event_force_elite
 	event_extra_goblins = 0
 	event_force_elite = false
-	_fill_ambient_population(AMBIENT_TARGET, extra_goblins, force_elite)
+	_fill_ambient_population(99, extra_goblins, force_elite)
 
 # Lets go of roaming enemies you have left far behind (never a boss): they are not killed, just gone, and the
 # ring spawns fresh ones where you are now.
@@ -3329,8 +3499,9 @@ func _process(delta: float) -> void:
 	_update_shake(delta)
 	_handle_debug_input()
 	_update_party_followers()
-	_update_town_label()
-	if not in_battle and not game_over and not event_choosing and not choosing_stat and not shop_open:
+	if not in_interior:
+		_update_town_label()
+	if not in_battle and not game_over and not event_choosing and not choosing_stat and not shop_open and not in_interior:
 		_update_regional_world(delta)
 
 	if event_choosing:

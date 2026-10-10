@@ -1,11 +1,12 @@
 extends Control
 class_name MiniMap
 
-# A small framed picture of the whole continent (WorldMap.gd's regions, shrunk) with a dot for you, the castle
-# town and the boss landmarks. Lives in the overworld HUD's corner so the 33,600-pixel world is easy to read.
+# A small framed picture of the whole continent (WorldMap.gd's regions, shrunk) with the room grid, the room you
+# are in lit up, and a dot for you, the castle town and the boss landmarks. Lives in the overworld HUD's corner so the 33,600-pixel world is easy to read.
 # The regions are painted once; only the dots move.
 
 const WorldMapScript := preload("res://scripts/WorldMap.gd")
+const RoomsScript := preload("res://scripts/Rooms.gd")
 
 const MAP_PX := Vector2(196, 139)
 const GROUND_COLORS := {
@@ -55,6 +56,12 @@ func set_player(pos: Vector2) -> void:
 		_overlay.queue_redraw()
 
 func _draw_overlay() -> void:
+	# the room grid, faintly, and the room you are in picked out
+	for r in RoomsScript.rooms:
+		_overlay.draw_rect(Rect2(r.rect.position * _scale, r.rect.size * _scale), Color(0, 0, 0, 0.22), false, 1.0)
+	var here: Dictionary = RoomsScript.room_at(player_pos)
+	_overlay.draw_rect(Rect2(here.rect.position * _scale, here.rect.size * _scale), Color(1.0, 0.95, 0.5, 0.22))
+	_overlay.draw_rect(Rect2(here.rect.position * _scale, here.rect.size * _scale), Color(1.0, 0.95, 0.5, 0.9), false, 1.5)
 	for l in WorldMapScript.landmarks:
 		var at: Vector2 = l.pos * _scale
 		if l.kind == "town":

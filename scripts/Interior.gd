@@ -1,0 +1,275 @@
+extends Node2D
+class_name Interior
+
+# The inside of a building: its own small room, parked far off the edge of the map. Walking through a building's door
+# in town fades out and puts you here (Main._enter_interior); the shopkeeper stands behind the counter and walking up
+# to it opens the same menu the door used to; the doorway at the bottom takes you back outside.
+#
+# Everything is placeholder art built from shapes (floors, walls, furniture) and the one existing NPC sprite, until the
+# user's own art replaces it. Positions in DEFS are px from the room's top-left corner. EVERY number is a DRAFT.
+
+const WALL := 56.0                     # thickness of the walls round the room
+const DOOR_WIDTH := 150.0              # the doorway in the bottom wall
+
+# kind (the town venue it belongs to): {name, size, floor, wall, npc [x, y, tint], counter [x, y, width] (or none),
+# trade [x, y, width, height] (walk in here to trade), things [[kind, x, y], ...]}
+const DEFS := {
+	"shop": {
+		"name": "General Store", "size": Vector2(1000, 720), "floor": Color(0.46, 0.33, 0.2), "wall": Color(0.27, 0.19, 0.13),
+		"npc": [500, 190, Color(0.95, 0.8, 0.5)], "counter": [500, 262, 380], "trade": [500, 340, 260, 70],
+		"things": [["shelf", 220, 104], ["shelf", 780, 104], ["barrel", 110, 210], ["barrel", 110, 270], ["barrel", 890, 210], ["crate", 880, 520], ["crate", 944, 520], ["crate", 944, 584], ["rug", 500, 540]],
+	},
+	"blacksmith": {
+		"name": "The Forge", "size": Vector2(1000, 720), "floor": Color(0.38, 0.36, 0.36), "wall": Color(0.2, 0.19, 0.2),
+		"npc": [690, 215, Color(0.8, 0.8, 0.85)], "counter": [430, 330, 320], "trade": [430, 405, 240, 70],
+		"things": [["forge", 820, 120], ["anvil", 690, 285], ["rack", 200, 104], ["rack", 400, 104], ["barrel", 100, 220], ["barrel", 100, 280], ["barrel", 900, 520]],
+	},
+	"butcher": {
+		"name": "The Butcher", "size": Vector2(900, 680), "floor": Color(0.7, 0.66, 0.6), "wall": Color(0.35, 0.22, 0.2),
+		"npc": [450, 190, Color(1.0, 0.8, 0.8)], "counter": [450, 262, 360], "trade": [450, 340, 240, 70],
+		"things": [["hang_meat", 160, 100], ["hang_meat", 280, 100], ["hang_meat", 620, 100], ["hang_meat", 740, 100], ["block", 130, 240], ["barrel", 780, 240], ["crate", 800, 540], ["crate", 100, 540]],
+	},
+	"healer": {
+		"name": "The Resting Inn", "size": Vector2(1100, 760), "floor": Color(0.5, 0.36, 0.24), "wall": Color(0.28, 0.2, 0.15),
+		"npc": [880, 230, Color(0.85, 1.0, 0.85)], "counter": [880, 300, 260], "trade": [880, 375, 240, 70],
+		"things": [["bed", 150, 190], ["bed", 300, 190], ["bed", 450, 190], ["fireplace", 780, 104], ["table", 330, 540], ["table", 820, 560], ["rug", 330, 540]],
+	},
+	"tavern": {
+		"name": "Bounty Hunter's Tavern", "size": Vector2(1100, 780), "floor": Color(0.42, 0.3, 0.19), "wall": Color(0.25, 0.17, 0.12),
+		"npc": [550, 175, Color(1.0, 0.85, 0.6)], "counter": [550, 250, 520], "trade": [550, 330, 300, 70],
+		"things": [["fireplace", 160, 104], ["barrel", 930, 120], ["barrel", 990, 120], ["round_table", 250, 540], ["round_table", 850, 540], ["round_table", 250, 360], ["rug", 850, 540]],
+	},
+	"seer": {
+		"name": "The Seer's Parlour", "size": Vector2(900, 700), "floor": Color(0.26, 0.18, 0.3), "wall": Color(0.16, 0.1, 0.2),
+		"npc": [450, 250, Color(0.85, 0.7, 1.0)], "counter": [450, 330, 220], "trade": [450, 410, 240, 70],
+		"things": [["curtain", 110, 110], ["curtain", 790, 110], ["crystal", 450, 335], ["rug", 450, 500], ["candle", 330, 330], ["candle", 570, 330]],
+	},
+	"dojo": {
+		"name": "The Dojo", "size": Vector2(1100, 760), "floor": Color(0.55, 0.42, 0.27), "wall": Color(0.3, 0.2, 0.14),
+		"npc": [550, 210, Color(1.0, 0.7, 0.7)], "trade": [550, 300, 260, 70],
+		"things": [["mat", 550, 520], ["dummy", 200, 210], ["dummy", 900, 210], ["rack", 260, 104], ["rack", 550, 104], ["rack", 840, 104]],
+	},
+	"church": {
+		"name": "The Church", "size": Vector2(1200, 900), "floor": Color(0.55, 0.54, 0.52), "wall": Color(0.3, 0.3, 0.34),
+		"npc": [600, 255, Color(1.0, 1.0, 0.95)], "trade": [600, 345, 280, 70],
+		"things": [["altar", 600, 140], ["window", 200, 100], ["window", 400, 100], ["window", 800, 100], ["window", 1000, 100], ["pew", 350, 470], ["pew", 350, 560], ["pew", 350, 650], ["pew", 850, 470], ["pew", 850, 560], ["pew", 850, 650], ["candle", 480, 140], ["candle", 720, 140]],
+	},
+	"beastiary": {
+		"name": "The Beastiary", "size": Vector2(1000, 760), "floor": Color(0.4, 0.3, 0.2), "wall": Color(0.22, 0.16, 0.12),
+		"npc": [500, 250, Color(0.8, 0.9, 1.0)], "counter": [500, 330, 260], "trade": [500, 405, 240, 70],
+		"things": [["bookshelf", 220, 104], ["bookshelf", 500, 104], ["bookshelf", 780, 104], ["bookshelf", 100, 300], ["bookshelf", 100, 480], ["table", 750, 540], ["rug", 500, 540]],
+	},
+	"enchanter": {
+		"name": "The Wizard's Tower", "size": Vector2(900, 760), "floor": Color(0.3, 0.3, 0.4), "wall": Color(0.15, 0.15, 0.25),
+		"npc": [450, 230, Color(0.7, 0.8, 1.0)], "trade": [450, 320, 240, 70],
+		"things": [["rune_circle", 450, 500], ["cauldron", 150, 220], ["bookshelf", 300, 104], ["bookshelf", 600, 104], ["crystal", 750, 240]],
+	},
+	"flea_market": {
+		"name": "The Flea Market", "size": Vector2(1200, 760), "floor": Color(0.5, 0.4, 0.28), "wall": Color(0.3, 0.22, 0.15),
+		"npc": [600, 300, Color(1.0, 0.92, 0.72)], "trade": [600, 400, 300, 70],
+		"things": [["stall", 250, 190], ["stall", 600, 160], ["stall", 950, 190], ["crate", 120, 540], ["crate", 1080, 540], ["barrel", 1060, 330], ["barrel", 140, 330]],
+	},
+}
+
+# What each kind of furniture looks like: [width, height, colour, solid].
+const THINGS := {
+	"shelf": [220, 44, Color(0.42, 0.27, 0.14), true], "barrel": [56, 56, Color(0.5, 0.32, 0.16), true],
+	"crate": [60, 60, Color(0.55, 0.4, 0.22), true], "rug": [320, 200, Color(0.55, 0.16, 0.16), false],
+	"anvil": [70, 44, Color(0.25, 0.25, 0.3), true], "forge": [130, 100, Color(0.35, 0.33, 0.33), true],
+	"rack": [180, 34, Color(0.4, 0.28, 0.16), true], "bed": [110, 170, Color(0.55, 0.35, 0.2), true],
+	"fireplace": [160, 70, Color(0.4, 0.38, 0.36), true], "table": [130, 90, Color(0.5, 0.34, 0.18), true],
+	"round_table": [120, 120, Color(0.45, 0.3, 0.18), true], "pew": [240, 38, Color(0.42, 0.27, 0.14), true],
+	"altar": [260, 90, Color(0.82, 0.8, 0.72), true], "window": [100, 70, Color(0.55, 0.75, 0.9), false],
+	"curtain": [70, 120, Color(0.45, 0.2, 0.55), false], "dummy": [46, 70, Color(0.7, 0.6, 0.35), true],
+	"mat": [420, 260, Color(0.85, 0.82, 0.7), false], "bookshelf": [220, 44, Color(0.3, 0.2, 0.12), true],
+	"cauldron": [80, 80, Color(0.15, 0.15, 0.17), true], "block": [60, 60, Color(0.5, 0.3, 0.2), true],
+	"stall": [220, 80, Color(0.62, 0.32, 0.22), true], "candle": [14, 22, Color(1.0, 0.9, 0.4), false],
+	"hang_meat": [40, 70, Color(0.75, 0.25, 0.25), false], "crystal": [60, 60, Color(0.6, 0.35, 0.9), true],
+	"rune_circle": [320, 320, Color(0.35, 0.3, 0.7), false],
+}
+
+var kind := ""
+var def: Dictionary = {}
+var size := Vector2.ZERO
+var origin := Vector2.ZERO
+var _on_trade: Callable
+var _on_exit: Callable
+
+static func has(venue: String) -> bool:
+	return DEFS.has(venue)
+
+# Builds the room at `origin` (world position of its top-left corner). on_trade runs when the player walks up to the
+# counter, on_exit when they step into the doorway.
+func setup(venue: String, at: Vector2, on_trade: Callable, on_exit: Callable) -> void:
+	kind = venue
+	def = DEFS[venue]
+	size = def.size
+	origin = at
+	position = at
+	z_index = -3
+	_on_trade = on_trade
+	_on_exit = on_exit
+	_build_floor()
+	_build_walls()
+	for t in def.things:
+		_build_thing(str(t[0]), Vector2(float(t[1]), float(t[2])))
+	_build_npc()
+	_build_triggers()
+
+func rect() -> Rect2:
+	return Rect2(origin, size)
+
+# Where the player appears: just inside the doorway.
+func entry_point() -> Vector2:
+	return origin + Vector2(size.x * 0.5, size.y - WALL - 90.0)
+
+func _rect_node(parent: Node, center: Vector2, rect_size: Vector2, color: Color, z: int = 0) -> ColorRect:
+	var r := ColorRect.new()
+	r.color = color
+	r.size = rect_size
+	r.position = center - rect_size * 0.5
+	r.z_index = z
+	r.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(r)
+	return r
+
+func _solid(center: Vector2, rect_size: Vector2, circle: bool = false) -> void:
+	var body := StaticBody2D.new()
+	body.position = center
+	var shape := CollisionShape2D.new()
+	if circle:
+		var c := CircleShape2D.new()
+		c.radius = minf(rect_size.x, rect_size.y) * 0.5
+		shape.shape = c
+	else:
+		var s := RectangleShape2D.new()
+		s.size = rect_size
+		shape.shape = s
+	body.add_child(shape)
+	add_child(body)
+
+func _disc(center: Vector2, radius: float, color: Color, z: int = 0) -> void:
+	var p := Polygon2D.new()
+	var pts := PackedVector2Array()
+	for i in 20:
+		var a := TAU * float(i) / 20.0
+		pts.append(center + Vector2(cos(a), sin(a)) * radius)
+	p.polygon = pts
+	p.color = color
+	p.z_index = z
+	add_child(p)
+
+func _build_floor() -> void:
+	var floor_color: Color = def.floor
+	_rect_node(self, size * 0.5, size, floor_color, -10)
+	# planks / tiles: faint lines every 44 px
+	var y := 0.0
+	while y < size.y:
+		_rect_node(self, Vector2(size.x * 0.5, y), Vector2(size.x, 2.0), floor_color.darkened(0.25), -9)
+		y += 44.0
+
+func _build_walls() -> void:
+	var wall_color: Color = def.wall
+	var door_half := DOOR_WIDTH * 0.5
+	# top, left, right
+	_rect_node(self, Vector2(size.x * 0.5, WALL * 0.5), Vector2(size.x, WALL), wall_color, 1)
+	_rect_node(self, Vector2(size.x * 0.5, WALL + 14.0), Vector2(size.x - WALL * 2.0, 28.0), wall_color.lightened(0.12), 0)
+	_rect_node(self, Vector2(WALL * 0.5, size.y * 0.5), Vector2(WALL, size.y), wall_color, 1)
+	_rect_node(self, Vector2(size.x - WALL * 0.5, size.y * 0.5), Vector2(WALL, size.y), wall_color, 1)
+	_solid(Vector2(size.x * 0.5, WALL * 0.5), Vector2(size.x, WALL))
+	_solid(Vector2(WALL * 0.5, size.y * 0.5), Vector2(WALL, size.y))
+	_solid(Vector2(size.x - WALL * 0.5, size.y * 0.5), Vector2(WALL, size.y))
+	# bottom wall with a doorway in the middle
+	var left_len := size.x * 0.5 - door_half
+	for side in [-1.0, 1.0]:
+		var cx: float = size.x * 0.5 + side * (door_half + left_len * 0.5)
+		_rect_node(self, Vector2(cx, size.y - WALL * 0.5), Vector2(left_len, WALL), wall_color, 1)
+		_solid(Vector2(cx, size.y - WALL * 0.5), Vector2(left_len, WALL))
+	_rect_node(self, Vector2(size.x * 0.5, size.y - WALL * 0.5), Vector2(DOOR_WIDTH, WALL), Color(0.2, 0.14, 0.1), 0)   # the door mat
+
+func _build_thing(thing: String, at: Vector2) -> void:
+	var spec: Array = THINGS.get(thing, [60, 60, Color(0.5, 0.5, 0.5), true])
+	var thing_size := Vector2(float(spec[0]), float(spec[1]))
+	var color: Color = spec[2]
+	var solid: bool = bool(spec[3])
+	match thing:
+		"barrel", "cauldron", "round_table", "crystal":
+			_disc(at, thing_size.x * 0.5, color, 0)
+			_disc(at, thing_size.x * 0.32, color.lightened(0.15), 0)
+			if solid:
+				_solid(at, thing_size, true)
+			if thing == "cauldron":
+				_disc(at, thing_size.x * 0.3, Color(0.3, 0.8, 0.35), 0)
+			if thing == "crystal":
+				_disc(at, thing_size.x * 0.7, Color(0.7, 0.4, 1.0, 0.2), -1)
+			return
+		"rune_circle":
+			_disc(at, thing_size.x * 0.5, color.darkened(0.3), -8)
+			_disc(at, thing_size.x * 0.44, color, -8)
+			_disc(at, thing_size.x * 0.3, color.darkened(0.3), -8)
+			for i in 6:
+				var a := TAU * float(i) / 6.0
+				_disc(at + Vector2(cos(a), sin(a)) * thing_size.x * 0.37, 12.0, Color(0.8, 0.7, 1.0), -7)
+			return
+		"rug", "mat":
+			_rect_node(self, at, thing_size, color, -8)
+			_rect_node(self, at, thing_size - Vector2(24, 24), color.lightened(0.12), -8)
+			return
+	_rect_node(self, at, thing_size, color, 0)
+	if solid:
+		_solid(at, thing_size)
+	match thing:
+		"shelf", "bookshelf":
+			for i in 5:
+				var item_color := Color.from_hsv(float(i) / 5.0, 0.5 if thing == "shelf" else 0.7, 0.85)
+				_rect_node(self, at + Vector2((float(i) - 2.0) * 38.0, -8.0), Vector2(26, 20), item_color, 0)
+		"forge":
+			_disc(at + Vector2(0, 6), 28.0, Color(1.0, 0.5, 0.1), 0)
+			_disc(at + Vector2(0, 6), 14.0, Color(1.0, 0.85, 0.3), 0)
+		"fireplace":
+			_disc(at + Vector2(0, 6), 22.0, Color(1.0, 0.5, 0.1), 0)
+		"altar":
+			_rect_node(self, at + Vector2(0, -30), Vector2(220, 16), Color(0.9, 0.2, 0.25), 0)
+		"rack":
+			for i in 5:
+				_rect_node(self, at + Vector2((float(i) - 2.0) * 32.0, -2.0), Vector2(6, 30), Color(0.75, 0.75, 0.8), 0)
+		"bed":
+			_rect_node(self, at + Vector2(0, 20), Vector2(96, 110), Color(0.3, 0.4, 0.75), 0)
+			_rect_node(self, at + Vector2(0, -60), Vector2(70, 30), Color(0.95, 0.95, 0.9), 0)
+		"dummy":
+			_rect_node(self, at + Vector2(0, -6), Vector2(30, 38), Color(0.85, 0.75, 0.45), 0)
+		"stall":
+			_rect_node(self, at + Vector2(0, -50), Vector2(240, 22), Color(0.9, 0.85, 0.7), 0)
+
+func _build_npc() -> void:
+	var npc := Sprite2D.new()
+	npc.texture = preload("res://assets/blade_ally.png")
+	npc.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	npc.modulate = def.npc[2]
+	npc.position = Vector2(float(def.npc[0]), float(def.npc[1]))
+	npc.scale = Vector2(2.0, 2.0)
+	add_child(npc)
+	if def.has("counter"):
+		var c: Array = def.counter
+		_rect_node(self, Vector2(float(c[0]), float(c[1])), Vector2(float(c[2]), 58.0), Color(0.6, 0.42, 0.22), 0)
+		_rect_node(self, Vector2(float(c[0]), float(c[1]) - 22.0), Vector2(float(c[2]), 14.0), Color(0.72, 0.52, 0.3), 0)
+		_solid(Vector2(float(c[0]), float(c[1])), Vector2(float(c[2]), 58.0))
+
+func _build_triggers() -> void:
+	var t: Array = def.trade
+	_trigger(Vector2(float(t[0]), float(t[1])), Vector2(float(t[2]), float(t[3])), _on_trade)
+	_trigger(Vector2(size.x * 0.5, size.y - WALL * 0.5), Vector2(DOOR_WIDTH - 30.0, WALL), _on_exit)
+
+func _trigger(at: Vector2, trigger_size: Vector2, action: Callable) -> void:
+	var area := Area2D.new()
+	area.position = at
+	var shape := CollisionShape2D.new()
+	var rect_shape := RectangleShape2D.new()
+	rect_shape.size = trigger_size
+	shape.shape = rect_shape
+	area.add_child(shape)
+	area.body_entered.connect(func(body):
+		if body.is_in_group("player"):
+			action.call()
+	)
+	add_child(area)

@@ -132,6 +132,7 @@ var coins_label: Label
 var items_label: Label
 var wave_label: Label
 var world_label: Label
+var room_label: Label
 var enemies_label: Label
 var level_label: Label
 var xp_label: Label
@@ -608,6 +609,13 @@ func _ready() -> void:
 	world_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	world_label.custom_minimum_size = Vector2(MiniMapScript.MAP_PX.x, 0)
 	banner_box.add_child(world_label)
+	room_label = Label.new()
+	room_label.add_theme_font_size_override("font_size", 13)
+	room_label.add_theme_color_override("font_color", Color(0.78, 0.76, 0.7))
+	room_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	room_label.custom_minimum_size = Vector2(MiniMapScript.MAP_PX.x, 0)
+	room_label.clip_text = true
+	banner_box.add_child(room_label)
 
 	var danger_row := HBoxContainer.new()
 	danger_row.add_theme_constant_override("separation", 3)
@@ -2080,6 +2088,12 @@ func update_wave(wave: int) -> void:
 
 func update_world(text: String) -> void:
 	world_label.text = text
+
+# The name of the room (Rooms.gd) you are in, under the region's name.
+func update_room(text: String) -> void:
+	if room_label != null:
+		room_label.text = text
+		room_label.visible = text != ""
 
 # How dangerous the ground you stand on is (WorldMap.gd tier, 0 = none, e.g. inside the town): filled pips,
 # green through red.
