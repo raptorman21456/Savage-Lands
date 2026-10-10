@@ -429,6 +429,135 @@ const ROOMS := {
 		"enemies": [["shade", 5], ["fae_hut", 1]],
 		"target": 5,
 	},
+	# ------------------------------------------------------------------ Death Mountain: the volcano and its hills
+	# A ring road of narrow ledges runs round the volcano through ten rooms, each a different pass: a pass with a pocket,
+	# a causeway over lava, a fork. The crater is entered from its north and south gates only.
+	# The foothills: where the mountain road from the crossroads climbs in, with a pocket off the road.
+	"6,3": {
+		"mass": "rock",
+		"shape": [["path", 600, 0, 1082, 3055, 1082], ["path", 560, 1527, 1082, 1527, 0], ["disc", 600, 1082, 520], ["path", 360, 2300, 1082, 2300, 1500], ["disc", 2300, 1500, 360]],
+		"decor": [["row", "stone", 900, 830, 2200, 830, 260], ["boulders", 2300, 1500, 2, 2, 120]],
+		"target": 4,
+	},
+	# The ash fork: the road splits, one arm to the crater's south gate, the other round the mountain.
+	"7,3": {
+		"mass": "volcanic",
+		"shape": [["path", 600, 0, 1082, 3055, 1082], ["path", 560, 1527, 1082, 1527, 0], ["disc", 1527, 1082, 560]],
+		"decor": [["ring", "stone", 1527, 1082, 330, 10], ["pair", "stone", 700, 1082, 0, 250], ["pair", "stone", 2350, 1082, 0, 250]],
+		"target": 4,
+	},
+	# The south-east corner of the ring: the road turns north, a pocket of rock beside the bend.
+	"8,3": {
+		"mass": "volcanic",
+		"shape": [["path", 560, 0, 1082, 1527, 1082, 1527, 0], ["disc", 1527, 1082, 480], ["path", 300, 1527, 1082, 2300, 1500], ["disc", 2300, 1500, 420]],
+		"decor": [["boulders", 2300, 1500, 2, 2, 110], ["pair", "stone", 700, 1082, 0, 240]],
+		"target": 4,
+	},
+	# A ledge road north with a side chamber.
+	"8,2": {
+		"mass": "volcanic",
+		"shape": [["path", 560, 1527, 0, 1527, 2164], ["box", 1527, 1082, 700, 300, 60], ["path", 300, 1527, 1082, 600, 1082], ["disc", 600, 1082, 380]],
+		"decor": [["ring", "stone", 600, 1082, 250, 8], ["pair", "stone", 1527, 400, 230, 0], ["pair", "stone", 1527, 1750, 230, 0]],
+		"target": 4,
+	},
+	# The lava causeway: a narrow path of black rock over a field of lava, a platform in the middle.
+	"8,1": {
+		"name": "The Lava Causeway",
+		"mass": "lava",
+		"shape": [["path", 300, 1527, 0, 1527, 2164], ["ell", 1527, 1082, 720, 480], ["ell", 1527, 380, 360, 240], ["ell", 1527, 1790, 360, 240]],
+		"decor": [["ring", "stone", 1527, 1082, 520, 10]],
+		"enemies": [["shade", 4], ["brute", 2]],
+		"target": 4,
+	},
+	# The north-east corner of the ring: the road turns west.
+	"8,0": {
+		"mass": "volcanic",
+		"shape": [["path", 560, 1527, 2164, 1527, 1082, 0, 1082], ["disc", 1527, 1082, 480], ["path", 300, 1527, 1082, 2300, 700], ["disc", 2300, 700, 380]],
+		"decor": [["boulders", 2300, 700, 2, 2, 110], ["pair", "stone", 700, 1082, 0, 240]],
+		"target": 4,
+	},
+	# North of the crater: the road runs east to west, a branch south to the crater's north gate.
+	"7,0": {
+		"mass": "volcanic",
+		"shape": [["path", 600, 0, 1082, 3055, 1082], ["path", 560, 1527, 1082, 1527, 2164], ["disc", 1527, 1082, 520]],
+		"decor": [["ring", "stone", 1527, 1082, 300, 10], ["pair", "stone", 700, 1082, 0, 250], ["pair", "stone", 2350, 1082, 0, 250]],
+		"target": 4,
+	},
+	# The north-west corner of the ring: the road turns south.
+	"6,0": {
+		"mass": "rock",
+		"shape": [["path", 560, 3055, 1082, 1527, 1082, 1527, 2164], ["disc", 1527, 1082, 480], ["path", 300, 1527, 1082, 800, 700], ["disc", 800, 700, 380]],
+		"decor": [["boulders", 800, 700, 2, 2, 110], ["pair", "stone", 2350, 1082, 0, 240]],
+		"target": 4,
+	},
+	# A ledge road with a chamber off it.
+	"6,1": {
+		"mass": "rock",
+		"shape": [["path", 560, 1527, 0, 1527, 2164], ["box", 600, 900, 330, 260, 40], ["path", 300, 600, 900, 1527, 900]],
+		"decor": [["pair", "stone", 1527, 450, 230, 0], ["pair", "stone", 1527, 1650, 230, 0], ["boulders", 600, 900, 2, 1, 120]],
+		"target": 4,
+	},
+	# A lava stream with a stone bridge across it.
+	"6,2": {
+		"mass": "lava",
+		"shape": [["box", 1527, 1082, 1450, 1000, 0], ["-path", 300, 0, 1500, 1200, 1500], ["-path", 300, 1850, 1500, 3055, 1500]],
+		"decor": [["row", "stone", 1250, 1250, 1800, 1250, 275]],
+		"target": 4,
+	},
+	# The crater: the Red Wyrm's great round lair, a ring of rocks round the bones of its nest.
+	"7,1": {
+		"name": "The Crater",
+		"span": [1, 2],
+		"mass": "volcanic",
+		"shape": [["ell", 1527, 2163, 1350, 1850]],
+		"decor": [["ring", "small", 1527, 2163, 1000, 20]],
+	},
+	# The south slope: a round clearing of ash on the mountain's southern shoulder.
+	"7,4": {
+		"mass": "volcanic",
+		"shape": [["ell", 1527, 1082, 1250, 780]],
+		"decor": [["boulders", 1527, 1082, 4, 2, 160]],
+		"target": 3,
+	},
+	# ------------------------------------------------------------------ The Lexian Peaks
+	# The north pass: a cliff road dropping in from the desert and out to the plains.
+	"9,4": {
+		"mass": "rock",
+		"shape": [["path", 560, 0, 1082, 1527, 1082, 1527, 2164], ["path", 500, 1527, 1082, 1527, 0], ["disc", 1527, 1082, 520], ["path", 300, 1527, 1082, 2400, 1500], ["disc", 2400, 1500, 330]],
+		"decor": [["ring", "stone", 1527, 1082, 340, 10], ["boulders", 2400, 1500, 2, 2, 110]],
+		"target": 4,
+	},
+	# A walled plateau at the end of a ledge.
+	"10,4": {
+		"mass": "rock",
+		"shape": [["box", 1527, 1082, 1000, 700, 120], ["path", 520, 0, 1082, 1527, 1082], ["path", 520, 1527, 1082, 1527, 2164]],
+		"decor": [["row", "stone", 900, 600, 2150, 600, 250], ["row", "stone", 900, 1560, 2150, 1560, 250]],
+		"enemies": [["brute", 4], ["orc", 2]],
+		"target": 5,
+	},
+	# The long pass: a canyon running west to east with alcoves, the road to the caves.
+	"9,5": {
+		"span": [2, 1],
+		"mass": "rock",
+		"shape": [["path", 700, 0, 1082, 6109, 1082], ["ell", 1500, 650, 420, 300], ["ell", 3055, 1500, 520, 330], ["ell", 4500, 650, 420, 300], ["path", 500, 4582, 1082, 4582, 2164]],
+		"decor": [["row", "stone", 400, 790, 2700, 790, 260], ["row", "stone", 400, 1374, 2700, 1374, 260], ["row", "stone", 3400, 790, 5700, 790, 260], ["row", "stone", 3400, 1374, 5700, 1374, 260]],
+		"enemies": [["brute", 3], ["orc", 3], ["centaur_pack", 1], ["archer", 1]],
+		"target": 6,
+	},
+	# A switchback: the ledge doubles back twice.
+	"9,6": {
+		"mass": "rock",
+		"shape": [["path", 500, 0, 1082, 1000, 1082, 1000, 1700, 2100, 1700, 2100, 800, 3055, 800], ["path", 500, 1527, 0, 1527, 1082]],
+		"decor": [["row", "stone", 1300, 1700, 1800, 1700, 250]],
+		"target": 4,
+	},
+	# The Caves: a ring of great rocks, each with a dark mouth.
+	"10,6": {
+		"name": "The Caves",
+		"mass": "rock",
+		"shape": [["ell", 1527, 1082, 1350, 900], ["path", 640, 1527, 0, 1527, 1082]],
+		"decor": [],
+	},
 }
 
 const EDGES := {
@@ -540,6 +669,42 @@ const EDGES := {
 	"0,7|0,8": [[1527, 700]],
 	"1,7|1,8": [[1527, 520]],
 	"2,7|2,8": [[1527, 520]],
+	# --- Death Mountain: the ring road, the crater's two gates, passes to the plains and the desert
+	"5,0|6,0": [[1082, 560]],
+	"5,1|6,1": "closed",
+	"6,0|7,0": [[1082, 600]],
+	"7,0|8,0": [[1082, 600]],
+	"8,0|9,0": [[1082, 520]],
+	"6,1|7,1": "closed",
+	"6,2|7,2": "closed",
+	"7,1|8,1": "closed",
+	"7,2|8,2": "closed",
+	"8,1|9,1": "closed",
+	"8,2|9,2": "closed",
+	"6,3|7,3": [[1082, 600]],
+	"7,3|8,3": [[1082, 600]],
+	"8,3|9,3": [[1082, 520]],
+	"7,4|8,4": [[1082, 520]],
+	"6,0|6,1": [[1527, 560]],
+	"6,1|6,2": [[1527, 560]],
+	"6,2|6,3": [[1527, 560]],
+	"7,0|7,1": [[1527, 700]],
+	"7,2|7,3": [[1527, 700]],
+	"8,0|8,1": [[1527, 560]],
+	"8,1|8,2": [[1527, 500]],
+	"8,2|8,3": [[1527, 560]],
+	"7,3|7,4": [[1527, 520]],
+	# --- the Lexian Peaks
+	"9,3|9,4": [[1527, 520]],
+	"10,3|10,4": "closed",
+	"9,4|10,4": [[1082, 520]],
+	"9,4|9,5": [[1527, 600]],
+	"10,4|10,5": [[1527, 520]],
+	"10,5|10,6": [[1527, 700]],
+	"9,5|9,6": [[1527, 520]],
+	"9,6|10,6": [[1082, 520]],
+	"9,6|9,7": "closed",
+	"10,6|10,7": "closed",
 }
 
 # ROADS: dirt roads drawn on the ground, from the town's four gates out across the land. Each is a stroke of `width`
@@ -549,9 +714,12 @@ const EDGES := {
 const ROADS := [
 	{"width": 90.0, "points": [[4.23, 3.5], [5.5, 3.5]]},                                                    # from where you woke to the crossroads
 	{"width": 90.0, "points": [[5.5, 5.2], [5.5, 3.5], [5.5, 2.5], [5.5, 1.0], [5.2, 0.7], [5.0, 0.55]]},     # the north road: town, crossroads, the ruins
-	{"width": 90.0, "points": [[5.8, 5.5], [6.5, 5.5], [7.5, 5.5], [8.5, 5.5], [9.2, 5.5]]},                  # the east road, up to the mountains
+	{"width": 90.0, "points": [[5.8, 5.5], [6.5, 5.5], [7.5, 5.5], [8.5, 5.5], [9.5, 5.5], [10.5, 5.5], [10.5, 6.3]]},   # the east road, through the long pass to the caves
 	{"width": 90.0, "points": [[5.5, 5.8], [5.5, 6.5], [5.5, 7.5], [5.5, 8.5], [5.5, 9.1]]},                  # the south road
 	{"width": 90.0, "points": [[5.2, 5.5], [4.5, 5.5], [3.5, 5.5], [2.5, 5.5], [1.5, 5.5], [1.0, 5.5], [0.7, 5.62], [0.5, 5.76]]},   # the west road, to the Lizen fort's south gate
 	{"width": 70.0, "points": [[6.5, 5.5], [6.5, 6.5]]},                                                     # the lane down to the ranch
+	{"width": 90.0, "style": "ash", "points": [[5.5, 3.5], [6.5, 3.5], [7.5, 3.5], [7.5, 3.0], [7.5, 2.6]]},                  # the mountain road, to the crater's south gate
+	{"width": 90.0, "style": "ash", "points": [[7.5, 3.5], [8.5, 3.5], [8.5, 2.5], [8.5, 1.5], [8.5, 0.5], [7.5, 0.5], [6.5, 0.5], [6.5, 1.5], [6.5, 2.5], [6.5, 3.5]]},   # the ring road round the volcano
+	{"width": 90.0, "style": "ash", "points": [[7.5, 0.5], [7.5, 1.0], [7.5, 1.4]]},                                                  # the branch to the crater's north gate
 	{"width": 140.0, "style": "boards", "points": [[2.0, 6.5], [3.0, 6.5]]},                                          # the boardwalk across the bog
 ]

@@ -291,8 +291,11 @@ func _unload_room(id: String) -> void:
 
 const ROAD_TEXTURE := preload("res://assets/ground_track.png")
 const ROAD_EDGE := Color(0.32, 0.25, 0.17)
-const BOARDS_COLOR := Color(0.5, 0.37, 0.22)
-const BOARDS_EDGE := Color(0.26, 0.18, 0.1)
+# Roads drawn flat instead of with the dirt texture: wooden boards over a bog, packed ash on the mountain.
+const FLAT_ROADS := {
+	"boards": {"fill": Color(0.5, 0.37, 0.22), "edge": Color(0.26, 0.18, 0.1)},
+	"ash": {"fill": Color(0.34, 0.28, 0.27), "edge": Color(0.14, 0.1, 0.1)},
+}
 
 static func _cell_to_px(p: Array) -> Vector2:
 	var cx := float(p[0])
@@ -314,7 +317,7 @@ func _build_roads(state: Dictionary) -> void:
 		for p in road.points:
 			pts.append(_cell_to_px(p))
 		var half: float = float(road.width) * 0.5
-		var boards: bool = str(road.get("style", "dirt")) == "boards"
+		var flat: Dictionary = FLAT_ROADS.get(str(road.get("style", "dirt")), {})
 		for layer in 2:
 			var radius: float = half + (11.0 if layer == 0 else 0.0)
 			for stroke in Geometry2D.offset_polyline(pts, radius, Geometry2D.JOIN_ROUND, Geometry2D.END_ROUND):
@@ -323,9 +326,9 @@ func _build_roads(state: Dictionary) -> void:
 					poly.polygon = piece
 					poly.z_index = -9
 					if layer == 0:
-						poly.color = BOARDS_EDGE if boards else ROAD_EDGE
-					elif boards:
-						poly.color = BOARDS_COLOR
+						poly.color = flat.edge if not flat.is_empty() else ROAD_EDGE
+					elif not flat.is_empty():
+						poly.color = flat.fill
 					else:
 						poly.texture = ROAD_TEXTURE
 						poly.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
@@ -1159,11 +1162,22 @@ func _spire(parent: Node, pos: Vector2, rng: RandomNumberGenerator) -> void:
 	_sprite(parent, CRYSTAL, pos, 6.5, Color(0.7, 0.9, 1.3), 8.0 * 6.5 * 0.5, 1)
 
 # The Crater: pools of lava around the Red Wyrm's nest.
-func _crater(parent: Node, pos: Vector2, rng: RandomNumberGenerator) -> void:
+func _crater(parent: Node, pos: Vector2, _rng: RandomNumberGenerator) -> void:
 	_disc(parent, pos, 1050.0, Color(0.15, 0.04, 0.03, 0.45), -2, 30)
+	# eight pools of lava evenly round the nest, each too hot to walk through
 	for i in 8:
-		var a := TAU * float(i) / 8.0 + rng.randf() * 0.5
-		_disc(parent, pos + Vector2(cos(a), sin(a)) * (520.0 + rng.randf() * 300.0), 90.0 + rng.randf() * 120.0, Color(1.0, 0.4 + rng.randf() * 0.2, 0.08, 0.9), -1, 14)
+		var a := TAU * float(i) / 8.0 + PI / 8.0
+		var c := pos + Vector2(cos(a), sin(a)) * 640.0
+		_disc(parent, c, 130.0, Color(1.0, 0.5, 0.08, 0.95), -1, 16)
+		_disc(parent, c, 85.0, Color(1.0, 0.8, 0.3, 0.9), -1, 14)
+		var body := StaticBody2D.new()
+		body.position = c
+		var collision := CollisionShape2D.new()
+		var shape := CircleShape2D.new()
+		shape.radius = 115.0
+		collision.shape = shape
+		body.add_child(collision)
+		parent.add_child(body)
 	_disc(parent, pos, 230.0, Color(0.12, 0.08, 0.08), 0, 20)
 
 # The Void Throne: a ring of dark crystals around a black disc.

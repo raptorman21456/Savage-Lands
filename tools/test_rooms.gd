@@ -193,7 +193,7 @@ func _init() -> void:
 	print("A hand-made doorway is exactly where it was put: the trail west of where you wake is %.0f px wide, centred %.0f px down (expected 480, 1082): %s" % [(float(spawn_door[0][1]) - float(spawn_door[0][0])) * 2164.0, (float(spawn_door[0][1]) + float(spawn_door[0][0])) * 0.5 * 2164.0, spawn_door])
 	print("...a side marked closed has no opening: %s (expected [])" % [RM.edges(RM.room_at(Vector2(WM.col_x(0) + 100.0, WM.row_y(2) + 100.0))).filter(func(e): return e.side == "e")[0].openings])
 	var named_authored: Array = authored.filter(func(r): return r.name != "").map(func(r): return r.name)
-	print("Only the places worth a name in the hand-made rooms have one: %s (expected The HeartWood, Where You Woke, The Fairy Ring, The Old Orchard, Hunter's Camp, The Wolf Den, The Windswept Rise, The Crossroads, The Stone Fields)" % [named_authored])
+	print("Only the places worth a name in the hand-made rooms have one: %s (expected a minority: 15 or so, the places worth finding)" % [named_authored])
 	var floors_ok := true
 	for r in authored:
 		var Lr = RM.layout(r)
