@@ -40,7 +40,7 @@ func _init() -> void:
 	print("Pesca is a dock town on a headland out in the water: region %s (expected pesca), and the sea beside it is still ocean: %s (expected ocean)" % [WM.region_at(WM.landmark("pesca").pos).id, WM.region_at(Vector2(0.14, 0.90) * WM.SIZE).id])
 	print("The very bottom of the map (middle) is the Frozen Wastes: %s (expected frozen_wastes)" % [WM.region_at(Vector2(0.55, 0.99) * WM.SIZE).id])
 	print("The bottom-right corner is the Voidlands: %s (expected voidlands)" % [WM.region_at(Vector2(0.98, 0.98) * WM.SIZE).id])
-	print("The top right has a massive volcano: crater %s (expected crater), its slopes %s (expected volcano_slopes), ringed by rocky hills %s (expected volcano_hills)" % [WM.region_at(Vector2(0.69, 0.17) * WM.SIZE).id, WM.region_at(Vector2(0.69, 0.17) * WM.SIZE + Vector2(2600, 0)).id, WM.region_at(Vector2(0.69, 0.17) * WM.SIZE + Vector2(4600, 0)).id])
+	print("The top right has a massive volcano: crater %s (expected crater), its slopes %s (expected volcano_slopes), ringed by rocky hills %s (expected volcano_hills)" % [WM.region_at(Vector2(0.69, 0.17) * WM.SIZE).id, WM.region_at(Vector2(0.69, 0.17) * WM.SIZE + Vector2(2600, 0)).id, WM.region_at(Vector2(0.69, 0.17) * WM.SIZE + Vector2(4200, 0)).id])
 	print("East of the volcano is the desert: %s (expected desert)" % [WM.region_at(Vector2(0.93, 0.2) * WM.SIZE).id])
 	print("The mountains moved down the east side below the desert: %s (expected mountains)" % [WM.region_at(Vector2(0.92, 0.46) * WM.SIZE).id])
 	print("...and the Voidlands swallow their southern half: %s (expected voidlands)" % [WM.region_at(Vector2(0.92, 0.70) * WM.SIZE).id])

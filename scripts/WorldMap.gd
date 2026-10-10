@@ -91,18 +91,20 @@ static func ensure_built() -> void:
 		[["wolf", 4], ["fae_hut", 2], ["gnome_pack", 2], ["brute", 1]], false, "treant"))
 	list.append(_region("ruins", "The Ruined Settlement", _wobble(_circle_n(cell_center_n(4, 0, 2, 1), 2300.0), noise, 0.8), "grass", Color(0.72, 0.74, 0.66), 2, "plains", true, "ruins",
 		[["shade", 3], ["orc", 2], ["goblin", 2]], false))
-	list.append(_region("desert", "Arahas Desert", _wobble(_poly_n([
-		Vector2(0.835, 0.05), Vector2(1, 0), Vector2(1, 0.395), Vector2(0.90, 0.375), Vector2(0.835, 0.34), Vector2(0.81, 0.20)]), noise, 1.0),
-		"sand", Color(1.3, 1.05, 0.7), 4, "desert", true, "desert",
-		[["centaur_pack", 2], ["orc", 3], ["brute", 2], ["archer", 1]], false, "iron_construct"))
 	list.append(_region("volcano_hills", "Death Mountain", _wobble(_circle_n(cell_center_n(7, 1, 1, 2), 5500.0), noise, 1.0), "rock", Color(0.85, 0.8, 0.78), 5, "mountains", true, "hills",
 		[["brute", 3], ["orc", 3], ["centaur_pack", 1], ["shade", 1]], false))
 	list.append(_region("volcano_slopes", "Death Mountain", _wobble(_circle_n(cell_center_n(7, 1, 1, 2), 3600.0), noise, 1.0), "ash", Color(1.15, 0.8, 0.7), 6, "volcano", true, "volcano",
 		[["brute", 3], ["shade", 3], ["archer", 1]], false, "lava_construct"))
 	list.append(_region("crater", "The Crater", _wobble(_circle_n(cell_center_n(7, 1, 1, 2), 1600.0), noise, 0.8), "ash", Color(1.35, 0.55, 0.4), 7, "volcano", true, "crater",
 		[["shade", 3], ["brute", 2]], false))
+	# painted after the volcano's hills so the desert wins its eight room cells (columns 9-10, rows 0-3) outright: a staircase along the room edges (its foot runs 300 px under the mountains, which are painted next, so the joint never shows a gap)
+	list.append(_region("desert", "Arahas Desert", _wobble(_poly_n([
+		Vector2(0.8182, 0.0), Vector2(1, 0.0), Vector2(1, 0.3762), Vector2(0.8182, 0.3762)]), noise, 0.3),
+		"sand", Color(1.3, 1.05, 0.7), 4, "desert", true, "desert",
+		[["centaur_pack", 2], ["orc", 3], ["brute", 2], ["archer", 1]], false, "iron_construct"))
+	# the six room cells under the desert (columns 9-10, rows 4-6), a staircase along their edges like the desert and the void (its foot runs under the Voidlands)
 	list.append(_region("mountains", "Lexian Peaks", _wobble(_poly_n([
-		Vector2(0.835, 0.40), Vector2(0.90, 0.37), Vector2(1, 0.38), Vector2(1, 0.78), Vector2(0.90, 0.72), Vector2(0.84, 0.62), Vector2(0.80, 0.50)]), noise, 1.0),
+		Vector2(0.8182, 0.3636), Vector2(1, 0.3636), Vector2(1, 0.649), Vector2(0.8182, 0.649)]), noise, 0.3),
 		"rock", Color(0.8, 0.78, 0.75), 5, "mountains", true, "mountains",
 		[["brute", 3], ["orc", 3], ["centaur_pack", 1], ["archer", 1]], false, "iron_construct"))
 	list.append(_region("lizen", "The Lizen Encampment", _wobble(_poly_n([
@@ -132,7 +134,8 @@ static func ensure_built() -> void:
 		"snow", Color(0.85, 0.95, 1.2), 5, "tundra", true, "frozen",
 		[["wolf", 4], ["brute", 3], ["shade", 2], ["archer", 1]], false, "black_dragonlet"))
 	list.append(_region("voidlands", "The Voidlands", _wobble(_poly_n([
-		Vector2(0.665, 1.0), Vector2(0.67, 0.92), Vector2(0.675, 0.83), Vector2(0.72, 0.755), Vector2(0.80, 0.69), Vector2(0.90, 0.665), Vector2(1, 0.66), Vector2(1, 1.0)]), noise, 1.0),
+		# a staircase along the edges of the thirteen room cells it fills (the hand-made rooms there are islands in the abyss, so no other ground may show through)
+		Vector2(0.6364, 1.0), Vector2(0.6364, 0.8182), Vector2(0.7273, 0.8182), Vector2(0.7273, 0.7273), Vector2(0.8182, 0.7273), Vector2(0.8182, 0.6364), Vector2(1, 0.6364), Vector2(1, 1.0)]), noise, 0.3),
 		"void", Color(0.6, 0.55, 0.85), 8, "voidlands", true, "void",
 		[["shade", 4], ["archer", 2], ["brute", 2], ["centaur_pack", 1]], false, "voidwing"))
 	list.append(_region("ranch", "The Ranch", _wobble(_circle_n(cell_center_n(6, 6), 1500.0), noise, 0.4), "grass", Color(0.95, 1.05, 0.85), 1, "plains", true, "ranch", [], false))

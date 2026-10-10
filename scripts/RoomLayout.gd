@@ -421,7 +421,8 @@ func _a_authored(ops: Array) -> void:
 	for op in ops:
 		var kind := str(op[0])
 		var negative := kind.begins_with("-")
-		if negative:
+		var bridge := kind.begins_with("+")          # laid after the cuts: a causeway across a rift
+		if negative or bridge:
 			kind = kind.substr(1)
 		var shapes: Array = []
 		var focus: Array = []
@@ -458,9 +459,11 @@ func _a_authored(ops: Array) -> void:
 		for s in shapes:
 			if negative:
 				_cuts.append(s)
+			elif bridge:
+				_bridges.append(s)
 			else:
 				_core.append(s)
-		if not negative:
+		if not negative and not bridge:
 			_skeleton.append_array(focus)
 	if _skeleton.is_empty():
 		_skeleton = [rect.get_center()]

@@ -179,7 +179,7 @@ func _init() -> void:
 
 	# --- the hand-made rooms (RoomData.gd)
 	var authored: Array = RM.rooms.filter(func(r): return r.authored)
-	print("Hand-made rooms are in the world: %d (expected 70 or more), almost all with a shape of their own: %d (expected all but Pesca)" % [authored.size(), authored.filter(func(r): return r.layout == "authored").size()])
+	print("Hand-made rooms are in the world: %d (expected 85 or more), almost all with a shape of their own: %d (expected all but Pesca)" % [authored.size(), authored.filter(func(r): return r.layout == "authored").size()])
 	var bad_pairs := []
 	for key in RM.RoomDataScript.EDGES:
 		var halves: PackedStringArray = str(key).split("|")
@@ -220,6 +220,16 @@ func _init() -> void:
 				if RM.layout(room_here).sample(q) < 0.0:
 					off_floor.append("%s@%s" % [room_here.id, Vector2i(q / 100.0)])
 	print("Every road runs on ground you can stand on: %d of %d sample points are in a wall: %s (expected 0)" % [off_floor.size(), road_points, off_floor.slice(0, 6)])
+
+	# --- the Rift: a chasm through the plateau with one bridge over it (a "+" shape is laid after the cuts)
+	var rift: Dictionary = RM.room_at(Vector2(WM.col_x(8) + 10, WM.row_y(8) + 10))
+	var rift_layout = RM.layout(rift)
+	var at := func(x: float, y: float) -> Vector2: return rift.rect.position + Vector2(x, y)
+	var chasm_above: bool = rift_layout.sample(at.call(3250.0, 600.0)) < 0.0
+	var chasm_below: bool = rift_layout.sample(at.call(3250.0, 1560.0)) < 0.0
+	var on_bridge: bool = rift_layout.sample(at.call(3000.0, 1082.0)) > 0.0 and rift_layout.sample(at.call(2900.0, 1082.0)) > 0.0
+	var west_bank: bool = rift_layout.sample(at.call(1500.0, 1082.0)) > 0.0 and rift_layout.sample(at.call(4600.0, 1082.0)) > 0.0
+	print("The Rift is a chasm with one bridge over it: chasm above %s and below %s, bridge floor %s, both banks floor %s (expected true true true true)" % [chasm_above, chasm_below, on_bridge, west_bank])
 	print("The north road starts at the town's north gate and reaches the ruins: starts %s (expected near (16800, 11400)), ends %s (expected near the ruins %s)" % [OWM._cell_to_px(RM.RoomDataScript.ROADS[1].points[0]), OWM._cell_to_px(RM.RoomDataScript.ROADS[1].points[RM.RoomDataScript.ROADS[1].points.size() - 1]), WM.landmark("ruins").pos])
 
 	# --- personalities

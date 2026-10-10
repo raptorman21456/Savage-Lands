@@ -628,6 +628,163 @@ const ROOMS := {
 		"enemies": [["wolf", 4], ["brute", 3], ["shade", 2]],
 		"target": 5,
 	},
+	# ------------------------------------------------------------------ Arahas Desert
+	# A caravan track (see ROADS) runs in from the mountain pass in the south, up through the dunes to the oasis. Mesas of
+	# sandstone stand in the open dunes; the canyons are walled by cliffs.
+	# The scorched flats: a pass in from the volcano's ring road, a winding canyon of sandstone.
+	"9,0": {
+		"mass": "sandstone",
+		"shape": [["path", 640, 0, 1082, 900, 1082, 1500, 1500, 2200, 700, 3055, 1082], ["disc", 900, 1082, 520], ["disc", 2200, 700, 460], ["path", 500, 1527, 2164, 1500, 1500]],
+		"decor": [["ring", "tall", 900, 1082, 380, 10], ["boulders", 2200, 700, 2, 2, 130]],
+		"target": 4,
+	},
+	# The sun court: the sandstone shell of a great hall, two chambers and a courtyard between.
+	"10,0": {
+		"name": "The Sun Court",
+		"mass": "sandstone",
+		"shape": [["box", 900, 1082, 650, 520, 60], ["box", 2250, 1082, 520, 420, 60], ["path", 420, 900, 1082, 2250, 1082], ["path", 500, 1527, 1082, 1527, 2164]],
+		"props": [["ruin_walls", 900, 1082]],
+		"decor": [["row", "stone", 500, 760, 1300, 760, 160], ["row", "stone", 500, 1404, 1300, 1404, 160]],
+		"target": 5,
+	},
+	# The great dunes: open sand with mesas standing in it, the caravan track across.
+	"9,1": {
+		"span": [2, 1],
+		"mass": "sandstone",
+		"shape": [["box", 3055, 1082, 2900, 1000, 0], ["-ell", 1000, 450, 520, 300], ["-ell", 2300, 1750, 600, 340], ["-ell", 3900, 480, 560, 300], ["-ell", 5400, 1650, 420, 300]],
+		"decor": [["row", "tall", 1500, 880, 4600, 880, 320], ["row", "tall", 1500, 1284, 4600, 1284, 320]],
+		"enemies": [["centaur_pack", 2], ["orc", 3], ["brute", 2], ["archer", 1]],
+		"target": 6,
+	},
+	# Bone canyon: a tall canyon with the bones of something enormous lying along it.
+	"9,2": {
+		"name": "Bone Canyon",
+		"span": [1, 2],
+		"mass": "sandstone",
+		"shape": [["path", 700, 1527, 0, 1300, 1100, 1750, 2300, 1400, 3400, 1527, 4327], ["disc", 1300, 1100, 520], ["disc", 1750, 2300, 560], ["disc", 1400, 3400, 520]],
+		"props": [["rock_formation", 1750, 2300]],
+		"decor": [["row", "stone", 1250, 600, 1550, 600, 150], ["row", "stone", 1250, 3800, 1550, 3800, 150]],
+		"enemies": [["brute", 3], ["orc", 3], ["shade", 2]],
+		"target": 6,
+	},
+	# The oasis: a lake in the sand, ringed with palms, a way all round it.
+	"10,2": {
+		"name": "The Oasis",
+		"span": [1, 2],
+		"mass": "water",
+		"shape": [["box", 1527, 2163, 1450, 2000, 200], ["-ell", 1527, 2163, 900, 1100]],
+		"decor": [["row", "tall", 600, 450, 2450, 450, 280], ["row", "tall", 600, 3880, 2450, 3880, 280], ["row", "tall", 520, 800, 520, 3500, 280], ["row", "tall", 2540, 800, 2540, 3500, 280]],
+		"target": 3,
+	},
+	# ------------------------------------------------------------------ The Voidlands
+	# Islands of black crystal over the abyss, joined by causeways. The Rift is the way in (a pass from the Stone Fields and
+	# a gap from the plains above); every road runs on to the Void Throne in the middle, which has a causeway out of
+	# each of its four sides. Some rooms are islands in the abyss, some are caverns of crystal rock.
+	# The Rift: a crack through a great plateau, crossed by one long stone bridge, which the crystal road follows.
+	"8,8": {
+		"name": "The Rift",
+		"span": [2, 1],
+		"mass": "abyss",
+		"shape": [
+			["box", 3055, 1082, 2900, 880, 220],
+			["-path", 640, 3050, 150, 3250, 600, 2900, 1082, 3250, 1560, 3050, 2000],
+			["-ell", 4150, 1600, 280, 200], ["-ell", 5250, 1500, 330, 240], ["-ell", 5300, 600, 260, 200],
+			["+path", 240, 2250, 1082, 3600, 1082],
+		],
+		"decor": [
+			["pair", "tall", 2250, 1082, 0, 300], ["pair", "tall", 3700, 1082, 0, 300],
+			["row", "stone", 500, 450, 1100, 450, 300], ["row", "stone", 1900, 450, 2300, 450, 200],
+			["row", "stone", 3700, 450, 4100, 450, 200],
+		],
+		"enemies": [["shade", 4], ["archer", 3], ["brute", 1]],
+		"target": 8,
+	},
+	# The crystal garden: a pocket off the Rift, three pillars of crystal and a row of tall crystals.
+	"9,7": {
+		"mass": "crystal_rock",
+		"shape": [["ell", 1527, 1150, 1100, 700], ["-disc", 1150, 1000, 130], ["-disc", 1900, 1000, 130], ["-disc", 1527, 1450, 130]],
+		"decor": [["row", "tall", 1100, 650, 1950, 650, 425]],
+		"enemies": [["shade", 3], ["archer", 2]],
+		"target": 5,
+	},
+	# The shard spire: a causeway down a tall abyss, a lookout off it, and a plateau at each end.
+	"10,7": {
+		"span": [1, 2],
+		"mass": "abyss",
+		"shape": [
+			["ell", 1500, 1300, 1050, 640],
+			["path", 420, 1500, 1850, 800, 2350, 2000, 2550, 1700, 3000],
+			["ell", 2450, 2150, 330, 230], ["path", 300, 2450, 2150, 2000, 2550],
+			["disc", 1700, 3250, 760],
+		],
+		"decor": [
+			["pair", "tall", 1500, 1300, 520, -380], ["pair", "tall", 1500, 1300, 520, 380],
+			["pair", "tall", 1700, 3250, 420, -420], ["pair", "tall", 1700, 3250, 420, 420],
+		],
+		"enemies": [["shade", 3], ["brute", 2], ["archer", 2]],
+		"target": 7,
+	},
+	# The ring: an island round a pit, a crystal at each corner of the ring.
+	"7,9": {
+		"mass": "abyss",
+		"shape": [["ell", 1527, 1082, 1150, 760], ["-ell", 1527, 1082, 560, 300]],
+		"decor": [["pair", "tall", 1527, 1082, 605, 375], ["pair", "tall", 1527, 1082, 605, -375]],
+		"enemies": [["shade", 3], ["brute", 2]],
+		"target": 5,
+	},
+	# The crossing: a diamond island with a lobe at each corner, causeways out of its four points.
+	"8,9": {
+		"mass": "crystal_rock",
+		"shape": [["rbox", 1527, 1082, 520, 520, 45, 60], ["disc", 2022, 587, 300], ["disc", 1032, 587, 300], ["disc", 2022, 1577, 300], ["disc", 1032, 1577, 300]],
+		"decor": [["pair", "tall", 1527, 1082, 495, 495], ["pair", "tall", 1527, 1082, 495, -495]],
+		"target": 6,
+	},
+	# The Void Throne: the archmage's round island, a causeway running out of each side.
+	"9,9": {
+		"name": "The Void Throne",
+		"mass": "abyss",
+		"shape": [["disc", 1527, 1082, 940]],
+		"decor": [["pair", "tall", 1527, 1082, 566, 566], ["pair", "tall", 1527, 1082, 566, -566]],
+	},
+	# The hollow: two crystal chambers, a pillared floor in each, a neck between.
+	"10,9": {
+		"span": [1, 2],
+		"mass": "crystal_rock",
+		"shape": [
+			["ell", 1500, 1250, 1000, 640], ["path", 420, 1500, 1250, 1560, 2200, 1600, 3000], ["ell", 1600, 3100, 1000, 720],
+			["-disc", 1150, 1550, 120], ["-disc", 1850, 1550, 120],
+			["-disc", 1200, 2750, 110], ["-disc", 2000, 2750, 110], ["-disc", 1200, 3550, 110], ["-disc", 2000, 3550, 110],
+		],
+		"decor": [["boulders", 2000, 3250, 2, 2, 110]],
+		"enemies": [["shade", 4], ["brute", 2], ["centaur_pack", 1]],
+		"target": 7,
+	},
+	# The long causeway: an isle at either end and a winding road between, over the bottom of the world.
+	"7,10": {
+		"span": [2, 1],
+		"mass": "abyss",
+		"shape": [
+			["disc", 1500, 1000, 640],
+			["path", 400, 1500, 1000, 2300, 1500, 3055, 700, 3800, 1500, 4600, 1000],
+			["disc", 2300, 1500, 380], ["disc", 3055, 700, 420], ["disc", 3800, 1500, 380],
+			["ell", 4600, 1000, 850, 560],
+		],
+		"decor": [["boulders", 3055, 700, 2, 1, 140], ["pair", "tall", 4600, 1000, 450, 250], ["pair", "tall", 4600, 1000, 450, -250]],
+		"enemies": [["shade", 4], ["archer", 3]],
+		"target": 6,
+	},
+	# The pillared hall: a long crystal hall with a row of pillars each side, a doorway at each end and one in the roof.
+	"9,10": {
+		"mass": "crystal_rock",
+		"shape": [
+			["box", 1527, 1082, 1150, 640, 120],
+			["-disc", 800, 760, 110], ["-disc", 1127, 760, 110], ["-disc", 1927, 760, 110], ["-disc", 2254, 760, 110],
+			["-disc", 800, 1404, 110], ["-disc", 1127, 1404, 110], ["-disc", 1927, 1404, 110], ["-disc", 2254, 1404, 110],
+		],
+		"decor": [],
+		"enemies": [["shade", 3], ["brute", 2], ["archer", 2]],
+		"target": 6,
+	},
 }
 
 const EDGES := {
@@ -784,6 +941,29 @@ const EDGES := {
 	"4,10|5,10": [[1082, 600]],
 	"6,9|7,9": "closed",
 	"6,10|7,10": "closed",
+	# --- Arahas Desert
+	"9,0|10,0": [[1082, 600]],
+	"9,0|9,1": [[1527, 600]],
+	"10,0|10,1": [[1527, 600]],
+	"9,1|9,2": [[1527, 700]],
+	"10,1|10,2": [[1527, 520]],
+	"9,2|10,2": [[1082, 520]],
+	"9,3|10,3": [[1082, 700]],
+	# --- the Voidlands: the Rift is the way in; the Throne has four causeways; the rest is a ring round it
+	"9,7|10,7": [[1300, 520]],
+	"9,8|10,8": [[1082, 560]],
+	"7,9|8,9": [[1082, 520]],
+	"8,9|9,9": [[1082, 560]],
+	"9,9|10,9": [[1082, 560]],
+	"9,10|10,10": [[1082, 520]],
+	"8,10|9,10": [[1082, 560]],
+	"9,7|9,8": [[1527, 520]],
+	"8,8|8,9": [[1527, 560]],
+	"9,8|9,9": [[1527, 700]],
+	"10,8|10,9": [[1527, 520]],
+	"9,9|9,10": [[1527, 560]],
+	"7,9|7,10": [[1527, 520]],
+	"8,9|8,10": [[1527, 560]],
 }
 
 # ROADS: dirt roads drawn on the ground, from the town's four gates out across the land. Each is a stroke of `width`
@@ -801,5 +981,7 @@ const ROADS := [
 	{"width": 90.0, "style": "ash", "points": [[5.5, 3.5], [6.5, 3.5], [7.5, 3.5], [7.5, 3.0], [7.5, 2.6]]},                  # the mountain road, to the crater's south gate
 	{"width": 90.0, "style": "ash", "points": [[7.5, 3.5], [8.5, 3.5], [8.5, 2.5], [8.5, 1.5], [8.5, 0.5], [7.5, 0.5], [6.5, 0.5], [6.5, 1.5], [6.5, 2.5], [6.5, 3.5]]},   # the ring road round the volcano
 	{"width": 90.0, "style": "ash", "points": [[7.5, 0.5], [7.5, 1.0], [7.5, 1.4]]},                                                  # the branch to the crater's north gate
+	{"width": 90.0, "style": "sand", "points": [[9.5, 5.5], [9.5, 4.5], [9.5, 3.5], [9.5, 2.5], [9.5, 1.5], [10.5, 1.5], [10.5, 2.25]]},   # the caravan track, up through the canyon and the dunes to the oasis
+	{"width": 90.0, "style": "crystal", "points": [[8.02, 8.5], [8.5, 8.5], [9.5, 8.5], [9.5, 9.0], [9.5, 9.14]]},   # the crystal road: over the Rift's bridge and on to the Void Throne
 	{"width": 140.0, "style": "boards", "points": [[2.0, 6.5], [3.0, 6.5]]},                                          # the boardwalk across the bog
 ]
