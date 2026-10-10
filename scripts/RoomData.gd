@@ -1003,6 +1003,7 @@ const ROADS := [
 	{"width": 90.0, "style": "ash", "points": [[7.5, 0.5], [7.5, 1.0], [7.5, 1.4]]},                                                  # the branch to the crater's north gate
 	{"width": 90.0, "style": "sand", "points": [[9.5, 5.5], [9.5, 4.5], [9.5, 3.5], [9.5, 2.5], [9.5, 1.5], [10.5, 1.5], [10.5, 2.25]]},   # the caravan track, up through the canyon and the dunes to the oasis
 	{"width": 90.0, "style": "crystal", "points": [[8.02, 8.5], [8.5, 8.5], [9.5, 8.5], [9.5, 9.0], [9.5, 9.14]]},   # the crystal road: over the Rift's bridge and on to the Void Throne
+	{"width": 120.0, "style": "boards", "points": [[3.045, 9.295], [2.39, 9.295], [2.29, 9.43], [2.226, 9.5]]},   # Pesca's boardwalk: past the front of its six houses and down to the Long Pier
 	{"width": 200.0, "style": "boards", "points": [[2.23, 9.5], [1.52, 9.5]]},   # the Long Pier: Pesca's west shore out over the sea to Gull Rock
 	{"width": 140.0, "style": "boards", "points": [[2.0, 6.5], [3.0, 6.5]]},                                          # the boardwalk across the bog
 ]

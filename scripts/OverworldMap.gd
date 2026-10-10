@@ -1125,30 +1125,38 @@ func _lizen(parent: Node, pos: Vector2, rng: RandomNumberGenerator) -> void:
 	for i in 4:
 		_box(parent, pos + Vector2(-110 + 75 * i, 190), Vector2(8, 56), Color(0.7, 0.15, 0.12), 0.0, false, 2)
 
-# Pesca: a dock town on a headland -- boardwalk, houses (the town's building art, for now) and a few boats.
-func _pesca(parent: Node, pos: Vector2, rng: RandomNumberGenerator) -> void:
-	var poly: PackedVector2Array = WorldMapScript.region("pesca").polygon
-	var base := Vector2.ZERO
-	for p in poly:
-		base += p
-	base /= float(poly.size())
-	var axis: Vector2 = (pos - base).normalized()
-	var length: float = base.distance_to(pos)
-	for i in int(length / 70.0):
-		_box(parent, base + axis * (70.0 * float(i)), Vector2(70, 22), Color(0.5, 0.35, 0.2), axis.angle() + PI / 2.0, false, 1)
-	var houses := [
-		preload("res://assets/building_shop.png"), preload("res://assets/building_tavern.png"), preload("res://assets/building_healer.png"),
-		preload("res://assets/building_blacksmith.png"), preload("res://assets/building_church.png"), preload("res://assets/building_butcher.png"),
-	]
-	var side := Vector2(-axis.y, axis.x)
-	for i in houses.size():
-		var along: float = 120.0 + 150.0 * float(i / 2)
-		var off: float = (150.0 if i % 2 == 0 else -150.0)
-		var at: Vector2 = base + axis * along + side * off
-		_sprite(parent, houses[i], at, 3.4, Color.WHITE, 0.0, 2)
+# Pesca's six houses (the town's building art for now), in a row along the boardwalk, each facing the water: which
+# interior (Interior.gd) its door opens and where the door is. Shared by the builder below and by Main, which puts a
+# door trigger at each.
+const PESCA_ROW := Vector2(7500.0, 19800.0)         # the middle of the first house
+const PESCA_HOUSE_PITCH := 330.0
+const PESCA_DOOR_DROP := 121.0                       # the door trigger sits this far below a house's middle (just past its front)
+const PESCA_HOUSES := [
+	{"interior": "pesca_tavern", "art": preload("res://assets/building_tavern.png")},
+	{"interior": "pesca_shop", "art": preload("res://assets/building_shop.png")},
+	{"interior": "pesca_fish", "art": preload("res://assets/building_butcher.png")},
+	{"interior": "pesca_smith", "art": preload("res://assets/building_blacksmith.png")},
+	{"interior": "pesca_healer", "art": preload("res://assets/building_healer.png")},
+	{"interior": "pesca_chapel", "art": preload("res://assets/building_church.png")},
+]
+
+static func pesca_buildings() -> Array:
+	var out: Array = []
+	for i in PESCA_HOUSES.size():
+		var at: Vector2 = PESCA_ROW + Vector2(PESCA_HOUSE_PITCH * float(i), 0.0)
+		out.append({"interior": PESCA_HOUSES[i].interior, "pos": at, "door": at + Vector2(0.0, PESCA_DOOR_DROP)})
+	return out
+
+# Pesca: a dock town on a headland -- a row of houses along a boardwalk (ROADS), a bollard in front of each, and the
+# fishing boats drawn up on the beach below in a row.
+func _pesca(parent: Node, _pos: Vector2, _rng: RandomNumberGenerator) -> void:
+	for i in PESCA_HOUSES.size():
+		var at: Vector2 = pesca_buildings()[i].pos
+		_sprite(parent, PESCA_HOUSES[i].art, at, 3.4, Color.WHITE, 0.0, 2)
 		_box(parent, at + Vector2(0, 52), Vector2(150, 90), Color(0, 0, 0, 0), 0.0, true, 0)
+		_box(parent, at + Vector2(0, 372), Vector2(14, 26), Color(0.3, 0.2, 0.12), 0.0, false, 1)
 	for i in 4:
-		var bp := pos + side * (260.0 + 80.0 * float(i)) + axis * (rng.randf() * 200.0)
+		var bp := Vector2(7500.0 + 250.0 * float(i), 20760.0)
 		_poly(parent, PackedVector2Array([bp + Vector2(-44, 0), bp + Vector2(44, 0), bp + Vector2(30, 24), bp + Vector2(-30, 24)]), Color(0.35, 0.22, 0.12), 1)
 		_box(parent, bp + Vector2(0, -26), Vector2(5, 52), Color(0.8, 0.78, 0.7), 0.0, false, 1)
 

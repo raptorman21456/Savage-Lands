@@ -1191,6 +1191,7 @@ func _ready() -> void:
 	_build_camera()
 	_build_sfx()
 	_build_town()
+	_build_pesca_doors()
 	_init_quest_board()
 	_roll_seer_stock()
 	if SaveDataScript.sandbox_active:
@@ -1841,10 +1842,20 @@ const INTERIOR_SLOT := 2600.0
 var in_interior := false
 var interior_kind := ""
 var interior_return := Vector2.ZERO
+var interior_in_town := true                # was the door in the town's plaza (else out in the world: Pesca)
 var interiors: Dictionary = {}              # venue kind -> its built Interior node
 var _fade_layer: CanvasLayer = null
 var _fade_rect: ColorRect = null
 var _interior_busy := false
+
+# Pesca's houses (OverworldMap.PESCA_HOUSES) are out in the world, not in the town's plaza: a door trigger at each, built once.
+func _build_pesca_doors() -> void:
+	if not regional_world:
+		return
+	for house in OverworldMapScript.pesca_buildings():
+		var interior: String = house.interior
+		var door: Vector2 = house.door
+		_make_door_trigger(door, Vector2(100, 48), func(): _enter_interior(interior, door))
 
 func _interior_origin(kind: String) -> Vector2:
 	return INTERIOR_ORIGIN + Vector2(float(InteriorScript.DEFS.keys().find(kind)) * INTERIOR_SLOT, 0.0)
@@ -1859,13 +1870,13 @@ func _get_interior(kind: String) -> Node2D:
 
 # What walking up to the counter does: the same menu the building's door opened before it had an inside.
 func _interior_trade(kind: String) -> void:
-	match kind:
+	match InteriorScript.venue_of(kind):
 		"shop": _try_open_shop("gear")
 		"enchanter": _try_open_shop("enchant")
 		"healer": _try_open_healer()
 		"beastiary": _try_open_beastiary()
 		"tavern": _try_open_tavern()
-		_: _try_open_panel(kind)
+		_: _try_open_panel(InteriorScript.venue_of(kind))
 
 func _fade(to_black: bool, seconds: float = 0.2) -> void:
 	if _fade_layer == null:
@@ -1889,6 +1900,7 @@ func _enter_interior(kind: String, door_pos: Vector2) -> void:
 	player.discovered_locations[kind] = true
 	interior_kind = kind
 	interior_return = door_pos + Vector2(0, 120.0)
+	interior_in_town = _in_town_area(door_pos, 80.0)
 	await _fade(true)
 	var room: Node2D = _get_interior(kind)
 	in_interior = true
@@ -1923,11 +1935,14 @@ func _leave_interior() -> void:
 	camera.limit_right = int(WORLD_SIZE.x)
 	camera.limit_bottom = int(WORLD_SIZE.y)
 	camera.reset_smoothing()
-	was_in_town = true
+	was_in_town = interior_in_town
 	current_room_id = ""
 	_apply_world_visuals()
-	hud.update_world("Town")
-	hud.set_danger(0)
+	if interior_in_town:
+		hud.update_world("Town")
+		hud.set_danger(0)
+	else:
+		_track_player_room()
 	await _fade(false)
 	_interior_busy = false
 

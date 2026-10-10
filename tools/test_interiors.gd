@@ -16,7 +16,7 @@ func _init() -> void:
 		e.free()
 	main.enemies_alive = 0
 
-	print("Eleven venues have a room: %d (expected 11)" % [IN.DEFS.size()])
+	print("Seventeen rooms: the town's eleven venues and Pesca's six houses: %d (expected 17)" % [IN.DEFS.size()])
 	var bad_reach := []
 	var bad_entry := []
 	var overlapping := []
@@ -108,4 +108,56 @@ func _init() -> void:
 	main._enter_interior("shop", door_pos)
 	await create_timer(1.6).timeout
 	print("A second visit goes to the same room (built once): %s (expected true)" % [main._get_interior("shop") == room])
+
+	# --- Pesca's six houses: out in the world, each with a door, a room of its own and the counter of a town venue
+	var houses: Array = main.OverworldMapScript.pesca_buildings()
+	var bad_doors := []
+	var bad_venues := []
+	for h in houses:
+		if not IN.DEFS.has(IN.venue_of(h.interior)) or IN.venue_of(h.interior) == h.interior:
+			bad_venues.append(h.interior)
+		var d: Vector2 = h.door
+		for p in [d, d + Vector2(0, 120.0)]:
+			player.global_position = p
+			await physics_frame
+			await physics_frame
+			if player.test_move(player.global_transform, Vector2.ZERO) or main.WorldMapScript.is_blocked(p):
+				bad_doors.append("%s@%s" % [h.interior, p])
+	print("Pesca has six houses, each with its own room that trades as one of the town's venues: %d houses (expected 6), problems=%s (expected [])" % [houses.size(), bad_venues])
+	print("...each door, and the spot you come out on, is open ground: problems=%s (expected [])" % [bad_doors])
+	# (still standing in the shop's room from the last visit: step out of it first)
+	var shop_room = main._get_interior("shop")
+	player.global_position = shop_room.origin + Vector2(shop_room.size.x * 0.5, shop_room.size.y - 100.0)
+	await physics_frame
+	player.global_position = shop_room.origin + Vector2(shop_room.size.x * 0.5, shop_room.size.y - IN.WALL * 0.5)
+	await physics_frame
+	await physics_frame
+	await create_timer(1.6).timeout
+	var tavern_house: Dictionary = houses[0]
+	var tavern_door: Vector2 = tavern_house.door
+	player.global_position = tavern_door + Vector2(0, 90.0)
+	await physics_frame
+	player.global_position = tavern_door
+	await physics_frame
+	await physics_frame
+	await create_timer(1.6).timeout
+	var tavern_room = main._get_interior(tavern_house.interior)
+	print("Walk into the first house's door and you are inside its room: in_interior=%s (expected true), room '%s' (expected The Salty Gull), standing in it: %s (expected true)" % [main.in_interior, main.hud.world_label.text, tavern_room.rect().has_point(player.global_position)])
+	var counter2: Array = IN.DEFS.pesca_tavern.trade
+	player.global_position = tavern_room.origin + Vector2(float(counter2[0]), float(counter2[1]) + 100.0)
+	await physics_frame
+	player.global_position = tavern_room.origin + Vector2(float(counter2[0]), float(counter2[1]))
+	await physics_frame
+	await physics_frame
+	await physics_frame
+	print("Its counter opens the tavern's menu: a town panel is open=%s (expected true)" % [main._any_town_panel_open()])
+	main._close_open_town_panels()
+	paused = false
+	player.global_position = tavern_room.origin + Vector2(tavern_room.size.x * 0.5, tavern_room.size.y - 100.0)
+	await physics_frame
+	player.global_position = tavern_room.origin + Vector2(tavern_room.size.x * 0.5, tavern_room.size.y - IN.WALL * 0.5)
+	await physics_frame
+	await physics_frame
+	await create_timer(1.6).timeout
+	print("The doorway puts you back on Pesca's boardwalk, %.0f px below the door (expected 120): in_interior=%s (expected false), the town label is not shown: %s (expected true)" % [player.global_position.y - tavern_door.y, main.in_interior, not main.was_in_town])
 	quit()

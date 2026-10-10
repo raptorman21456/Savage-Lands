@@ -11,7 +11,7 @@ class_name Interior
 const WALL := 56.0                     # thickness of the walls round the room
 const DOOR_WIDTH := 150.0              # the doorway in the bottom wall
 
-# kind (the town venue it belongs to): {name, size, floor, wall, npc [x, y, tint], counter [x, y, width] (or none),
+# kind (the town venue it belongs to, or a room of its own with a "venue" it trades as): {name, venue, size, floor, wall, npc [x, y, tint], counter [x, y, width] (or none),
 # trade [x, y, width, height] (walk in here to trade), things [[kind, x, y], ...]}
 const DEFS := {
 	"shop": {
@@ -69,6 +69,38 @@ const DEFS := {
 		"npc": [600, 300, Color(1.0, 0.92, 0.72)], "trade": [600, 400, 300, 70],
 		"things": [["stall", 250, 190], ["stall", 600, 160], ["stall", 950, 190], ["crate", 120, 540], ["crate", 1080, 540], ["barrel", 1060, 330], ["barrel", 140, 330]],
 	},
+	# --- Pesca's six houses (OverworldMap.PESCA_HOUSES). Each is a dock-town cousin of a town venue ("venue") and opens the
+	# same menu; the room is its own.
+	"pesca_tavern": {
+		"name": "The Salty Gull", "venue": "tavern", "size": Vector2(1100, 780), "floor": Color(0.38, 0.27, 0.17), "wall": Color(0.2, 0.15, 0.11),
+		"npc": [550, 175, Color(0.9, 0.85, 0.7)], "counter": [550, 250, 520], "trade": [550, 330, 300, 70],
+		"things": [["ship_wheel", 550, 100], ["net", 230, 100], ["net", 870, 100], ["lantern", 400, 108], ["lantern", 700, 108], ["barrel", 90, 170], ["barrel", 90, 236], ["barrel", 1010, 170], ["round_table", 270, 540], ["round_table", 830, 540], ["round_table", 830, 380], ["rope_coil", 560, 660]],
+	},
+	"pesca_shop": {
+		"name": "The Chandlery", "venue": "shop", "size": Vector2(1000, 720), "floor": Color(0.5, 0.4, 0.26), "wall": Color(0.25, 0.2, 0.15),
+		"npc": [500, 190, Color(0.9, 0.85, 0.6)], "counter": [500, 262, 380], "trade": [500, 340, 260, 70],
+		"things": [["shelf", 220, 104], ["shelf", 780, 104], ["net", 500, 100], ["barrel", 110, 210], ["barrel", 110, 270], ["rope_coil", 890, 230], ["rope_coil", 890, 310], ["sea_chest", 120, 520], ["crate", 880, 520], ["crate", 944, 520], ["rug", 500, 540]],
+	},
+	"pesca_fish": {
+		"name": "The Fishmonger", "venue": "butcher", "size": Vector2(900, 680), "floor": Color(0.62, 0.66, 0.66), "wall": Color(0.2, 0.3, 0.35),
+		"npc": [450, 190, Color(0.85, 0.95, 1.0)], "counter": [450, 262, 360], "trade": [450, 340, 240, 70],
+		"things": [["fish_rack", 140, 100], ["fish_rack", 270, 100], ["fish_rack", 630, 100], ["fish_rack", 760, 100], ["crate", 130, 240], ["barrel", 780, 240], ["crate", 800, 540], ["crate", 100, 540]],
+	},
+	"pesca_smith": {
+		"name": "The Shipwright's Forge", "venue": "blacksmith", "size": Vector2(1000, 720), "floor": Color(0.34, 0.34, 0.36), "wall": Color(0.18, 0.18, 0.2),
+		"npc": [690, 215, Color(0.8, 0.82, 0.9)], "counter": [430, 330, 320], "trade": [430, 405, 240, 70],
+		"things": [["forge", 820, 120], ["anvil", 690, 285], ["oars", 200, 104], ["oars", 400, 104], ["anchor", 110, 250], ["barrel", 110, 360], ["rope_coil", 790, 430], ["barrel", 900, 520]],
+	},
+	"pesca_healer": {
+		"name": "The Tidewatch Inn", "venue": "healer", "size": Vector2(1100, 760), "floor": Color(0.45, 0.34, 0.24), "wall": Color(0.24, 0.2, 0.2),
+		"npc": [880, 230, Color(0.85, 1.0, 0.9)], "counter": [880, 300, 260], "trade": [880, 375, 240, 70],
+		"things": [["hammock", 150, 190], ["hammock", 300, 190], ["hammock", 450, 190], ["fireplace", 700, 104], ["lantern", 560, 108], ["table", 330, 540], ["table", 820, 560], ["rug", 330, 540]],
+	},
+	"pesca_chapel": {
+		"name": "The Sailors' Chapel", "venue": "church", "size": Vector2(1000, 780), "floor": Color(0.5, 0.52, 0.54), "wall": Color(0.26, 0.3, 0.36),
+		"npc": [500, 255, Color(0.95, 1.0, 1.0)], "trade": [500, 345, 280, 70],
+		"things": [["altar", 500, 140], ["window", 180, 100], ["window", 340, 100], ["window", 660, 100], ["window", 820, 100], ["lantern", 380, 140], ["lantern", 620, 140], ["anchor", 100, 300], ["anchor", 900, 300], ["pew", 300, 470], ["pew", 300, 560], ["pew", 300, 650], ["pew", 700, 470], ["pew", 700, 560], ["pew", 700, 650]],
+	},
 }
 
 # What each kind of furniture looks like: [width, height, colour, solid].
@@ -86,6 +118,11 @@ const THINGS := {
 	"stall": [220, 80, Color(0.62, 0.32, 0.22), true], "candle": [14, 22, Color(1.0, 0.9, 0.4), false],
 	"hang_meat": [40, 70, Color(0.75, 0.25, 0.25), false], "crystal": [60, 60, Color(0.6, 0.35, 0.9), true],
 	"rune_circle": [320, 320, Color(0.35, 0.3, 0.7), false],
+	"net": [130, 80, Color(0.62, 0.56, 0.38), false], "fish_rack": [120, 34, Color(0.4, 0.28, 0.16), true],
+	"ship_wheel": [86, 86, Color(0.45, 0.3, 0.15), false], "anchor": [60, 90, Color(0.22, 0.24, 0.28), true],
+	"lantern": [16, 24, Color(1.0, 0.85, 0.4), false], "rope_coil": [64, 64, Color(0.7, 0.6, 0.38), false],
+	"oars": [150, 22, Color(0.5, 0.38, 0.2), true], "sea_chest": [74, 50, Color(0.5, 0.32, 0.16), true],
+	"hammock": [100, 150, Color(0.72, 0.66, 0.5), true],
 }
 
 var kind := ""
@@ -97,6 +134,10 @@ var _on_exit: Callable
 
 static func has(venue: String) -> bool:
 	return DEFS.has(venue)
+
+# The town venue whose menu a room's counter opens (a town room is its own venue).
+static func venue_of(room_kind: String) -> String:
+	return str(DEFS[room_kind].get("venue", room_kind))
 
 # Builds the room at `origin` (world position of its top-left corner). on_trade runs when the player walks up to the
 # counter, on_exit when they step into the doorway.
@@ -203,6 +244,33 @@ func _build_thing(thing: String, at: Vector2) -> void:
 			if thing == "crystal":
 				_disc(at, thing_size.x * 0.7, Color(0.7, 0.4, 1.0, 0.2), -1)
 			return
+		"ship_wheel":
+			_disc(at, thing_size.x * 0.5, color.darkened(0.3), 0)
+			_disc(at, thing_size.x * 0.4, color, 0)
+			_disc(at, thing_size.x * 0.28, color.darkened(0.45), 0)
+			_rect_node(self, at, Vector2(thing_size.x * 1.05, 8.0), color.lightened(0.1), 0)
+			_rect_node(self, at, Vector2(8.0, thing_size.y * 1.05), color.lightened(0.1), 0)
+			_disc(at, 9.0, Color(0.85, 0.7, 0.3), 0)
+			return
+		"lantern":
+			_disc(at, 30.0, Color(1.0, 0.9, 0.5, 0.16), -1)
+			_rect_node(self, at, thing_size, color, 0)
+			_rect_node(self, at + Vector2(0, -15), Vector2(20, 5), Color(0.25, 0.2, 0.15), 0)
+			return
+		"rope_coil":
+			_disc(at, thing_size.x * 0.5, color, -8)
+			_disc(at, thing_size.x * 0.33, color.darkened(0.3), -8)
+			_disc(at, thing_size.x * 0.17, color, -8)
+			return
+		"anchor":
+			_rect_node(self, at, Vector2(10.0, 78.0), color, 0)
+			_rect_node(self, at + Vector2(0, -26), Vector2(44.0, 9.0), color, 0)
+			_rect_node(self, at + Vector2(-16, 30), Vector2(22.0, 8.0), color, 0)
+			_rect_node(self, at + Vector2(16, 30), Vector2(22.0, 8.0), color, 0)
+			_disc(at + Vector2(0, -42), 7.0, color.lightened(0.2), 0)
+			if solid:
+				_solid(at, Vector2(44.0, 84.0))
+			return
 		"rune_circle":
 			_disc(at, thing_size.x * 0.5, color.darkened(0.3), -8)
 			_disc(at, thing_size.x * 0.44, color, -8)
@@ -240,6 +308,23 @@ func _build_thing(thing: String, at: Vector2) -> void:
 			_rect_node(self, at + Vector2(0, -6), Vector2(30, 38), Color(0.85, 0.75, 0.45), 0)
 		"stall":
 			_rect_node(self, at + Vector2(0, -50), Vector2(240, 22), Color(0.9, 0.85, 0.7), 0)
+		"net":
+			for i in 5:
+				_rect_node(self, at + Vector2((float(i) - 2.0) * 26.0, 0), Vector2(3, thing_size.y), color.darkened(0.35), 0)
+			for j in 4:
+				_rect_node(self, at + Vector2(0, (float(j) - 1.5) * 20.0), Vector2(thing_size.x, 3), color.darkened(0.35), 0)
+		"fish_rack":
+			for i in 3:
+				_rect_node(self, at + Vector2((float(i) - 1.0) * 34.0, 24.0), Vector2(11, 28), Color(0.62, 0.76, 0.85), 0)
+		"oars":
+			_rect_node(self, at + Vector2(-62, 0), Vector2(28, 18), color.lightened(0.15), 0)
+			_rect_node(self, at + Vector2(62, 0), Vector2(28, 18), color.lightened(0.15), 0)
+		"sea_chest":
+			_rect_node(self, at + Vector2(0, -8), Vector2(74, 8), Color(0.85, 0.7, 0.3), 0)
+			_rect_node(self, at + Vector2(0, -8), Vector2(10, 14), Color(0.85, 0.7, 0.3), 0)
+		"hammock":
+			_rect_node(self, at + Vector2(0, 14), Vector2(82, 108), color.darkened(0.15), 0)
+			_rect_node(self, at + Vector2(0, -50), Vector2(58, 26), Color(0.95, 0.93, 0.85), 0)
 
 func _build_npc() -> void:
 	var npc := Sprite2D.new()
