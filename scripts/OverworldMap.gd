@@ -13,6 +13,7 @@ class_name OverworldMap
 
 const WorldMapScript := preload("res://scripts/WorldMap.gd")
 const RoomsScript := preload("res://scripts/Rooms.gd")
+const RoomDataScript := preload("res://scripts/RoomData.gd")
 
 const ROOM_LOAD_MARGIN := 1600.0      # a room starts to be built when you come within this of it...
 const ROOM_UNLOAD_MARGIN := 2600.0    # ...and is freed once you are further than this
@@ -264,6 +265,7 @@ func _advance(state: Dictionary, budget: int) -> void:
 			state.layout = RoomsScript.layout(state.room)
 			state.stage = 1
 		1:
+			_build_roads(state)
 			_build_mass(state)
 			# the doorways stay clear of scenery
 			for ex in RoomsScript.exits(state.room):
@@ -284,6 +286,50 @@ func _unload_room(id: String) -> void:
 	_rooms[id].root.queue_free()
 	_rooms.erase(id)
 	_work.erase(id)
+
+# --- roads --------------------------------------------------------------------------------------
+
+const ROAD_TEXTURE := preload("res://assets/ground_track.png")
+const ROAD_EDGE := Color(0.32, 0.25, 0.17)
+
+static func _cell_to_px(p: Array) -> Vector2:
+	var cx := float(p[0])
+	var cy := float(p[1])
+	var ic := clampi(floori(cx), 0, WorldMapScript.ROOM_COLS - 1)
+	var ir := clampi(floori(cy), 0, WorldMapScript.ROOM_ROWS - 1)
+	var x0 := float(WorldMapScript.col_x(ic))
+	var x1 := float(WorldMapScript.col_x(ic + 1))
+	var y0 := float(WorldMapScript.row_y(ir))
+	var y1 := float(WorldMapScript.row_y(ir + 1))
+	return Vector2(x0 + (cx - float(ic)) * (x1 - x0), y0 + (cy - float(ir)) * (y1 - y0))
+
+# The dirt roads (RoomData.ROADS) that cross this room, drawn on the ground, edged darker.
+func _build_roads(state: Dictionary) -> void:
+	var rect: Rect2 = state.room.rect
+	var rect_poly := PackedVector2Array([rect.position, Vector2(rect.end.x, rect.position.y), rect.end, Vector2(rect.position.x, rect.end.y)])
+	for road in RoomDataScript.ROADS:
+		var pts := PackedVector2Array()
+		for p in road.points:
+			pts.append(_cell_to_px(p))
+		var half: float = float(road.width) * 0.5
+		for layer in 2:
+			var radius: float = half + (11.0 if layer == 0 else 0.0)
+			for stroke in Geometry2D.offset_polyline(pts, radius, Geometry2D.JOIN_ROUND, Geometry2D.END_ROUND):
+				for piece in Geometry2D.intersect_polygons(stroke, rect_poly):
+					var poly := Polygon2D.new()
+					poly.polygon = piece
+					poly.z_index = -9
+					if layer == 0:
+						poly.color = ROAD_EDGE
+					else:
+						poly.texture = ROAD_TEXTURE
+						poly.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
+						poly.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+						var uv := PackedVector2Array()
+						for v in piece:
+							uv.append(v / 3.0)
+						poly.uv = uv
+					state.root.add_child(poly)
 
 # --- the solid ground of a room ---------------------------------------------------------------
 

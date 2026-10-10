@@ -284,8 +284,12 @@ static func _apply_authored(r: Dictionary) -> void:
 		r.stands = data.decor
 	if data.has("enemies"):
 		r.enemies = data.enemies
+	elif r.landmarks.is_empty():
+		r.enemies = []                                   # no generated residents: the country's own
 	if data.has("target") and r.kind not in ["safe", "sea"]:
 		r.target = int(data.target)
+	elif r.landmarks.is_empty() and r.kind not in ["safe", "sea"]:
+		r.target = 3
 
 static func _register(r: Dictionary) -> void:
 	rooms.append(r)

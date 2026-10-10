@@ -193,13 +193,34 @@ func _init() -> void:
 	print("A hand-made doorway is exactly where it was put: the trail west of where you wake is %.0f px wide, centred %.0f px down (expected 480, 1082): %s" % [(float(spawn_door[0][1]) - float(spawn_door[0][0])) * 2164.0, (float(spawn_door[0][1]) + float(spawn_door[0][0])) * 0.5 * 2164.0, spawn_door])
 	print("...a side marked closed has no opening: %s (expected [])" % [RM.edges(RM.room_at(Vector2(WM.col_x(0) + 100.0, WM.row_y(2) + 100.0))).filter(func(e): return e.side == "e")[0].openings])
 	var named_authored: Array = authored.filter(func(r): return r.name != "").map(func(r): return r.name)
-	print("Only the places worth a name in the hand-made wood have one: %s (expected The Fairy Ring, The Old Orchard, Hunter's Camp, The Wolf Den, The HeartWood, Where You Woke)" % [named_authored])
+	print("Only the places worth a name in the hand-made rooms have one: %s (expected The HeartWood, Where You Woke, The Fairy Ring, The Old Orchard, Hunter's Camp, The Wolf Den, The Windswept Rise, The Crossroads, The Stone Fields)" % [named_authored])
 	var floors_ok := true
 	for r in authored:
 		var Lr = RM.layout(r)
 		if Lr.floor_fraction < 0.12 or Lr.repairs > 4:
 			floors_ok = false
 	print("Every hand-made room has a good amount of floor and needed no big repairs: %s (expected true)" % [floors_ok])
+
+	# --- roads
+	var OWM := preload("res://scripts/OverworldMap.gd")
+	var off_floor := []
+	var road_points := 0
+	for road in RM.RoomDataScript.ROADS:
+		var pts: Array = []
+		for p in road.points:
+			pts.append(OWM._cell_to_px(p))
+		for i in pts.size() - 1:
+			var a: Vector2 = pts[i]
+			var b: Vector2 = pts[i + 1]
+			var n := int(a.distance_to(b) / 150.0)
+			for k in n + 1:
+				var q: Vector2 = a.lerp(b, float(k) / float(maxi(n, 1)))
+				road_points += 1
+				var room_here: Dictionary = RM.room_at(q)
+				if RM.layout(room_here).sample(q) < 0.0:
+					off_floor.append("%s@%s" % [room_here.id, Vector2i(q / 100.0)])
+	print("Every road runs on ground you can stand on: %d of %d sample points are in a wall: %s (expected 0)" % [off_floor.size(), road_points, off_floor.slice(0, 6)])
+	print("The north road starts at the town's north gate and reaches the ruins: starts %s (expected near (16800, 11400)), ends %s (expected near the ruins %s)" % [OWM._cell_to_px(RM.RoomDataScript.ROADS[1].points[0]), OWM._cell_to_px(RM.RoomDataScript.ROADS[1].points[RM.RoomDataScript.ROADS[1].points.size() - 1]), WM.landmark("ruins").pos])
 
 	# --- personalities
 	var variants := {}

@@ -2390,7 +2390,9 @@ func _regional_spawn_spot(any_room: bool = false) -> Dictionary:
 				break
 		var area: Rect2 = RoomsScript.spawn_rect(room)
 		var pos: Vector2 = area.position + Vector2(randf(), randf()) * area.size
-		if pos.distance_to(player.global_position) < ROOM_SPAWN_MIN:
+		# first try well off screen; in a small glade settle for just off screen
+		var least: float = ROOM_SPAWN_MIN if attempt < 10 else ROOM_SPAWN_MIN * 0.7
+		if pos.distance_to(player.global_position) < least:
 			continue
 		if RoomsScript.layout(room).sample(pos) < ROOM_SPAWN_CLEARANCE:
 			continue                                   # in a wall of trees, a lake...
@@ -2424,10 +2426,14 @@ func _fill_ambient_population(limit: int = 99, extra_goblins: int = 0, force_eli
 	if in_battle or game_over:
 		return
 	var spawned := 0
+	var misses := 0
 	while spawned < limit and enemies_alive < MAX_AMBIENT_ENEMIES:
 		var spot: Dictionary = _regional_spawn_spot()
 		if spot.is_empty():
-			break
+			misses += 1                                   # a small glade can take a few tries to find room
+			if misses >= 5:
+				break
+			continue
 		var region: Dictionary = spot.region
 		if region.miniboss != "" and randf() < MINIBOSS_CHANCE:
 			_spawn_roaming_miniboss(region, spot.pos)

@@ -37,7 +37,7 @@ func _init() -> void:
 	built.sort()
 	print("The room you wake in and the ones within reach are built: %d rooms %s (expected 6: the spawn room, its west, north and south neighbours, and the two corners west)" % [built.size(), built])
 	var group_enemies: Array = main.get_tree().get_nodes_in_group("enemies")
-	print("Each nearby room has its own roaming enemies: %d (expected 10-35), none within %d px of you: %s (expected true)" % [group_enemies.size(), int(main.ROOM_SPAWN_MIN), group_enemies.all(func(e): return e.global_position.distance_to(player.global_position) >= main.ROOM_SPAWN_MIN - 1.0)])
+	print("Each nearby room has its own roaming enemies: %d (expected 10-35), none within %d px of you: %s (expected true)" % [group_enemies.size(), int(main.ROOM_SPAWN_MIN * 0.7), group_enemies.all(func(e): return e.global_position.distance_to(player.global_position) >= main.ROOM_SPAWN_MIN * 0.7 - 1.0)])
 	print("...every one stands in a room that has wild enemies (not the sea, not a safe room): %s (expected true)" % [group_enemies.all(func(e): return RM.room_at(e.global_position).target > 0)])
 	var per_room_ok := true
 	for r in RM.rooms_near(player.global_position, main.ROOM_ACTIVE_MARGIN):
