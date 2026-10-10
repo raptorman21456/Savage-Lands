@@ -68,9 +68,21 @@ func _init() -> void:
 		if Geometry2D.is_point_in_polygon(WM.landmark("pesca").pos, p):
 			pesca_in_water = true
 	print("...so Pesca stands on solid ground: %s (expected false)" % [pesca_in_water])
+	# --- out in the sea: the Long Pier and Gull Rock are ground, the water either side is not; Leviathan's hull is on the beach
+	var in_water := func(p: Vector2) -> bool:
+		for piece in polys:
+			if Geometry2D.is_point_in_polygon(p, piece):
+				return true
+		return false
+	var pier_ok: bool = not in_water.call(Vector2(5500, 20555)) and not in_water.call(Vector2(6700, 20555)) and not in_water.call(Vector2(4300, 20555))
+	var sea_ok: bool = in_water.call(Vector2(5500, 20555 - 220)) and in_water.call(Vector2(5500, 20555 + 220)) and in_water.call(Vector2(3300, 20555 + 900))
+	var rock_ok: bool = not in_water.call(Vector2(3900, 20555)) and not in_water.call(Vector2(3900, 20555 - 450)) and WM.region_at(Vector2(3900, 20555)).id == "gull_rock"
+	print("The Long Pier runs out of Pesca to Gull Rock over the sea: pier and islet are ground %s and %s, the water beside them is not %s (expected true true true)" % [pier_ok, rock_ok, sea_ok])
+	var wreck: Dictionary = WM.landmark("leviathan_shore")
+	print("Leviathan's hull is on the strand, not in the water: region %s (expected beach), in the sea's collision %s (expected false), its boss is still %s (expected leviathan)" % [WM.region_at(wreck.pos).id, in_water.call(wreck.pos) or in_water.call(wreck.pos + Vector2(0, 220)), wreck.boss])
 	var missing := []
 	for r in WM.regions:
-		if r.walkable and r.enemies.is_empty() and not (r.id in ["pesca", "ranch"]):
+		if r.walkable and r.enemies.is_empty() and not (r.id in ["pesca", "ranch", "long_pier", "gull_rock"]):
 			missing.append(r.id)
 	print("Every walkable region except the safe ones has an enemy table: missing %s (expected [])" % [missing])
 	print("Pesca and the ranch are safe (no wild enemies): %s (expected true)" % [WM.region("pesca").enemies.is_empty() and WM.region("ranch").enemies.is_empty()])

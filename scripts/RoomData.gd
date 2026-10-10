@@ -785,6 +785,23 @@ const ROOMS := {
 		"enemies": [["shade", 3], ["brute", 2], ["archer", 2]],
 		"target": 6,
 	},
+	# ------------------------------------------------------------------ The sea and Leviathan's Shore
+	# Leviathan's Shore: the strand below the south shore, a hull run aground at the water's edge (the landmark) and two
+	# more wrecks in the shallows off the beach. The sea is the wall on the west; the way out is east to the White Spire.
+	"4,10": {
+		"name": "Leviathan's Shore",
+		"mass": "",
+		"shape": [["poly", 1330, 200, 1420, 600, 1600, 1000, 1790, 1400, 2000, 1844, 2500, 1844, 2500, 200]],
+		"props": [["fallen_logs", 2250, 900], ["wreck", 1450, 1164], ["wreck", 1650, 1700]],
+		"decor": [["row", "stone", 1820, 1100, 2140, 1700, 220]],
+	},
+	# The sea off Pesca: the Long Pier (see ROADS and WorldMap) runs west from the headland to Gull Rock, with a stack of
+	# rock either side of the boards now and then. The sea itself is deep water nobody can cross: only the pier and the
+	# islet are ground.
+	"1,9": {
+		"props": [["lighthouse", 845, 1082], ["rock_formation", 2300, 1342], ["rock_formation", 1800, 822], ["rock_formation", 2800, 822]],
+		"decor": [["pair", "stone", 845, 1082, 0, 470], ["boulders", 480, 1082, 2, 2, 90]],
+	},
 }
 
 const EDGES := {
@@ -964,6 +981,9 @@ const EDGES := {
 	"9,9|9,10": [[1527, 560]],
 	"7,9|7,10": [[1527, 520]],
 	"8,9|8,10": [[1527, 560]],
+	# --- Leviathan's Shore: the sea closes its west side; the strand opens north and east
+	"3,10|4,10": "closed",
+	"4,9|4,10": [[1900, 700]],
 }
 
 # ROADS: dirt roads drawn on the ground, from the town's four gates out across the land. Each is a stroke of `width`
@@ -983,5 +1003,6 @@ const ROADS := [
 	{"width": 90.0, "style": "ash", "points": [[7.5, 0.5], [7.5, 1.0], [7.5, 1.4]]},                                                  # the branch to the crater's north gate
 	{"width": 90.0, "style": "sand", "points": [[9.5, 5.5], [9.5, 4.5], [9.5, 3.5], [9.5, 2.5], [9.5, 1.5], [10.5, 1.5], [10.5, 2.25]]},   # the caravan track, up through the canyon and the dunes to the oasis
 	{"width": 90.0, "style": "crystal", "points": [[8.02, 8.5], [8.5, 8.5], [9.5, 8.5], [9.5, 9.0], [9.5, 9.14]]},   # the crystal road: over the Rift's bridge and on to the Void Throne
+	{"width": 200.0, "style": "boards", "points": [[2.23, 9.5], [1.52, 9.5]]},   # the Long Pier: Pesca's west shore out over the sea to Gull Rock
 	{"width": 140.0, "style": "boards", "points": [[2.0, 6.5], [3.0, 6.5]]},                                          # the boardwalk across the bog
 ]

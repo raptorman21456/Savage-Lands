@@ -129,6 +129,12 @@ static func ensure_built() -> void:
 		Vector2(0.245, 0.735), Vector2(0.29, 0.75), Vector2(0.305, 0.80), Vector2(0.29, 0.84), Vector2(0.245, 0.885), Vector2(0.20, 0.90),
 		Vector2(0.185, 0.875), Vector2(0.215, 0.835), Vector2(0.232, 0.79)]), noise, 0.35),
 		"sand", Color(1.1, 1.05, 0.9), 1, "beach", true, "pesca", [], false))
+	# Out in the sea: the Long Pier, a boardwalk west from Pesca's shore (it starts inside the headland so the two join), and
+	# Gull Rock, the islet with the lighthouse at its far end. Walkable, so the sea's collision has them cut out.
+	var pier_line := PackedVector2Array([Vector2(6800.0, 20555.0), Vector2(4000.0, 20555.0)])
+	var pier_poly: PackedVector2Array = Geometry2D.offset_polyline(pier_line, 125.0, Geometry2D.JOIN_SQUARE, Geometry2D.END_SQUARE)[0]
+	list.append(_region("long_pier", "The Long Pier", pier_poly, "sand", Color(1.1, 1.05, 0.9), 1, "beach", true, "pier", [], false))
+	list.append(_region("gull_rock", "Gull Rock", _circle_n(Vector2(3900.0, 20555.0) / SIZE, 620.0), "sand", Color(1.1, 1.05, 0.9), 1, "beach", true, "gull_rock", [], false))
 	list.append(_region("frozen_wastes", "The Frozen Wastes", _wobble(_poly_n([
 		Vector2(0.43, 1.0), Vector2(0.44, 0.90), Vector2(0.47, 0.845), Vector2(0.55, 0.815), Vector2(0.64, 0.83), Vector2(0.69, 0.88), Vector2(0.67, 1.0)]), noise, 1.0),
 		"snow", Color(0.85, 0.95, 1.2), 5, "tundra", true, "frozen",
@@ -153,7 +159,7 @@ static func ensure_built() -> void:
 		_landmark("ruins", "The Ruined Settlement", "ruins", cell_center_n(4, 0, 2, 1), 700.0),
 		_landmark("lizen_encampment", "The Lizen Encampment", "boss", cell_center_n(0, 5), 700.0, "lizen_warband"),
 		_landmark("pesca", "Pesca", "town", Vector2(0.222, 0.86), 600.0),
-		_landmark("leviathan_shore", "Leviathan's Shore", "boss", Vector2(0.395, 0.915), 700.0, "leviathan"),
+		_landmark("leviathan_shore", "Leviathan's Shore", "boss", Vector2(13950.0, 22250.0) / SIZE, 700.0, "leviathan"),    # on the strand, hull to the water
 		_landmark("frozen_spire", "The White Spire", "boss", cell_center_n(5, 10), 700.0, "white_dragon"),
 		_landmark("crater", "The Crater", "boss", cell_center_n(7, 1, 1, 2), 700.0, "red_wyrm"),
 		_landmark("void_throne", "The Void Throne", "boss", cell_center_n(9, 9), 700.0, "archmage"),

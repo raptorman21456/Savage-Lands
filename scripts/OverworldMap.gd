@@ -828,6 +828,8 @@ func _build_feature(parent: Node, kind: String, flavour: String, at: Vector2, ra
 		"cliff_ridge": _f_ridge(parent, at, radius, rng)
 		"mouth": _f_mouth(parent, at)
 		"crystals": _f_crystals(parent, at, radius, rng)
+		"lighthouse": _f_lighthouse(parent, at, radius, rng)
+		"wreck": _wreck(parent, at, rng, false)
 
 func _f_clearing(parent: Node, at: Vector2, radius: float, _rng: RandomNumberGenerator) -> void:
 	_disc(parent, at, radius, Color(1.0, 0.98, 0.7, 0.10), -2, 28)
@@ -957,6 +959,25 @@ func _f_ridge(parent: Node, at: Vector2, radius: float, rng: RandomNumberGenerat
 func _f_mouth(parent: Node, at: Vector2) -> void:
 	_sprite(parent, ROCK, at, 12.0, Color(0.7, 0.68, 0.66), 7.0 * 12.0, 0)
 	_poly(parent, PackedVector2Array([at + Vector2(-46, 84), at + Vector2(-30, 20), at + Vector2(0, 0), at + Vector2(30, 20), at + Vector2(46, 84)]), Color(0.03, 0.03, 0.04), 1)
+
+# Gull Rock's lighthouse: a white tower with two red bands, a gallery, a lamp and a roof, on a base nothing can walk through.
+func _f_lighthouse(parent: Node, at: Vector2, _radius: float, _rng: RandomNumberGenerator) -> void:
+	var k := 0.8
+	var white := Color(0.92, 0.9, 0.84)
+	var red := Color(0.7, 0.15, 0.13)
+	var bottom := 10.0
+	var top := -330.0
+	var half := func(y: float) -> float: return lerpf(70.0, 44.0, (bottom - y) / (bottom - top)) * k
+	var bands := [[10.0, -70.0, white], [-70.0, -140.0, red], [-140.0, -210.0, white], [-210.0, -280.0, red], [-280.0, -330.0, white]]
+	for b in bands:
+		var y0: float = b[0]
+		var y1: float = b[1]
+		_poly(parent, PackedVector2Array([at + Vector2(-half.call(y0), y0 * k), at + Vector2(half.call(y0), y0 * k), at + Vector2(half.call(y1), y1 * k), at + Vector2(-half.call(y1), y1 * k)]), b[2], 1)
+	_box(parent, at + Vector2(0, -338.0 * k), Vector2(140.0 * k, 14.0 * k), Color(0.25, 0.22, 0.2), 0.0, false, 1)
+	_box(parent, at + Vector2(0, -368.0 * k), Vector2(60.0 * k, 46.0 * k), Color(1.0, 0.93, 0.6), 0.0, false, 1)
+	_poly(parent, PackedVector2Array([at + Vector2(-48.0 * k, -391.0 * k), at + Vector2(48.0 * k, -391.0 * k), at + Vector2(0, -440.0 * k)]), red, 1)
+	_disc(parent, at + Vector2(0, -368.0 * k), 130.0 * k, Color(1.0, 0.95, 0.6, 0.22), 2, 20)
+	_box(parent, at + Vector2(0, 0), Vector2(120.0 * k, 40.0 * k), Color(0, 0, 0, 0), 0.0, true, 0)
 
 # Crystals in an even row, alternately tall and short.
 func _f_crystals(parent: Node, at: Vector2, _radius: float, _rng: RandomNumberGenerator) -> void:
@@ -1149,12 +1170,13 @@ func _ranch(parent: Node, pos: Vector2, rng: RandomNumberGenerator) -> void:
 		_disc(parent, pos + Vector2(cos(a), sin(a)) * (150.0 + rng.randf() * 280.0), 26.0, Color(0.85, 0.72, 0.3), 0, 12)
 
 # Leviathan's Shore: a wrecked hull on the beach.
-func _wreck(parent: Node, pos: Vector2, rng: RandomNumberGenerator) -> void:
+func _wreck(parent: Node, pos: Vector2, _rng: RandomNumberGenerator, on_beach: bool = true) -> void:
 	_poly(parent, PackedVector2Array([pos + Vector2(-240, 0), pos + Vector2(240, -40), pos + Vector2(190, 76), pos + Vector2(-190, 96)]), Color(0.3, 0.2, 0.12), 0)
 	_box(parent, pos + Vector2(26, -110), Vector2(12, 170), Color(0.4, 0.3, 0.2), 0.15, false, 1)
 	_box(parent, pos + Vector2(70, -96), Vector2(96, 76), Color(0.8, 0.78, 0.7, 0.8), 0.15, false, 1)
-	for i in 6:
-		_sprite(parent, ROCK, pos + Vector2(-420 + rng.randf() * 840.0, 170 + rng.randf() * 200.0), 2.6, Color(0.8, 0.85, 0.9))
+	if on_beach:                                         # a neat row of rocks along the keel (a wreck standing in the sea has none)
+		for i in 5:
+			_sprite(parent, ROCK, pos + Vector2(-100.0 + 200.0 * float(i), 240), 2.6, Color(0.8, 0.85, 0.9))
 
 # The White Spire: shards of ice.
 func _spire(parent: Node, pos: Vector2, rng: RandomNumberGenerator) -> void:

@@ -62,6 +62,7 @@ const MASS := {
 const FEATURE_RADIUS := {
 	"clearing": 300.0, "standing_stones": 260.0, "farm": 420.0, "pond": 250.0, "rock_formation": 260.0, "camp": 330.0,
 	"fallen_logs": 260.0, "ruin_walls": 340.0, "graves": 300.0, "cliff_ridge": 520.0, "mouth": 260.0, "crystals": 280.0,
+	"lighthouse": 200.0, "wreck": 300.0,
 }
 # How far from a landmark's centre its structure reaches (the room keeps that much floor around it).
 const STRUCTURE_RADIUS := {
@@ -393,7 +394,7 @@ static func _group_for(region: Dictionary) -> String:
 		"mountains": return "mountains"
 		"lizen": return "lizen"
 		"swamp": return "swamp"
-		"beach", "pesca", "ocean": return "beach"
+		"beach", "pesca", "ocean", "long_pier", "gull_rock": return "beach"
 		"frozen_wastes": return "frozen"
 		"voidlands": return "void"
 	return "plains"
