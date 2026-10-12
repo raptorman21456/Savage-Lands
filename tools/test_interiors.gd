@@ -16,7 +16,7 @@ func _init() -> void:
 		e.free()
 	main.enemies_alive = 0
 
-	print("Twenty-three rooms: the town's eleven venues, Pesca's six houses and the Lizen Encampment's six tents: %d (expected 23)" % [IN.DEFS.size()])
+	print("Twenty-six rooms: the town's eleven venues, Pesca's six houses, the Lizen Encampment's six tents and the Ranch's three buildings: %d (expected 26)" % [IN.DEFS.size()])
 	var bad_reach := []
 	var bad_entry := []
 	var overlapping := []
@@ -197,4 +197,47 @@ func _init() -> void:
 	await physics_frame
 	await create_timer(1.6).timeout
 	print("The doorway puts you back in the avenue beside the tent: in_interior=%s (expected false), %.0f px from the spot beside the door (expected 0)" % [main.in_interior, player.global_position.distance_to(tent.return)])
+
+	# --- the Ranch's three buildings: the barn takes bets on the horses, the farmhouse puts you up, the smokehouse sells meat
+	var ranch_houses: Array = main.OverworldMapScript.ranch_buildings()
+	var bad_ranch_doors := []
+	var bad_ranch_venues := []
+	for h in ranch_houses:
+		if not main.town_panels.has(IN.venue_of(h.interior)):
+			bad_ranch_venues.append(h.interior)
+		for p in [h.door, h.return]:
+			player.global_position = p
+			await physics_frame
+			await physics_frame
+			if player.test_move(player.global_transform, Vector2.ZERO) or main.WorldMapScript.is_blocked(p):
+				bad_ranch_doors.append("%s@%s" % [h.interior, p])
+	print("The Ranch has three buildings, each trading as a town venue with a menu: %d buildings (expected 3), problems=%s (expected [])" % [ranch_houses.size(), bad_ranch_venues])
+	print("...each door, and the spot you come out on in the yard, is open ground: problems=%s (expected [])" % [bad_ranch_doors])
+	var barn: Dictionary = ranch_houses[0]
+	player.global_position = barn.door + Vector2(0, 60.0)
+	await physics_frame
+	player.global_position = barn.door
+	await physics_frame
+	await physics_frame
+	await create_timer(1.6).timeout
+	var barn_room = main._get_interior(barn.interior)
+	var barn_in: bool = main.in_interior
+	var barn_name: String = main.hud.world_label.text
+	var barn_goal: Vector2 = IN.goal_of(barn.interior)
+	player.global_position = barn_room.origin + barn_goal + Vector2(0, 100.0)
+	await physics_frame
+	player.global_position = barn_room.origin + barn_goal
+	await physics_frame
+	await physics_frame
+	await physics_frame
+	print("Walk into the barn: in_interior=%s (expected true), room '%s' (expected The Barn); its counter opens the racing menu: a town panel is open=%s (expected true)" % [barn_in, barn_name, main._any_town_panel_open()])
+	main._close_open_town_panels()
+	paused = false
+	player.global_position = barn_room.origin + Vector2(barn_room.size.x * 0.5, barn_room.size.y - 100.0)
+	await physics_frame
+	player.global_position = barn_room.origin + Vector2(barn_room.size.x * 0.5, barn_room.size.y - IN.WALL * 0.5)
+	await physics_frame
+	await physics_frame
+	await create_timer(1.6).timeout
+	print("The doorway puts you back in the yard below the barn door: in_interior=%s (expected false), %.0f px from the spot below the door (expected 0)" % [main.in_interior, player.global_position.distance_to(barn.return)])
 	quit()

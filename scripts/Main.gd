@@ -1848,12 +1848,13 @@ var _fade_layer: CanvasLayer = null
 var _fade_rect: ColorRect = null
 var _interior_busy := false
 
-# The buildings out in the world rather than in the town's plaza (Pesca's six houses, the Lizen Encampment's six tents):
+# The buildings out in the world rather than in the town's plaza (Pesca's six houses, the Lizen Encampment's six tents,
+# the Ranch's three buildings):
 # a door trigger at each, built once.
 func _build_world_doors() -> void:
 	if not regional_world:
 		return
-	for house in OverworldMapScript.pesca_buildings() + OverworldMapScript.lizen_buildings():
+	for house in OverworldMapScript.pesca_buildings() + OverworldMapScript.lizen_buildings() + OverworldMapScript.ranch_buildings():
 		var interior: String = house.interior
 		var door: Vector2 = house.door
 		var back: Vector2 = house.return

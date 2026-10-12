@@ -1185,22 +1185,60 @@ func _pesca(parent: Node, _pos: Vector2, _rng: RandomNumberGenerator) -> void:
 		_poly(parent, PackedVector2Array([bp + Vector2(-44, 0), bp + Vector2(44, 0), bp + Vector2(30, 24), bp + Vector2(-30, 24)]), Color(0.35, 0.22, 0.12), 1)
 		_box(parent, bp + Vector2(0, -26), Vector2(5, 52), Color(0.8, 0.78, 0.7), 0.0, false, 1)
 
-# The ranch: a fenced paddock with a barn and haystacks on the town's outskirts.
-func _ranch(parent: Node, pos: Vector2, rng: RandomNumberGenerator) -> void:
-	var radius := 620.0
-	var posts := 64
-	for i in posts:
-		var a := TAU * float(i) / float(posts)
-		if cos(a) > 0.95:
-			continue                                   # the gate faces the town... east
-		var p := pos + Vector2(cos(a), sin(a)) * radius
-		_box(parent, p, Vector2(60, 7), Color(0.55, 0.4, 0.22), a + PI / 2.0, false, 0)
-		_box(parent, p, Vector2(9, 22), Color(0.4, 0.28, 0.15), 0.0, true, 1)
-	_sprite(parent, preload("res://assets/building_shop.png"), pos + Vector2(-210, -170), 5.0, Color(0.9, 0.7, 0.6), 0.0, 2)
-	_box(parent, pos + Vector2(-210, -100), Vector2(220, 150), Color(0, 0, 0, 0), 0.0, true, 0)
-	for i in 5:
-		var a := rng.randf() * TAU
-		_disc(parent, pos + Vector2(cos(a), sin(a)) * (150.0 + rng.randf() * 280.0), 26.0, Color(0.85, 0.72, 0.3), 0, 12)
+# The Ranch's three buildings, in a row along the paddock's north side either side of the gate the lane comes in by
+# (offsets from the landmark): the barn (the shop's building art, red, big), the farmhouse and the smokehouse. Which
+# interior (Interior.gd) each door opens, where the door is and where you come out (below it, in the yard). Shared by
+# the builder below and by Main, which puts a door trigger at each.
+const RANCH_BUILDINGS := [
+	{"interior": "ranch_barn", "art": preload("res://assets/building_shop.png"), "at": Vector2(-430, -330), "scale": 5.0, "tint": Color(0.9, 0.7, 0.6), "box": Vector2(210, 110), "box_y": 65.0, "door_y": 150.0, "door_size": Vector2(120, 48)},
+	{"interior": "ranch_house", "art": preload("res://assets/building_tavern.png"), "at": Vector2(330, -330), "scale": 3.4, "tint": Color(1.0, 0.95, 0.85), "box": Vector2(150, 90), "box_y": 52.0, "door_y": 121.0, "door_size": Vector2(100, 48)},
+	{"interior": "ranch_smoke", "art": preload("res://assets/building_butcher.png"), "at": Vector2(560, -330), "scale": 3.4, "tint": Color.WHITE, "box": Vector2(150, 90), "box_y": 52.0, "door_y": 121.0, "door_size": Vector2(100, 48)},
+]
+const RANCH_HALF := Vector2(700.0, 520.0)           # the paddock's fence, half its width and height
+const RANCH_GATE := 150.0                            # the north gate: no fence this near the lane
+
+static func ranch_buildings() -> Array:
+	var centre: Vector2 = WorldMapScript.landmark("ranch").pos
+	var out: Array = []
+	for b in RANCH_BUILDINGS:
+		var at: Vector2 = centre + b.at
+		var door: Vector2 = at + Vector2(0.0, float(b.door_y))
+		out.append({"interior": b.interior, "pos": at, "door": door, "door_size": b.door_size, "return": door + Vector2(0.0, 120.0)})
+	return out
+
+# The ranch: a rectangular paddock fenced all round but for a gate in the north (where the lane comes in), the barn, the
+# farmhouse and the smokehouse along its north side, a trough, a block of hay bales and three horses in the yard.
+func _ranch(parent: Node, pos: Vector2, _rng: RandomNumberGenerator) -> void:
+	var corners := [Vector2(-1, -1), Vector2(1, -1), Vector2(1, 1), Vector2(-1, 1)]
+	for side in 4:
+		var a: Vector2 = pos + corners[side] * RANCH_HALF
+		var b: Vector2 = pos + corners[(side + 1) % 4] * RANCH_HALF
+		var n := int(a.distance_to(b) / 100.0)
+		for i in n:
+			var p0: Vector2 = a.lerp(b, float(i) / float(n))
+			var p1: Vector2 = a.lerp(b, float(i + 1) / float(n))
+			var gap0: bool = side == 0 and absf(p0.x - pos.x) < RANCH_GATE
+			var gap1: bool = side == 0 and absf(p1.x - pos.x) < RANCH_GATE
+			if not gap0:
+				_box(parent, p0, Vector2(9, 22), Color(0.4, 0.28, 0.15), 0.0, true, 1)
+			if not gap0 and not gap1:
+				_box(parent, (p0 + p1) * 0.5, Vector2(a.distance_to(b) / float(n), 7), Color(0.55, 0.4, 0.22), (b - a).angle(), false, 0)
+	for i in RANCH_BUILDINGS.size():
+		var b: Dictionary = RANCH_BUILDINGS[i]
+		var at: Vector2 = pos + b.at
+		var s: float = b.scale
+		_sprite(parent, b.art, at, s, b.tint, 0.0, 2)
+		_box(parent, at + Vector2(0, float(b.box_y)), b.box, Color(0, 0, 0, 0), 0.0, true, 0)
+	for i in 3:                                          # a block of hay bales, three by two
+		for j in 2:
+			var bale: Vector2 = pos + Vector2(-600.0 + 70.0 * float(i), 200.0 + 56.0 * float(j))
+			_box(parent, bale, Vector2(60, 44), Color(0.85, 0.72, 0.3), 0.0, true, 1)
+			_box(parent, bale, Vector2(60, 5), Color(0.5, 0.38, 0.15), 0.0, false, 2)
+	_box(parent, pos + Vector2(-250, -60), Vector2(130, 34), Color(0.4, 0.3, 0.2), 0.0, true, 1)       # the trough, by the barn
+	_box(parent, pos + Vector2(-250, -60), Vector2(112, 18), Color(0.3, 0.5, 0.7), 0.0, false, 2)
+	var tints := [Color(0.8, 0.55, 0.35), Color(0.72, 0.72, 0.74), Color(0.55, 0.35, 0.2)]
+	for i in 3:
+		_sprite(parent, preload("res://assets/horse.png"), pos + Vector2(260.0 + 100.0 * float(i), 200.0), 3.0, tints[i], 0.0, 1)
 
 # Leviathan's Shore: a wrecked hull on the beach.
 func _wreck(parent: Node, pos: Vector2, _rng: RandomNumberGenerator, on_beach: bool = true) -> void:

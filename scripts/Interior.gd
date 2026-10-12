@@ -143,6 +143,24 @@ const DEFS := {
 		"things": [["curtain", 110, 110], ["curtain", 790, 110], ["totem", 450, 130], ["cauldron", 200, 260], ["candle", 330, 320], ["candle", 570, 320], ["rune_circle", 450, 490]],
 		"loot": [["coin", 20, 700, 300]],
 	},
+	# --- The Ranch's three buildings (OverworldMap.RANCH_BUILDINGS): a barn with the town's racing horses, the farmhouse and
+	# the smokehouse. Each trades as a venue ("venue"): the barn takes bets on the racing horses, the farmhouse puts you
+	# up for the night, the smokehouse sells cured meat.
+	"ranch_barn": {
+		"name": "The Barn", "venue": "horse_racing", "size": Vector2(1100, 780), "floor": Color(0.55, 0.45, 0.28), "wall": Color(0.3, 0.2, 0.12),
+		"npc": [550, 190, Color(0.85, 0.9, 0.75)], "counter": [550, 262, 360], "trade": [550, 340, 260, 70],
+		"things": [["saddle_rack", 550, 104], ["horse_stall", 150, 220], ["horse_stall", 150, 400], ["horse_stall", 150, 580], ["horse_stall", 950, 220], ["horse_stall", 950, 400], ["horse_stall", 950, 580], ["hay_bale", 420, 520], ["hay_bale", 480, 520], ["hay_bale", 620, 520], ["hay_bale", 680, 520], ["hay", 550, 450]],
+	},
+	"ranch_house": {
+		"name": "The Farmhouse", "venue": "healer", "size": Vector2(1000, 720), "floor": Color(0.5, 0.38, 0.24), "wall": Color(0.3, 0.22, 0.15),
+		"npc": [700, 215, Color(1.0, 0.9, 0.8)], "counter": [700, 290, 300], "trade": [700, 365, 240, 70],
+		"things": [["bed", 130, 190], ["bed", 270, 190], ["fireplace", 470, 104], ["shelf", 820, 104], ["rug", 300, 520], ["table", 300, 520], ["barrel", 900, 230], ["crate", 880, 560]],
+	},
+	"ranch_smoke": {
+		"name": "The Smokehouse", "venue": "butcher", "size": Vector2(900, 680), "floor": Color(0.5, 0.42, 0.32), "wall": Color(0.25, 0.17, 0.13),
+		"npc": [450, 190, Color(1.0, 0.85, 0.8)], "counter": [450, 262, 360], "trade": [450, 340, 240, 70],
+		"things": [["hang_meat", 120, 100], ["hang_meat", 210, 100], ["hang_meat", 300, 100], ["hang_meat", 600, 100], ["hang_meat", 690, 100], ["hang_meat", 780, 100], ["block", 130, 260], ["barrel", 780, 260], ["barrel", 780, 330], ["crate", 120, 540], ["crate", 800, 540], ["crate", 800, 480]],
+	},
 }
 
 # What each kind of furniture looks like: [width, height, colour, solid].
@@ -170,6 +188,8 @@ const THINGS := {
 	"bunk": [100, 170, Color(0.4, 0.28, 0.16), true], "long_table": [300, 80, Color(0.45, 0.3, 0.17), true],
 	"shield_stand": [60, 60, Color(0.55, 0.58, 0.62), true], "totem": [50, 100, Color(0.38, 0.26, 0.14), true],
 	"trough": [150, 50, Color(0.4, 0.3, 0.2), true],
+	"horse_stall": [170, 150, Color(0.4, 0.28, 0.16), true], "hay_bale": [70, 46, Color(0.85, 0.72, 0.3), true],
+	"saddle_rack": [120, 34, Color(0.4, 0.28, 0.16), true], "hay": [220, 110, Color(0.78, 0.66, 0.3), false],
 }
 
 var kind := ""
@@ -348,7 +368,7 @@ func _build_thing(thing: String, at: Vector2) -> void:
 				var a := TAU * float(i) / 6.0
 				_disc(at + Vector2(cos(a), sin(a)) * thing_size.x * 0.37, 12.0, Color(0.8, 0.7, 1.0), -7)
 			return
-		"rug", "mat":
+		"rug", "mat", "hay":
 			_rect_node(self, at, thing_size, color, -8)
 			_rect_node(self, at, thing_size - Vector2(24, 24), color.lightened(0.12), -8)
 			return
@@ -417,6 +437,25 @@ func _build_thing(thing: String, at: Vector2) -> void:
 			_rect_node(self, at + Vector2(0, 32), Vector2(34, 18), Color(0.3, 0.55, 0.3), 0)
 		"trough":
 			_rect_node(self, at, Vector2(132, 30), Color(0.3, 0.5, 0.7), 0)
+		"horse_stall":
+			_rect_node(self, at, Vector2(150, 130), Color(0.75, 0.65, 0.35), 0)
+			_rect_node(self, at + Vector2(0, -68), Vector2(170, 8), color.darkened(0.3), 0)
+			_rect_node(self, at + Vector2(0, 68), Vector2(170, 8), color.darkened(0.3), 0)
+			_rect_node(self, at + Vector2(-82, 0), Vector2(8, 150), color.darkened(0.3), 0)
+			_rect_node(self, at + Vector2(82, 0), Vector2(8, 150), color.darkened(0.3), 0)
+			var horse := Sprite2D.new()
+			horse.texture = preload("res://assets/horse.png")
+			horse.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			horse.modulate = [Color(0.8, 0.55, 0.35), Color(0.72, 0.72, 0.74), Color(0.55, 0.35, 0.2)][int(at.x + at.y) % 3]
+			horse.position = at
+			horse.scale = Vector2(4.0, 4.0)
+			add_child(horse)
+		"hay_bale":
+			for i in 3:
+				_rect_node(self, at + Vector2((float(i) - 1.0) * 22.0, 0), Vector2(4, thing_size.y), Color(0.5, 0.38, 0.15), 0)
+		"saddle_rack":
+			_rect_node(self, at + Vector2(-28, 0), Vector2(34, 18), Color(0.45, 0.25, 0.12), 0)
+			_rect_node(self, at + Vector2(28, 0), Vector2(34, 18), Color(0.45, 0.25, 0.12), 0)
 
 func _build_npc() -> void:
 	if def.has("npc"):
