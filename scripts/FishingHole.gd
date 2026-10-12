@@ -13,7 +13,30 @@ class_name FishingHole
 # Sizes, worst to best: junk, small, medium, large, golden. Loot follows
 # straight from size -- see loot_for_size.
 
-const BAIT_COST := 8
+# Fishing is at Pesca now (the Fishmonger there sells bait, fish and rods; see FishmongerPanel.gd). A cast uses one bait.
+# BAIT_PRICE is what one bait costs at the Fishmonger -- all the prices and rod numbers here are drafts.
+const BAIT_PRICE := 6
+const BAIT_PACK := 5                    # the Fishmonger also sells this many at a discount
+const BAIT_PACK_PRICE := 27
+
+# Rods, worst to best. window_ticks widens the bite window, tension_mult scales how fast the line tightens while you
+# reel (lower is gentler), luck adds to the Angler's Hook-style fishing_luck. You use the best rod you own.
+const RODS := [
+	{"id": "rod_driftwood", "name": "Driftwood Rod", "price": 0, "window_ticks": 0, "tension_mult": 1.0, "luck": 0.0,
+		"description": "A bent stick and a bit of string. It catches fish, just not on purpose."},
+	{"id": "rod_oak", "name": "Oakwood Rod", "price": 150, "window_ticks": 4, "tension_mult": 0.9, "luck": 0.05,
+		"description": "A little more give and a little more patience: the bite window is 4 ticks longer and the line tightens 10% slower."},
+	{"id": "rod_reef", "name": "Reef Rod", "price": 450, "window_ticks": 8, "tension_mult": 0.8, "luck": 0.15,
+		"description": "Whalebone and braided silk. The bite window is 8 ticks longer, the line tightens 20% slower and the better fish find your hook more often."},
+	{"id": "rod_golden", "name": "Golden Rod", "price": 1000, "window_ticks": 12, "tension_mult": 0.7, "luck": 0.3,
+		"description": "The kind of rod a harbour master hangs over the fireplace. The bite window is 12 ticks longer, the line tightens 30% slower and the best fish come looking for it."},
+]
+
+static func rod(id: String) -> Dictionary:
+	for r in RODS:
+		if r.id == id:
+			return r
+	return RODS[0]
 
 # Base weights (out of 100) before fishing_luck (the Angler's Hook talisman)
 # skews them toward the rarer, better catches -- same additive-then-renormalize
@@ -69,20 +92,20 @@ static func bite_wait_ticks(size: String) -> int:
 	return BITE_WAIT_TICKS.get(size, 30)
 
 # Ticks the bite window stays open -- widened by fishing_luck, never shrunk.
-static func bite_window_ticks(luck: float = 0.0) -> int:
-	return BASE_BITE_WINDOW_TICKS + int(round(maxf(0.0, luck) * LUCK_WINDOW_BONUS_TICKS_PER_POINT))
+static func bite_window_ticks(luck: float = 0.0, rod_ticks: int = 0) -> int:
+	return BASE_BITE_WINDOW_TICKS + rod_ticks + int(round(maxf(0.0, luck) * LUCK_WINDOW_BONUS_TICKS_PER_POINT))
 
 # One tick of reeling. `holding` is whether the player is pressing reel THIS
 # tick; releasing lets tension bleed off but earns no progress. Returns the new
 # {progress, tension} state; the caller (FishingPanel) checks for >=1.0 on
 # either. `rng` makes the surge roll seedable for tests.
-static func step_reel(progress: float, tension: float, size: String, holding: bool, rng: RandomNumberGenerator = null) -> Dictionary:
+static func step_reel(progress: float, tension: float, size: String, holding: bool, rng: RandomNumberGenerator = null, tension_mult: float = 1.0) -> Dictionary:
 	if rng == null:
 		rng = RandomNumberGenerator.new()
 		rng.randomize()
 	if holding:
 		progress += PROGRESS_PER_REEL_TICK.get(size, 0.08)
-		tension += TENSION_PER_REEL_TICK.get(size, 0.09)
+		tension += TENSION_PER_REEL_TICK.get(size, 0.09) * tension_mult
 	else:
 		tension = maxf(0.0, tension - TENSION_RELAX_PER_TICK)
 	if rng.randf() < SURGE_CHANCE:

@@ -118,35 +118,28 @@ func _init() -> void:
 
 	# Outskirts venues: the door trigger sits outside the walls, inside its own
 	# footprint's rect, clear of the fence gap's walls.
-	var pond_rect: Rect2 = main.FISHING_POND_RECT
 	var track_rect: Rect2 = main.RACE_TRACK_RECT
 	for kind in outside_kinds:
 		var door_center: Vector2 = main.TOWN_AREA_ORIGIN + layout[kind].pos
 		var door_rect := Rect2(door_center - layout[kind].door / 2.0, layout[kind].door)
-		var zone: Rect2 = track_rect if kind == "horse_racing" else pond_rect
+		var zone: Rect2 = track_rect
 		print("%s's door is outside the walls (%s, expected false for in-town) and touching its own venue's ground (%s, expected true)" % [
 			kind, main._in_town_area(door_center), zone.grow(80.0).encloses(door_rect)
 		])
 		print("...and is registered in the map's building list: %s (expected true)" % [main.town_building_positions.has(kind)])
 
-	# Outskirts: the pond and race track sit outside the walls, off each other,
-	# well inside the world, and protected from decorations/enemy spawns.
-	var pond: Rect2 = main.FISHING_POND_RECT
+	# Outskirts: the race track sits outside the walls, well inside the world, and protected from decorations/enemy
+	# spawns. (Fishing moved to Pesca: the town has no pond.)
 	var track: Rect2 = main.RACE_TRACK_RECT
 	var world := Rect2(Vector2.ZERO, main.WORLD_SIZE)
-	print("pond and race track sit outside the town and off each other: %s (expected false)" % [
-		pond.intersects(main.TOWN_AREA_RECT) or track.intersects(main.TOWN_AREA_RECT) or pond.intersects(track)
-	])
-	print("both have 300px of wilderness around them inside the world: %s (expected true)" % [
-		world.grow(-300.0).encloses(pond) and world.grow(-300.0).encloses(track)
-	])
-	print("the protected zone covers the town, pond and track but not open wilderness: town=%s pond=%s track=%s wild=%s (expected true true true false)" % [
+	print("the race track sits outside the town: %s (expected false)" % [track.intersects(main.TOWN_AREA_RECT)])
+	print("...with 300px of wilderness around it inside the world: %s (expected true)" % [world.grow(-300.0).encloses(track)])
+	print("the protected zone covers the town and track but not open wilderness: town=%s track=%s wild=%s (expected true true false)" % [
 		main._in_protected_zone(main.TOWN_AREA_RECT.get_center()),
-		main._in_protected_zone(pond.get_center()),
 		main._in_protected_zone(track.get_center()),
 		main._in_protected_zone(main.PLAYER_SPAWN_POSITION),
 	])
-	print("...but only the plaza counts as being in town for the HUD label: pond_in_town=%s (expected false)" % [main._in_town_area(pond.get_center())])
+	print("...but only the plaza counts as being in town for the HUD label: track_in_town=%s (expected false)" % [main._in_town_area(track.get_center())])
 
 	var any_deco_protected := false
 	for d in main.deco_nodes:

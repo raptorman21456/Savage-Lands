@@ -19,7 +19,7 @@ func _init() -> void:
 	rng.seed = 55555
 
 	# --- Pure rules -------------------------------------------------------------------
-	print("bait costs %d coins" % [hole.BAIT_COST])
+	print("bait costs %d coins at the Fishmonger, a tin of %d costs %d" % [hole.BAIT_PRICE, hole.BAIT_PACK, hole.BAIT_PACK_PRICE])
 	var w0: Dictionary = hole.size_weights(0.0)
 	var w_luck: Dictionary = hole.size_weights(0.5)
 	print("luck skews weight toward the rarer sizes: medium %.1f -> %.1f, junk unchanged %.1f == %.1f (expected up, equal)" % [w0.medium, w_luck.medium, w0.junk, w_luck.junk])
@@ -101,17 +101,18 @@ func _init() -> void:
 		return
 	panel.rng = rng
 	player.coins = 100
+	player.bait = 99
 	main._try_open_panel("fishing")
 	print("the door opens it: visible=%s (expected true), title=%s (expected THE FISHING HOLE), state=%s (expected idle)" % [panel.visible, panel.title_label.text, panel.state])
 
 	# Casting spends bait and starts the wait.
-	var before: int = player.coins
-	print("cast: ok=%s (expected true), coins=%d (expected %d), state=%s (expected waiting)" % [panel.cast(), player.coins, before - hole.BAIT_COST, panel.state])
+	var before: int = player.bait
+	print("cast: ok=%s (expected true), bait=%d (expected %d), state=%s (expected waiting)" % [panel.cast(), player.bait, before - 1, panel.state])
 	print("can't cast again mid-line: %s (expected false)" % [panel.cast()])
-	player.coins = 0
+	player.bait = 0
 	panel._reset("idle")
-	print("can't afford bait: %s (expected false), state=%s (expected idle)" % [panel.cast(), panel.state])
-	player.coins = 100
+	print("out of bait: %s (expected false), state=%s (expected idle)" % [panel.cast(), panel.state])
+	player.bait = 99
 
 	# Force a quick bite for a deterministic hook-miss check.
 	panel.cast()

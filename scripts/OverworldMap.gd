@@ -960,6 +960,13 @@ func _f_mouth(parent: Node, at: Vector2) -> void:
 	_sprite(parent, ROCK, at, 12.0, Color(0.7, 0.68, 0.66), 7.0 * 12.0, 0)
 	_poly(parent, PackedVector2Array([at + Vector2(-46, 84), at + Vector2(-30, 20), at + Vector2(0, 0), at + Vector2(30, 20), at + Vector2(46, 84)]), Color(0.03, 0.03, 0.04), 1)
 
+# Gull Rock's lighthouse (the one prop standing at the middle of the islet's room "1,9", see RoomData): its door, at its
+# foot, opens the keeper's room. Shared by the builder (_f_lighthouse) and by Main, which puts a door trigger there.
+static func gull_buildings() -> Array:
+	var at := Vector2(float(WorldMapScript.col_x(1)) + 845.0, float(WorldMapScript.row_y(9)) + 1082.0)
+	var door: Vector2 = at + Vector2(0.0, 60.0)
+	return [{"interior": "gull_lighthouse", "pos": at, "door": door, "door_size": Vector2(110, 50), "return": door + Vector2(0.0, 110.0)}]
+
 # Gull Rock's lighthouse: a white tower with two red bands, a gallery, a lamp and a roof, on a base nothing can walk through.
 func _f_lighthouse(parent: Node, at: Vector2, _radius: float, _rng: RandomNumberGenerator) -> void:
 	var k := 0.8
@@ -977,6 +984,8 @@ func _f_lighthouse(parent: Node, at: Vector2, _radius: float, _rng: RandomNumber
 	_box(parent, at + Vector2(0, -368.0 * k), Vector2(60.0 * k, 46.0 * k), Color(1.0, 0.93, 0.6), 0.0, false, 1)
 	_poly(parent, PackedVector2Array([at + Vector2(-48.0 * k, -391.0 * k), at + Vector2(48.0 * k, -391.0 * k), at + Vector2(0, -440.0 * k)]), red, 1)
 	_disc(parent, at + Vector2(0, -368.0 * k), 130.0 * k, Color(1.0, 0.95, 0.6, 0.22), 2, 20)
+	_box(parent, at + Vector2(0, -2), Vector2(26, 34), Color(0.22, 0.14, 0.09), 0.0, false, 2)               # the door at its foot
+	_box(parent, at + Vector2(0, -2), Vector2(18, 26), Color(0.12, 0.08, 0.05), 0.0, false, 3)
 	_box(parent, at + Vector2(0, 0), Vector2(120.0 * k, 40.0 * k), Color(0, 0, 0, 0), 0.0, true, 0)
 
 # Crystals in an even row, alternately tall and short.
@@ -1116,6 +1125,9 @@ func _ruin_sign(parent: Node, at: Vector2, picture: String) -> void:
 			_box(parent, at + Vector2(0, -56), Vector2(20, 6), ink, 0.0, false, 3)
 		"barrel":
 			_disc(parent, at + Vector2(0, -50), 11.0, ink, 3, 14)
+		"fish":
+			_disc(parent, at + Vector2(-4, -50), 9.0, ink, 3, 14)
+			_poly(parent, PackedVector2Array([at + Vector2(4, -50), at + Vector2(16, -58), at + Vector2(16, -42)]), ink, 3)
 
 # A settlement where everyone is dead: broken walls, rubble, bare trees and a few grave markers. Sized for a
 # 32 px player: a ruined house is ~150 px across. Each house has a doorway you can go through (ruin_buildings).
@@ -1209,6 +1221,13 @@ const PESCA_HOUSES := [
 	{"interior": "pesca_chapel", "art": preload("res://assets/building_church.png")},
 ]
 
+# Where you fish: a little jetty of planks on Pesca's south shore, below the boats, with a bucket, a rod rack and a sign.
+# Walking onto it opens the Fishing panel (Main._build_fishing_spot).
+const PESCA_FISHING_SPOT := Vector2(7800.0, 21060.0)
+
+static func pesca_fishing_spot() -> Dictionary:
+	return {"pos": PESCA_FISHING_SPOT, "size": Vector2(180, 90)}
+
 static func pesca_buildings() -> Array:
 	var out: Array = []
 	for i in PESCA_HOUSES.size():
@@ -1224,6 +1243,13 @@ func _pesca(parent: Node, _pos: Vector2, _rng: RandomNumberGenerator) -> void:
 		_sprite(parent, PESCA_HOUSES[i].art, at, 3.4, Color.WHITE, 0.0, 2)
 		_box(parent, at + Vector2(0, 52), Vector2(150, 90), Color(0, 0, 0, 0), 0.0, true, 0)
 		_box(parent, at + Vector2(0, 372), Vector2(14, 26), Color(0.3, 0.2, 0.12), 0.0, false, 1)
+	_box(parent, PESCA_FISHING_SPOT, Vector2(200, 100), Color(0.42, 0.3, 0.18), 0.0, false, 0)                  # the jetty
+	_box(parent, PESCA_FISHING_SPOT + Vector2(0, -38), Vector2(200, 6), Color(0.3, 0.2, 0.12), 0.0, false, 1)
+	_box(parent, PESCA_FISHING_SPOT + Vector2(-70, 8), Vector2(30, 34), Color(0.5, 0.36, 0.2), 0.0, true, 1)     # a bucket of bait
+	_box(parent, PESCA_FISHING_SPOT + Vector2(-70, 0), Vector2(24, 12), Color(0.3, 0.5, 0.65), 0.0, false, 2)
+	for i in 3:                                                                                            # a rack of rods
+		_box(parent, PESCA_FISHING_SPOT + Vector2(60.0 + 14.0 * float(i), -8), Vector2(4, 64), Color(0.45, 0.32, 0.18), 0.0, false, 1)
+	_ruin_sign(parent, PESCA_FISHING_SPOT + Vector2(0, 62), "fish")
 	for i in 4:
 		var bp := Vector2(7500.0 + 250.0 * float(i), 20760.0)
 		_poly(parent, PackedVector2Array([bp + Vector2(-44, 0), bp + Vector2(44, 0), bp + Vector2(30, 24), bp + Vector2(-30, 24)]), Color(0.35, 0.22, 0.12), 1)

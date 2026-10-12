@@ -135,10 +135,10 @@ func _init() -> void:
 	# --- Allies from the capstones ---
 	save_data_script.save_data({"essence": 5000, "upgrades": {"strength": 1, "agility": 1, "vigor": 1, "berserker_edge": 3, "reflexes_unlock": 1, "adrenaline": 2}, "best_wave": 0})
 	panel._refresh()
-	var ally_before: int = player.party_members.filter(func(m): return m.get("name", "") == "Knight").size()
+	var flag_before: bool = player.meta_battle_hardened
 	panel._on_node_pressed("battle_hardened")
-	var ally_after: int = player.party_members.filter(func(m): return m.get("name", "") == "Knight").size()
-	print("the Knight joins at once, once: before=%d after=%d (expected 0, 1)" % [ally_before, ally_after])
+	var placeholders: int = player.party_members.filter(func(m): return m.get("name", "") == "Knight").size()
+	print("Friends in High Places puts the Knight within reach (he is found in the ruins, nothing joins at once): flag %s -> %s (expected false -> true), placeholder knights=%d (expected 0)" % [flag_before, player.meta_battle_hardened, placeholders])
 	panel._on_node_pressed("pack_leader")
 	print("Pack Leader opens a party slot right away: max_party_slots=%d (expected 3)" % [player.max_party_slots])
 	player.party = []

@@ -16,7 +16,7 @@ func _init() -> void:
 		e.free()
 	main.enemies_alive = 0
 
-	print("Thirty-three rooms: the town's eleven venues, Pesca's six houses, the Lizen Encampment's six tents, the Ranch's three buildings, the Ruined Settlement's four houses and the Caves' three mouths: %d (expected 33)" % [IN.DEFS.size()])
+	print("Thirty-four rooms: the town's eleven venues, Pesca's six houses, the Lizen Encampment's six tents, the Ranch's three buildings, the Ruined Settlement's four houses, the Caves' three mouths and Gull Rock's lighthouse: %d (expected 34)" % [IN.DEFS.size()])
 	var bad_reach := []
 	var bad_entry := []
 	var overlapping := []
@@ -114,7 +114,7 @@ func _init() -> void:
 	main._interior_busy = true            # standing on a door while we check the ground must not open it
 	var bad_venues := []
 	for h in houses:
-		if not IN.DEFS.has(IN.venue_of(h.interior)) or IN.venue_of(h.interior) == h.interior:
+		if not main.town_panels.has(IN.venue_of(h.interior)) or IN.venue_of(h.interior) == h.interior:
 			bad_venues.append(h.interior)
 		var d: Vector2 = h.door
 		for p in [d, d + Vector2(0, 120.0)]:
@@ -327,4 +327,19 @@ func _init() -> void:
 	await physics_frame
 	await create_timer(1.6).timeout
 	print("The doorway puts you back below the mouth: in_interior=%s (expected false), %.0f px from the spot below the rock (expected 0)" % [main.in_interior, player.global_position.distance_to(den.return)])
+
+	# --- Gull Rock's lighthouse: a door at its foot, the keeper's room (its chest is tested in test_druid_and_chest.gd)
+	var gull: Array = main.OverworldMapScript.gull_buildings()
+	var bad_gull_doors := []
+	main._interior_busy = true            # standing on a door while we check the ground must not open it
+	for h in gull:
+		for p in [h.door, h.return]:
+			player.global_position = p
+			await physics_frame
+			await physics_frame
+			if player.test_move(player.global_transform, Vector2.ZERO) or main.WorldMapScript.is_blocked(p):
+				bad_gull_doors.append("%s@%s" % [h.interior, p])
+	main._interior_busy = false
+	print("Gull Rock's lighthouse has a door into a room with a chest and nothing to trade: %d door (expected 1), chest %s (expected true), no counter %s (expected true)" % [gull.size(), IN.DEFS.gull_lighthouse.has("chests"), not IN.DEFS.gull_lighthouse.has("trade")])
+	print("...the door below the tower, and the spot you come out on, are open ground: problems=%s (expected [])" % [bad_gull_doors])
 	quit()

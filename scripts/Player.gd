@@ -13,6 +13,7 @@ const ClothingScript := preload("res://scripts/Clothing.gd")
 const BlacksmithScript := preload("res://scripts/Blacksmith.gd")
 const DojoScript := preload("res://scripts/Dojo.gd")
 const TalismansScript := preload("res://scripts/Talismans.gd")
+const FishingHoleScript := preload("res://scripts/FishingHole.gd")
 const PartyRulesScript := preload("res://scripts/PartyRules.gd")
 const PartyMemberScript := preload("res://scripts/PartyMember.gd")
 const DefenseScript := preload("res://scripts/Defense.gd")
@@ -308,6 +309,13 @@ var meta_reroll_discount_pct := 0.0
 const WORLDWALKER_HP_BONUS_PCT := 0.15
 const WORLDWALKER_DAMAGE_BONUS_PCT := 0.10
 var meta_worldwalker := false
+# Friends in High Places (Church capstone): the Knight is there to be found in the Ruined Settlement (Main.gd's Knight
+# section). It used to seed a flat mercenary at the start of the run.
+var meta_battle_hardened := false
+
+# Fishing (FishingHole.gd): bait is spent a cast at a time, and you fish with the best rod you own. Both reset every run.
+var bait := 0
+var owned_rods := {"rod_driftwood": true}
 
 # Party: combat companions that fight as real battle units on their own tile.
 # Two kinds of entry live side by side:
@@ -709,8 +717,7 @@ func _apply_meta_upgrades() -> void:
 	# Skill tree capstones -- one-time unlocks for fully investing in a wing
 	# (see SaveData.gd:UPGRADES). Each is now a whole new mechanic rather than a
 	# flat stat, so the ally-granting ones just seed the party here.
-	if bonuses.get("battle_hardened", 0) > 0:
-		party_members.append({"name": "Knight", "dmg_mult": 0.75})
+	meta_battle_hardened = bonuses.get("battle_hardened", 0) > 0
 	# Beastmaster (repurposed): guarantees a Fickle Wolf from the start of
 	# the run instead of a bonus recruit-chance.
 	if bonuses.get("beastmaster", 0) > 0:
@@ -822,8 +829,7 @@ func apply_meta_purchase(id: String) -> void:
 		"potions", "second_wind":
 			add_potion("potion_health")
 		"battle_hardened":
-			if not party_members.any(func(m): return m.get("name", "") == "Knight"):
-				party_members.append({"name": "Knight", "dmg_mult": 0.75})
+			meta_battle_hardened = true
 		"beastmaster":
 			if party_wolves().is_empty():
 				recruit("wolf")
@@ -1475,6 +1481,11 @@ func try_buy_weapon(weapon: Dictionary) -> bool:
 	_equip_weapon(weapon)
 	return true
 
+# A weapon found rather than bought (a chest's): it goes into your collection, not onto you -- wielding it is still
+# up to the Might/Intimidation gates.
+func grant_weapon(weapon_id: String) -> void:
+	owned_weapons[weapon_id] = true
+
 # Buys a weapon into your collection WITHOUT equipping it, so a party member can carry it
 # (the Staff can only be bought this way). The Might/Intimidation gates are about wielding it
 # yourself, so they do not apply. False if you can't afford it or already own it.
@@ -1829,6 +1840,38 @@ func add_coins(amount: int) -> void:
 # Coins added exactly as given -- no coin-bonus percentage. For gambling
 # winnings (the Wishing Well, the horse races): a skill-tree or talisman coin
 # bonus would otherwise quietly inflate the payouts past the odds the game shows.
+# The best rod you own (the Fishing panel and the Fishmonger both read it).
+func fishing_rod() -> Dictionary:
+	var best: Dictionary = FishingHoleScript.RODS[0]
+	for r in FishingHoleScript.RODS:
+		if owned_rods.has(r.id):
+			best = r
+	return best
+
+func try_spend_bait() -> bool:
+	if bait <= 0:
+		return false
+	bait -= 1
+	return true
+
+func try_buy_rod(rod_id: String) -> bool:
+	var rod: Dictionary = FishingHoleScript.rod(rod_id)
+	if rod.id != rod_id or owned_rods.has(rod_id) or not try_spend_coins(int(rod.price)):
+		return false
+	owned_rods[rod_id] = true
+	return true
+
+# Sells one of a fish you carry for `price` coins. False if you have none.
+func try_sell_food(food_id: String, price: int) -> bool:
+	var i := potion_queue.find(food_id)
+	if i < 0:
+		return false
+	potion_queue.remove_at(i)
+	healing_items = potion_queue.size()
+	items_changed.emit(healing_items)
+	add_coins_flat(price)
+	return true
+
 func add_coins_flat(amount: int) -> void:
 	coins += amount
 	coins_changed.emit(coins)

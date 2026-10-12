@@ -125,15 +125,15 @@ func _reset(new_state: String) -> void:
 func _refresh() -> void:
 	if _player == null or coins_label == null:
 		return
-	coins_label.text = "Coins: %d" % _player.coins
+	coins_label.text = "Coins: %d   Bait: %d   Rod: %s" % [_player.coins, _player.bait, _player.fishing_rod().name]
 	bar_box.visible = state == "reeling"
 	if state == "reeling":
 		progress_fill.size = Vector2(BAR_WIDTH * progress, BAR_HEIGHT)
 		tension_fill.size = Vector2(BAR_WIDTH * tension, BAR_HEIGHT)
 	match state:
 		"idle":
-			action_button.text = "Cast (%d coins)" % FishingHoleScript.BAIT_COST
-			action_button.disabled = _player.coins < FishingHoleScript.BAIT_COST
+			action_button.text = "Cast (1 bait)" if _player.bait > 0 else "Out of bait"
+			action_button.disabled = _player.bait <= 0
 		"waiting":
 			action_button.text = "Waiting..."
 			action_button.disabled = true
@@ -161,13 +161,19 @@ func _on_action_up() -> void:
 # --- The loop, as pure-ish state transitions (each also callable directly by
 # tests, without going through the button). ---------------------------------
 
+# The Angler's Hook-style luck plus the rod's own.
+func _fishing_luck() -> float:
+	return _player.talisman_bonus("fishing_luck") + float(_player.fishing_rod().luck)
+
 # Spends bait and starts the wait for a bite. False if it can't be afforded or
 # a cast is already in progress.
 func cast() -> bool:
-	if state != "idle" or _player == null or not _player.try_spend_coins(FishingHoleScript.BAIT_COST):
+	if state != "idle" or _player == null or not _player.try_spend_bait():
+		if _player != null and state == "idle":
+			speech_label.text = "You are out of bait. The Fishmonger in Pesca sells it."
 		_play_sfx("error")
 		return false
-	var luck: float = _player.talisman_bonus("fishing_luck")
+	var luck: float = _fishing_luck()
 	current_size = FishingHoleScript.roll_size(luck, rng)
 	wait_ticks_left = FishingHoleScript.bite_wait_ticks(current_size)
 	state = "waiting"
@@ -182,7 +188,7 @@ func _tick_waiting() -> void:
 	wait_ticks_left -= 1
 	if wait_ticks_left <= 0:
 		state = "biting"
-		bite_ticks_left = FishingHoleScript.bite_window_ticks(_player.talisman_bonus("fishing_luck"))
+		bite_ticks_left = FishingHoleScript.bite_window_ticks(_fishing_luck(), int(_player.fishing_rod().window_ticks))
 		speech_label.text = "Something's biting! Hook it!"
 		_play_sfx("buff")
 		_refresh()
@@ -211,7 +217,7 @@ func hook() -> bool:
 # One reel tick, driven by whatever holding_reel currently is. Resolves the
 # catch or the snap when a threshold is crossed.
 func _tick_reeling() -> void:
-	var result: Dictionary = FishingHoleScript.step_reel(progress, tension, current_size, holding_reel, rng)
+	var result: Dictionary = FishingHoleScript.step_reel(progress, tension, current_size, holding_reel, rng, float(_player.fishing_rod().tension_mult))
 	progress = result.progress
 	tension = result.tension
 	if tension >= 1.0:

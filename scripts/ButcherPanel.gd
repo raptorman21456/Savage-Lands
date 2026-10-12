@@ -15,7 +15,7 @@ func _panel_title() -> String:
 	return "THE BUTCHER"
 
 func _window_size() -> Vector2:
-	return Vector2(600, 430)
+	return Vector2(600, 520)
 
 func _build_content(outer: VBoxContainer) -> void:
 	outer.add_child(_make_label("\"Cured, smoked, or roasted -- small portions, honest prices. A little meat goes a long way out there.\"", 14, Color(0.8, 0.8, 0.75)))
@@ -36,6 +36,16 @@ func _refresh() -> void:
 			food.icon, food.name, food.description, "%d c" % price,
 			"Buy", _player.coins < price, _on_buy_pressed.bind(food.id)
 		))
+	# He buys fish too, and pays properly (Pesca's Fishmonger pays only a quarter of this).
+	var any_fish := false
+	for fish in FoodsScript.for_vendor("fish"):
+		var held: int = _player.potion_queue.count(fish.id)
+		if held <= 0:
+			continue
+		if not any_fish:
+			stock_box.add_child(_make_label("Sell your catch", 15, Color(0.6, 0.9, 0.7)))
+			any_fish = true
+		stock_box.add_child(_make_shop_row(fish.icon, "%s  (you have %d)" % [fish.name, held], "Fresh fish: he pays well for it here.", "+%d c" % FoodsScript.sell_price(fish.id, false), "Sell", false, _on_sell_pressed.bind(fish.id)))
 
 # Returns whether the purchase went through (tests drive this directly).
 func buy(food_id: String) -> bool:
@@ -50,3 +60,16 @@ func buy(food_id: String) -> bool:
 
 func _on_buy_pressed(food_id: String) -> void:
 	buy(food_id)
+
+# Sells one fish at the town's full price. False if you carry none.
+func sell(food_id: String) -> bool:
+	var price: int = FoodsScript.sell_price(food_id, false)
+	if _player == null or price <= 0 or not _player.try_sell_food(food_id, price):
+		_play_sfx("error")
+		return false
+	_play_sfx("coin")
+	_refresh()
+	return true
+
+func _on_sell_pressed(food_id: String) -> void:
+	sell(food_id)

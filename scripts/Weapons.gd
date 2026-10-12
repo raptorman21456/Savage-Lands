@@ -463,6 +463,20 @@ static func _build_tiered_variant(base: Dictionary, tier: Dictionary, material: 
 	variant.name = " ".join(name_parts)
 	return variant
 
+# A guaranteed Legendary (a treasure chest's): a random weapon the player can use (never a Staff) in a random material,
+# but never Wood -- a Wooden Legendary would be weaker than a Fine Steel Masterwork. Pass an rng for a repeatable roll.
+static func make_legendary(rng: RandomNumberGenerator = null) -> Dictionary:
+	var pick := func(n: int) -> int:
+		return (rng.randi() if rng != null else randi()) % n
+	var base: Dictionary = UPGRADABLE_TYPES[pick.call(UPGRADABLE_TYPES.size())]
+	var materials: Array = MATERIALS.filter(func(m): return m.id != "wood")
+	var material: Dictionary = materials[pick.call(materials.size())]
+	var tier: Dictionary = {}
+	for t in TIERS:
+		if t.tier_name == "Legendary":
+			tier = t
+	return _build_tiered_variant(base, tier, material)
+
 static func make_variant(base: Dictionary, min_rank: int = 0, luck_bonus: float = 0.0) -> Dictionary:
 	var tier: Dictionary = _pick_tier(min_rank, luck_bonus)
 	if tier.tier_name == "Mythic" and MYTHIC_WEAPONS.has(base.id):

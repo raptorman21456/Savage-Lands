@@ -15,7 +15,8 @@ const DOOR_WIDTH := 150.0              # the doorway in the bottom wall
 
 # kind (the town venue it belongs to, or a room of its own with a "venue" it trades as): {name, venue, size, floor, wall, npc [x, y, tint], counter [x, y, width] (or none),
 # trade [x, y, width, height] (walk in here to trade; a room with nothing to trade has none, and a "reach" [x, y] the walking
-# test must be able to get to instead), things [[kind, x, y], ...], loot [[coin / meat, amount, x, y], ...] (lying about)}
+# test must be able to get to instead), things [[kind, x, y], ...], loot [[coin / meat, amount, x, y], ...] (lying about), chests [[id, x, y], ...] (walk up to the front of one and it opens:
+# the room's owner decides what is in it)}
 const DEFS := {
 	"shop": {
 		"name": "General Store", "size": Vector2(1000, 720), "floor": Color(0.46, 0.33, 0.2), "wall": Color(0.27, 0.19, 0.13),
@@ -85,7 +86,7 @@ const DEFS := {
 		"things": [["shelf", 220, 104], ["shelf", 780, 104], ["net", 500, 100], ["barrel", 110, 210], ["barrel", 110, 270], ["rope_coil", 890, 230], ["rope_coil", 890, 310], ["sea_chest", 120, 520], ["crate", 880, 520], ["crate", 944, 520], ["rug", 500, 540]],
 	},
 	"pesca_fish": {
-		"name": "The Fishmonger", "venue": "butcher", "size": Vector2(900, 680), "floor": Color(0.62, 0.66, 0.66), "wall": Color(0.2, 0.3, 0.35),
+		"name": "The Fishmonger", "venue": "fishmonger", "size": Vector2(900, 680), "floor": Color(0.62, 0.66, 0.66), "wall": Color(0.2, 0.3, 0.35),
 		"npc": [450, 190, Color(0.85, 0.95, 1.0)], "counter": [450, 262, 360], "trade": [450, 340, 240, 70],
 		"things": [["fish_rack", 140, 100], ["fish_rack", 270, 100], ["fish_rack", 630, 100], ["fish_rack", 760, 100], ["crate", 130, 240], ["barrel", 780, 240], ["crate", 800, 540], ["crate", 100, 540]],
 	},
@@ -192,6 +193,7 @@ const DEFS := {
 	"cave_mine": {
 		"name": "The Old Mine", "size": Vector2(1100, 760), "floor": Color(0.22, 0.2, 0.2), "wall": Color(0.16, 0.15, 0.16),
 		"reach": [550, 330],
+		"chests": [["old_mine", 130, 330]],
 		"things": [["rack", 300, 104], ["rack", 800, 104], ["ore_vein", 550, 100], ["lantern", 420, 108], ["lantern", 680, 108], ["post", 200, 200], ["post", 450, 200], ["post", 650, 200], ["post", 900, 200], ["mine_track", 250, 420], ["mine_track", 550, 420], ["mine_track", 850, 420], ["mine_cart", 860, 420], ["barrel", 980, 200], ["crate", 120, 220], ["stalagmite", 110, 610], ["stalagmite", 990, 610], ["stalagmite", 170, 660], ["rubble", 900, 580]],
 		"loot": [["coin", 40, 980, 320]],
 	},
@@ -206,6 +208,14 @@ const DEFS := {
 		"reach": [500, 480],
 		"things": [["nest", 500, 340], ["bones", 420, 360], ["bones", 580, 330], ["bones", 800, 250], ["pelt", 250, 520], ["pelt", 760, 500], ["rubble", 150, 350], ["rubble", 860, 380], ["stalagmite", 110, 150], ["stalagmite", 890, 150], ["stalagmite", 120, 600], ["stalagmite", 880, 600]],
 		"loot": [["coin", 40, 500, 340], ["meat", 1, 780, 560]],
+	},
+	# --- Gull Rock's lighthouse (OverworldMap.gull_buildings): the keeper's room, with a sea chest (a guaranteed Legendary
+	# weapon, once a run -- see Main._open_chest). "chests": [[id, x, y]].
+	"gull_lighthouse": {
+		"name": "The Lighthouse", "size": Vector2(900, 700), "floor": Color(0.48, 0.4, 0.3), "wall": Color(0.62, 0.6, 0.56),
+		"reach": [450, 420],
+		"things": [["window", 260, 100], ["window", 640, 100], ["lantern", 450, 108], ["bed", 130, 210], ["bookshelf", 760, 104], ["barrel", 800, 230], ["table", 730, 430], ["rope_coil", 120, 530], ["anchor", 800, 560]],
+		"chests": [["gull_lighthouse", 450, 190]],
 	},
 }
 
@@ -252,6 +262,8 @@ var size := Vector2.ZERO
 var origin := Vector2.ZERO
 var _on_trade: Callable
 var _on_exit: Callable
+var _on_chest: Callable
+var _chests: Dictionary = {}      # chest id -> {closed, open}: the two looks of one chest
 
 static func has(venue: String) -> bool:
 	return DEFS.has(venue)
@@ -262,7 +274,7 @@ static func venue_of(room_kind: String) -> String:
 
 # Builds the room at `origin` (world position of its top-left corner). on_trade runs when the player walks up to the
 # counter, on_exit when they step into the doorway.
-func setup(venue: String, at: Vector2, on_trade: Callable, on_exit: Callable) -> void:
+func setup(venue: String, at: Vector2, on_trade: Callable, on_exit: Callable, on_chest: Callable = Callable()) -> void:
 	kind = venue
 	def = DEFS[venue]
 	size = def.size
@@ -271,6 +283,7 @@ func setup(venue: String, at: Vector2, on_trade: Callable, on_exit: Callable) ->
 	z_index = -3
 	_on_trade = on_trade
 	_on_exit = on_exit
+	_on_chest = on_chest
 	_build_floor()
 	_build_walls()
 	for t in def.things:
@@ -278,6 +291,7 @@ func setup(venue: String, at: Vector2, on_trade: Callable, on_exit: Callable) ->
 	_build_npc()
 	_build_triggers()
 	_build_loot()
+	_build_chests()
 
 func rect() -> Rect2:
 	return Rect2(origin, size)
@@ -599,6 +613,41 @@ func _build_triggers() -> void:
 		var t: Array = def.trade
 		_trigger(Vector2(float(t[0]), float(t[1])), Vector2(float(t[2]), float(t[3])), _on_trade)
 	_trigger(Vector2(size.x * 0.5, size.y - WALL * 0.5), Vector2(DOOR_WIDTH - 30.0, WALL), _on_exit)
+
+# A sea chest: solid, closed until you walk up to its front (then the owner's callback runs once per visit to the front);
+# open_chest() swaps it for the open, empty look.
+func _build_chests() -> void:
+	for c in def.get("chests", []):
+		var id := str(c[0])
+		var at := Vector2(float(c[1]), float(c[2]))
+		_solid(at, Vector2(80, 56))
+		_chests[id] = chest_nodes(self, at)
+		_trigger(at + Vector2(0, 64), Vector2(120, 50), func():
+			if _on_chest.is_valid():
+				_on_chest.call(id)
+		)
+
+# The two looks of a sea chest at `at` under `parent` (a room, or the open world): {closed, open}, the open one hidden.
+static func chest_nodes(parent: Node2D, at: Vector2) -> Dictionary:
+	var closed := Node2D.new()
+	parent.add_child(closed)
+	var open := Node2D.new()
+	open.visible = false
+	parent.add_child(open)
+	for part in [[closed, Vector2(0, 0), Vector2(80, 56), Color(0.45, 0.3, 0.15)], [closed, Vector2(0, -14), Vector2(80, 18), Color(0.55, 0.38, 0.2)], [closed, Vector2(0, -4), Vector2(82, 5), Color(0.8, 0.65, 0.25)], [closed, Vector2(0, 2), Vector2(12, 16), Color(0.9, 0.75, 0.3)],
+			[open, Vector2(0, 0), Vector2(80, 56), Color(0.3, 0.2, 0.1)], [open, Vector2(0, -2), Vector2(60, 30), Color(0.12, 0.08, 0.05)], [open, Vector2(0, -44), Vector2(80, 14), Color(0.55, 0.38, 0.2)]]:
+		var r := ColorRect.new()
+		r.color = part[3]
+		r.size = part[2]
+		r.position = at + part[1] - part[2] * 0.5
+		r.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		part[0].add_child(r)
+	return {"closed": closed, "open": open}
+
+func open_chest(id: String) -> void:
+	if _chests.has(id):
+		_chests[id].closed.visible = false
+		_chests[id].open.visible = true
 
 # Coins and meat lying about the room. Pickups live under Main (that is where their sound is played from); they are
 # gone once taken, for the run.

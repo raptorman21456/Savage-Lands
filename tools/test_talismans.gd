@@ -937,9 +937,15 @@ func _init() -> void:
 		owned_all[item.id] = true
 	print("nothing to offer when you own everything: %d (expected 0)" % [tal.roll_stock(5, owned_all, rng).size()])
 	var owned_most := owned_all.duplicate()
-	owned_most.erase("ember_charm")
+	owned_most.erase("whetstone_pendant")
 	owned_most.erase("wolf_fang")
 	print("a nearly-owned catalog offers only what's left: %s (expected the two, any order)" % [tal.roll_stock(5, owned_most, rng)])
+	var found_in_stock := false
+	for i in 200:
+		for id in tal.roll_stock(5, {}, rng):
+			if tal.get_talisman(id).get("found", false):
+				found_in_stock = true
+	print("the four talismans found in the world are never in the Seer's stock: %s (expected false)" % [found_in_stock])
 	# Rarity weighting: commons dominate a big sample.
 	var counts := {"common": 0, "uncommon": 0, "rare": 0, "epic": 0}
 	for i in 400:

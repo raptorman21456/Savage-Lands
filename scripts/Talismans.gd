@@ -1,7 +1,9 @@
 extends Node
 class_name Talismans
 
-# Talismans: small charms sold by the town Seer, each granting one passive
+# Talismans: small charms sold by the town Seer (all but four, which are FOUND in the world and never sold: Ember
+# Charm in the Lava Causeway, Wildfire Core in the Crater, Stone Amulet in the Old Mine and Lucky Clover by luck on the
+# Great Expanse -- an item with "found": true; see Main.gd's chests), each granting one passive
 # effect while EQUIPPED. You can own as many as you like, but only a few slots
 # are open at once -- and slots grow with player level (SLOT_LEVELS).
 #
@@ -168,7 +170,7 @@ const RARITY_COLORS := {
 
 static var ITEMS := [
 	# --- Offense ---
-	{"id": "ember_charm", "name": "Ember Charm", "rarity": "common", "price": 70,
+	{"id": "ember_charm", "name": "Ember Charm", "rarity": "common", "price": 70, "found": true,
 		"effects": {"burn_chance": 0.10, "burn_chance_multihit": 0.02, "ember_burn": 1},
 		"description": "10% chance for any attack to set the target on fire (2% per hit on multi-hit moves). The fire deals (5 + your attack / 5) damage, then 70% of that again each turn after, rounded up, until it burns out."},
 	{"id": "wolf_fang", "name": "Wolf Fang", "rarity": "common", "price": 70,
@@ -187,7 +189,7 @@ static var ITEMS := [
 		"effects": {"arrow_unlimited": 1, "arrow_price_pct": 0.10},
 		"description": "No limit on carried special arrows, but they cost 10% more."},
 	# --- Defense ---
-	{"id": "stone_amulet", "name": "Stone Amulet", "rarity": "uncommon", "price": 120,
+	{"id": "stone_amulet", "name": "Stone Amulet", "rarity": "uncommon", "price": 120, "found": true,
 		"effects": {"material_passive_boost": 1},
 		"description": "Doubles what your current weapon's material does -- its damage, price, stamina and break-chance swings from plain steel are all doubled, and so is its passive. Steel itself becomes 1.2x damage at 0.8x price and 0.8x stamina."},
 	{"id": "turtle_shell", "name": "Turtle Shell", "rarity": "common", "price": 70,
@@ -222,7 +224,7 @@ static var ITEMS := [
 		"effects": {"special_stamina_flat_reduction": 5},
 		"description": "Every weapon special costs 5 less stamina."},
 	# --- Economy ---
-	{"id": "lucky_clover", "name": "Lucky Clover", "rarity": "uncommon", "price": 110,
+	{"id": "lucky_clover", "name": "Lucky Clover", "rarity": "uncommon", "price": 110, "found": true,
 		"effects": {"double_secondary_chance": 1},
 		"description": "Double chance for secondary effects to occur -- burning, bleeding, stuns, extra strikes, material passives and every other on-hit proc."},
 	{"id": "merchants_coin", "name": "Merchant's Coin", "rarity": "common", "price": 40,
@@ -277,7 +279,7 @@ static var ITEMS := [
 	{"id": "ironclad_ward", "name": "Ironclad Ward", "rarity": "epic", "price": 130,
 		"effects": {"ironclad_ward": 1},
 		"description": "You can only Move on every other turn, but your defense is multiplied by 250%."},
-	{"id": "wildfire_core", "name": "Wildfire Core", "rarity": "epic", "price": 130,
+	{"id": "wildfire_core", "name": "Wildfire Core", "rarity": "epic", "price": 130, "found": true,
 		"effects": {"wildfire_core": 1},
 		"description": "A burning enemy that dies explodes into 3x its fire damage, hurting and igniting everything nearby -- allies and you included."},
 ]
@@ -330,7 +332,7 @@ static func roll_stock(count: int, owned: Dictionary, rng: RandomNumberGenerator
 		rng.randomize()
 	var pool: Array = []
 	for item in ITEMS:
-		if not owned.has(item.id):
+		if not owned.has(item.id) and not item.get("found", false):
 			pool.append(item)
 	var result := []
 	while result.size() < count and not pool.is_empty():

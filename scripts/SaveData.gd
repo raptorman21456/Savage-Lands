@@ -71,7 +71,7 @@ static var UPGRADES := {
 	# Ally companion, applied via Player.has_blade_ally, not a stat delta.
 	# Both the power path (Berserker's Edge) and the finesse path
 	# (Adrenaline) feed into it -- the wing's two branches reconverging.
-	"battle_hardened": {"name": "Friends in High Places", "stat_bonus": 1, "base_cost": 350, "cost_step": 0, "max_level": 1, "description": "Warrior capstone -- unlocks the Knight as a permanent ally who fights beside you in every battle.", "prereqs": [{"id": "berserker_edge", "min_level": 3}, {"id": "adrenaline", "min_level": 2}]},
+	"battle_hardened": {"name": "Friends in High Places", "stat_bonus": 1, "base_cost": 350, "cost_step": 0, "max_level": 1, "description": "Warrior capstone -- puts the Knight within reach: find him in the Ruined Settlement and he joins your party.", "prereqs": [{"id": "berserker_edge", "min_level": 3}, {"id": "adrenaline", "min_level": 2}]},
 	# A further Warrior-wing unlock past the capstone itself -- stat_bonus
 	# is again just an ownership flag, the real effect is +1 max party slot
 	# (Player.max_party_slots), applied in Player.gd:_apply_meta_upgrades.
@@ -420,6 +420,16 @@ static func is_game_completed_ever() -> bool:
 static func mark_game_completed() -> void:
 	var data := load_lifetime_data()
 	data.game_completed_ever = true
+	save_lifetime_data(data)
+
+# The Druid is freed for good the first time the Lizen Encampment is cleared out: from then on she waits in the HeartWood
+# at the start of every run (see Main.gd's druid section).
+static func is_druid_unlocked() -> bool:
+	return load_lifetime_data().get("druid_unlocked_ever", false)
+
+static func mark_druid_unlocked() -> void:
+	var data := load_lifetime_data()
+	data.druid_unlocked_ever = true
 	save_lifetime_data(data)
 
 static func is_tutorial_completed_ever() -> bool:

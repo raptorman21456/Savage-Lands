@@ -49,6 +49,7 @@ const ChurchPanelScript := preload("res://scripts/ChurchPanel.gd")
 const WishingWellPanelScript := preload("res://scripts/WishingWellPanel.gd")
 const HorseRacePanelScript := preload("res://scripts/HorseRacePanel.gd")
 const FishingPanelScript := preload("res://scripts/FishingPanel.gd")
+const FishmongerPanelScript := preload("res://scripts/FishmongerPanel.gd")
 const TalismansScript := preload("res://scripts/Talismans.gd")
 const SandboxScript := preload("res://scripts/Sandbox.gd")
 const SandboxPanelScript := preload("res://scripts/SandboxPanel.gd")
@@ -177,13 +178,12 @@ const TOWN_LAYOUT := {
 	"beastiary": {"name": "Beastiary", "pos": Vector2(1560, 862), "size": Vector2(120, 144), "door": Vector2(90, 60)},
 	# Outside the walls (see TOWN_OUTSKIRTS_KINDS): `pos` is the door trigger's
 	# own centre here, since the venue it opens is the big footprint in
-	# FISHING_POND_RECT / RACE_TRACK_RECT rather than a building sprite.
+	# RACE_TRACK_RECT rather than a building sprite.
 	"horse_racing": {"name": "Racing Grounds", "pos": Vector2(2040, 494), "size": Vector2.ZERO, "door": Vector2(120, 50), "outside": true},
-	"fishing": {"name": "Fishing Hole", "pos": Vector2(-110, 255), "size": Vector2.ZERO, "door": Vector2(70, 60), "outside": true},
 }
 # Venues that sit outside the plaza walls; their slots are in TOWN_LAYOUT with
 # "outside": true.
-const TOWN_OUTSKIRTS_KINDS := ["horse_racing", "fishing"]
+const TOWN_OUTSKIRTS_KINDS := ["horse_racing"]
 # The subset of TOWN_LAYOUT that _build_town actually places, in the order the
 # Map tab numbers them.
 const TOWN_BUILT_KINDS := ["shop", "healer", "enchanter", "beastiary", "quest_board", "tavern", "butcher", "flea_market", "blacksmith", "dojo", "seer", "wishing_well", "church"]
@@ -191,7 +191,6 @@ const TOWN_BUILT_KINDS := ["shop", "healer", "enchanter", "beastiary", "quest_bo
 # (which is what the bigger world is for). Only the reserved footprints live
 # here for now -- decorations and enemy spawns already steer clear of them
 # (see _in_protected_zone) so nothing wanders into where they'll be built.
-static var FISHING_POND_RECT := Rect2(TOWN_AREA_ORIGIN + Vector2(-700, 40), Vector2(560, 430))
 static var RACE_TRACK_RECT := Rect2(TOWN_AREA_ORIGIN + Vector2(1900, 40), Vector2(640, 490))
 # Since the town now sits on the map's own center, the player can't spawn
 # there too -- placed just outside its south gate instead, so a run starts
@@ -1192,6 +1191,10 @@ func _ready() -> void:
 	_build_sfx()
 	_build_town()
 	_build_world_doors()
+	_build_druid()
+	_build_knight()
+	_build_world_chests()
+	_build_fishing_spot()
 	_init_quest_board()
 	_roll_seer_stock()
 	if SaveDataScript.sandbox_active:
@@ -1496,7 +1499,6 @@ func _build_town() -> void:
 	_build_church_marker()
 	_place_building(town_building_positions.wishing_well, preload("res://assets/wishing_well.png"), "wishing_well")
 	_build_race_track()
-	_build_fishing_hole()
 
 	# The castle: a purely decorative landmark (no door, no panel -- see
 	# gen_sprites.gd:make_castle) at the top-middle of the plaza, between the
@@ -1539,13 +1541,12 @@ func _build_town_gate(pos: Vector2, inward: Vector2, rotated: bool) -> void:
 func _in_town_area(pos: Vector2, margin: float = 0.0) -> bool:
 	return TOWN_AREA_RECT.grow(margin).has_point(pos)
 
-# The plaza plus the outside-the-walls venues' footprints (fishing pond, race
+# The plaza plus the outside-the-walls venues' footprints (the race
 # track) -- everywhere scattered decorations and roaming-enemy spawns must
 # stay out of. _in_town_area stays plaza-only, since the HUD's "Town" label
 # should only flip when you actually walk through a gate.
 func _in_protected_zone(pos: Vector2, margin: float = 0.0) -> bool:
 	return _in_town_area(pos, margin) \
-		or FISHING_POND_RECT.grow(margin).has_point(pos) \
 		or RACE_TRACK_RECT.grow(margin).has_point(pos)
 
 # Fountain centerpiece, a scattering of flower beds/market stalls, and 2
@@ -1728,50 +1729,6 @@ func _build_race_track() -> void:
 		horse.z_index = -5
 		add_child(horse)
 
-# The Fishing Hole, just outside the west gate: a lake filling FISHING_POND_
-# RECT (already avoided by decorations/enemy spawns -- see _in_protected_zone)
-# with a bit of shore around it, a couple of lily pads for atmosphere, and a
-# small dock on the town-facing edge whose door trigger sits just outside the
-# water so walking up to it never means walking through the lake. Built from
-# plain ColorRects, not generated sprites -- unlike every other venue, nothing
-# here needs a hand-drawn look, and the panel draws its own pond view anyway.
-func _build_fishing_hole() -> void:
-	var rect: Rect2 = FISHING_POND_RECT
-	var shore := ColorRect.new()
-	shore.color = Color(0.5, 0.44, 0.3)
-	shore.position = rect.position - Vector2(16, 16)
-	shore.size = rect.size + Vector2(32, 32)
-	shore.z_index = -9
-	add_child(shore)
-	var water := ColorRect.new()
-	water.color = Color(0.16, 0.34, 0.48)
-	water.position = rect.position
-	water.size = rect.size
-	water.z_index = -8
-	add_child(water)
-	# The lake blocks movement -- you fish from its edge, not by wading in.
-	_add_wall(rect.get_center(), rect.size)
-
-	for spot in [Vector2(60, 60), Vector2(rect.size.x - 80, 90), Vector2(rect.size.x - 60, rect.size.y - 60), Vector2(80, rect.size.y - 90)]:
-		var lily := ColorRect.new()
-		lily.color = Color(0.26, 0.5, 0.3)
-		lily.size = Vector2(20, 14)
-		lily.position = rect.position + spot
-		lily.z_index = -7
-		add_child(lily)
-
-	# The dock: a short pier from the town-facing (east) edge, jutting a little
-	# into the water for the look of it -- the walkable door trigger sits just
-	# past the water's own edge, clear of the lake's collision.
-	var dock := ColorRect.new()
-	dock.color = Color(0.42, 0.3, 0.18)
-	dock.size = Vector2(70, 44)
-	dock.position = Vector2(rect.end.x - 20, rect.position.y + rect.size.y / 2.0 - dock.size.y / 2.0)
-	dock.z_index = -6
-	add_child(dock)
-	var door: Dictionary = TOWN_LAYOUT.fishing
-	_make_door_trigger(TOWN_AREA_ORIGIN + door.pos, door.door, func(): _try_open_panel("fishing"))
-
 # One fence segment: collision plus a two-tone plank so it reads as a rail.
 func _add_fence(rect: Rect2) -> void:
 	_add_wall(rect.get_center(), rect.size)
@@ -1830,6 +1787,330 @@ func _add_town_wall(pos: Vector2, size: Vector2) -> void:
 	wall_sprite.z_index = -6
 	add_child(wall_sprite)
 
+# --- The Druid ---------------------------------------------------------------------------------------------------
+# She is held in a cage in the Lizen Encampment until you clear the camp out (the Lizen Warband beaten and every
+# defender in the fort dead). The first time that ever happens she is freed for good (a lifetime flag): she joins you
+# at once if there is room, and on every later run she waits in the HeartWood instead, joining you when you walk up
+# to her. Roaming enemies stop refilling the fort once its warlord is down, so a cleared camp stays cleared.
+
+const DRUID_CAMP_OFFSET := Vector2(0, -330)             # from the Lizen landmark: the north end of the avenue
+const DRUID_HEARTWOOD_OFFSET := Vector2(-700, -420)     # from the HeartWood landmark: off the tree's north-west
+const DRUID_TOUCH_RADIUS := 150.0
+var druid_npc: Node2D = null
+var druid_cage: Node2D = null
+var druid_recruited := false                            # she is in your party this run
+var lizen_camp_cleared := false                         # this run
+
+func _druid_spot() -> Vector2:
+	if SaveDataScript.is_druid_unlocked():
+		return WorldMapScript.landmark("heartwood").pos + DRUID_HEARTWOOD_OFFSET
+	return WorldMapScript.landmark("lizen_encampment").pos + DRUID_CAMP_OFFSET
+
+func _build_druid() -> void:
+	if not regional_world or SaveDataScript.sandbox_active:
+		return
+	var at := _druid_spot()
+	druid_npc = Node2D.new()
+	druid_npc.position = at
+	add_child(druid_npc)
+	var glow := Polygon2D.new()
+	var ring := PackedVector2Array()
+	for i in 20:
+		ring.append(Vector2(cos(TAU * float(i) / 20.0), sin(TAU * float(i) / 20.0)) * 70.0)
+	glow.polygon = ring
+	glow.color = Color(0.5, 1.0, 0.6, 0.16)
+	glow.z_index = -1
+	druid_npc.add_child(glow)
+	var sprite := Sprite2D.new()
+	sprite.texture = preload("res://assets/blade_ally.png")
+	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	sprite.modulate = PartyRulesScript.KINDS["druid"].tint
+	sprite.scale = Vector2(TOWN_NPC_SCALE, TOWN_NPC_SCALE)
+	sprite.z_index = 1
+	druid_npc.add_child(sprite)
+	var tag := Label.new()
+	tag.text = "Druid"
+	tag.add_theme_font_size_override("font_size", 14)
+	tag.modulate = Color(0.7, 1.0, 0.75)
+	tag.position = Vector2(-26, -64)
+	tag.z_index = 3
+	druid_npc.add_child(tag)
+	var touch := Area2D.new()
+	var touch_shape := CollisionShape2D.new()
+	var circle := CircleShape2D.new()
+	circle.radius = DRUID_TOUCH_RADIUS
+	touch_shape.shape = circle
+	touch.add_child(touch_shape)
+	touch.body_entered.connect(func(body):
+		if body.is_in_group("player"):
+			_on_druid_touched()
+	)
+	druid_npc.add_child(touch)
+	if not SaveDataScript.is_druid_unlocked():
+		druid_cage = _make_druid_cage(at)
+
+# A wooden cage round her: a solid square you cannot walk into, bars drawn over her.
+func _make_druid_cage(at: Vector2) -> Node2D:
+	var cage := StaticBody2D.new()
+	cage.position = at
+	var shape := CollisionShape2D.new()
+	var box := RectangleShape2D.new()
+	box.size = Vector2(120, 120)
+	shape.shape = box
+	cage.add_child(shape)
+	var wood := Color(0.36, 0.25, 0.14)
+	var bars := [[Vector2(0, -58), Vector2(128, 10)], [Vector2(0, 58), Vector2(128, 10)], [Vector2(-60, 0), Vector2(12, 128)], [Vector2(60, 0), Vector2(12, 128)]]
+	for i in 5:
+		bars.append([Vector2(-36.0 + 18.0 * float(i), 0), Vector2(6, 116)])
+	for b in bars:
+		var bar := Polygon2D.new()
+		var half: Vector2 = b[1] * 0.5
+		bar.polygon = PackedVector2Array([b[0] + Vector2(-half.x, -half.y), b[0] + Vector2(half.x, -half.y), b[0] + Vector2(half.x, half.y), b[0] + Vector2(-half.x, half.y)])
+		bar.color = wood
+		bar.z_index = 2
+		cage.add_child(bar)
+	add_child(cage)
+	return cage
+
+func _on_druid_touched() -> void:
+	if druid_recruited or druid_npc == null or in_battle or in_interior:
+		return
+	if druid_cage != null:
+		hud.show_message("The Druid is locked in a cage. The Lizen hold her -- clear out their camp to free her.")
+		return
+	_try_recruit_druid()
+
+func _try_recruit_druid() -> bool:
+	if druid_recruited:
+		return false
+	if not player.can_recruit("druid"):
+		hud.show_message("Your party is full. Make room, then come back for the Druid.")
+		return false
+	player.recruit("druid")
+	druid_recruited = true
+	if druid_npc != null:
+		druid_npc.queue_free()
+		druid_npc = null
+	hud.show_message("The Druid joins your party!")
+	play_sfx("item")
+	return true
+
+# The Lizen camp is cleared once its warlord is down and nobody is left standing in the fort.
+func _check_lizen_camp_cleared() -> void:
+	if lizen_camp_cleared or in_battle or not defeated_landmark_bosses.has("lizen_encampment"):
+		return
+	var fort: Dictionary = RoomsScript.room_at(WorldMapScript.landmark("lizen_encampment").pos)
+	if _enemies_in_room(fort) > 0:
+		return
+	lizen_camp_cleared = true
+	var first_time := not SaveDataScript.is_druid_unlocked()
+	SaveDataScript.mark_druid_unlocked()
+	if druid_cage != null:
+		druid_cage.queue_free()
+		druid_cage = null
+	if first_time:
+		hud.show_message("The Lizen camp is cleared. The Druid is free!")
+		if druid_npc != null:
+			_try_recruit_druid()
+	else:
+		hud.show_message("The Lizen camp is cleared.")
+
+# Rooms that never refill with roaming enemies: the Lizen fort once its warlord is down.
+func _room_spawn_closed(room: Dictionary) -> bool:
+	return defeated_landmark_bosses.has("lizen_encampment") and room.landmarks.has("lizen_encampment")
+
+# --- The Knight --------------------------------------------------------------------------------------------------
+# Friends in High Places (the Church capstone) puts him within reach: he stands in the Ruined Settlement, the ruins
+# nearest your spawn, and joins you when you walk up to him. (It used to seed a flat placeholder mercenary at the start
+# of the run.)
+
+const KNIGHT_RUINS_OFFSET := Vector2(0, -430)           # from the Ruined Settlement landmark: between the well and the graves
+var knight_npc: Node2D = null
+var knight_recruited := false
+
+func _build_knight() -> void:
+	if not regional_world or SaveDataScript.sandbox_active or knight_npc != null or knight_recruited or not player.meta_battle_hardened:
+		return
+	var at: Vector2 = WorldMapScript.landmark("ruins").pos + KNIGHT_RUINS_OFFSET
+	knight_npc = Node2D.new()
+	knight_npc.position = at
+	add_child(knight_npc)
+	var glow := Polygon2D.new()
+	var ring := PackedVector2Array()
+	for i in 20:
+		ring.append(Vector2(cos(TAU * float(i) / 20.0), sin(TAU * float(i) / 20.0)) * 70.0)
+	glow.polygon = ring
+	glow.color = Color(0.6, 0.7, 1.0, 0.16)
+	glow.z_index = -1
+	knight_npc.add_child(glow)
+	var sprite := Sprite2D.new()
+	sprite.texture = preload("res://assets/blade_ally.png")
+	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	sprite.modulate = PartyRulesScript.KINDS["knight"].tint
+	sprite.scale = Vector2(TOWN_NPC_SCALE, TOWN_NPC_SCALE)
+	sprite.z_index = 1
+	knight_npc.add_child(sprite)
+	var tag := Label.new()
+	tag.text = "Knight"
+	tag.add_theme_font_size_override("font_size", 14)
+	tag.modulate = Color(0.75, 0.85, 1.0)
+	tag.position = Vector2(-26, -64)
+	tag.z_index = 3
+	knight_npc.add_child(tag)
+	var touch := Area2D.new()
+	var touch_shape := CollisionShape2D.new()
+	var circle := CircleShape2D.new()
+	circle.radius = 130.0
+	touch_shape.shape = circle
+	touch.add_child(touch_shape)
+	touch.body_entered.connect(func(body):
+		if body.is_in_group("player"):
+			_on_knight_touched()
+	)
+	knight_npc.add_child(touch)
+
+func _on_knight_touched() -> void:
+	if knight_recruited or knight_npc == null or in_battle or in_interior:
+		return
+	if not player.can_recruit("knight"):
+		hud.show_message("Your party is full. Make room, then come back for the Knight.")
+		return
+	player.recruit("knight")
+	knight_recruited = true
+	knight_npc.queue_free()
+	knight_npc = null
+	hud.show_message("The Knight joins your party!")
+	play_sfx("item")
+
+# --- The Lucky Clover --------------------------------------------------------------------------------------------
+# Found by luck, never sold: every CLOVER_STEP px you walk on the Great Expanse (the plains, not the town, ranch or
+# hills) has a 1 in 1000 chance of turning one up. Once you have it the rolling stops.
+
+const CLOVER_STEP := 100.0                              # one "unit" of walking
+const CLOVER_CHANCE := 1.0 / 1000.0
+var _clover_last_pos := Vector2.INF
+var _clover_walked := 0.0
+
+func _roll_lucky_clover() -> void:
+	if player.owned_talismans.has("lucky_clover") or in_battle or in_interior:
+		_clover_last_pos = Vector2.INF
+		return
+	var here: Vector2 = player.global_position
+	var moved: float = 0.0 if _clover_last_pos == Vector2.INF else here.distance_to(_clover_last_pos)
+	_clover_last_pos = here
+	if moved > 400.0:                                   # a jump (a fade, a test), not walking
+		return
+	if WorldMapScript.region_at(here).id != "great_expanse" or _in_protected_zone(here):
+		return
+	_clover_walked += moved
+	while _clover_walked >= CLOVER_STEP:
+		_clover_walked -= CLOVER_STEP
+		if randf() < CLOVER_CHANCE:
+			_found_lucky_clover()
+			return
+
+func _found_lucky_clover() -> void:
+	player.owned_talismans["lucky_clover"] = true
+	var worn := false
+	if player.equipped_talismans.size() < player.talisman_slots():
+		worn = player.equip_talisman("lucky_clover")
+	hud.show_message("A four-leaf clover in the grass: the Lucky Clover!%s" % (" You put it on." if worn else " (Wear it from your Inventory.)"))
+	play_sfx("level_up")
+
+# --- Chests ------------------------------------------------------------------------------------------------------
+# A sea chest holds one fixed thing, once a run (a new run is a fresh Main, so every chest is shut again). Gull Rock's
+# lighthouse holds a guaranteed Legendary weapon, rolled when you open it: a random weapon in a random material that is
+# not Wood, added to your collection (wielding it still needs the Might for its tier). Three of the four FOUND
+# talismans (Talismans.gd, "found") each wait in a chest of their own. Chests in a room (Interior "chests") open when you
+# walk up to their front; the two out in the world (_world_chest_spots) when you touch them.
+
+const CHEST_CONTENTS := {
+	"gull_lighthouse": {"kind": "legendary"},
+	"old_mine": {"kind": "talisman", "id": "stone_amulet"},          # the mountains: the Old Mine under the Caves
+	"lava_causeway": {"kind": "talisman", "id": "ember_charm"},      # Death Mountain's lava ridge
+	"crater": {"kind": "talisman", "id": "wildfire_core"},           # the heart of the mountain
+}
+var opened_chests: Dictionary = {}                      # chest id -> what was in it, this run
+var world_chests: Dictionary = {}                       # chest id -> {closed, open} nodes, for the chests out in the world
+
+func _world_chest_spots() -> Dictionary:
+	return {
+		"lava_causeway": Vector2(WorldMapScript.col_x(8), WorldMapScript.row_y(1)) + Vector2(1527, 1082),   # the middle of the causeway's platform
+		"crater": WorldMapScript.landmark("crater").pos + Vector2(0, -300),
+	}
+
+func _build_world_chests() -> void:
+	if not regional_world or SaveDataScript.sandbox_active:
+		return
+	var spots: Dictionary = _world_chest_spots()
+	for id in spots:
+		var at: Vector2 = spots[id]
+		var holder := Node2D.new()
+		holder.z_index = 1
+		add_child(holder)
+		world_chests[id] = InteriorScript.chest_nodes(holder, at)
+		var body := StaticBody2D.new()
+		body.position = at
+		var shape := CollisionShape2D.new()
+		var box := RectangleShape2D.new()
+		box.size = Vector2(80, 56)
+		shape.shape = box
+		body.add_child(shape)
+		add_child(body)
+		var touch := Area2D.new()
+		touch.position = at
+		var touch_shape := CollisionShape2D.new()
+		var circle := CircleShape2D.new()
+		circle.radius = 100.0
+		touch_shape.shape = circle
+		touch.add_child(touch_shape)
+		var chest_id: String = id
+		touch.body_entered.connect(func(b):
+			if b.is_in_group("player"):
+				call_deferred("_open_chest", chest_id)
+		)
+		add_child(touch)
+
+func _open_chest(chest_id: String, interior_kind: String = "") -> void:
+	if opened_chests.has(chest_id) or not CHEST_CONTENTS.has(chest_id):
+		return
+	var content: Dictionary = CHEST_CONTENTS[chest_id]
+	var text := ""
+	var reward := ""
+	match str(content.kind):
+		"legendary":
+			var weapon: Dictionary = WeaponsScript.make_legendary()
+			player.grant_weapon(weapon.id)
+			reward = str(weapon.id)
+			var needs := int(weapon.get("required_might", 0))
+			text = "In the chest: the %s!%s" % [weapon.name, "" if player.stat_might >= needs else " (it takes %d Might to wield)" % needs]
+		"talisman":
+			var talisman_id: String = content.id
+			var talisman: Dictionary = TalismansScript.get_talisman(talisman_id)
+			var had: bool = player.owned_talismans.has(talisman_id)
+			player.owned_talismans[talisman_id] = true
+			var worn := false
+			if not had and player.equipped_talismans.size() < player.talisman_slots():
+				worn = player.equip_talisman(talisman_id)
+			reward = talisman_id
+			text = "In the chest: the %s!%s" % [talisman.name, " You put it on." if worn else " (Wear it from your Inventory.)"]
+	opened_chests[chest_id] = reward
+	var room = interiors.get(interior_kind)
+	if room != null:
+		room.open_chest(chest_id)
+	if world_chests.has(chest_id):
+		world_chests[chest_id].closed.visible = false
+		world_chests[chest_id].open.visible = true
+	hud.show_message(text)
+	play_sfx("item")
+
+# Fishing is at Pesca now (not the town): walking onto the jetty on Pesca's south shore opens the Fishing panel.
+func _build_fishing_spot() -> void:
+	if not regional_world:
+		return
+	var spot: Dictionary = OverworldMapScript.pesca_fishing_spot()
+	_make_door_trigger(spot.pos, spot.size, func(): _try_open_panel("fishing"))
+
 # --- Building interiors ------------------------------------------------------------------------
 # Most town buildings have a room of their own (Interior.gd), parked off the east edge of the map. The door in town
 # fades out and puts you inside; the shopkeeper's counter opens the same menu the door used to; the doorway at the
@@ -1849,12 +2130,12 @@ var _fade_rect: ColorRect = null
 var _interior_busy := false
 
 # The buildings out in the world rather than in the town's plaza (Pesca's six houses, the Lizen Encampment's six tents,
-# the Ranch's three buildings, the Ruined Settlement's four houses, the Caves' three mouths):
+# the Ranch's three buildings, the Ruined Settlement's four houses, the Caves' three mouths, Gull Rock's lighthouse):
 # a door trigger at each, built once.
 func _build_world_doors() -> void:
 	if not regional_world:
 		return
-	for house in OverworldMapScript.pesca_buildings() + OverworldMapScript.lizen_buildings() + OverworldMapScript.ranch_buildings() + OverworldMapScript.ruin_buildings() + OverworldMapScript.cave_buildings():
+	for house in OverworldMapScript.pesca_buildings() + OverworldMapScript.lizen_buildings() + OverworldMapScript.ranch_buildings() + OverworldMapScript.ruin_buildings() + OverworldMapScript.cave_buildings() + OverworldMapScript.gull_buildings():
 		var interior: String = house.interior
 		var door: Vector2 = house.door
 		var back: Vector2 = house.return
@@ -1867,8 +2148,11 @@ func _get_interior(kind: String) -> Node2D:
 	if not interiors.has(kind) or not is_instance_valid(interiors[kind]):
 		var node: Node2D = InteriorScript.new()
 		add_child(node)
-		node.setup(kind, _interior_origin(kind), func(): _interior_trade(kind), _leave_interior)
+		# (deferred: opening a chest can wear a talisman, which touches the physics world from inside a trigger's callback)
+		node.setup(kind, _interior_origin(kind), func(): _interior_trade(kind), _leave_interior, func(id): call_deferred("_open_chest", id, kind))
 		interiors[kind] = node
+		for id in opened_chests:
+			node.open_chest(id)
 	return interiors[kind]
 
 # What walking up to the counter does: the same menu the building's door opened before it had an inside.
@@ -2352,11 +2636,13 @@ func _update_regional_world(delta: float) -> void:
 		return
 	overworld_map.update_rooms(player.global_position)
 	hud.update_minimap(player.global_position)
+	_roll_lucky_clover()
 	region_check_timer -= delta
 	if region_check_timer <= 0.0:
 		region_check_timer = 0.25
 		_track_player_region()
 		_track_player_room()
+		_check_lizen_camp_cleared()
 	ambient_spawn_timer -= delta
 	if ambient_spawn_timer <= 0.0:
 		ambient_spawn_timer = AMBIENT_SPAWN_INTERVAL
@@ -2388,7 +2674,7 @@ func _regional_spawn_spot(any_room: bool = false) -> Dictionary:
 	var weights: Array = []
 	var total := 0.0
 	for r in RoomsScript.rooms_near(player.global_position, ROOM_ACTIVE_MARGIN):
-		if int(r.target) <= 0:
+		if int(r.target) <= 0 or _room_spawn_closed(r):
 			continue
 		var want: int = int(r.target) if any_room else int(r.target) - _enemies_in_room(r)
 		if want <= 0:
@@ -2615,6 +2901,7 @@ func _build_hud() -> void:
 	_register_town_panel("wishing_well", WishingWellPanelScript.new())
 	_register_town_panel("horse_racing", HorseRacePanelScript.new())
 	_register_town_panel("fishing", FishingPanelScript.new())
+	_register_town_panel("fishmonger", FishmongerPanelScript.new())
 	hud.battle_main_action.connect(_on_battle_main_action)
 	hud.battle_fight_action.connect(_on_battle_fight_action)
 	hud.battle_move_action.connect(_on_battle_move_action)
@@ -3089,6 +3376,8 @@ func _try_open_panel(kind: String) -> void:
 # state (a Beastmaster wolf is recruited there, with its loyalty already set).
 func apply_meta_purchase(id: String) -> void:
 	player.apply_meta_purchase(id)
+	if id == "battle_hardened":
+		_build_knight()          # Friends in High Places: the Knight is now there to be found
 	refresh_church_marker()
 
 func _any_town_panel_open() -> bool:

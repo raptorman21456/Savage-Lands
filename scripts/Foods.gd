@@ -14,7 +14,9 @@ class_name Foods
 # _battle_player_item). Amounts are deliberately small: a Health Potion heals
 # 20 HP for 15 coins, and the player's max HP starts at 20.
 #
-# vendor: "butcher" / "baker" are sold in town; "fish" is only ever caught.
+# vendor: "butcher" / "baker" are sold in town; "fish" is caught at Pesca and sold by Pesca's Fishmonger. A fish can be
+# SOLD back too ("sell"): the town's Butcher and the ranch's Smokehouse pay the full amount, Pesca -- where the whole
+# town fishes -- only PESCA_SELL_MULT of it. All the fish numbers are drafts.
 # Same shape as a Potions.TIERS entry so Player._consume_potion can treat
 # either kind identically ("effect" is always "" -- food never cleanses/buffs).
 static var ITEMS := [
@@ -64,14 +66,14 @@ static var ITEMS := [
 	# bought -- "price" is unused but kept for shape-consistency with every
 	# other entry.
 	{
-		"id": "food_minnow", "name": "Fried Minnow", "vendor": "fish", "price": 0,
+		"id": "food_minnow", "name": "Fried Minnow", "vendor": "fish", "price": 10, "sell": 8,
 		"heal_amount": 4, "stamina_amount": 10, "effect": "",
 		"description": "Heals 4 HP and restores 10 stamina.",
 		"shop_description": "",
 		"icon": "food_fish",
 	},
 	{
-		"id": "food_bass", "name": "Grilled Bass", "vendor": "fish", "price": 0,
+		"id": "food_bass", "name": "Grilled Bass", "vendor": "fish", "price": 24, "sell": 20,
 		"heal_amount": 10, "stamina_amount": 28, "effect": "",
 		"description": "Heals 10 HP and restores 28 stamina.",
 		"shop_description": "",
@@ -84,6 +86,16 @@ static func get_food(id: String) -> Dictionary:
 		if item.id == id:
 			return item
 	return {}
+
+# Pesca pays only this much of a fish's selling price (see the Fishmonger).
+const PESCA_SELL_MULT := 0.25
+
+# What a fish sells for: its full price, or at Pesca the cut-rate one (never less than 1). 0 for anything that isn't a fish.
+static func sell_price(food_id: String, at_pesca: bool) -> int:
+	var sell: int = int(get_food(food_id).get("sell", 0))
+	if sell <= 0:
+		return 0
+	return maxi(1, int(round(float(sell) * PESCA_SELL_MULT))) if at_pesca else sell
 
 static func is_food(id: String) -> bool:
 	return not get_food(id).is_empty()
