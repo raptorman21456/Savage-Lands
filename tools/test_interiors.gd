@@ -16,7 +16,7 @@ func _init() -> void:
 		e.free()
 	main.enemies_alive = 0
 
-	print("Thirty rooms: the town's eleven venues, Pesca's six houses, the Lizen Encampment's six tents, the Ranch's three buildings and the Ruined Settlement's four houses: %d (expected 30)" % [IN.DEFS.size()])
+	print("Thirty-three rooms: the town's eleven venues, Pesca's six houses, the Lizen Encampment's six tents, the Ranch's three buildings, the Ruined Settlement's four houses and the Caves' three mouths: %d (expected 33)" % [IN.DEFS.size()])
 	var bad_reach := []
 	var bad_entry := []
 	var overlapping := []
@@ -111,6 +111,7 @@ func _init() -> void:
 	# --- Pesca's six houses: out in the world, each with a door, a room of its own and the counter of a town venue
 	var houses: Array = main.OverworldMapScript.pesca_buildings()
 	var bad_doors := []
+	main._interior_busy = true            # standing on a door while we check the ground must not open it
 	var bad_venues := []
 	for h in houses:
 		if not IN.DEFS.has(IN.venue_of(h.interior)) or IN.venue_of(h.interior) == h.interior:
@@ -122,6 +123,7 @@ func _init() -> void:
 			await physics_frame
 			if player.test_move(player.global_transform, Vector2.ZERO) or main.WorldMapScript.is_blocked(p):
 				bad_doors.append("%s@%s" % [h.interior, p])
+	main._interior_busy = false
 	print("Pesca has six houses, each with its own room that trades as one of the town's venues: %d houses (expected 6), problems=%s (expected [])" % [houses.size(), bad_venues])
 	print("...each door, and the spot you come out on, is open ground: problems=%s (expected [])" % [bad_doors])
 	# (still standing in the shop's room from the last visit: step out of it first)
@@ -163,6 +165,7 @@ func _init() -> void:
 	# --- the Lizen Encampment's six tents: a door each, a room of nothing to trade but a little loot lying about
 	var tents: Array = main.OverworldMapScript.lizen_buildings()
 	var bad_tent_doors := []
+	main._interior_busy = true            # standing on a door while we check the ground must not open it
 	for h in tents:
 		for p in [h.door, h.return]:
 			player.global_position = p
@@ -170,6 +173,7 @@ func _init() -> void:
 			await physics_frame
 			if player.test_move(player.global_transform, Vector2.ZERO) or main.WorldMapScript.is_blocked(p):
 				bad_tent_doors.append("%s@%s" % [h.interior, p])
+	main._interior_busy = false
 	var no_trade := tents.all(func(h): return not IN.DEFS[h.interior].has("trade"))
 	print("The Lizen Encampment has six tents, each with a room of its own and nothing to trade: %d tents (expected 6), no counters %s (expected true)" % [tents.size(), no_trade])
 	print("...each door, and the spot you come out on beside it, is open ground: problems=%s (expected [])" % [bad_tent_doors])
@@ -201,6 +205,7 @@ func _init() -> void:
 	# --- the Ranch's three buildings: the barn takes bets on the horses, the farmhouse puts you up, the smokehouse sells meat
 	var ranch_houses: Array = main.OverworldMapScript.ranch_buildings()
 	var bad_ranch_doors := []
+	main._interior_busy = true            # standing on a door while we check the ground must not open it
 	var bad_ranch_venues := []
 	for h in ranch_houses:
 		if not main.town_panels.has(IN.venue_of(h.interior)):
@@ -211,6 +216,7 @@ func _init() -> void:
 			await physics_frame
 			if player.test_move(player.global_transform, Vector2.ZERO) or main.WorldMapScript.is_blocked(p):
 				bad_ranch_doors.append("%s@%s" % [h.interior, p])
+	main._interior_busy = false
 	print("The Ranch has three buildings, each trading as a town venue with a menu: %d buildings (expected 3), problems=%s (expected [])" % [ranch_houses.size(), bad_ranch_venues])
 	print("...each door, and the spot you come out on in the yard, is open ground: problems=%s (expected [])" % [bad_ranch_doors])
 	var barn: Dictionary = ranch_houses[0]
@@ -244,6 +250,7 @@ func _init() -> void:
 	# --- the Ruined Settlement's four houses: a doorway each, a room of dust and bones, a few coins still lying about
 	var ruin_houses: Array = main.OverworldMapScript.ruin_buildings()
 	var bad_ruin_doors := []
+	main._interior_busy = true            # standing on a door while we check the ground must not open it
 	for h in ruin_houses:
 		for p in [h.door, h.return]:
 			player.global_position = p
@@ -251,6 +258,7 @@ func _init() -> void:
 			await physics_frame
 			if player.test_move(player.global_transform, Vector2.ZERO) or main.WorldMapScript.is_blocked(p):
 				bad_ruin_doors.append("%s@%s" % [h.interior, p])
+	main._interior_busy = false
 	var ruin_no_trade := ruin_houses.all(func(h): return not IN.DEFS[h.interior].has("trade") and IN.DEFS[h.interior].has("loot"))
 	print("The Ruined Settlement has four houses, each with a room of its own, nothing to trade and a little loot: %d houses (expected 4), %s (expected true)" % [ruin_houses.size(), ruin_no_trade])
 	print("...each doorway, and the spot you come out on towards the well, is open ground: problems=%s (expected [])" % [bad_ruin_doors])
@@ -278,4 +286,45 @@ func _init() -> void:
 	await physics_frame
 	await create_timer(1.6).timeout
 	print("The doorway puts you back by the well side of the house: in_interior=%s (expected false), %.0f px from the spot outside the doorway (expected 0)" % [main.in_interior, player.global_position.distance_to(ruin.return)])
+
+	# --- the Caves' three mouths: three different caves, nothing to trade, loot lying about (the den's includes a meat)
+	var caves: Array = main.OverworldMapScript.cave_buildings()
+	var bad_cave_doors := []
+	main._interior_busy = true            # standing on a door while we check the ground must not open it
+	for h in caves:
+		for p in [h.door, h.return]:
+			player.global_position = p
+			await physics_frame
+			await physics_frame
+			if player.test_move(player.global_transform, Vector2.ZERO) or main.WorldMapScript.is_blocked(p):
+				bad_cave_doors.append("%s@%s" % [h.interior, p])
+	main._interior_busy = false
+	var cave_no_trade := caves.all(func(h): return not IN.DEFS[h.interior].has("trade") and IN.DEFS[h.interior].has("loot"))
+	print("The Caves have three mouths, each into a cave of its own with nothing to trade and some loot: %d mouths (expected 3), %s (expected true)" % [caves.size(), cave_no_trade])
+	print("...each door below its rock, and the spot you come out on, is open ground: problems=%s (expected [])" % [bad_cave_doors])
+	var den: Dictionary = caves[2]
+	player.global_position = den.door + Vector2(0, 40.0)
+	await physics_frame
+	player.global_position = den.door
+	await physics_frame
+	await physics_frame
+	await create_timer(1.6).timeout
+	var den_room = main._get_interior(den.interior)
+	var den_coins_before: int = player.coins
+	var den_meat_before: int = player.healing_items
+	for l in IN.DEFS[den.interior].loot:
+		player.global_position = den_room.origin + Vector2(float(l[2]), float(l[3]) + 80.0)
+		await physics_frame
+		player.global_position = den_room.origin + Vector2(float(l[2]), float(l[3]))
+		await physics_frame
+		await physics_frame
+		await physics_frame
+	print("Walk into the east cave: in_interior=%s (expected true), room '%s' (expected The Den); its loot pays: coins %d -> %d (expected +40), meat %d -> %d (expected +1)" % [main.in_interior, main.hud.world_label.text, den_coins_before, player.coins, den_meat_before, player.healing_items])
+	player.global_position = den_room.origin + Vector2(den_room.size.x * 0.5, den_room.size.y - 100.0)
+	await physics_frame
+	player.global_position = den_room.origin + Vector2(den_room.size.x * 0.5, den_room.size.y - IN.WALL * 0.5)
+	await physics_frame
+	await physics_frame
+	await create_timer(1.6).timeout
+	print("The doorway puts you back below the mouth: in_interior=%s (expected false), %.0f px from the spot below the rock (expected 0)" % [main.in_interior, player.global_position.distance_to(den.return)])
 	quit()

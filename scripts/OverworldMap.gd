@@ -1328,9 +1328,32 @@ func _throne(parent: Node, pos: Vector2, rng: RandomNumberGenerator) -> void:
 		var a := TAU * float(i) / 8.0
 		_sprite(parent, CRYSTAL, pos + Vector2(cos(a), sin(a)) * 520.0, 6.0, Color(0.8, 0.5, 1.3), 8.0 * 6.0 * 0.5, 1)
 
-# The mountain's caves: dark mouths in big outcrops of rock.
-func _caves(parent: Node, pos: Vector2, rng: RandomNumberGenerator) -> void:
-	for i in 3:
-		var c := pos + Vector2(-700 + 700.0 * float(i), -320 + 340.0 * float(i % 2))
+# The Caves' three mouths in the mountain (offsets from the landmark): which interior (Interior.gd) each opens, where the
+# door is (just below the rock) and where you come out (below it). Shared by the builder below and by Main, which puts a
+# door trigger at each.
+const CAVE_MOUTHS := [
+	{"interior": "cave_mine", "at": Vector2(-700, -320)},
+	{"interior": "cave_grotto", "at": Vector2(0, 20)},
+	{"interior": "cave_den", "at": Vector2(700, -320)},
+]
+
+static func cave_buildings() -> Array:
+	var centre: Vector2 = WorldMapScript.landmark("caves").pos
+	var out: Array = []
+	for m in CAVE_MOUTHS:
+		var door: Vector2 = centre + m.at + Vector2(0.0, 262.0)
+		out.append({"interior": m.interior, "pos": centre + m.at, "door": door, "door_size": Vector2(150, 60), "return": door + Vector2(0.0, 100.0)})
+	return out
+
+# The mountain's caves: three dark mouths in big outcrops of rock, a lamp either side of each.
+func _caves(parent: Node, pos: Vector2, _rng: RandomNumberGenerator) -> void:
+	for m in CAVE_MOUTHS:
+		var c: Vector2 = pos + m.at
 		_sprite(parent, ROCK, c, 16.0, Color(0.7, 0.68, 0.66), 8.0 * 16.0 * 0.6, 0)
 		_poly(parent, PackedVector2Array([c + Vector2(-70, 190), c + Vector2(-44, 60), c + Vector2(0, 24), c + Vector2(44, 60), c + Vector2(70, 190)]), Color(0.03, 0.03, 0.04), 1)
+		for side in [-1.0, 1.0]:
+			var lamp: Vector2 = c + Vector2(110.0 * side, 250.0)
+			_box(parent, lamp, Vector2(8, 44), Color(0.3, 0.2, 0.12), 0.0, false, 1)
+			_disc(parent, lamp + Vector2(0, -26), 12.0, Color(1.0, 0.85, 0.4), 2, 12)
+			_disc(parent, lamp + Vector2(0, -26), 38.0, Color(1.0, 0.85, 0.4, 0.14), 2, 16)
+

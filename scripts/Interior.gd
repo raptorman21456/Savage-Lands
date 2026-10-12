@@ -187,6 +187,26 @@ const DEFS := {
 		"things": [["barrel", 110, 200], ["barrel", 110, 270], ["barrel", 170, 200], ["crate", 780, 200], ["crate", 844, 200], ["crate", 780, 264], ["barrel", 780, 420], ["barrel", 780, 486], ["crate", 110, 496], ["crate", 110, 560], ["crate", 174, 560], ["rubble", 450, 300], ["bones", 450, 470], ["web", 96, 124], ["web_r", 804, 124]],
 		"loot": [["coin", 30, 200, 470]],
 	},
+	# --- The Caves' three mouths (OverworldMap.CAVE_MOUTHS): three different caves in the mountain. Nothing trades down there;
+	# each is a place to look round with some loot (more than the towns': this is the Lexian Peaks).
+	"cave_mine": {
+		"name": "The Old Mine", "size": Vector2(1100, 760), "floor": Color(0.22, 0.2, 0.2), "wall": Color(0.16, 0.15, 0.16),
+		"reach": [550, 330],
+		"things": [["rack", 300, 104], ["rack", 800, 104], ["ore_vein", 550, 100], ["lantern", 420, 108], ["lantern", 680, 108], ["post", 200, 200], ["post", 450, 200], ["post", 650, 200], ["post", 900, 200], ["mine_track", 250, 420], ["mine_track", 550, 420], ["mine_track", 850, 420], ["mine_cart", 860, 420], ["barrel", 980, 200], ["crate", 120, 220], ["stalagmite", 110, 610], ["stalagmite", 990, 610], ["stalagmite", 170, 660], ["rubble", 900, 580]],
+		"loot": [["coin", 40, 980, 320]],
+	},
+	"cave_grotto": {
+		"name": "The Crystal Grotto", "size": Vector2(1000, 760), "floor": Color(0.16, 0.16, 0.22), "wall": Color(0.12, 0.1, 0.18),
+		"reach": [250, 500],
+		"things": [["pool", 500, 360], ["crystal", 200, 200], ["crystal", 800, 200], ["crystal", 150, 420], ["crystal", 850, 420], ["crystal", 500, 150], ["mushroom", 300, 320], ["mushroom", 335, 345], ["mushroom", 700, 330], ["mushroom", 668, 352], ["stalagmite", 120, 640], ["stalagmite", 880, 640], ["stalagmite", 100, 120]],
+		"loot": [["coin", 35, 780, 520]],
+	},
+	"cave_den": {
+		"name": "The Den", "size": Vector2(1000, 740), "floor": Color(0.24, 0.2, 0.16), "wall": Color(0.17, 0.14, 0.12),
+		"reach": [500, 480],
+		"things": [["nest", 500, 340], ["bones", 420, 360], ["bones", 580, 330], ["bones", 800, 250], ["pelt", 250, 520], ["pelt", 760, 500], ["rubble", 150, 350], ["rubble", 860, 380], ["stalagmite", 110, 150], ["stalagmite", 890, 150], ["stalagmite", 120, 600], ["stalagmite", 880, 600]],
+		"loot": [["coin", 40, 500, 340], ["meat", 1, 780, 560]],
+	},
 }
 
 # What each kind of furniture looks like: [width, height, colour, solid].
@@ -219,6 +239,11 @@ const THINGS := {
 	"hearth": [160, 70, Color(0.3, 0.28, 0.27), true], "broken_table": [130, 90, Color(0.38, 0.27, 0.16), true],
 	"rubble": [110, 80, Color(0.4, 0.38, 0.35), true], "bones": [60, 40, Color(0.85, 0.82, 0.72), false],
 	"web": [80, 80, Color(1.0, 1.0, 1.0, 0.18), false], "web_r": [80, 80, Color(1.0, 1.0, 1.0, 0.18), false],
+	"stalagmite": [50, 60, Color(0.36, 0.35, 0.38), true], "mine_track": [300, 40, Color(0.5, 0.5, 0.55), false],
+	"mine_cart": [90, 60, Color(0.4, 0.36, 0.32), true], "post": [24, 24, Color(0.42, 0.3, 0.18), true],
+	"ore_vein": [120, 40, Color(0.18, 0.18, 0.22), false], "pool": [150, 150, Color(0.12, 0.22, 0.38), true],
+	"mushroom": [24, 24, Color(0.62, 0.45, 0.85), false], "nest": [200, 200, Color(0.55, 0.45, 0.28), false],
+	"pelt": [110, 70, Color(0.45, 0.3, 0.2), false],
 }
 
 var kind := ""
@@ -367,6 +392,41 @@ func _build_thing(thing: String, at: Vector2) -> void:
 			if solid:
 				_solid(at, thing_size)
 			return
+		"stalagmite":
+			var cone := Polygon2D.new()
+			cone.polygon = PackedVector2Array([at + Vector2(-25, 30), at + Vector2(0, -30), at + Vector2(25, 30)])
+			cone.color = color
+			add_child(cone)
+			var lit := Polygon2D.new()
+			lit.polygon = PackedVector2Array([at + Vector2(0, -30), at + Vector2(25, 30), at + Vector2(6, 30)])
+			lit.color = color.lightened(0.18)
+			add_child(lit)
+			if solid:
+				_solid(at + Vector2(0, 14), Vector2(36, 36), true)
+			return
+		"mine_track":
+			for i in 10:
+				_rect_node(self, at + Vector2(-135.0 + 30.0 * float(i), 0), Vector2(8, 28), Color(0.3, 0.22, 0.14), -7)
+			_rect_node(self, at + Vector2(0, -10), Vector2(thing_size.x, 4), color, -7)
+			_rect_node(self, at + Vector2(0, 10), Vector2(thing_size.x, 4), color, -7)
+			return
+		"pool":
+			_disc(at, thing_size.x * 0.54, Color(0.06, 0.1, 0.18), 0)
+			_disc(at, thing_size.x * 0.47, color, 0)
+			_disc(at + Vector2(-18, -16), 18.0, Color(0.3, 0.5, 0.7, 0.5), 0)
+			if solid:
+				_solid(at, thing_size, true)
+			return
+		"mushroom":
+			_disc(at, 24.0, Color(0.6, 0.4, 0.9, 0.12), -1)
+			_rect_node(self, at + Vector2(0, 6), Vector2(6, 12), Color(0.85, 0.82, 0.75), 0)
+			_disc(at + Vector2(0, -2), 11.0, color, 0)
+			return
+		"nest":
+			_disc(at, thing_size.x * 0.5, color.darkened(0.25), -8)
+			_disc(at, thing_size.x * 0.4, color, -8)
+			_disc(at, thing_size.x * 0.25, color.darkened(0.2), -8)
+			return
 		"brazier":
 			_disc(at, thing_size.x * 1.1, Color(1.0, 0.6, 0.2, 0.1), -1)
 			_disc(at, thing_size.x * 0.5, color, 0)
@@ -417,7 +477,7 @@ func _build_thing(thing: String, at: Vector2) -> void:
 				var a := TAU * float(i) / 6.0
 				_disc(at + Vector2(cos(a), sin(a)) * thing_size.x * 0.37, 12.0, Color(0.8, 0.7, 1.0), -7)
 			return
-		"rug", "mat", "hay":
+		"rug", "mat", "hay", "pelt":
 			_rect_node(self, at, thing_size, color, -8)
 			_rect_node(self, at, thing_size - Vector2(24, 24), color.lightened(0.12), -8)
 			return
@@ -486,6 +546,16 @@ func _build_thing(thing: String, at: Vector2) -> void:
 			_rect_node(self, at + Vector2(0, 32), Vector2(34, 18), Color(0.3, 0.55, 0.3), 0)
 		"trough":
 			_rect_node(self, at, Vector2(132, 30), Color(0.3, 0.5, 0.7), 0)
+		"mine_cart":
+			for chunk in [[-22, -6], [4, -10], [24, -4]]:
+				_disc(at + Vector2(float(chunk[0]), float(chunk[1])), 11.0, Color(0.15, 0.15, 0.18), 0)
+			_rect_node(self, at + Vector2(-28, 34), Vector2(14, 8), Color(0.15, 0.15, 0.17), 0)
+			_rect_node(self, at + Vector2(28, 34), Vector2(14, 8), Color(0.15, 0.15, 0.17), 0)
+		"post":
+			_rect_node(self, at + Vector2(0, -4), Vector2(34, 8), color.lightened(0.15), 0)
+		"ore_vein":
+			for i in 4:
+				_rect_node(self, at + Vector2((float(i) - 1.5) * 26.0, float(i % 2) * 8.0 - 4.0), Vector2(10, 8), Color(0.95, 0.75, 0.3), 0)
 		"broken_table":
 			_rect_node(self, at + Vector2(0, -2), Vector2(6, thing_size.y), Color(0.15, 0.1, 0.06), 0)
 			_rect_node(self, at + Vector2(52, 14), Vector2(30, 14), color.darkened(0.3), 0)
