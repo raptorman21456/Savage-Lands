@@ -14,6 +14,7 @@ const BlacksmithScript := preload("res://scripts/Blacksmith.gd")
 const DojoScript := preload("res://scripts/Dojo.gd")
 const TalismansScript := preload("res://scripts/Talismans.gd")
 const FishingHoleScript := preload("res://scripts/FishingHole.gd")
+const SpellUpgradesScript := preload("res://scripts/SpellUpgrades.gd")
 const PartyRulesScript := preload("res://scripts/PartyRules.gd")
 const PartyMemberScript := preload("res://scripts/PartyMember.gd")
 const DefenseScript := preload("res://scripts/Defense.gd")
@@ -315,6 +316,8 @@ var meta_battle_hardened := false
 
 # Fishing (FishingHole.gd): bait is spent a cast at a time, and you fish with the best rod you own. Both reset every run.
 var bait := 0
+# Spell upgrades bought at the Wizard's Tower (SpellUpgrades.gd): spell id -> 0 (plain), 1 (+) or 2 (EX). Per run, like runes.
+var spell_levels := {}
 var owned_rods := {"rod_driftwood": true}
 
 # Party: combat companions that fight as real battle units on their own tile.
@@ -1840,6 +1843,23 @@ func add_coins(amount: int) -> void:
 # Coins added exactly as given -- no coin-bonus percentage. For gambling
 # winnings (the Wishing Well, the horse races): a skill-tree or talisman coin
 # bonus would otherwise quietly inflate the payouts past the odds the game shows.
+func spell_level(spell_id: String) -> int:
+	return int(spell_levels.get(spell_id, 0))
+
+# Buys the next level of a spell at the Wizard's Tower, with banked Essence (it lasts this run; the Essence is gone for
+# good). False if it is already EX, is not a spell, or you cannot afford it.
+func try_upgrade_spell(spell_id: String) -> bool:
+	if not SpellUpgradesScript.has(spell_id):
+		return false
+	var next: int = spell_level(spell_id) + 1
+	if next > SpellUpgradesScript.MAX_LEVEL:
+		return false
+	var price: Dictionary = SpellUpgradesScript.price(next)
+	if not SaveDataScript.try_spend_essence(int(price.essence)):
+		return false
+	spell_levels[spell_id] = next
+	return true
+
 # The best rod you own (the Fishing panel and the Fishmonger both read it).
 func fishing_rod() -> Dictionary:
 	var best: Dictionary = FishingHoleScript.RODS[0]

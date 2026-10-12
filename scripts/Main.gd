@@ -31,6 +31,7 @@ const ArmorScript := preload("res://scripts/Armor.gd")
 const ShieldsScript := preload("res://scripts/Shields.gd")
 const PotionsScript := preload("res://scripts/Potions.gd")
 const SaveDataScript := preload("res://scripts/SaveData.gd")
+const SpellUpgradesScript := preload("res://scripts/SpellUpgrades.gd")
 const EnchantmentsScript := preload("res://scripts/Enchantments.gd")
 const SfxScript := preload("res://scripts/Sfx.gd")
 const EventsScript := preload("res://scripts/Events.gd")
@@ -986,6 +987,7 @@ var battle_rally_turns := 0
 # The Druid's Empower on the hero: while above 0 the hero deals extra damage (a member's own timer is its
 # "buff_turns"). Counts down once per round with the other kit timers.
 var battle_hero_buff_turns := 0
+var battle_hero_buff_mult := 1.5                       # what Empower multiplies the hero's damage by (SpellUpgrades)
 # Armour traits (Armor.gd): Bloodrage Hide's damage stacks and their timer, the crit Shadowweave sets up
 # after a dodge, and whether Spellward Robes have spent their one free ward this battle.
 var battle_bloodrage_stacks := 0
@@ -2926,6 +2928,7 @@ func _build_hud() -> void:
 	hud.shop_reroll_pressed.connect(_on_shop_reroll_pressed)
 	hud.shop_continue_pressed.connect(_on_shop_continue_pressed)
 	hud.enchant_apply_pressed.connect(_on_enchant_apply_pressed)
+	hud.spell_upgrade_pressed.connect(_on_spell_upgrade_pressed)
 	hud.arrow_buy_pressed.connect(_on_arrow_buy_pressed)
 	hud.arrow_sell_pressed.connect(_on_arrow_sell_pressed)
 	hud.game_over_return_pressed.connect(_on_game_over_return_pressed)
@@ -3674,6 +3677,31 @@ func _refresh_enchant_display() -> void:
 	var weapon_id: String = player.current_weapon_base.get("id", "")
 	var applied_rune_id: String = player.weapon_enchantments.get(weapon_id, "")
 	hud.show_enchant_tab(player.coins, player.runic_shards, player.current_weapon_base.name, weapon_id, applied_rune_id, EnchantmentsScript.RUNES)
+	_refresh_spells_display()
+
+# The Wizard's Tower's Spells tab: every spell with its level, what the next level does and what it costs.
+func spell_upgrade_rows() -> Array:
+	var rows: Array = []
+	for s in SpellUpgradesScript.SPELLS:
+		var level: int = player.spell_level(s.id)
+		var maxed: bool = level >= SpellUpgradesScript.MAX_LEVEL
+		var price: Dictionary = SpellUpgradesScript.price(level + 1)
+		rows.append({
+			"id": s.id, "owner": s.owner, "level": level, "maxed": maxed,
+			"title": SpellUpgradesScript.display_name(s.id, level) if maxed else "%s  ->  %s" % [SpellUpgradesScript.display_name(s.id, level), SpellUpgradesScript.display_name(s.id, level + 1)],
+			"effect": "Fully upgraded." if maxed else SpellUpgradesScript.level_text(s.id, level + 1),
+			"price_text": "" if maxed else "%d Essence" % int(price.essence),
+			"can_buy": not maxed and SaveDataScript.banked_essence() >= int(price.get("essence", 0)),
+		})
+	return rows
+
+func _refresh_spells_display() -> void:
+	hud.show_spells_tab("Every spell can be upgraded twice, to + and then EX, for banked Essence. An upgrade is for the spell, not the caster, and lasts only this run -- but the Essence is gone for good, so don't die. (%d Essence banked)" % SaveDataScript.banked_essence(), spell_upgrade_rows())
+
+func _on_spell_upgrade_pressed(spell_id: String) -> void:
+	if player.try_upgrade_spell(spell_id):
+		play_sfx("purchase")
+	_refresh_shop_display()
 
 func _on_enchant_apply_pressed(rune_id: String) -> void:
 	var applied: bool = player.try_apply_enchantment(rune_id)
@@ -5733,9 +5761,9 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 		dmg = int(round(dmg * (1.0 + ATTACK_POTION_DAMAGE_BONUS_PCT)))
 	# The Druid's Empower: x1.5 damage for a few rounds, on the hero or on a member.
 	if attacker_label == "You" and battle_hero_buff_turns > 0:
-		dmg = int(round(dmg * PartyKitsScript.DRUID_BUFF_MULT))
+		dmg = int(round(dmg * battle_hero_buff_mult))
 	elif _actor_is_ally() and int(battle_actor.get("buff_turns", 0)) > 0:
-		dmg = int(round(dmg * PartyKitsScript.DRUID_BUFF_MULT))
+		dmg = int(round(dmg * float(battle_actor.get("buff_mult", PartyKitsScript.DRUID_BUFF_MULT))))
 	# Bloodrage Hide: every hit taken stacks extra damage dealt, for a couple of turns.
 	if attacker_label == "You" and battle_bloodrage_stacks > 0:
 		dmg = int(round(dmg * (1.0 + battle_bloodrage_stacks * float(player.armor_trait_value("dmg_per_stack", 0.1)))))
@@ -6003,7 +6031,7 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 	if blind_chance > 0.0 and u.hp > 0 and abs(u.tile.x - origin_tile.x) + abs(u.tile.y - origin_tile.y) >= 2 and randf() < _proc(blind_chance):
 		u["blind_turns"] = BLINDNESS_TURNS
 		hud.battle_log("The %s is blinded!" % u.name)
-	if effect == "landfall" and u.hp > 0 and randf() < _proc(LANDFALL_STUN_CHANCE):
+	if effect == "landfall" and u.hp > 0 and randf() < _proc(_sn("staff_landfall", "stun", LANDFALL_STUN_CHANCE)):
 		u["stunned"] = true
 		hud.battle_log("The %s is stunned!" % u.name)
 	if u.hp > 0:
@@ -6153,7 +6181,7 @@ func _shared_effect_at(tile: Vector2i, key: String, exclude) -> float:
 		var share: float = float(s.get("mods", {}).get("talisman_share", 0.0))
 		if share <= 0.0:
 			continue
-		var radius: int = PartyKitsScript.CHARM_RADIUS if int(s.get("charm_turns", 0)) > 0 else PartyKitsScript.AURA_RADIUS
+		var radius: int = int(s.get("charm_radius", PartyKitsScript.CHARM_RADIUS)) if int(s.get("charm_turns", 0)) > 0 else PartyKitsScript.AURA_RADIUS
 		if abs(s.tile.x - tile.x) + abs(s.tile.y - tile.y) > radius:
 			continue
 		total += share * float(s.get("mods", {}).get(key, 0.0))
@@ -6265,7 +6293,7 @@ func _hit(idx: int, mult: float, effect: String, weapon: Dictionary, flat: int =
 		return
 	# A Druid under her movement spell swings for a flat (attack / 2) + 5 whatever she holds.
 	if battle_actor.get("sprint", false) and effect == "" and flat < 0:
-		flat = maxi(1, int(round((float(battle_actor.get("attack", 0.0)) / PartyKitsScript.DRUID_SPRINT_ATTACK_DIV + PartyKitsScript.DRUID_SPRINT_FLAT_BONUS) * float(battle_actor.get("dmg_mult", 1.0)))))
+		flat = maxi(1, int(round((float(battle_actor.get("attack", 0.0)) / _sn("druid_sprint", "attack_div", PartyKitsScript.DRUID_SPRINT_ATTACK_DIV) + _sn("druid_sprint", "flat", PartyKitsScript.DRUID_SPRINT_FLAT_BONUS)) * float(battle_actor.get("dmg_mult", 1.0)))))
 	_apply_single_hit(idx, mult * float(battle_actor.get("dmg_mult", 1.0)), effect, weapon, _actor_label(), battle_actor.tile, flat, multihit, _actor_attack_stat())
 
 # The end of an attack action: the hero ends its turn; a member ends its command, and a kill
@@ -7240,7 +7268,26 @@ func _ally_special_pool(u: Dictionary) -> Array:
 	for kit in PartyKitsScript.specials_for(str(u.get("kind", ""))):
 		out.append(_kit_special_for(u, kit))
 	for special in u.get("weapon", {}).get("specials", []):
-		out.append(special)
+		out.append(_with_spell_level(special))
+	return out
+
+# --- Spell upgrades (SpellUpgrades.gd) -------------------------------------------------------------------
+# An upgrade belongs to the spell, whoever casts it: one number of one spell, at its current level.
+func _sn(spell_id: String, key: String, fallback: float = 0.0) -> float:
+	return SpellUpgradesScript.number(spell_id, player.spell_level(spell_id), key, fallback)
+
+# The special as the player sees and casts it at its upgraded level: renamed (Restore+, Restore EX), a line added saying what
+# the upgrade does, and the fireball's damage multiplier raised. A plain spell, or anything that is not a spell, comes back as is.
+func _with_spell_level(s: Dictionary) -> Dictionary:
+	var id: String = str(s.get("id", ""))
+	var level: int = player.spell_level(id) if SpellUpgradesScript.has(id) else 0
+	if level <= 0:
+		return s
+	var out: Dictionary = s.duplicate(true)
+	out["name"] = SpellUpgradesScript.display_name(id, level)
+	out["description"] = "%s  [%s] %s" % [str(s.get("description", "")), SpellUpgradesScript.SUFFIX[level].strip_edges(), SpellUpgradesScript.level_text(id, level)]
+	if id == "staff_i_cast_fireball":
+		out["dmg_mult"] = _sn(id, "mult", 1.2)
 	return out
 
 # --- What the Party screen shows -----------------------------------------------------------
@@ -7268,19 +7315,22 @@ func _kit_special_for(u: Dictionary, kit: Dictionary) -> Dictionary:
 	var mods: Dictionary = u.get("mods", {})
 	var cost: int = int(s.get("stamina_cost", 0))
 	if s.get("cost_all", false):
-		# Every HP but one, in mana-worth; at 1 HP the cost cannot be paid at all.
-		cost = maxi(1, int(u.hp) - 1) * MANA_PER_HP
+		# Every HP but one (the upgrades leave her more: SpellUpgrades keep_pct), in mana-worth; with nothing to spare the
+		# cost cannot be paid at all.
+		var keep: int = maxi(1, int(round(float(u.max_hp) * _sn(str(s.get("id", "")), "keep_pct"))))
+		cost = (int(u.hp) - keep if int(u.hp) > keep else int(u.hp)) * MANA_PER_HP
 	elif s.has("hp_cost_flat"):
 		# A flat HP cost plus a share of max HP (Curse of Rot: 10 HP + 15% of max HP).
 		cost = (int(s.hp_cost_flat) + int(round(float(u.max_hp) * float(s.get("hp_cost_pct", 0.0))))) * MANA_PER_HP
 	elif s.get("per_skeleton", false):
 		var member = u.get("member", null)
 		var kills: int = int(member.kills_last_battle) if member != null else 0
-		var count: int = mini(kills, maxi(0, (int(u.hp) - 1) / PartyKitsScript.SKELETON_HP_COST))
+		var skeleton_cost: int = int(_sn("necromancer_summon_the_dead", "hp_cost", PartyKitsScript.SKELETON_HP_COST))
+		var count: int = mini(kills, maxi(0, (int(u.hp) - 1) / skeleton_cost))
 		# It can only be cast with enough HP in hand (5 HP + 40% of max HP), on top of paying per skeleton.
 		var needed: int = int(s.get("require_hp_flat", 0)) + int(round(float(u.max_hp) * float(s.get("require_hp_pct", 0.0))))
 		s["summon_count"] = count
-		cost = maxi(1, count) * PartyKitsScript.SKELETON_HP_COST * MANA_PER_HP
+		cost = maxi(1, count) * skeleton_cost * MANA_PER_HP
 		if kills <= 0:
 			s["disabled_reason"] = "no enemy was slain in the last battle"
 		elif int(u.hp) < needed:
@@ -7303,7 +7353,7 @@ func _kit_special_for(u: Dictionary, kit: Dictionary) -> Dictionary:
 		if int(player.owned_arrows.get(arrow_kind, 0)) <= 0:
 			s["disabled_reason"] = "out of %s arrows" % arrow_kind
 	s["stamina_cost"] = cost
-	return s
+	return _with_spell_level(s)
 
 # Which side an effect needs the player to pick from before it resolves ("" = no pick needed).
 func _special_target_kind(effect: String) -> String:
@@ -7359,7 +7409,8 @@ func _ally_pick_candidates(u: Dictionary, kind: String, action: Dictionary = {})
 	var out: Array = []
 	if kind == "chant":
 		# Cleansing Chant: the whole circle at once (one status each), or one ally freed of everything.
-		out.append({"label": "Everyone within %d tiles (one each)" % PartyKitsScript.AURA_RADIUS, "target": "area"})
+		var chant_everything: bool = _sn("shaman_cleansing_chant", "all") > 0.0
+		out.append({"label": "Everyone within %d tiles (%s)" % [int(_sn("shaman_cleansing_chant", "radius", PartyKitsScript.AURA_RADIUS)), "purge all" if chant_everything else "one each"], "target": "area"})
 		var hero_found: Array = _hero_afflictions()
 		out.append({"label": "You: purge all (%s)" % (", ".join(hero_found) if not hero_found.is_empty() else "clean"), "target": "hero"})
 		for a in battle_allies:
@@ -7483,14 +7534,14 @@ func _resolve_fireball(action: Dictionary, weapon: Dictionary) -> void:
 		var idx: int = battle_units.find(v.unit)
 		if idx < 0:
 			continue
-		var flat: int = maxi(1, int(round((base - FIREBALL_FALLOFF_PER_TILE * int(v.dist)) * float(battle_actor.get("dmg_mult", 1.0)))))
+		var flat: int = maxi(1, int(round((base - _sn("staff_i_cast_fireball", "falloff", FIREBALL_FALLOFF_PER_TILE) * int(v.dist)) * float(battle_actor.get("dmg_mult", 1.0)))))
 		_flash_battle_tile(v.unit.tile, v.unit.get("size", 1))
 		_hit(idx, 1.0, "fireball", weapon, flat, true)
 
 # Landfall: every enemy on the field takes (attack x 3) + (magic / 2), each with a 25% stun chance.
 func _resolve_landfall(weapon: Dictionary) -> void:
 	var u = battle_actor
-	var flat: int = maxi(1, int(round((float(u.get("attack", 0.0)) * 3.0 + float(u.get("magic", 0.0)) / 2.0) * float(u.get("dmg_mult", 1.0)))))
+	var flat: int = maxi(1, int(round((float(u.get("attack", 0.0)) * _sn("staff_landfall", "attack_mult", 3.0) + float(u.get("magic", 0.0)) * _sn("staff_landfall", "magic_mult", 0.5)) * float(u.get("dmg_mult", 1.0)))))
 	hud.battle_log("%s calls the sky down!" % _actor_label())
 	for e in battle_units.duplicate():
 		var idx: int = battle_units.find(e)
@@ -7503,16 +7554,16 @@ func _resolve_channel() -> void:
 	if target == null:
 		return
 	if typeof(target) == TYPE_STRING:
-		var gain: int = int(round(player.max_stamina * CHANNEL_RESTORE_PCT))
+		var gain: int = int(round(player.max_stamina * _sn("staff_channel", "pct", CHANNEL_RESTORE_PCT)))
 		player.regen_stamina(gain)
 		hud.battle_log("%s channels %d stamina into you." % [_actor_label(), gain])
 		return
 	if int(target.get("max_mana", 0)) > 0:
-		var gain_mana: int = int(round(int(target.max_mana) * CHANNEL_RESTORE_PCT))
+		var gain_mana: int = int(round(int(target.max_mana) * _sn("staff_channel", "pct", CHANNEL_RESTORE_PCT)))
 		target.mana = mini(int(target.max_mana), int(target.mana) + gain_mana)
 		hud.battle_log("%s channels %d mana into %s." % [_actor_label(), gain_mana, target.name])
 	else:
-		var gain_sta: int = int(round(int(target.get("max_stamina", 0)) * CHANNEL_RESTORE_PCT))
+		var gain_sta: int = int(round(int(target.get("max_stamina", 0)) * _sn("staff_channel", "pct", CHANNEL_RESTORE_PCT)))
 		target["stamina"] = mini(int(target.get("max_stamina", 0)), int(target.get("stamina", 0)) + gain_sta)
 		hud.battle_log("%s channels %d stamina into %s." % [_actor_label(), gain_sta, target.name])
 
@@ -7637,7 +7688,8 @@ func _resolve_curse_of_rot() -> void:
 	if idx < 0 or idx >= battle_units.size():
 		return
 	var e: Dictionary = battle_units[idx]
-	e["rot_turns"] = PartyKitsScript.ROT_TURNS
+	e["rot_turns"] = int(_sn("necromancer_curse_of_rot", "turns", PartyKitsScript.ROT_TURNS))
+	e["rot_pct"] = _sn("necromancer_curse_of_rot", "pct", PartyKitsScript.ROT_DAMAGE_PCT)
 	e["rot_by"] = battle_actor
 	hud.battle_log("%s curses the %s -- it begins to rot!" % [_actor_label(), e.name])
 
@@ -7676,8 +7728,8 @@ func _resolve_summon_dead(action: Dictionary) -> void:
 
 func _make_skeleton(tile: Vector2i) -> Dictionary:
 	return {
-		"tile": tile, "hp": PartyKitsScript.SKELETON_HP, "max_hp": PartyKitsScript.SKELETON_HP,
-		"name": "Skeleton", "kind": "skeleton", "attack": PartyKitsScript.SKELETON_DAMAGE, "magic": 0.0,
+		"tile": tile, "hp": int(_sn("necromancer_summon_the_dead", "hp", PartyKitsScript.SKELETON_HP)), "max_hp": int(_sn("necromancer_summon_the_dead", "hp", PartyKitsScript.SKELETON_HP)),
+		"name": "Skeleton", "kind": "skeleton", "attack": _sn("necromancer_summon_the_dead", "damage", PartyKitsScript.SKELETON_DAMAGE), "magic": 0.0,
 		"dmg_mult": 1.0, "defense_pct": 0.0, "move_range": PartyKitsScript.SKELETON_MOVE, "attack_range": 1,
 		"stamina": 0, "max_stamina": 0, "mana": 0, "max_mana": 0, "hp_as_mana": false,
 		"weapon": {"damage_mult": 1.0}, "mods": {}, "fainted": false, "skip_turns": 0, "charging": {},
@@ -7728,8 +7780,11 @@ func _auto_ally_act(a: Dictionary) -> void:
 
 # How Charming: the Shaman's talisman sharing reaches 4 tiles for 2 turns.
 func _resolve_how_charming() -> void:
-	battle_actor["charm_turns"] = PartyKitsScript.CHARM_TURNS
-	hud.battle_log("%s's charms glow -- her talismans now reach allies up to %d tiles away for %d turns!" % [_actor_label(), PartyKitsScript.CHARM_RADIUS, PartyKitsScript.CHARM_TURNS])
+	var charm_turns: int = int(_sn("shaman_how_charming", "turns", PartyKitsScript.CHARM_TURNS))
+	var charm_radius: int = int(_sn("shaman_how_charming", "radius", PartyKitsScript.CHARM_RADIUS))
+	battle_actor["charm_turns"] = charm_turns
+	battle_actor["charm_radius"] = charm_radius
+	hud.battle_log("%s's charms glow -- her talismans now reach allies up to %d tiles away for %d turns!" % [_actor_label(), charm_radius, charm_turns])
 
 # The hero ("hero") and every living ally unit within `radius` tiles of `center`.
 func _friends_within(center: Vector2i, radius: int) -> Array:
@@ -7744,13 +7799,14 @@ func _friends_within(center: Vector2i, radius: int) -> Array:
 # Soothing Rain: heals everyone within 2 tiles (the Shaman too) for 20% of their max HP.
 func _resolve_soothing_rain() -> void:
 	hud.battle_log("%s calls down a soothing rain." % _actor_label())
-	for f in _friends_within(_actor_tile(), PartyKitsScript.AURA_RADIUS):
+	var rain_pct: float = _sn("shaman_soothing_rain", "pct", PartyKitsScript.SOOTHING_RAIN_PCT)
+	for f in _friends_within(_actor_tile(), int(_sn("shaman_soothing_rain", "radius", PartyKitsScript.AURA_RADIUS))):
 		if typeof(f) == TYPE_STRING:
-			var healed: int = int(round(player.max_health * PartyKitsScript.SOOTHING_RAIN_PCT))
+			var healed: int = int(round(player.max_health * rain_pct))
 			player.heal(healed)
 			hud.battle_log("The rain heals you for %d." % healed)
 		else:
-			var amount: int = int(round(int(f.max_hp) * PartyKitsScript.SOOTHING_RAIN_PCT))
+			var amount: int = int(round(int(f.max_hp) * rain_pct))
 			f["hp"] = mini(int(f.max_hp), int(f.hp) + amount)
 			hud.battle_log("The rain heals %s for %d." % [f.name, amount])
 
@@ -7760,7 +7816,15 @@ func _resolve_cleansing_chant() -> void:
 	var target = battle_ally_target
 	hud.battle_log("%s sings a cleansing chant." % _actor_label())
 	if target == null or (typeof(target) == TYPE_STRING and target == "area"):
-		for f in _friends_within(_actor_tile(), PartyKitsScript.AURA_RADIUS):
+		var chant_radius: int = int(_sn("shaman_cleansing_chant", "radius", PartyKitsScript.AURA_RADIUS))
+		var everything: bool = _sn("shaman_cleansing_chant", "all") > 0.0       # EX: every affliction off every ally
+		for f in _friends_within(_actor_tile(), chant_radius):
+			var who_f: String = "You are" if typeof(f) == TYPE_STRING else str(f.name) + " is"
+			if everything:
+				var purged: Array = _cleanse_all_hero_statuses() if typeof(f) == TYPE_STRING else _cleanse_all_ally_statuses(f)
+				if not purged.is_empty():
+					hud.battle_log("%s purged of %s." % [who_f, ", ".join(purged)])
+				continue
 			var cleared: String = _cleanse_one_hero_status() if typeof(f) == TYPE_STRING else _cleanse_one_ally_status(f)
 			if cleared != "":
 				hud.battle_log("%s is cleansed of %s." % ["You are" if typeof(f) == TYPE_STRING else str(f.name), cleared])
@@ -7894,35 +7958,39 @@ func _resolve_bellow(weapon: Dictionary) -> void:
 func _resolve_sprint() -> void:
 	var u = battle_actor
 	u["sprint"] = true
-	battle_ally_moves_left += int(u.move_range)
+	battle_ally_moves_left += int(round(float(u.move_range) * (_sn("druid_sprint", "move_mult", PartyKitsScript.DRUID_SPRINT_MOVE_MULT) - 1.0)))
 	hud.battle_log("%s's feet barely touch the ground -- double the movement this turn." % _actor_label())
 
-# The Druid's heal: 25% of the target's max HP plus a third of her magic (a half once upgraded).
+# The Druid's heal: 25% of the target's max HP plus a third of her magic (the Wizard's Tower's upgrades raise both).
 func _resolve_druid_heal() -> void:
 	var u = battle_actor
 	var target = battle_ally_target
 	if target == null:
 		return
-	var upgraded: bool = u.has("member") and bool(u.member.upgraded_spells.get("druid_heal", false))
-	var magic_part: float = float(u.get("magic", 0.0)) / (PartyKitsScript.DRUID_HEAL_MAGIC_DIV_UPGRADED if upgraded else PartyKitsScript.DRUID_HEAL_MAGIC_DIV)
+	var heal_pct: float = _sn("druid_heal", "pct", PartyKitsScript.DRUID_HEAL_PCT)
+	var magic_part: float = float(u.get("magic", 0.0)) / _sn("druid_heal", "div", PartyKitsScript.DRUID_HEAL_MAGIC_DIV)
 	if typeof(target) == TYPE_STRING:
-		var healed: int = int(round(player.max_health * PartyKitsScript.DRUID_HEAL_PCT + magic_part))
+		var healed: int = int(round(player.max_health * heal_pct + magic_part))
 		player.heal(healed)
 		hud.battle_log("%s heals you for %d." % [_actor_label(), healed])
 	else:
-		var amount: int = int(round(int(target.max_hp) * PartyKitsScript.DRUID_HEAL_PCT + magic_part))
+		var amount: int = int(round(int(target.max_hp) * heal_pct + magic_part))
 		target["hp"] = mini(int(target.max_hp), int(target.hp) + amount)
 		hud.battle_log("%s heals %s for %d." % [_actor_label(), target.name, amount])
 
 # The Druid's buff: the target deals 1.5x damage for 3 rounds.
 func _resolve_druid_buff() -> void:
 	var target = battle_actor if battle_ally_target == null else battle_ally_target
+	var mult: float = _sn("druid_buff", "mult", PartyKitsScript.DRUID_BUFF_MULT)
+	var turns: int = int(_sn("druid_buff", "turns", PartyKitsScript.DRUID_BUFF_TURNS))
 	if typeof(target) == TYPE_STRING:
-		battle_hero_buff_turns = PartyKitsScript.DRUID_BUFF_TURNS
-		hud.battle_log("%s empowers you -- x1.5 damage for %d turns!" % [_actor_label(), PartyKitsScript.DRUID_BUFF_TURNS])
+		battle_hero_buff_turns = turns
+		battle_hero_buff_mult = mult
+		hud.battle_log("%s empowers you -- x%s damage for %d turns!" % [_actor_label(), str(mult), turns])
 	else:
-		target["buff_turns"] = PartyKitsScript.DRUID_BUFF_TURNS
-		hud.battle_log("%s empowers %s -- x1.5 damage for %d turns!" % [_actor_label(), target.name, PartyKitsScript.DRUID_BUFF_TURNS])
+		target["buff_turns"] = turns
+		target["buff_mult"] = mult
+		hud.battle_log("%s empowers %s -- x%s damage for %d turns!" % [_actor_label(), target.name, str(mult), turns])
 
 # Pickpocket: no damage, 3 coins, and a tile of extra movement next turn.
 func _resolve_pickpocket() -> void:
@@ -8888,7 +8956,7 @@ func _enemy_take_turn(u: Dictionary, assigned_targets: Dictionary, fae_spawns_ne
 	# Curse of Rot (the Necromancer): a share of max HP every turn while it lasts.
 	if u.get("rot_turns", 0) > 0:
 		u.rot_turns -= 1
-		var rot_dmg: int = max(1, int(round(float(u.max_hp) * PartyKitsScript.ROT_DAMAGE_PCT)))
+		var rot_dmg: int = max(1, int(round(float(u.max_hp) * float(u.get("rot_pct", PartyKitsScript.ROT_DAMAGE_PCT)))))
 		u.hp -= rot_dmg
 		_spawn_battle_damage_number(u.tile, rot_dmg, u.get("size", 1))
 		hud.battle_log("The %s rots for %d damage!" % [u.name, rot_dmg])

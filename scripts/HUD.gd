@@ -205,6 +205,11 @@ var shop_enchant_scroll: ScrollContainer
 var shop_enchant_row_box: VBoxContainer
 var shop_enchant_weapon_label: Label
 var shop_enchant_row_nodes := []
+var shop_spells_tab_button: Button
+var shop_spells_scroll: ScrollContainer
+var shop_spells_row_box: VBoxContainer
+var shop_spells_note_label: Label
+var shop_spells_row_nodes := []
 var game_over_panel: ColorRect
 var game_over_label: Label
 var game_over_stats_scroll: ScrollContainer
@@ -245,6 +250,7 @@ signal shop_lock_pressed(index: int)
 signal shop_reroll_pressed
 signal shop_continue_pressed
 signal enchant_apply_pressed(rune_id: String)
+signal spell_upgrade_pressed(spell_id: String)
 signal arrow_buy_pressed(kind: String)
 signal arrow_sell_pressed(kind: String)
 signal game_over_return_pressed
@@ -994,10 +1000,18 @@ func _ready() -> void:
 	shop_enchant_tab_button.toggle_mode = true
 	shop_tab_row.add_child(shop_enchant_tab_button)
 
+	shop_spells_tab_button = Button.new()
+	shop_spells_tab_button.text = "Spells"
+	shop_spells_tab_button.custom_minimum_size = Vector2(100, 32)
+	shop_spells_tab_button.toggle_mode = true
+	shop_tab_row.add_child(shop_spells_tab_button)
+
 	shop_gear_tab_button.pressed.connect(func(): _select_shop_tab("gear"))
 	shop_enchant_tab_button.pressed.connect(func(): _select_shop_tab("enchant"))
+	shop_spells_tab_button.pressed.connect(func(): _select_shop_tab("spells"))
 	_style_shop_tab_button(shop_gear_tab_button)
 	_style_shop_tab_button(shop_enchant_tab_button)
+	_style_shop_tab_button(shop_spells_tab_button)
 
 	var shop_status_row := HBoxContainer.new()
 	shop_status_row.add_theme_constant_override("separation", 24)
@@ -1063,6 +1077,27 @@ func _ready() -> void:
 	shop_enchant_row_box.add_theme_constant_override("separation", 8)
 	shop_enchant_row_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	shop_enchant_column.add_child(shop_enchant_row_box)
+
+	# The Wizard's Tower's second tab: upgrade spells (SpellUpgrades.gd), one row per spell.
+	shop_spells_scroll = ScrollContainer.new()
+	shop_spells_scroll.custom_minimum_size = Vector2(0, 260)
+	shop_spells_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	shop_spells_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	shop_spells_scroll.visible = false
+	shop_column.add_child(shop_spells_scroll)
+	var shop_spells_column := VBoxContainer.new()
+	shop_spells_column.add_theme_constant_override("separation", 8)
+	shop_spells_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	shop_spells_scroll.add_child(shop_spells_column)
+	shop_spells_note_label = Label.new()
+	shop_spells_note_label.add_theme_font_size_override("font_size", 14)
+	shop_spells_note_label.add_theme_color_override("font_color", Color(0.85, 0.85, 0.9))
+	shop_spells_note_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+	shop_spells_column.add_child(shop_spells_note_label)
+	shop_spells_row_box = VBoxContainer.new()
+	shop_spells_row_box.add_theme_constant_override("separation", 8)
+	shop_spells_row_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	shop_spells_column.add_child(shop_spells_row_box)
 
 	shop_description_label = Label.new()
 	shop_description_label.custom_minimum_size = Vector2(0, 36)
@@ -1943,8 +1978,10 @@ func _build_settings_panel() -> void:
 func _select_shop_tab(tab: String) -> void:
 	shop_row_scroll.visible = tab == "gear"
 	shop_enchant_scroll.visible = tab == "enchant"
+	shop_spells_scroll.visible = tab == "spells"
 	shop_gear_tab_button.button_pressed = tab == "gear"
 	shop_enchant_tab_button.button_pressed = tab == "enchant"
+	shop_spells_tab_button.button_pressed = tab == "spells"
 	shop_description_label.text = ""
 
 # Gear and Enchant used to be two clicks apart no matter which building's
@@ -1957,6 +1994,7 @@ func _select_shop_tab(tab: String) -> void:
 func lock_shop_tab(active_tab: String) -> void:
 	shop_gear_tab_button.visible = active_tab == "gear"
 	shop_enchant_tab_button.visible = active_tab == "enchant"
+	shop_spells_tab_button.visible = active_tab == "enchant"          # the Tower has both of its tabs
 	# The same panel now presents as whichever building you walked into --
 	# the tower has no gear to reroll and none of the [1-9]/[R] shortcuts
 	# apply there, so it shouldn't advertise them (Main.gd:_handle_shop_input
@@ -2587,6 +2625,37 @@ func show_enchant_tab(coins: int, runic_shards: int, current_weapon_name: String
 		button.add_child(cost_label)
 
 		shop_enchant_row_nodes.append(button)
+
+# The Wizard's Tower's Spells tab: one row per spell. rows: [{id, title, owner, effect, level, price_text, can_buy, maxed}].
+func show_spells_tab(note: String, rows: Array) -> void:
+	for n in shop_spells_row_nodes:
+		n.queue_free()
+	shop_spells_row_nodes.clear()
+	shop_spells_note_label.text = note
+	for row in rows:
+		var button := Button.new()
+		button.custom_minimum_size = Vector2(0, 64)
+		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		button.text = "%s   (%s)\n%s" % [row.title, row.owner, row.effect]
+		button.disabled = bool(row.maxed) or not bool(row.can_buy)
+		var spell_id: String = row.id
+		button.pressed.connect(func(): spell_upgrade_pressed.emit(spell_id))
+		_style_shop_row_button(button, "enchant")
+		shop_spells_row_box.add_child(button)
+
+		var cost_label := Label.new()
+		cost_label.set_anchors_preset(Control.PRESET_FULL_RECT)
+		cost_label.offset_left = -170
+		cost_label.offset_right = -12
+		cost_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		cost_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		cost_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		cost_label.text = row.price_text
+		cost_label.add_theme_font_size_override("font_size", 15)
+		cost_label.add_theme_color_override("font_color", Color(0.75, 0.55, 1.0) if (bool(row.can_buy) and not bool(row.maxed)) else Color(0.6, 0.6, 0.6))
+		button.add_child(cost_label)
+		shop_spells_row_nodes.append(button)
 
 # background_color (each world's own WORLDS.battle_bg, see Main.gd) is
 # accepted but no longer used for the gradient itself -- a fixed green-to-

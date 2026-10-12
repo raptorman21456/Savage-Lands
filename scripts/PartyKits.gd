@@ -128,7 +128,7 @@ const KITS := {
 	"druid": [
 		# The doc's names and costs (2026-10-09): Restore 40 mana, Empower 30 mana, Vitalize 40 mana.
 		{"id": "druid_heal", "name": "Restore", "stamina_cost": 40, "dmg_mult": 0.0, "effect": "druid_heal",
-			"description": "Heal an ally for 25% of their max HP plus a third of the Druid's magic (a half once upgraded at the Wizard's Tower)."},
+			"description": "Heal an ally for 25% of their max HP plus a third of the Druid's magic. The Wizard's Tower can upgrade it twice."},
 		{"id": "druid_buff", "name": "Empower", "stamina_cost": 30, "dmg_mult": 0.0, "effect": "druid_buff",
 			"description": "An ally deals 1.5x damage for 3 turns."},
 		{"id": "druid_sprint", "name": "Vitalize", "stamina_cost": 40, "dmg_mult": 0.0, "effect": "sprint", "keeps_turn": true,

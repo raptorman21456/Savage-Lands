@@ -536,6 +536,19 @@ static func can_buy_any_upgrade(data: Dictionary) -> bool:
 			return true
 	return false
 
+# The Essence banked in the active slot (what the Church and the Wizard's Tower's spell upgrades spend).
+static func banked_essence() -> int:
+	return int(load_data().get("essence", 0))
+
+# Spends banked Essence outside the Church (the Wizard's Tower's spell upgrades); false if there is not enough.
+static func try_spend_essence(cost: int) -> bool:
+	var data := load_data()
+	if int(data.get("essence", 0)) < cost:
+		return false
+	data.essence = int(data.get("essence", 0)) - cost
+	save_data(data)
+	return true
+
 # Mutates `data` in place (caller is expected to have gotten it from
 # load_data() and to persist it afterward with save_data()).
 static func try_buy_upgrade(data: Dictionary, id: String) -> bool:
