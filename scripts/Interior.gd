@@ -161,6 +161,32 @@ const DEFS := {
 		"npc": [450, 190, Color(1.0, 0.85, 0.8)], "counter": [450, 262, 360], "trade": [450, 340, 240, 70],
 		"things": [["hang_meat", 120, 100], ["hang_meat", 210, 100], ["hang_meat", 300, 100], ["hang_meat", 600, 100], ["hang_meat", 690, 100], ["hang_meat", 780, 100], ["block", 130, 260], ["barrel", 780, 260], ["barrel", 780, 330], ["crate", 120, 540], ["crate", 800, 540], ["crate", 800, 480]],
 	},
+	# --- The Ruined Settlement's four houses (OverworldMap.RUIN_HOUSES): the town where everyone is dead. Nothing trades;
+	# each room is dust, cobwebs, broken furniture and the bones of whoever was home, with a few coins still lying about.
+	"ruin_cottage": {
+		"name": "The Cottage", "size": Vector2(900, 680), "floor": Color(0.33, 0.29, 0.24), "wall": Color(0.3, 0.28, 0.25),
+		"reach": [300, 330],
+		"things": [["bed", 150, 190], ["bones", 150, 205], ["bed", 300, 190], ["hearth", 620, 104], ["broken_table", 450, 420], ["rubble", 780, 200], ["bones", 640, 520], ["crate", 780, 560], ["web", 96, 124], ["web_r", 804, 124]],
+		"loot": [["coin", 15, 760, 420]],
+	},
+	"ruin_smithy": {
+		"name": "The Smithy", "size": Vector2(1000, 700), "floor": Color(0.28, 0.28, 0.3), "wall": Color(0.24, 0.24, 0.27),
+		"reach": [500, 430],
+		"things": [["hearth", 800, 120], ["anvil", 690, 285], ["rack", 200, 104], ["rack", 400, 104], ["barrel", 100, 220], ["rubble", 420, 300], ["bones", 560, 430], ["web", 96, 124], ["web_r", 904, 124]],
+		"loot": [["coin", 20, 200, 520]],
+	},
+	"ruin_chapel": {
+		"name": "The Chapel", "size": Vector2(1000, 780), "floor": Color(0.42, 0.42, 0.42), "wall": Color(0.28, 0.28, 0.32),
+		"reach": [500, 360],
+		"things": [["altar", 500, 140], ["window", 180, 100], ["window", 820, 100], ["candle", 420, 140], ["pew", 300, 470], ["pew", 300, 650], ["pew", 700, 560], ["rubble", 700, 300], ["bones", 500, 580], ["web", 96, 124], ["web_r", 904, 124]],
+		"loot": [["coin", 15, 820, 650]],
+	},
+	"ruin_store": {
+		"name": "The Storehouse", "size": Vector2(900, 680), "floor": Color(0.36, 0.3, 0.2), "wall": Color(0.28, 0.24, 0.18),
+		"reach": [450, 400],
+		"things": [["barrel", 110, 200], ["barrel", 110, 270], ["barrel", 170, 200], ["crate", 780, 200], ["crate", 844, 200], ["crate", 780, 264], ["barrel", 780, 420], ["barrel", 780, 486], ["crate", 110, 496], ["crate", 110, 560], ["crate", 174, 560], ["rubble", 450, 300], ["bones", 450, 470], ["web", 96, 124], ["web_r", 804, 124]],
+		"loot": [["coin", 30, 200, 470]],
+	},
 }
 
 # What each kind of furniture looks like: [width, height, colour, solid].
@@ -190,6 +216,9 @@ const THINGS := {
 	"trough": [150, 50, Color(0.4, 0.3, 0.2), true],
 	"horse_stall": [170, 150, Color(0.4, 0.28, 0.16), true], "hay_bale": [70, 46, Color(0.85, 0.72, 0.3), true],
 	"saddle_rack": [120, 34, Color(0.4, 0.28, 0.16), true], "hay": [220, 110, Color(0.78, 0.66, 0.3), false],
+	"hearth": [160, 70, Color(0.3, 0.28, 0.27), true], "broken_table": [130, 90, Color(0.38, 0.27, 0.16), true],
+	"rubble": [110, 80, Color(0.4, 0.38, 0.35), true], "bones": [60, 40, Color(0.85, 0.82, 0.72), false],
+	"web": [80, 80, Color(1.0, 1.0, 1.0, 0.18), false], "web_r": [80, 80, Color(1.0, 1.0, 1.0, 0.18), false],
 }
 
 var kind := ""
@@ -318,6 +347,26 @@ func _build_thing(thing: String, at: Vector2) -> void:
 			if thing == "crystal":
 				_disc(at, thing_size.x * 0.7, Color(0.7, 0.4, 1.0, 0.2), -1)
 			return
+		"web", "web_r":
+			var mirror := -1.0 if thing == "web_r" else 1.0
+			var web := Polygon2D.new()
+			web.polygon = PackedVector2Array([at + Vector2(-40.0 * mirror, -40), at + Vector2(40.0 * mirror, -40), at + Vector2(-40.0 * mirror, 40)])
+			web.color = color
+			web.z_index = 1
+			add_child(web)
+			return
+		"bones":
+			_disc(at + Vector2(-18, -4), 9.0, color, 0)
+			for i in 3:
+				_rect_node(self, at + Vector2(6, -6.0 + 10.0 * float(i)), Vector2(28, 4), color, 0)
+			_rect_node(self, at + Vector2(6, 4), Vector2(4, 30), color, 0)
+			return
+		"rubble":
+			for chunk in [[-30, -10, 34, 28, 0.0], [10, 8, 40, 30, 0.12], [-8, -24, 30, 22, -0.1], [30, -16, 24, 20, 0.2]]:
+				_rect_node(self, at + Vector2(float(chunk[0]), float(chunk[1])), Vector2(float(chunk[2]), float(chunk[3])), color.lightened(float(chunk[4])), 0)
+			if solid:
+				_solid(at, thing_size)
+			return
 		"brazier":
 			_disc(at, thing_size.x * 1.1, Color(1.0, 0.6, 0.2, 0.1), -1)
 			_disc(at, thing_size.x * 0.5, color, 0)
@@ -437,6 +486,9 @@ func _build_thing(thing: String, at: Vector2) -> void:
 			_rect_node(self, at + Vector2(0, 32), Vector2(34, 18), Color(0.3, 0.55, 0.3), 0)
 		"trough":
 			_rect_node(self, at, Vector2(132, 30), Color(0.3, 0.5, 0.7), 0)
+		"broken_table":
+			_rect_node(self, at + Vector2(0, -2), Vector2(6, thing_size.y), Color(0.15, 0.1, 0.06), 0)
+			_rect_node(self, at + Vector2(52, 14), Vector2(30, 14), color.darkened(0.3), 0)
 		"horse_stall":
 			_rect_node(self, at, Vector2(150, 130), Color(0.75, 0.65, 0.35), 0)
 			_rect_node(self, at + Vector2(0, -68), Vector2(170, 8), color.darkened(0.3), 0)

@@ -16,7 +16,7 @@ func _init() -> void:
 		e.free()
 	main.enemies_alive = 0
 
-	print("Twenty-six rooms: the town's eleven venues, Pesca's six houses, the Lizen Encampment's six tents and the Ranch's three buildings: %d (expected 26)" % [IN.DEFS.size()])
+	print("Thirty rooms: the town's eleven venues, Pesca's six houses, the Lizen Encampment's six tents, the Ranch's three buildings and the Ruined Settlement's four houses: %d (expected 30)" % [IN.DEFS.size()])
 	var bad_reach := []
 	var bad_entry := []
 	var overlapping := []
@@ -240,4 +240,42 @@ func _init() -> void:
 	await physics_frame
 	await create_timer(1.6).timeout
 	print("The doorway puts you back in the yard below the barn door: in_interior=%s (expected false), %.0f px from the spot below the door (expected 0)" % [main.in_interior, player.global_position.distance_to(barn.return)])
+
+	# --- the Ruined Settlement's four houses: a doorway each, a room of dust and bones, a few coins still lying about
+	var ruin_houses: Array = main.OverworldMapScript.ruin_buildings()
+	var bad_ruin_doors := []
+	for h in ruin_houses:
+		for p in [h.door, h.return]:
+			player.global_position = p
+			await physics_frame
+			await physics_frame
+			if player.test_move(player.global_transform, Vector2.ZERO) or main.WorldMapScript.is_blocked(p):
+				bad_ruin_doors.append("%s@%s" % [h.interior, p])
+	var ruin_no_trade := ruin_houses.all(func(h): return not IN.DEFS[h.interior].has("trade") and IN.DEFS[h.interior].has("loot"))
+	print("The Ruined Settlement has four houses, each with a room of its own, nothing to trade and a little loot: %d houses (expected 4), %s (expected true)" % [ruin_houses.size(), ruin_no_trade])
+	print("...each doorway, and the spot you come out on towards the well, is open ground: problems=%s (expected [])" % [bad_ruin_doors])
+	var ruin: Dictionary = ruin_houses[0]
+	player.global_position = ruin.door + Vector2(0, 70.0)
+	await physics_frame
+	player.global_position = ruin.door
+	await physics_frame
+	await physics_frame
+	await create_timer(1.6).timeout
+	var ruin_room = main._get_interior(ruin.interior)
+	var ruin_coins_before: int = player.coins
+	var ruin_loot: Array = IN.DEFS[ruin.interior].loot[0]
+	player.global_position = ruin_room.origin + Vector2(float(ruin_loot[2]), float(ruin_loot[3]) + 80.0)
+	await physics_frame
+	player.global_position = ruin_room.origin + Vector2(float(ruin_loot[2]), float(ruin_loot[3]))
+	await physics_frame
+	await physics_frame
+	await physics_frame
+	print("Walk into the first house: in_interior=%s (expected true), room '%s' (expected The Cottage); its coins pay: %d -> %d (expected +%d)" % [main.in_interior, main.hud.world_label.text, ruin_coins_before, player.coins, int(ruin_loot[1])])
+	player.global_position = ruin_room.origin + Vector2(ruin_room.size.x * 0.5, ruin_room.size.y - 100.0)
+	await physics_frame
+	player.global_position = ruin_room.origin + Vector2(ruin_room.size.x * 0.5, ruin_room.size.y - IN.WALL * 0.5)
+	await physics_frame
+	await physics_frame
+	await create_timer(1.6).timeout
+	print("The doorway puts you back by the well side of the house: in_interior=%s (expected false), %.0f px from the spot outside the doorway (expected 0)" % [main.in_interior, player.global_position.distance_to(ruin.return)])
 	quit()

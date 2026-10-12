@@ -1075,22 +1075,66 @@ func _heartwood(parent: Node, pos: Vector2, _rng: RandomNumberGenerator) -> void
 		var a := TAU * (float(i) + 0.5) / 8.0
 		_sprite(parent, TREE, pos + Vector2(cos(a), sin(a)) * 900.0, 5.0, Color(0.65, 0.92, 0.66), 8.0 * 5.0, 1)
 
+# The Ruined Settlement's four houses, one in each corner round the well (offsets from the landmark; the corner says
+# which way it faces: north houses open on their south wall, south houses on their north wall, the doorway beside the
+# short wall facing the well). Which interior (Interior.gd) each doorway opens, where it is, where you come out (towards
+# the well) and the sign on the wall by it. Shared by the builder below and by Main, which puts a door trigger at each.
+const RUIN_HOUSES := [
+	{"interior": "ruin_cottage", "corner": Vector2(-1, -1), "sign": "bed"},
+	{"interior": "ruin_smithy", "corner": Vector2(1, -1), "sign": "anvil"},
+	{"interior": "ruin_chapel", "corner": Vector2(-1, 1), "sign": "cross"},
+	{"interior": "ruin_store", "corner": Vector2(1, 1), "sign": "barrel"},
+]
+const RUIN_HALF := Vector2(150.0, 105.0)             # half the size of a house's walls
+
+static func ruin_buildings() -> Array:
+	var centre: Vector2 = WorldMapScript.landmark("ruins").pos
+	var out: Array = []
+	for h in RUIN_HOUSES:
+		var corner: Vector2 = h.corner
+		var c: Vector2 = centre + Vector2(corner.x * 480.0, corner.y * 300.0)
+		var wall_y: float = c.y - corner.y * RUIN_HALF.y                  # the wall that faces the well
+		var door := Vector2(c.x + corner.x * RUIN_HALF.x * 0.4, wall_y)   # the middle of the gap beside it
+		out.append({"interior": h.interior, "pos": c, "door": door, "door_size": Vector2(150, 44), "return": door + Vector2(0.0, -corner.y * 110.0),
+			"sign": h.sign, "sign_at": Vector2(c.x - corner.x * RUIN_HALF.x * 0.6, wall_y - corner.y * 14.0)})
+	return out
+
+# A signpost: a pole and a board with a picture on it (a bed, an anvil, a cross, a barrel).
+func _ruin_sign(parent: Node, at: Vector2, picture: String) -> void:
+	var ink := Color(0.88, 0.82, 0.66)
+	_box(parent, at + Vector2(0, -14), Vector2(8, 44), Color(0.3, 0.2, 0.12), 0.0, false, 2)
+	_box(parent, at + Vector2(0, -50), Vector2(58, 32), Color(0.34, 0.26, 0.18), 0.0, false, 2)
+	match picture:
+		"bed":
+			_box(parent, at + Vector2(0, -48), Vector2(34, 12), ink, 0.0, false, 3)
+			_box(parent, at + Vector2(-12, -54), Vector2(10, 8), ink, 0.0, false, 3)
+		"anvil":
+			_box(parent, at + Vector2(0, -56), Vector2(32, 8), ink, 0.0, false, 3)
+			_box(parent, at + Vector2(0, -46), Vector2(12, 12), ink, 0.0, false, 3)
+		"cross":
+			_box(parent, at + Vector2(0, -50), Vector2(6, 24), ink, 0.0, false, 3)
+			_box(parent, at + Vector2(0, -56), Vector2(20, 6), ink, 0.0, false, 3)
+		"barrel":
+			_disc(parent, at + Vector2(0, -50), 11.0, ink, 3, 14)
+
 # A settlement where everyone is dead: broken walls, rubble, bare trees and a few grave markers. Sized for a
-# 32 px player: a ruined house is ~150 px across.
+# 32 px player: a ruined house is ~150 px across. Each house has a doorway you can go through (ruin_buildings).
 func _ruins(parent: Node, pos: Vector2, _rng: RandomNumberGenerator) -> void:
 	_disc(parent, pos, 1100.0, Color(0.2, 0.2, 0.18, 0.3), -2, 32)
 	var wall := Color(0.42, 0.4, 0.37)
 	# four ruined houses round a well: three standing walls each and a doorway facing the well
 	for corner in [Vector2(-1, -1), Vector2(1, -1), Vector2(-1, 1), Vector2(1, 1)]:
 		var c: Vector2 = pos + Vector2(corner.x * 480.0, corner.y * 300.0)
-		var hx := 150.0
-		var hy := 105.0
+		var hx := RUIN_HALF.x
+		var hy := RUIN_HALF.y
 		_box(parent, c + Vector2(0, corner.y * hy), Vector2(hx * 2.0, 16), wall, 0.0, true, 0)           # the far wall
 		_box(parent, c + Vector2(-hx, 0), Vector2(16, hy * 2.0), wall, 0.0, true, 0)
 		_box(parent, c + Vector2(hx, 0), Vector2(16, hy * 2.0), wall, 0.0, true, 0)
 		_box(parent, c + Vector2(-corner.x * hx * 0.6, -corner.y * hy), Vector2(hx * 0.8, 16), wall, 0.0, true, 0)   # the wall facing the well, with a doorway beside it
 		for k in [Vector2(-1, -1), Vector2(1, -1), Vector2(-1, 1), Vector2(1, 1)]:
 			_sprite(parent, ROCK, c + Vector2(hx * k.x, hy * k.y) * 1.1, 2.4, Color(0.7, 0.68, 0.64))
+	for house in ruin_buildings():
+		_ruin_sign(parent, house.sign_at, house.sign)
 	# the well
 	_disc(parent, pos, 54.0, Color(0.3, 0.3, 0.33), 0, 18)
 	_disc(parent, pos, 34.0, Color(0.1, 0.12, 0.2), 1, 14)
