@@ -1102,8 +1102,31 @@ func _ruins(parent: Node, pos: Vector2, _rng: RandomNumberGenerator) -> void:
 		_sprite(parent, DEAD_TREE, pos + Vector2(side * 380.0, -600.0), 2.6, Color(0.75, 0.72, 0.68), 8.0 * 2.6)
 		_sprite(parent, DEAD_TREE, pos + Vector2(side * 800.0, 0.0), 2.6, Color(0.75, 0.72, 0.68), 8.0 * 2.6)
 
-# The Lizen Encampment: a palisade ring with a gate north and south, tents, towers and a fire.
-func _lizen(parent: Node, pos: Vector2, rng: RandomNumberGenerator) -> void:
+# The Lizen Encampment's six tents (the warband's camp: a boss's lair, so they only hold loot): two columns either side of
+# the avenue between the fort's north and south gates, three rows, each tent facing the avenue's end. Which interior
+# (Interior.gd) each door opens, where the door is and where you come out (beside it, into the avenue). Shared by the
+# builder below and by Main, which puts a door trigger at each.
+const LIZEN_TENTS := [
+	{"interior": "lizen_war", "col": -1.0, "row": -1.0, "tint": Color(0.55, 0.28, 0.2)},
+	{"interior": "lizen_shaman", "col": 1.0, "row": -1.0, "tint": Color(0.42, 0.3, 0.5)},
+	{"interior": "lizen_barracks", "col": -1.0, "row": 0.0, "tint": Color(0.38, 0.45, 0.25)},
+	{"interior": "lizen_mess", "col": 1.0, "row": 0.0, "tint": Color(0.55, 0.45, 0.28)},
+	{"interior": "lizen_forge", "col": -1.0, "row": 1.0, "tint": Color(0.4, 0.4, 0.43)},
+	{"interior": "lizen_armoury", "col": 1.0, "row": 1.0, "tint": Color(0.35, 0.42, 0.5)},
+]
+
+static func lizen_buildings() -> Array:
+	var centre: Vector2 = WorldMapScript.landmark("lizen_encampment").pos
+	var out: Array = []
+	for t in LIZEN_TENTS:
+		var c: Vector2 = centre + Vector2(250.0 * float(t.col), 270.0 * float(t.row))
+		var door: Vector2 = c + Vector2(0.0, 68.0)
+		out.append({"interior": t.interior, "pos": c, "door": door, "door_size": Vector2(80, 44), "return": door + Vector2(-120.0 * float(t.col), 30.0), "tint": t.tint})
+	return out
+
+# The Lizen Encampment: a palisade with a tower at each corner and a gate north and south, a fire in the middle and six
+# tents in two columns along the avenue between the gates, a banner each side of both gates.
+func _lizen(parent: Node, pos: Vector2, _rng: RandomNumberGenerator) -> void:
 	var radius := 520.0
 	_disc(parent, pos, radius + 140.0, Color(0.3, 0.22, 0.12, 0.35), -2, 36)
 	var posts := 60
@@ -1116,14 +1139,16 @@ func _lizen(parent: Node, pos: Vector2, rng: RandomNumberGenerator) -> void:
 	for i in 4:
 		var a := PI / 4.0 + PI / 2.0 * float(i)
 		_box(parent, pos + Vector2(cos(a), sin(a)) * radius, Vector2(54, 54), Color(0.3, 0.2, 0.1), 0.0, true, 2)
-	for i in 6:
-		var a := TAU * float(i) / 6.0 + 0.4
-		var c := pos + Vector2(cos(a), sin(a)) * 270.0
-		_poly(parent, PackedVector2Array([c + Vector2(0, -62), c + Vector2(58, 38), c + Vector2(-58, 38)]), Color(0.38, 0.45, 0.25), 1)
+	for tent in lizen_buildings():
+		var c: Vector2 = tent.pos
+		_poly(parent, PackedVector2Array([c + Vector2(0, -62), c + Vector2(58, 38), c + Vector2(-58, 38)]), tent.tint, 1)
+		_poly(parent, PackedVector2Array([c + Vector2(0, -14), c + Vector2(18, 38), c + Vector2(-18, 38)]), Color(0.1, 0.08, 0.06), 2)
+		_box(parent, c + Vector2(0, 14), Vector2(112, 48), Color(0, 0, 0, 0), 0.0, true, 0)
 	_disc(parent, pos, 26.0, Color(0.9, 0.45, 0.12), 1, 12)
 	_disc(parent, pos, 54.0, Color(0.1, 0.07, 0.04, 0.5), 0, 14)
-	for i in 4:
-		_box(parent, pos + Vector2(-110 + 75 * i, 190), Vector2(8, 56), Color(0.7, 0.15, 0.12), 0.0, false, 2)
+	for gate in [-1.0, 1.0]:
+		for side in [-1.0, 1.0]:
+			_box(parent, pos + Vector2(110.0 * side, 470.0 * gate), Vector2(8, 56), Color(0.7, 0.15, 0.12), 0.0, false, 2)
 
 # Pesca's six houses (the town's building art for now), in a row along the boardwalk, each facing the water: which
 # interior (Interior.gd) its door opens and where the door is. Shared by the builder below and by Main, which puts a
@@ -1144,7 +1169,7 @@ static func pesca_buildings() -> Array:
 	var out: Array = []
 	for i in PESCA_HOUSES.size():
 		var at: Vector2 = PESCA_ROW + Vector2(PESCA_HOUSE_PITCH * float(i), 0.0)
-		out.append({"interior": PESCA_HOUSES[i].interior, "pos": at, "door": at + Vector2(0.0, PESCA_DOOR_DROP)})
+		out.append({"interior": PESCA_HOUSES[i].interior, "pos": at, "door": at + Vector2(0.0, PESCA_DOOR_DROP), "door_size": Vector2(100, 48), "return": at + Vector2(0.0, PESCA_DOOR_DROP + 120.0)})
 	return out
 
 # Pesca: a dock town on a headland -- a row of houses along a boardwalk (ROADS), a bollard in front of each, and the

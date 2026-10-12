@@ -16,7 +16,7 @@ func _init() -> void:
 		e.free()
 	main.enemies_alive = 0
 
-	print("Seventeen rooms: the town's eleven venues and Pesca's six houses: %d (expected 17)" % [IN.DEFS.size()])
+	print("Twenty-three rooms: the town's eleven venues, Pesca's six houses and the Lizen Encampment's six tents: %d (expected 23)" % [IN.DEFS.size()])
 	var bad_reach := []
 	var bad_entry := []
 	var overlapping := []
@@ -26,8 +26,7 @@ func _init() -> void:
 		await physics_frame
 		# the doorway, the counter and everything between must be walkable
 		var entry: Vector2 = room.entry_point()
-		var trade: Array = def.trade
-		var target: Vector2 = room.origin + Vector2(float(trade[0]), float(trade[1]))
+		var target: Vector2 = room.origin + IN.goal_of(kind)
 		player.global_position = entry
 		await physics_frame
 		await physics_frame
@@ -160,4 +159,42 @@ func _init() -> void:
 	await physics_frame
 	await create_timer(1.6).timeout
 	print("The doorway puts you back on Pesca's boardwalk, %.0f px below the door (expected 120): in_interior=%s (expected false), the town label is not shown: %s (expected true)" % [player.global_position.y - tavern_door.y, main.in_interior, not main.was_in_town])
+
+	# --- the Lizen Encampment's six tents: a door each, a room of nothing to trade but a little loot lying about
+	var tents: Array = main.OverworldMapScript.lizen_buildings()
+	var bad_tent_doors := []
+	for h in tents:
+		for p in [h.door, h.return]:
+			player.global_position = p
+			await physics_frame
+			await physics_frame
+			if player.test_move(player.global_transform, Vector2.ZERO) or main.WorldMapScript.is_blocked(p):
+				bad_tent_doors.append("%s@%s" % [h.interior, p])
+	var no_trade := tents.all(func(h): return not IN.DEFS[h.interior].has("trade"))
+	print("The Lizen Encampment has six tents, each with a room of its own and nothing to trade: %d tents (expected 6), no counters %s (expected true)" % [tents.size(), no_trade])
+	print("...each door, and the spot you come out on beside it, is open ground: problems=%s (expected [])" % [bad_tent_doors])
+	var tent: Dictionary = tents[0]
+	player.global_position = tent.door + Vector2(0, 60.0)
+	await physics_frame
+	player.global_position = tent.door
+	await physics_frame
+	await physics_frame
+	await create_timer(1.6).timeout
+	var war_room = main._get_interior(tent.interior)
+	var coins_before: int = player.coins
+	var loot: Array = IN.DEFS[tent.interior].loot[0]
+	player.global_position = war_room.origin + Vector2(float(loot[2]), float(loot[3]) + 80.0)
+	await physics_frame
+	player.global_position = war_room.origin + Vector2(float(loot[2]), float(loot[3]))
+	await physics_frame
+	await physics_frame
+	await physics_frame
+	print("Walk into the first tent: in_interior=%s (expected true), room '%s' (expected The War Tent); picking up its coins pays: %d -> %d (expected +%d)" % [main.in_interior, main.hud.world_label.text, coins_before, player.coins, int(loot[1])])
+	player.global_position = war_room.origin + Vector2(war_room.size.x * 0.5, war_room.size.y - 100.0)
+	await physics_frame
+	player.global_position = war_room.origin + Vector2(war_room.size.x * 0.5, war_room.size.y - IN.WALL * 0.5)
+	await physics_frame
+	await physics_frame
+	await create_timer(1.6).timeout
+	print("The doorway puts you back in the avenue beside the tent: in_interior=%s (expected false), %.0f px from the spot beside the door (expected 0)" % [main.in_interior, player.global_position.distance_to(tent.return)])
 	quit()

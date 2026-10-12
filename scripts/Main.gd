@@ -1191,7 +1191,7 @@ func _ready() -> void:
 	_build_camera()
 	_build_sfx()
 	_build_town()
-	_build_pesca_doors()
+	_build_world_doors()
 	_init_quest_board()
 	_roll_seer_stock()
 	if SaveDataScript.sandbox_active:
@@ -1848,14 +1848,16 @@ var _fade_layer: CanvasLayer = null
 var _fade_rect: ColorRect = null
 var _interior_busy := false
 
-# Pesca's houses (OverworldMap.PESCA_HOUSES) are out in the world, not in the town's plaza: a door trigger at each, built once.
-func _build_pesca_doors() -> void:
+# The buildings out in the world rather than in the town's plaza (Pesca's six houses, the Lizen Encampment's six tents):
+# a door trigger at each, built once.
+func _build_world_doors() -> void:
 	if not regional_world:
 		return
-	for house in OverworldMapScript.pesca_buildings():
+	for house in OverworldMapScript.pesca_buildings() + OverworldMapScript.lizen_buildings():
 		var interior: String = house.interior
 		var door: Vector2 = house.door
-		_make_door_trigger(door, Vector2(100, 48), func(): _enter_interior(interior, door))
+		var back: Vector2 = house.return
+		_make_door_trigger(door, house.door_size, func(): _enter_interior(interior, door, back))
 
 func _interior_origin(kind: String) -> Vector2:
 	return INTERIOR_ORIGIN + Vector2(float(InteriorScript.DEFS.keys().find(kind)) * INTERIOR_SLOT, 0.0)
@@ -1893,13 +1895,13 @@ func _fade(to_black: bool, seconds: float = 0.2) -> void:
 	tween.tween_property(_fade_rect, "color:a", 1.0 if to_black else 0.0, seconds)
 	await tween.finished
 
-func _enter_interior(kind: String, door_pos: Vector2) -> void:
+func _enter_interior(kind: String, door_pos: Vector2, return_pos: Vector2 = Vector2.INF) -> void:
 	if in_interior or _interior_busy or _town_door_blocked():
 		return
 	_interior_busy = true
 	player.discovered_locations[kind] = true
 	interior_kind = kind
-	interior_return = door_pos + Vector2(0, 120.0)
+	interior_return = return_pos if return_pos.is_finite() else door_pos + Vector2(0, 120.0)
 	interior_in_town = _in_town_area(door_pos, 80.0)
 	await _fade(true)
 	var room: Node2D = _get_interior(kind)

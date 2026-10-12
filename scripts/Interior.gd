@@ -8,11 +8,14 @@ class_name Interior
 # Everything is placeholder art built from shapes (floors, walls, furniture) and the one existing NPC sprite, until the
 # user's own art replaces it. Positions in DEFS are px from the room's top-left corner. EVERY number is a DRAFT.
 
+const PickupScript := preload("res://scripts/Pickup.gd")
+
 const WALL := 56.0                     # thickness of the walls round the room
 const DOOR_WIDTH := 150.0              # the doorway in the bottom wall
 
 # kind (the town venue it belongs to, or a room of its own with a "venue" it trades as): {name, venue, size, floor, wall, npc [x, y, tint], counter [x, y, width] (or none),
-# trade [x, y, width, height] (walk in here to trade), things [[kind, x, y], ...]}
+# trade [x, y, width, height] (walk in here to trade; a room with nothing to trade has none, and a "reach" [x, y] the walking
+# test must be able to get to instead), things [[kind, x, y], ...], loot [[coin / meat, amount, x, y], ...] (lying about)}
 const DEFS := {
 	"shop": {
 		"name": "General Store", "size": Vector2(1000, 720), "floor": Color(0.46, 0.33, 0.2), "wall": Color(0.27, 0.19, 0.13),
@@ -101,6 +104,45 @@ const DEFS := {
 		"npc": [500, 255, Color(0.95, 1.0, 1.0)], "trade": [500, 345, 280, 70],
 		"things": [["altar", 500, 140], ["window", 180, 100], ["window", 340, 100], ["window", 660, 100], ["window", 820, 100], ["lantern", 380, 140], ["lantern", 620, 140], ["anchor", 100, 300], ["anchor", 900, 300], ["pew", 300, 470], ["pew", 300, 560], ["pew", 300, 650], ["pew", 700, 470], ["pew", 700, 560], ["pew", 700, 650]],
 	},
+	# --- The Lizen Encampment's six tents (OverworldMap.LIZEN_TENTS): the warband's camp, a boss's lair, so nothing here trades.
+	# Each room is a place to look round with a little loot lying about ("loot": [kind, amount, x, y]); "reach" is a spot
+	# the walking test has to be able to get to, in place of a counter.
+	"lizen_war": {
+		"name": "The War Tent", "size": Vector2(1000, 720), "floor": Color(0.36, 0.28, 0.2), "wall": Color(0.28, 0.3, 0.16),
+		"reach": [500, 450],
+		"things": [["throne", 500, 130], ["banner", 300, 118], ["banner", 700, 118], ["rack", 140, 104], ["rack", 860, 104], ["war_table", 500, 330], ["brazier", 110, 300], ["brazier", 890, 300], ["rug", 500, 570], ["crate", 880, 560], ["crate", 944, 560]],
+		"loot": [["coin", 30, 500, 460]],
+	},
+	"lizen_barracks": {
+		"name": "The Barracks", "size": Vector2(1100, 740), "floor": Color(0.34, 0.3, 0.22), "wall": Color(0.26, 0.3, 0.18),
+		"reach": [550, 450],
+		"things": [["bunk", 150, 200], ["bunk", 330, 200], ["bunk", 770, 200], ["bunk", 950, 200], ["bunk", 150, 530], ["bunk", 330, 530], ["bunk", 770, 530], ["bunk", 950, 530], ["rack", 550, 104], ["brazier", 550, 330], ["crate", 240, 370], ["crate", 860, 370]],
+		"loot": [["coin", 20, 240, 430], ["coin", 20, 860, 430]],
+	},
+	"lizen_forge": {
+		"name": "The Warband's Forge", "size": Vector2(1000, 720), "floor": Color(0.3, 0.3, 0.32), "wall": Color(0.18, 0.2, 0.18),
+		"reach": [500, 450],
+		"things": [["forge", 800, 120], ["anvil", 660, 285], ["rack", 200, 104], ["rack", 400, 104], ["trough", 160, 300], ["barrel", 100, 480], ["barrel", 900, 520], ["crate", 880, 420]],
+		"loot": [["coin", 20, 400, 480]],
+	},
+	"lizen_mess": {
+		"name": "The Mess", "size": Vector2(1100, 760), "floor": Color(0.4, 0.34, 0.24), "wall": Color(0.28, 0.22, 0.15),
+		"reach": [250, 450],
+		"things": [["cauldron", 150, 180], ["hang_meat", 320, 100], ["hang_meat", 420, 100], ["hang_meat", 680, 100], ["hang_meat", 780, 100], ["long_table", 550, 330], ["long_table", 550, 500], ["barrel", 980, 160], ["barrel", 980, 230], ["crate", 120, 600], ["crate", 990, 600]],
+		"loot": [["meat", 1, 250, 470], ["coin", 15, 850, 430]],
+	},
+	"lizen_armoury": {
+		"name": "The Armoury", "size": Vector2(1000, 720), "floor": Color(0.34, 0.34, 0.36), "wall": Color(0.2, 0.2, 0.24),
+		"reach": [500, 470],
+		"things": [["rack", 180, 104], ["rack", 400, 104], ["rack", 620, 104], ["rack", 840, 104], ["shield_stand", 140, 300], ["shield_stand", 140, 420], ["shield_stand", 860, 300], ["shield_stand", 860, 420], ["crate", 500, 300], ["crate", 564, 300], ["crate", 500, 364], ["rug", 500, 540]],
+		"loot": [["coin", 25, 500, 470]],
+	},
+	"lizen_shaman": {
+		"name": "The Shaman's Tent", "size": Vector2(900, 700), "floor": Color(0.26, 0.2, 0.3), "wall": Color(0.16, 0.14, 0.2),
+		"reach": [450, 320],
+		"things": [["curtain", 110, 110], ["curtain", 790, 110], ["totem", 450, 130], ["cauldron", 200, 260], ["candle", 330, 320], ["candle", 570, 320], ["rune_circle", 450, 490]],
+		"loot": [["coin", 20, 700, 300]],
+	},
 }
 
 # What each kind of furniture looks like: [width, height, colour, solid].
@@ -123,6 +165,11 @@ const THINGS := {
 	"lantern": [16, 24, Color(1.0, 0.85, 0.4), false], "rope_coil": [64, 64, Color(0.7, 0.6, 0.38), false],
 	"oars": [150, 22, Color(0.5, 0.38, 0.2), true], "sea_chest": [74, 50, Color(0.5, 0.32, 0.16), true],
 	"hammock": [100, 150, Color(0.72, 0.66, 0.5), true],
+	"war_table": [260, 130, Color(0.42, 0.28, 0.15), true], "banner": [50, 110, Color(0.7, 0.15, 0.13), false],
+	"throne": [90, 70, Color(0.35, 0.22, 0.12), true], "brazier": [50, 50, Color(0.28, 0.27, 0.3), true],
+	"bunk": [100, 170, Color(0.4, 0.28, 0.16), true], "long_table": [300, 80, Color(0.45, 0.3, 0.17), true],
+	"shield_stand": [60, 60, Color(0.55, 0.58, 0.62), true], "totem": [50, 100, Color(0.38, 0.26, 0.14), true],
+	"trough": [150, 50, Color(0.4, 0.3, 0.2), true],
 }
 
 var kind := ""
@@ -156,9 +203,16 @@ func setup(venue: String, at: Vector2, on_trade: Callable, on_exit: Callable) ->
 		_build_thing(str(t[0]), Vector2(float(t[1]), float(t[2])))
 	_build_npc()
 	_build_triggers()
+	_build_loot()
 
 func rect() -> Rect2:
 	return Rect2(origin, size)
+
+# The spot in a room the walking test has to be able to reach from the doorway: its counter, or its "reach" point.
+static func goal_of(room_kind: String) -> Vector2:
+	var d: Dictionary = DEFS[room_kind]
+	var g: Array = d.trade if d.has("trade") else d.reach
+	return Vector2(float(g[0]), float(g[1]))
 
 # Where the player appears: just inside the doorway.
 func entry_point() -> Vector2:
@@ -244,6 +298,21 @@ func _build_thing(thing: String, at: Vector2) -> void:
 			if thing == "crystal":
 				_disc(at, thing_size.x * 0.7, Color(0.7, 0.4, 1.0, 0.2), -1)
 			return
+		"brazier":
+			_disc(at, thing_size.x * 1.1, Color(1.0, 0.6, 0.2, 0.1), -1)
+			_disc(at, thing_size.x * 0.5, color, 0)
+			_disc(at, thing_size.x * 0.34, Color(0.95, 0.45, 0.1), 0)
+			_disc(at, thing_size.x * 0.18, Color(1.0, 0.85, 0.3), 0)
+			if solid:
+				_solid(at, thing_size, true)
+			return
+		"shield_stand":
+			_disc(at, thing_size.x * 0.5, color, 0)
+			_disc(at, thing_size.x * 0.34, Color(0.65, 0.18, 0.15), 0)
+			_disc(at, thing_size.x * 0.12, color.lightened(0.25), 0)
+			if solid:
+				_solid(at, thing_size, true)
+			return
 		"ship_wheel":
 			_disc(at, thing_size.x * 0.5, color.darkened(0.3), 0)
 			_disc(at, thing_size.x * 0.4, color, 0)
@@ -325,15 +394,39 @@ func _build_thing(thing: String, at: Vector2) -> void:
 		"hammock":
 			_rect_node(self, at + Vector2(0, 14), Vector2(82, 108), color.darkened(0.15), 0)
 			_rect_node(self, at + Vector2(0, -50), Vector2(58, 26), Color(0.95, 0.93, 0.85), 0)
+		"banner":
+			_rect_node(self, at + Vector2(0, -58), Vector2(66, 8), Color(0.3, 0.2, 0.1), 0)
+			_disc(at + Vector2(0, -10), 12.0, Color(0.9, 0.8, 0.3), 0)
+		"throne":
+			_rect_node(self, at + Vector2(0, -28), Vector2(90, 14), Color(0.22, 0.14, 0.08), 0)
+			_rect_node(self, at + Vector2(0, 6), Vector2(60, 36), Color(0.65, 0.15, 0.13), 0)
+		"war_table":
+			_rect_node(self, at, Vector2(220, 90), Color(0.82, 0.74, 0.55), 0)
+			for i in 3:
+				_rect_node(self, at + Vector2((float(i) - 1.0) * 70.0, -10.0), Vector2(14, 14), Color(0.65, 0.15, 0.13), 0)
+				_rect_node(self, at + Vector2((float(i) - 1.0) * 70.0 + 30.0, 18.0), Vector2(10, 10), Color(0.25, 0.3, 0.2), 0)
+		"bunk":
+			_rect_node(self, at + Vector2(0, 24), Vector2(84, 110), Color(0.3, 0.42, 0.28), 0)
+			_rect_node(self, at + Vector2(0, -62), Vector2(60, 26), Color(0.8, 0.78, 0.65), 0)
+		"long_table":
+			for i in 5:
+				_rect_node(self, at + Vector2((float(i) - 2.0) * 56.0, 0), Vector2(22, 22), Color(0.85, 0.82, 0.7), 0)
+		"totem":
+			_rect_node(self, at + Vector2(0, -26), Vector2(34, 18), Color(0.85, 0.7, 0.3), 0)
+			_rect_node(self, at + Vector2(0, 4), Vector2(34, 18), Color(0.65, 0.15, 0.13), 0)
+			_rect_node(self, at + Vector2(0, 32), Vector2(34, 18), Color(0.3, 0.55, 0.3), 0)
+		"trough":
+			_rect_node(self, at, Vector2(132, 30), Color(0.3, 0.5, 0.7), 0)
 
 func _build_npc() -> void:
-	var npc := Sprite2D.new()
-	npc.texture = preload("res://assets/blade_ally.png")
-	npc.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	npc.modulate = def.npc[2]
-	npc.position = Vector2(float(def.npc[0]), float(def.npc[1]))
-	npc.scale = Vector2(2.0, 2.0)
-	add_child(npc)
+	if def.has("npc"):
+		var npc := Sprite2D.new()
+		npc.texture = preload("res://assets/blade_ally.png")
+		npc.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		npc.modulate = def.npc[2]
+		npc.position = Vector2(float(def.npc[0]), float(def.npc[1]))
+		npc.scale = Vector2(2.0, 2.0)
+		add_child(npc)
 	if def.has("counter"):
 		var c: Array = def.counter
 		_rect_node(self, Vector2(float(c[0]), float(c[1])), Vector2(float(c[2]), 58.0), Color(0.6, 0.42, 0.22), 0)
@@ -341,9 +434,23 @@ func _build_npc() -> void:
 		_solid(Vector2(float(c[0]), float(c[1])), Vector2(float(c[2]), 58.0))
 
 func _build_triggers() -> void:
-	var t: Array = def.trade
-	_trigger(Vector2(float(t[0]), float(t[1])), Vector2(float(t[2]), float(t[3])), _on_trade)
+	if def.has("trade"):
+		var t: Array = def.trade
+		_trigger(Vector2(float(t[0]), float(t[1])), Vector2(float(t[2]), float(t[3])), _on_trade)
 	_trigger(Vector2(size.x * 0.5, size.y - WALL * 0.5), Vector2(DOOR_WIDTH - 30.0, WALL), _on_exit)
+
+# Coins and meat lying about the room. Pickups live under Main (that is where their sound is played from); they are
+# gone once taken, for the run.
+func _build_loot() -> void:
+	var holder := get_parent()
+	if holder == null:
+		return
+	for l in def.get("loot", []):
+		var pickup = PickupScript.new()
+		pickup.kind = str(l[0])
+		pickup.amount = int(l[1])
+		pickup.position = origin + Vector2(float(l[2]), float(l[3]))
+		holder.add_child(pickup)
 
 func _trigger(at: Vector2, trigger_size: Vector2, action: Callable) -> void:
 	var area := Area2D.new()
