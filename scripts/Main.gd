@@ -4611,6 +4611,9 @@ func _make_member_battle_unit(member, tile: Vector2i, might_mult: float) -> Dict
 		"steal_chance": float(rules.get("steal_chance", 0.0)),
 		"moves_after_attack": bool(rules.get("moves_after_attack", false)),
 		"kill_max_hp": float(rules.get("kill_max_hp", 0.0)),
+		# Stealth (see "Ally stealth"): every member can slip out of sight; a kind may improve it (the Rogue's).
+		"stealth_turns": 0,
+		"stealth_cfg": rules.get("stealth", {}),
 	}
 
 # Rock is the only terrain type that actually blocks movement outright (water
@@ -5058,6 +5061,17 @@ func _update_enemy_awareness() -> void:
 			continue
 		if _enemy_can_see_player_now(u):
 			u.aware_of_player = true
+	# The same for every member that is hiding (Ally stealth): spotted from close enough, with a clear line.
+	for u in battle_units:
+		if ENEMY_TRAITS.get(u.name, {}).get("is_boss_tier", false):
+			continue
+		var footprint: Array = _footprint(u.tile, u.get("size", 1))
+		for a in battle_allies:
+			var sight: int = _ally_stealth_sight(a)
+			if sight < 0 or int(a.hp) <= 0 or _enemy_sees_ally(u, a):
+				continue
+			if _footprint_dist(footprint, a.tile) <= sight and _has_line_of_sight(u.tile, a.tile):
+				_mark_ally_spotted(u, a)
 
 # Single source of truth for "does this enemy currently perceive the
 # player" -- drives AI targeting/wander, the red "!" indicator, hover-LOS,
@@ -5579,6 +5593,11 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 		if player.stealth_turns_remaining > 0:
 			stealth_forced_crit = true
 			player.stealth_turns_remaining = 0
+	# A member's Stealth (Ally stealth): its next attack is a guaranteed crit and ends the stealth.
+	var ally_stealth_crit := false
+	if _actor_is_ally() and attacker_label != "You" and effect != "thorns" and int(battle_actor.get("stealth_turns", 0)) > 0:
+		ally_stealth_crit = true
+		battle_actor["stealth_turns"] = 0
 	# Dagger's Bleeding Cut: two independent 50% rolls -- one to force this
 	# hit to land as a crit (here), one to cause Bleeding (after damage is
 	# dealt, alongside the other on-hit effects below).
@@ -5742,7 +5761,7 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 	# player's stat) -- doubles damage and ignores the rock-cover reduction
 	# below entirely ("ignores defense"), same as Blindness's guaranteed
 	# crit-on-hit reuses.
-	var is_crit := blind_forced_crit or stealth_forced_crit or bleeding_cut_forced_crit or sucker_forced_crit or shadow_forced_crit or effect == "jugular"
+	var is_crit := blind_forced_crit or stealth_forced_crit or ally_stealth_crit or bleeding_cut_forced_crit or sucker_forced_crit or shadow_forced_crit or effect == "jugular"
 	# A member crits off its own crit chance (talismans, favours) -- never the hero's stat.
 	var actor_crit_chance: float = _actor_tb("crit_chance") if _actor_is_ally() else (player.crit_chance_total() if attacker_label == "You" else 0.0)
 	# The Marksman's bow favour multiplies whatever crit chance it has.
@@ -5752,7 +5771,10 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 		is_crit = true
 	if is_crit:
 		# 2.0 by default; Duelist's Coin raises this (see Player.crit_damage_mult).
-		dmg = int(round(dmg * (2.0 + _actor_tb("crit_damage_mult_bonus") if _actor_is_ally() else player.crit_damage_mult())))
+		var crit_mult: float = (2.0 + _actor_tb("crit_damage_mult_bonus")) if _actor_is_ally() else player.crit_damage_mult()
+		if ally_stealth_crit:
+			crit_mult += float(battle_actor.get("stealth_cfg", {}).get("crit_bonus", 0.0))
+		dmg = int(round(dmg * crit_mult))
 	# Attack Potion: a flat damage bonus for a few of the player's own turns,
 	# gated on attacker_label the same way every other player-only modifier
 	# here is, so an ally's own attack (which funnels through this same
@@ -5844,6 +5866,8 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 	if u.hp > 0:
 		dmg = mini(dmg, u.hp)
 	u["aware_of_player"] = true
+	if _actor_is_ally():
+		_mark_ally_spotted(u, battle_actor)      # a member that hits an enemy is seen by it, stealth or not
 	u.hp -= dmg
 	run_damage_dealt += dmg
 	# Bloodmoon Fang (talisman): ANY landed hit -- player's or an ally's --
@@ -6415,6 +6439,8 @@ func _battle_perform_attack(action: Dictionary) -> void:
 		_resolve_soothing_rain()
 	elif effect == "cleansing_chant":
 		_resolve_cleansing_chant()
+	elif effect == "ally_stealth":
+		_resolve_ally_stealth()
 	# The older kits.
 	elif effect == "drive_by":
 		_resolve_drive_by(dmg_mult, weapon)
@@ -7231,6 +7257,8 @@ func _on_battle_ally_action(action: String) -> void:
 
 # Mana a caster regains from Guarding (the hero's Defend gives STAMINA_REGEN_ON_DEFEND stamina).
 const ALLY_GUARD_MANA := 15
+# Summon the Dead's "how many" picker offers one button per number up to this many (the HUD keeps that many pick buttons).
+const SUMMON_PICK_LIMIT := 24
 # Channel restores this share of the target's maximum mana (stamina for anyone without mana).
 const CHANNEL_RESTORE_PCT := 0.2
 
@@ -7250,16 +7278,21 @@ func _ally_specials(u: Dictionary) -> Array:
 		}]
 	var pool: Array = _ally_special_pool(u)
 	# A member brings only the specials chosen on the Party screen (PartyRules.SPECIAL_SLOTS of them), in
-	# slot order; anyone without a loadout (a mercenary, a skeleton) simply has the whole pool.
+	# slot order; anyone without a loadout (a mercenary, a skeleton) simply has the whole pool. Every roster member
+	# also has Stealth, which is not one of the three slots.
 	if not u.has("special_ids"):
-		return pool
+		return pool + _ally_universal_specials(u)
 	var out: Array = []
 	for id in u.special_ids:
 		for s in pool:
 			if str(s.get("id", "")) == str(id):
 				out.append(s)
 				break
-	return out
+	return out + _ally_universal_specials(u)
+
+# What every roster member can do whatever it carries (not a Party-screen slot): Stealth. (Not the wolf, a temporary companion.)
+func _ally_universal_specials(u: Dictionary) -> Array:
+	return [_ally_stealth_special(u)] if u.get("member", null) != null and str(u.get("kind", "")) != "wolf" else []
 
 # Everything a unit COULD bring: the kind's own specials first (Rallying Cry, Curse of Rot...), then the
 # weapon's three. The Party screen chooses from this.
@@ -7329,7 +7362,10 @@ func _kit_special_for(u: Dictionary, kit: Dictionary) -> Dictionary:
 		var count: int = mini(kills, maxi(0, (int(u.hp) - 1) / skeleton_cost))
 		# It can only be cast with enough HP in hand (5 HP + 40% of max HP), on top of paying per skeleton.
 		var needed: int = int(s.get("require_hp_flat", 0)) + int(round(float(u.max_hp) * float(s.get("require_hp_pct", 0.0))))
+		# `summon_count` / the cost are for the most it can raise; the picker (_ally_pick_candidates) lets the player ask
+		# for fewer, and _ally_pick_target reprices the action to match.
 		s["summon_count"] = count
+		s["summon_max"] = count
 		cost = maxi(1, count) * skeleton_cost * MANA_PER_HP
 		if kills <= 0:
 			s["disabled_reason"] = "no enemy was slain in the last battle"
@@ -7362,6 +7398,7 @@ func _special_target_kind(effect: String) -> String:
 		"revive": return "downed"
 		"charge", "dodge_and_weave": return "direction"
 		"cleansing_chant": return "chant"
+		"summon_dead": return "summon"
 		"druid_heal", "druid_buff": return "ally_self"
 	return ""
 
@@ -7390,7 +7427,8 @@ func _ally_choose_special(i: int) -> void:
 		hud.battle_log("Your %s has lost its weapon!" % u.name)
 		return
 	var kind: String = _special_target_kind(str(action.get("effect", "")))
-	if kind == "":
+	# With only one skeleton to raise there is nothing to choose.
+	if kind == "" or (kind == "summon" and int(action.get("summon_max", 0)) <= 1):
 		_ally_perform(action)
 		return
 	var picks: Array = _ally_pick_candidates(u, kind, action)
@@ -7407,6 +7445,19 @@ func _ally_choose_special(i: int) -> void:
 # "downed" = every downed ally. Each entry {"label", "target"} (target "hero" or a unit dict).
 func _ally_pick_candidates(u: Dictionary, kind: String, action: Dictionary = {}) -> Array:
 	var out: Array = []
+	if kind == "summon":
+		# Summon the Dead: how many to raise, from 1 to the most she can (one per enemy slain last battle, and as many as
+		# her HP pays for). The picker has SUMMON_PICK_LIMIT buttons; past that the last one is the maximum.
+		var most: int = int(action.get("summon_max", 0))
+		var each: int = int(_sn("necromancer_summon_the_dead", "hp_cost", PartyKitsScript.SKELETON_HP_COST))
+		var counts: Array = []
+		for n in range(1, mini(most, SUMMON_PICK_LIMIT - 1 if most > SUMMON_PICK_LIMIT else most) + 1):
+			counts.append(n)
+		if most > SUMMON_PICK_LIMIT:
+			counts.append(most)
+		for n in counts:
+			out.append({"label": "Raise %d  (%d HP)%s" % [n, n * each, "  - most" if n == most else ""], "target": n})
+		return out
 	if kind == "chant":
 		# Cleansing Chant: the whole circle at once (one status each), or one ally freed of everything.
 		var chant_everything: bool = _sn("shaman_cleansing_chant", "all") > 0.0
@@ -7446,7 +7497,15 @@ func _ally_pick_target(j: int) -> void:
 	if j < 0 or j >= battle_ally_pick_candidates.size():
 		return
 	var action: Dictionary = battle_ally_pending_action
-	battle_ally_target = battle_ally_pick_candidates[j].target
+	var picked = battle_ally_pick_candidates[j].target
+	if str(action.get("effect", "")) == "summon_dead":
+		# The pick is a number of skeletons, not a target: the action is repriced to raise (and pay for) exactly that many.
+		var n: int = clampi(int(picked), 1, maxi(1, int(action.get("summon_max", 1))))
+		action["summon_count"] = n
+		action["stamina_cost"] = n * int(_sn("necromancer_summon_the_dead", "hp_cost", PartyKitsScript.SKELETON_HP_COST)) * MANA_PER_HP
+		battle_ally_target = null
+	else:
+		battle_ally_target = picked
 	battle_ally_pending_action = {}
 	battle_ally_pick_candidates = []
 	_ally_perform(action)
@@ -7487,14 +7546,66 @@ func _ally_menu_info() -> Dictionary:
 	for special in specials:
 		var cost: int = int(special.get("stamina_cost", 0))
 		var reason: String = str(special.get("disabled_reason", ""))
+		# Summon the Dead's price is per skeleton (the picker asks how many); the rest show their whole cost.
+		var cost_text: String = _ally_cost_text(u, cost)
+		if special.get("per_skeleton", false):
+			cost_text = " (%d HP each)" % int(_sn("necromancer_summon_the_dead", "hp_cost", PartyKitsScript.SKELETON_HP_COST))
 		info.specials.append({
-			"label": str(special.name) + _ally_cost_text(u, cost),
+			"label": str(special.name) + cost_text,
 			"disabled": (disarmed and not special.get("kit", false)) or reason != "" or not _unit_can_pay(u, cost),
 			"tip": str(special.get("description", "")) + ((" (" + reason + ")") if reason != "" else ""),
 		})
 	for c in battle_ally_pick_candidates:
 		info.picks.append({"label": str(c.label)})
 	return info
+
+# --- Ally stealth -------------------------------------------------------------------------------
+# Every party member can slip out of sight, like the hero (_battle_player_stealth): for a few of its own turns an enemy that
+# has not spotted it cannot pick it as a target. An enemy spots a stealthy member by coming within STEALTH_SIGHT_RANGE tiles
+# with a clear line, or by being hit by it -- and having spotted it, stays on it for the rest of the battle (spotted_allies,
+# the per-ally version of the hero's aware_of_player). Its next attack is a guaranteed crit and breaks the stealth. A kind
+# may improve this (PartyRules "stealth": the Rogue's lasts longer, costs less, crits harder, and is never fully visible
+# even when not hiding -- passive_sight). Boss-tier enemies and a taunting Guardian ignore it, as they do the hero's.
+
+# The Stealth entry in a member's special list.
+func _ally_stealth_special(u: Dictionary) -> Dictionary:
+	var cfg: Dictionary = u.get("stealth_cfg", {})
+	var turns: int = int(cfg.get("turns", STEALTH_TURNS))
+	var bonus: float = float(cfg.get("crit_bonus", 0.0))
+	return {
+		"id": "ally_stealth", "name": "Stealth", "stamina_cost": int(cfg.get("cost", STEALTH_STAMINA_COST)), "dmg_mult": 0.0,
+		"effect": "ally_stealth", "kit": true,
+		"description": "Slip out of sight for %d turns: enemies that have not noticed this member cannot target them unless they come within %d tiles. Their next attack is a guaranteed crit%s, and ends the stealth." % [
+			turns, STEALTH_SIGHT_RANGE, (" that hits %d%% harder than a normal crit" % int(round(bonus * 100.0 / 2.0))) if bonus > 0.0 else ""],
+	}
+
+func _resolve_ally_stealth() -> void:
+	var u = battle_actor
+	u["stealth_turns"] = int(u.get("stealth_cfg", {}).get("turns", STEALTH_TURNS))
+	hud.battle_log("%s slips into the shadows." % _actor_label())
+
+# How close an enemy must come to spot this member (-1 = the member is not hiding, every enemy sees it).
+func _ally_stealth_sight(a: Dictionary) -> int:
+	var sight := -1
+	if int(a.get("stealth_turns", 0)) > 0:
+		sight = STEALTH_SIGHT_RANGE
+	var passive: int = int(a.get("stealth_cfg", {}).get("passive_sight", 0))
+	if passive > 0:
+		sight = passive if sight < 0 else mini(sight, passive)
+	return sight
+
+# Can this enemy pick this member as a target right now?
+func _enemy_sees_ally(u: Dictionary, a: Dictionary) -> bool:
+	if _ally_stealth_sight(a) < 0:
+		return true
+	if ENEMY_TRAITS.get(u.name, {}).get("is_boss_tier", false):
+		return true
+	return bool(u.get("spotted_allies", {}).get(str(a.get("name", "")), false))
+
+func _mark_ally_spotted(u: Dictionary, a: Dictionary) -> void:
+	var spotted: Dictionary = u.get("spotted_allies", {})
+	spotted[str(a.get("name", ""))] = true
+	u["spotted_allies"] = spotted
 
 # --- The Staff's effects (and Revival, ready for the Necromancer) -----------------------------
 
@@ -7688,30 +7799,37 @@ func _resolve_curse_of_rot() -> void:
 	if idx < 0 or idx >= battle_units.size():
 		return
 	var e: Dictionary = battle_units[idx]
-	e["rot_turns"] = int(_sn("necromancer_curse_of_rot", "turns", PartyKitsScript.ROT_TURNS))
+	e["rot_turns"] = PartyKitsScript.ROT_TURNS
 	e["rot_pct"] = _sn("necromancer_curse_of_rot", "pct", PartyKitsScript.ROT_DAMAGE_PCT)
+	e["rot_kills"] = maxi(1, int(_sn("necromancer_curse_of_rot", "kills", 1.0)))   # how many kills its death counts as
 	e["rot_by"] = battle_actor
 	hud.battle_log("%s curses the %s -- it begins to rot!" % [_actor_label(), e.name])
 
 # Every enemy death passes through here. A cursed enemy's kill is its Necromancer's whoever dealt
-# the blow, and a Necromancer's own kill counts too. Each kill is +1 max HP kept for good, and a
-# heal on top when it carries a staff (the "kill_heal" favour).
+# the blow (and counts as as many kills as the curse's level says: 1, 1, 2), and a Necromancer's own
+# kill counts too. Each kill is +1 max HP kept for good, and a heal on top when it carries a staff
+# (the "kill_heal" favour); a kill that counts twice gives both twice.
 func _note_enemy_death(enemy: Dictionary, killer) -> void:
 	var credited = enemy.get("rot_by", null)
-	if (credited == null or typeof(credited) != TYPE_DICTIONARY) and typeof(killer) == TYPE_DICTIONARY:
+	var counted := 1
+	if typeof(credited) == TYPE_DICTIONARY:
+		counted = maxi(1, int(enemy.get("rot_kills", 1)))
+	elif typeof(killer) == TYPE_DICTIONARY:
 		credited = killer
-	if credited == null or typeof(credited) != TYPE_DICTIONARY or str(credited.get("kind", "")) != "necromancer":
+	else:
 		return
-	var gain: int = int(credited.get("kill_max_hp", 0.0))
+	if str(credited.get("kind", "")) != "necromancer":
+		return
+	var gain: int = int(credited.get("kill_max_hp", 0.0)) * counted
+	var kill_heal: int = int(credited.get("mods", {}).get("kill_heal", 0.0)) * counted
 	var member = credited.get("member", null)
 	if member != null:
-		member.kills_this_battle += 1
+		member.kills_this_battle += counted
 		member.bonus["hp"] = float(member.bonus.get("hp", 0.0)) + gain
 	credited["max_hp"] = int(credited.max_hp) + gain
 	if int(credited.hp) > 0:
-		var heal: int = gain + int(credited.get("mods", {}).get("kill_heal", 0.0))
-		credited["hp"] = mini(int(credited.max_hp), int(credited.hp) + heal)
-		hud.battle_log("%s feeds on the kill (+%d max HP%s)." % [credited.name, gain, (", +%d HP" % int(credited.get("mods", {}).get("kill_heal", 0.0))) if int(credited.get("mods", {}).get("kill_heal", 0.0)) > 0 else ""])
+		credited["hp"] = mini(int(credited.max_hp), int(credited.hp) + gain + kill_heal)
+		hud.battle_log("%s feeds on the kill%s (+%d max HP%s)." % [credited.name, (" -- it counts as %d" % counted) if counted > 1 else "", gain, (", +%d HP" % kill_heal) if kill_heal > 0 else ""])
 
 # Summon the Dead: raises the skeletons the menu worked out (one per enemy slain last battle, 5 HP
 # each, already paid) on the open tiles nearest the Necromancer.
@@ -8484,7 +8602,10 @@ func _assign_enemy_targets() -> Dictionary:
 		# them (see _enemy_currently_sees_player -- while Stealth is active,
 		# this can differ per unit; outside Stealth it's always true, so this
 		# reduces to exactly the prior always-include-the-player behavior).
-		var targets: Array = ally_tiles.duplicate()
+		var targets: Array = []
+		for a in battle_allies:
+			if _enemy_sees_ally(u, a):
+				targets.append(a.tile)
 		if _enemy_currently_sees_player(u):
 			targets.append(battle_player_tile)
 		if targets.is_empty():
@@ -8524,6 +8645,8 @@ func _pick_enemy_target_tile(u: Dictionary) -> Vector2i:
 		best_tile = battle_player_tile
 		best_dist = _footprint_dist(footprint, battle_player_tile)
 	for a in battle_allies:
+		if not _enemy_sees_ally(u, a):
+			continue
 		var d: int = _footprint_dist(footprint, a.tile)
 		if best_dist < 0 or d < best_dist:
 			best_dist = d
@@ -9372,6 +9495,8 @@ func _tick_ally_timers(ally_unit: Dictionary) -> void:
 		ally_unit["charm_turns"] = int(ally_unit.charm_turns) - 1
 	if int(ally_unit.get("buff_turns", 0)) > 0:
 		ally_unit["buff_turns"] = int(ally_unit.buff_turns) - 1
+	if int(ally_unit.get("stealth_turns", 0)) > 0:
+		ally_unit["stealth_turns"] = int(ally_unit.stealth_turns) - 1
 
 # The hero lost a turn (reeling): hand play on to whoever is next.
 func _hero_turn_skipped() -> void:

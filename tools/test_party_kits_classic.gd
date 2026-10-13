@@ -193,7 +193,7 @@ func _init() -> void:
 	var dl := []
 	for s in main._ally_specials(d1):
 		dl.append(s.name + main._ally_cost_text(d1, int(s.stamina_cost)))
-	print("Druid's spells: %s (expected Restore (40 MP), Empower (30 MP), Vitalize (40 MP), then no weapon specials when bare-handed)" % [dl])
+	print("Druid's spells: %s (expected Restore (40 MP), Empower (30 MP), Vitalize (40 MP), Stealth (20 MP) -- every member has it -- then no weapon specials when bare-handed)" % [dl])
 	main.battle_units = [_make_goblin(main, Vector2i(6, 6), 999)]
 	await _cast(main, d1, "Restore", t1)
 	print("Restore = 25%% of 40 max HP + magic 12 / 3 = 14: HP 5 -> %d (expected 19); costs 40 mana: %d left (expected %d)" % [t1.hp, d1.mana, d1.max_mana - 40])
@@ -274,7 +274,7 @@ func _init() -> void:
 	var gl := []
 	for s in main._ally_specials(g1):
 		gl.append(s.name + main._ally_cost_text(g1, int(s.stamina_cost)))
-	print("Guardian's specials: %s (expected [Taunt, Body Slam (35 STA), Haymaker (50 STA), Earbursting Bellow (60 STA)])" % [gl])
+	print("Guardian's specials: %s (expected [Taunt, Body Slam (35 STA), Haymaker (50 STA), Earbursting Bellow (60 STA), Stealth (20 STA)])" % [gl])
 	main.battle_units = [gt]
 	var g_filler := _filler()
 	main.battle_allies = [g1, g_filler]

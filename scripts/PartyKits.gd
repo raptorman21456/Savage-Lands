@@ -103,10 +103,10 @@ const KITS := {
 		# Takes the Necromancer to 1 HP to cast (the cost is worked out when the menu opens).
 		{"id": "necromancer_revival_blessing", "name": "Revival Blessing", "stamina_cost": 0, "dmg_mult": 0.0, "effect": "revive", "cost_all": true,
 			"description": "Raise a downed ally to full HP. It takes everything the Necromancer has: HP drops to 1."},
-		# 5 HP per skeleton, one for each enemy slain in the last battle; needs 5 HP + 40% of max HP to cast
-		# (require_hp_*; both worked out when the menu opens).
+		# 5 HP per skeleton, as many as you choose (a picker) up to one for each enemy slain in the last battle; needs
+		# 5 HP + 40% of max HP to cast (require_hp_*; both worked out when the menu opens).
 		{"id": "necromancer_summon_the_dead", "name": "Summon the Dead", "stamina_cost": 0, "dmg_mult": 0.0, "effect": "summon_dead", "per_skeleton": true, "require_hp_flat": 5, "require_hp_pct": 0.4,
-			"description": "Raise a 1 HP skeleton (4 damage) for every enemy slain in the last battle, for 5 HP each. They charge the nearest enemy. Needs 5 HP plus 40% of max HP to cast."},
+			"description": "Raise 1 HP skeletons (4 damage) for 5 HP each -- you choose how many, up to one for every enemy slain in the last battle. They charge the nearest enemy. Needs 5 HP plus 40% of max HP to cast."},
 	],
 	"shaman": [
 		{"id": "shaman_how_charming", "name": "How Charming", "stamina_cost": 40, "dmg_mult": 0.0, "effect": "how_charming",
@@ -166,7 +166,7 @@ const KITS := {
 
 # Effects that are not aimed at an enemy in reach: _battle_perform_attack does not refuse them for
 # "no enemy in range".
-const NO_ENEMY_NEEDED := ["rallying_cry", "charge", "stalwart", "summon_dead", "how_charming", "soothing_rain", "cleansing_chant", "channel", "revive", "taunt", "sprint", "druid_heal", "druid_buff"]
+const NO_ENEMY_NEEDED := ["rallying_cry", "charge", "stalwart", "summon_dead", "how_charming", "soothing_rain", "cleansing_chant", "channel", "revive", "taunt", "sprint", "druid_heal", "druid_buff", "ally_stealth"]
 
 static func specials_for(kind: String) -> Array:
 	return KITS.get(kind, [])

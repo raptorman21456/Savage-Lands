@@ -106,7 +106,7 @@ const KINDS := {
 	},
 	"rogue": {
 		"name": "Rogue", "levels": true,
-		"description": "Quick hands, quicker feet. Would rather lift an enemy's coin purse than its life, right up until the moment it decides otherwise.",
+		"description": "Quick hands, quicker feet. Would rather lift an enemy's coin purse than its life, right up until the moment it decides otherwise. Always half in shadow: foes only notice the Rogue from close by, and its Stealth lasts longer, costs less and bites harder.",
 		"base": {"hp": 20.0, "attack": 1.0, "defense": 0.0, "speed": 5.0, "magic": 0.0, "fortitude": 0.0},
 		# Armour (defense) -30%, attack +30%, speed +40%, HP as normal.
 		"growth": {"hp": 1.0, "attack": 1.3, "defense": 0.7, "speed": 1.4, "magic": 1.0, "fortitude": 1.0},
@@ -118,6 +118,11 @@ const KINDS := {
 		# after attacking it may move again.
 		"steal_chance": 0.25, "moves_after_attack": true,
 		"favour": {"weapon": "dagger", "damage_pct": 0.25},
+		# Every member can use Stealth (Main.gd:_ally_stealth_special); the Rogue's is better, and it is never fully visible.
+		# DRAFT numbers (the user asked only for "always partially on" and "buffed"): plain Stealth is 3 turns / 20 / foes spot a
+		# hiding member from 2 tiles; the Rogue's lasts 5 turns, costs 10, its stealthed crit does +1.0x on top of a normal crit's
+		# 2x, and even when not hiding foes only spot it from 3 tiles (passive_sight).
+		"stealth": {"turns": 5, "cost": 10, "crit_bonus": 1.0, "passive_sight": 3},
 		"attack_range": 1, "tint": Color(0.85, 0.7, 1.0),
 	},
 	# --- The four from the design doc (their kits live in PartyKits.gd) ---

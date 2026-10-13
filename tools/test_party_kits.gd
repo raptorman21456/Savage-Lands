@@ -137,7 +137,7 @@ func _init() -> void:
 	var sword_names := []
 	for s in main._ally_specials(sword_unit):
 		sword_names.append(s.name)
-	print("...kit first, then the weapon's own specials: %s (expected 3 kit names, then 3 greatsword ones)" % [sword_names])
+	print("...kit first, then the weapon's own specials: %s (expected 3 kit names, then 3 greatsword ones, then Stealth, which every member has)" % [sword_names])
 	player.unequip_ally_weapon(knight)
 	var brawler_unit: Dictionary = main._make_member_battle_unit(brawler, Vector2i(1, 4), 1.0)
 	print("Brawler perks: crit chance +%.2f (expected 0.10), double-hit chance +%.2f (expected 0.10), bare fists range %d (expected 2)" % [brawler_unit.mods.get("crit_chance", 0.0), brawler_unit.weapon.get("passive_double_hit_chance", 0.0), brawler_unit.attack_range])
@@ -174,21 +174,21 @@ func _init() -> void:
 	var labels := []
 	for s in main._ally_menu_info().specials:
 		labels.append(s.label)
-	print("Knight's Special menu: %s (expected [Rallying Cry (25 STA), CHARGE!! (50 STA), Stalwart (10 STA)])" % [labels])
+	print("Knight's Special menu: %s (expected [Rallying Cry (25 STA), CHARGE!! (50 STA), Stalwart (10 STA), Stealth (20 STA)])" % [labels])
 	var nlabels := []
 	var necro_menu: Dictionary = main._make_member_battle_unit(necro, Vector2i(1, 3), 1.0)
 	for s in main._ally_specials(necro_menu):
 		nlabels.append(s.name + main._ally_cost_text(necro_menu, int(s.stamina_cost)))
-	print("Necromancer's, in HP: %s (expected [Curse of Rot (12 HP), Revival Blessing (14 HP), Summon the Dead (5 HP)])" % [nlabels])
+	print("Necromancer's, in HP: %s (expected [Curse of Rot (12 HP), Revival Blessing (14 HP), Summon the Dead (5 HP), Stealth (4 HP)])" % [nlabels])
 	var slabels := []
 	var shaman_menu: Dictionary = main._make_member_battle_unit(shaman, Vector2i(1, 3), 1.0)
 	for s in main._ally_specials(shaman_menu):
 		slabels.append(s.name + main._ally_cost_text(shaman_menu, int(s.stamina_cost)))
-	print("Shaman's, in mana: %s (expected [How Charming (40 MP), Soothing Rain (50 MP), Cleansing Chant (30 MP)])" % [slabels])
+	print("Shaman's, in mana: %s (expected [How Charming (40 MP), Soothing Rain (50 MP), Cleansing Chant (30 MP), Stealth (20 MP)])" % [slabels])
 	var blabels := []
 	for s in main._ally_specials(brawler_unit):
 		blabels.append(s.name + main._ally_cost_text(brawler_unit, int(s.stamina_cost)))
-	print("Brawler's: %s (expected [Sucker Punch (30 STA), Dodge and Weave (45 STA), Drain Punch (40 STA)])" % [blabels])
+	print("Brawler's: %s (expected [Sucker Punch (30 STA), Dodge and Weave (45 STA), Drain Punch (40 STA), Stealth (20 STA)])" % [blabels])
 
 	# =========================================================
 	# Knight: Rallying Cry

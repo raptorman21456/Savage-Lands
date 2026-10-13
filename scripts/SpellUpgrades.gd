@@ -44,8 +44,8 @@ const SPELLS := [
 		"text": ["", "Reaches allies within 3 tiles.", "Within 3 tiles, EVERY affliction comes off EVERY ally at once."]},
 	# --- the Necromancer ---
 	{"id": "necromancer_curse_of_rot", "owner": "Necromancer", "name": "Curse of Rot",
-		"numbers": [{"pct": 0.10, "turns": 5}, {"pct": 0.12, "turns": 5}, {"pct": 0.15, "turns": 6}],
-		"text": ["", "The curse eats 12% of max HP a turn.", "The curse eats 15% of max HP a turn, for 6 turns."]},
+		"numbers": [{"pct": 0.10, "kills": 1}, {"pct": 0.12, "kills": 1}, {"pct": 0.15, "kills": 2}],
+		"text": ["", "The curse eats 12% of max HP a turn.", "The curse eats 15% of max HP a turn, and a kill it claims counts as 2 kills."]},
 	{"id": "necromancer_revival_blessing", "owner": "Necromancer", "name": "Revival Blessing",
 		"numbers": [{"keep_pct": 0.0}, {"keep_pct": 0.25}, {"keep_pct": 0.5}],
 		"text": ["", "The Necromancer is left with 25% of her max HP, not 1.", "The Necromancer is left with half her max HP."]},

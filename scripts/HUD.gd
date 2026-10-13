@@ -357,6 +357,7 @@ var battle_ally_buttons := {}
 # The ally's special-move list and the friendly-target picker: a fixed pool of buttons relabelled
 # every refresh from battle_ally_menu_info (set by Main.gd:_refresh_battle_display each frame).
 const ALLY_SPECIAL_SLOTS := 12
+const ALLY_PICK_SLOTS := 24                # Summon the Dead's "how many" picker has a button per number (Main.SUMMON_PICK_LIMIT)
 var battle_ally_special_box: HFlowContainer
 var battle_ally_special_buttons := []
 var battle_ally_special_back: Button
@@ -1736,7 +1737,7 @@ func _build_battle_ui() -> void:
 	battle_ally_pick_box.add_theme_constant_override("v_separation", 4)
 	battle_ally_pick_box.visible = false
 	battle_content_root.add_child(battle_ally_pick_box)
-	for i in ALLY_SPECIAL_SLOTS:
+	for i in ALLY_PICK_SLOTS:
 		var pick_button := Button.new()
 		pick_button.pressed.connect(func(): battle_ally_action.emit("pick_%d" % i))
 		_style_standard_button(pick_button)
@@ -2816,6 +2817,9 @@ func update_battle_grid(grid_w: int, grid_h: int, terrain: Dictionary, player_ti
 			# Whoever the player is commanding right now glows, like the current target.
 			if a.get("acting", false):
 				ally_icon.modulate = ally_icon.modulate * Color(1.4, 1.4, 0.75)
+			# A member hiding in the shadows (Stealth) is drawn faded.
+			if int(a.get("stealth_turns", 0)) > 0:
+				ally_icon.modulate.a = 0.5
 			ally_icon.position = a_tile_origin + Vector2(a_padding, a_padding)
 			ally_icon.size = Vector2(battle_tile_size - a_padding * 2, battle_tile_size - a_padding * 2)
 			ally_icon.visible = ally_icon.texture != null

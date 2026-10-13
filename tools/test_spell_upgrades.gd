@@ -273,8 +273,16 @@ func _init() -> void:
 		var hp_before: int = int(cursed.hp)
 		main.battle_allies = [n1, _filler()]
 		await main._process_enemy_turn()
-		rot.append([int(cursed.get("rot_turns", 0)) + 1, hp_before - int(cursed.hp)])
-	print("Curse of Rot: 10%% a turn for 5 turns, 12%% for 5, 15%% for 6 (a goblin of 100 HP loses 10 / 12 / 15 in its first tick): %s (expected [[5, 10], [5, 12], [6, 15]])" % [rot])
+		var turns: int = int(cursed.get("rot_turns", 0)) + 1
+		var rot_damage: int = hp_before - int(cursed.hp)
+		# ...and when the rot finishes it, the kill counts for the Necromancer: once, once, then twice (kills and max HP both).
+		necro.kills_this_battle = 0
+		var max_before: int = int(n1.max_hp)
+		cursed.hp = 1
+		cursed.max_hp = 100
+		await main._process_enemy_turn()
+		rot.append([turns, rot_damage, necro.kills_this_battle, int(n1.max_hp) - max_before])
+	print("Curse of Rot: 10%% / 12%% / 15%% of max HP a turn, always 5 turns (a goblin of 100 HP loses 10 / 12 / 15 in its first tick); a kill the rot finishes counts as 1 / 1 / 2 kills and gives that much max HP: %s (expected [[5, 10, 1, 1], [5, 12, 1, 1], [5, 15, 2, 2]])" % [rot])
 	player.spell_levels.clear()
 
 	var revive := []
@@ -306,6 +314,60 @@ func _init() -> void:
 		var raised: Array = main.battle_allies.filter(func(a): return a.get("kind", "") == "skeleton")
 		skel.append([raised.size(), int(raised[0].hp) if raised.size() > 0 else 0, int(raised[0].attack) if raised.size() > 0 else 0, 40 - int(n3.hp)])
 	print("Summon the Dead (2 kills): skeletons of 1 HP / 4 damage at 5 HP each, 2 HP / 6 at 5, 3 HP / 8 at 4: %s (expected [[2, 1, 4, 10], [2, 2, 6, 10], [2, 3, 8, 8]])" % [skel])
+	player.spell_levels.clear()
+	necro.kills_last_battle = 0
+
+	# Summon the Dead asks how many to raise, from 1 to the most she can (one per enemy slain last battle, and as many as her HP pays for).
+	var summon_menu := func(kills: int, hp: int, level: int) -> Dictionary:
+		player.spell_levels["necromancer_summon_the_dead"] = level
+		_reset(main, player)
+		var n: Dictionary = main._make_member_battle_unit(necro, Vector2i(3, 4), 1.0)
+		n.mods = {}
+		n.weapon = {"damage_mult": 1.0}
+		n.max_hp = hp
+		n.hp = hp
+		necro.kills_last_battle = kills
+		var filler := _filler()
+		main.battle_allies = [n, filler]
+		main.battle_ally_queue = [filler]
+		main.battle_units = [_make_goblin(main, Vector2i(7, 4), 50)]
+		main.battle_commanding_ally = n
+		var idx := -1
+		var specials: Array = main._ally_specials(n)
+		for i in specials.size():
+			if specials[i].name == SU.display_name("necromancer_summon_the_dead", level):
+				idx = i
+		main._ally_choose_special(idx)
+		return {"unit": n}
+	var sm: Dictionary = summon_menu.call(4, 40, 0)
+	var labels: Array = main._ally_menu_info().picks.map(func(p): return p.label)
+	print("With 4 kills last battle and 40 HP the picker offers 1 to 4 (5 HP each): state=%s (expected ally_pick), %s (expected [Raise 1  (5 HP), Raise 2  (10 HP), Raise 3  (15 HP), Raise 4  (20 HP)  - most])" % [main.battle_menu_state, labels])
+	print("The special's own button prices it per skeleton: '%s' (expected Summon the Dead (5 HP each))" % [main._ally_menu_info().specials.filter(func(s): return s.label.begins_with("Summon"))[0].label])
+	main._ally_pick_target(1)
+	await process_frame
+	await process_frame
+	var raised_two: Array = main.battle_allies.filter(func(a): return a.get("kind", "") == "skeleton")
+	print("Picking 2 raises exactly 2 and charges for 2 (not the 4 it could): %d skeletons (expected 2), HP 40 -> %d (expected 30)" % [raised_two.size(), sm.unit.hp])
+	print("...and the picker is spent: pending action=%s (expected {})" % [main.battle_ally_pending_action])
+
+	sm = summon_menu.call(1, 40, 0)
+	await process_frame
+	await process_frame
+	print("With only one skeleton to raise there is nothing to choose: it is raised at once: %d skeleton, HP 40 -> %d (expected 1, 35)" % [main.battle_allies.filter(func(a): return a.get("kind", "") == "skeleton").size(), sm.unit.hp])
+
+	sm = summon_menu.call(5, 12, 0)
+	print("HP caps the picker: 5 kills but 12 HP pays for 11/5 = 2: %d options (expected 2)" % [main._ally_menu_info().picks.size()])
+
+	sm = summon_menu.call(3, 40, 2)
+	labels = main._ally_menu_info().picks.map(func(p): return p.label)
+	print("At EX a skeleton costs 4 HP, so the picker prices it so: %s (expected [Raise 1  (4 HP), Raise 2  (8 HP), Raise 3  (12 HP)  - most])" % [labels])
+
+	sm = summon_menu.call(30, 200, 0)
+	labels = main._ally_menu_info().picks.map(func(p): return p.label)
+	print("With 30 skeletons available the picker keeps to its %d buttons (the HUD has %d), 1 to %d and then the most: %d options (expected 24), last '%s' (expected Raise 30  (150 HP)  - most), the one before '%s' (expected Raise 23  (115 HP))" % [main.SUMMON_PICK_LIMIT, main.hud.battle_ally_pick_buttons.size(), main.SUMMON_PICK_LIMIT - 1, labels.size(), labels[labels.size() - 1], labels[labels.size() - 2]])
+	main.battle_menu_state = "main"
+	main.battle_ally_pending_action = {}
+	main.battle_ally_pick_candidates = []
 	player.spell_levels.clear()
 	necro.kills_last_battle = 0
 
@@ -356,6 +418,7 @@ func _init() -> void:
 		d6.mods = {}
 		var friend: Dictionary = main._make_member_battle_unit(shaman, Vector2i(2, 4), 1.0)
 		friend.mods = {}
+		friend.max_mana = 100                     # (pinned: the check is about the percentage, not the Shaman's levelled magic)
 		friend.mana = 0
 		main.battle_allies = [d6, friend]
 		main.battle_units = [_make_goblin(main, Vector2i(7, 7))]
