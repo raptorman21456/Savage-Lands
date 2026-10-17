@@ -1,54 +1,53 @@
 extends CanvasLayer
 class_name InventoryPanel
 
-# The player's full in-run menu -- opened from the pause menu's "Inventory"
-# button or the overworld's direct "I" key (see Main.gd:_process). Tabbed,
-# grid-based: Weapons (weapons/armor/shields), Items (potions/arrows),
-# Party (recruited followers), Map (a schematic of wherever you are), and
-# Settings (a passthrough to HUD's existing settings screen, not rebuilt
-# here -- see _on_tab_pressed).
+# The player's in-run menu -- opened from the pause menu's "Inventory" button or the overworld's "I" key (see Main.gd:_process) -- as a
+# floating window in the pixel kit (PixelKit.gd): five tabs, icon-only except the one you are on.
+#   Gear      weapons / armour / clothes / shields as a grid of cards with a detail card beside it (InvGearView)
+#   Items     potions, food and arrows (click a potion or food to use it)
+#   Party     you and your recruits on one page (PartyScreen): equipment tiles, specials, stats; press a tile and a picker popup opens
+#   Map       the continent with pins and zoom (InvMapView)
+#   Settings  audio, controls, gameplay (InvSettingsView)
+# Talismans have no tab: they are a popup (InvTalismanPopup) from a unit's Talismans line on the Party page.
+# Weapons carry their quality as slowly turning pixel rays (PixelRays.gd), never in the name.
 #
-# Weapons and Shields are real, browsable collections (owned_weapons/
-# owned_shields track every one ever acquired) so their grids are fully
-# interactive -- click any owned one to equip it. Armor has no such
-# ownership model (buying a piece immediately replaces whatever you had --
-# see Player.gd:try_buy_armor): only ever one exists at a time, so its
-# section is a single info card, not a clickable grid.
+# What a button does is decided in InvData (the same equip functions on Player as ever); this file builds the window, owns the popups,
+# plays the sounds and rebuilds. The `_on_*_pressed` handlers below are kept as plain "do this to the player" entry points.
 
-const EnchantmentsScript := preload("res://scripts/Enchantments.gd")
-const PotionsScript := preload("res://scripts/Potions.gd")
 const WeaponsScript := preload("res://scripts/Weapons.gd")
 const ShieldsScript := preload("res://scripts/Shields.gd")
 const ClothingScript := preload("res://scripts/Clothing.gd")
 const ArmorScript := preload("res://scripts/Armor.gd")
-const BlacksmithScript := preload("res://scripts/Blacksmith.gd")
-const TalismansScript := preload("res://scripts/Talismans.gd")
-const WeaponIconsScript := preload("res://scripts/WeaponIcons.gd")
-const WorldMapScript := preload("res://scripts/WorldMap.gd")
-const RoomsScript := preload("res://scripts/Rooms.gd")
-const MiniMapScript := preload("res://scripts/MiniMap.gd")
-const PartyScreenScript := preload("res://scripts/PartyScreen.gd")
 
-const TABS := ["Weapons", "Items", "Talismans", "Party", "Map", "Settings"]
-const GRID_COLUMNS := 4
-const CELL_SIZE := Vector2(112, 122)
-# Weapons get bigger cards than everything else on the tab (icon at 2x, tier tag,
-# name, damage), five to a row. Legendary and Mythic cards glow.
-const WEAPON_CELL_SIZE := Vector2(150, 172)
-const WEAPON_COLUMNS := 5
-const GLOW_SIZE := 9
-const GLOW_SIZE_MYTHIC := 12
-const EQUIPPED_COLOR := Color(1.0, 0.85, 0.2)
-const BORDER_COLOR := Color(0.4, 0.4, 0.45)
+const TABS := ["Gear", "Items", "Party", "Map", "Settings"]
+const TAB_ICONS := {"Gear": "tab_gear", "Items": "tab_items", "Party": "tab_party", "Map": "tab_map", "Settings": "tab_settings"}
+const WINDOW_SIZE := Vector2(1120, 624)
+const POPUP_SIZE := Vector2(1076, 604)
 
 var _was_paused := false
 var _player: Player = null
-var active_tab: String = "Weapons"
+var active_tab: String = "Gear"
 var tab_buttons := {}
 var tab_containers := {}
-var map_canvas: Control
-# Whose sheet the Party tab shows (PartyMember.id); kept here because the tab is rebuilt after every change.
-var party_selected_id := -1
+# Whose sheet the Party tab shows (PartyMember.id, or PartyScreen.HERO_ID for you) and which of its pages; kept here because the tab is rebuilt.
+var party_selected_id := -2
+var party_page := "Equipment"
+var settings_page := "Audio"
+var view_states := {}          # each view's remembered category / selection / sort / search, by name
+var window: Panel = null
+var content: Control = null
+var body: Control = null
+var scrim: ColorRect = null
+var popup_layer: Control = null
+var popup_view: Control = null  # the view inside the open popup, if any
+var popup_kind := ""            # "gear", "talisman" or "pick"
+var popup_member = null
+var popup_category := ""
+var gear_view: InvGearView = null
+var items_view: InvGearView = null
+var party_screen: PartyScreen = null
+var map_view: InvMapView = null
+var settings_view: InvSettingsView = null
 
 func _ready() -> void:
 	layer = 30
@@ -56,423 +55,307 @@ func _ready() -> void:
 	_build()
 
 func _build() -> void:
-	var scrim := ColorRect.new()
+	scrim = ColorRect.new()
 	scrim.color = Color(0, 0, 0, 0.75)
 	scrim.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(scrim)
-
-	var window_size := Vector2(880, 640)
-	var window := Panel.new()
-	window.size = window_size
-	var window_style := StyleBoxFlat.new()
-	window_style.bg_color = Color(0.08, 0.08, 0.1)
-	window_style.border_color = Color(0.4, 0.4, 0.45)
-	window_style.set_border_width_all(3)
-	window_style.set_corner_radius_all(10)
-	window.add_theme_stylebox_override("panel", window_style)
+	window = Panel.new()
+	window.size = WINDOW_SIZE
+	window.add_theme_stylebox_override("panel", PixelKit.frame("panel"))
 	scrim.add_child(window)
-	window.position = ((get_viewport().get_visible_rect().size - window_size) / 2).round()
-
-	var margin := MarginContainer.new()
-	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
-	for side in ["left", "right", "top", "bottom"]:
-		margin.add_theme_constant_override("margin_%s" % side, 20)
-	window.add_child(margin)
-
-	var outer := VBoxContainer.new()
-	outer.add_theme_constant_override("separation", 14)
-	margin.add_child(outer)
-
-	var title_row := HBoxContainer.new()
-	outer.add_child(title_row)
-	var title := Label.new()
-	title.text = "INVENTORY"
-	title.add_theme_font_size_override("font_size", 26)
-	title.add_theme_color_override("font_color", Color(1, 0.9, 0.3))
-	title_row.add_child(title)
-	var spacer := Control.new()
-	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	title_row.add_child(spacer)
-	var close_button := Button.new()
-	close_button.text = "Close"
-	close_button.pressed.connect(close)
-	title_row.add_child(close_button)
-
+	content = Control.new()
+	content.position = Vector2(14, 14)
+	content.size = WINDOW_SIZE - Vector2(28, 28)
+	window.add_child(content)
+	var title := PixelKit.label("Inventory", "head", PixelKit.GOLD3)
+	title.position = Vector2(8, 10)
+	content.add_child(title)
 	var tab_row := HBoxContainer.new()
-	tab_row.add_theme_constant_override("separation", 8)
-	outer.add_child(tab_row)
+	tab_row.add_theme_constant_override("separation", 0)
+	tab_row.position = Vector2(230, 4)
+	content.add_child(tab_row)
 	for tab_name in TABS:
-		var button := Button.new()
-		button.text = tab_name
-		button.toggle_mode = true
-		button.custom_minimum_size = Vector2(130, 34)
-		button.button_pressed = tab_name == active_tab
-		button.pressed.connect(_on_tab_pressed.bind(tab_name))
-		_style_tab_button(button)
-		tab_row.add_child(button)
-		tab_buttons[tab_name] = button
-
-	var scroll := ScrollContainer.new()
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	outer.add_child(scroll)
-	var content_stack := VBoxContainer.new()
-	content_stack.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scroll.add_child(content_stack)
+		var b := PixelButton.make("", TAB_ICONS[tab_name], _on_tab_pressed.bind(tab_name), tab_name == active_tab)
+		b.tooltip_text = tab_name
+		tab_row.add_child(b)
+		tab_buttons[tab_name] = b
+	var close_button := PixelButton.make("×", "", close)
+	close_button.tooltip_text = "Close"
+	close_button.position = Vector2(content.size.x - 56, 4)
+	close_button.custom_minimum_size = Vector2(52, 48)
+	content.add_child(close_button)
+	body = Control.new()
+	body.position = Vector2(6, 62)
+	body.size = Vector2(content.size.x - 12, 500)
+	content.add_child(body)
+	var hint := PixelKit.label("Q / E  Tabs      Esc  Back      I  Close", "body", PixelKit.DIM)
+	hint.position = Vector2(8, content.size.y - 26)
+	content.add_child(hint)
 	for tab_name in TABS:
-		if tab_name == "Settings":
-			continue
-		var container := VBoxContainer.new()
-		container.add_theme_constant_override("separation", 18)
-		container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var container := Control.new()
+		container.size = body.size
 		container.visible = tab_name == active_tab
-		content_stack.add_child(container)
+		body.add_child(container)
 		tab_containers[tab_name] = container
+	popup_layer = Control.new()
+	popup_layer.set_anchors_preset(Control.PRESET_FULL_RECT)
+	popup_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	scrim.add_child(popup_layer)
+	_style_tab_buttons()
 
-func _style_tab_button(button: Button) -> void:
-	button.add_theme_stylebox_override("normal", _make_stylebox(Color(0.13, 0.12, 0.15, 0.92), BORDER_COLOR, 2, 8))
-	button.add_theme_stylebox_override("hover", _make_stylebox(Color(0.2, 0.19, 0.13, 0.96), Color(1.0, 0.9, 0.2), 2, 8))
-	button.add_theme_stylebox_override("pressed", _make_stylebox(Color(0.22, 0.18, 0.05, 0.95), Color(1.0, 0.85, 0.2), 2, 8))
-	button.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
-
-func _make_stylebox(bg: Color, border: Color, border_width: int, radius: int) -> StyleBoxFlat:
-	var style := StyleBoxFlat.new()
-	style.bg_color = bg
-	style.border_color = border
-	style.set_border_width_all(border_width)
-	style.set_corner_radius_all(radius)
-	return style
+func _center_window() -> void:
+	window.position = ((get_viewport().get_visible_rect().size - WINDOW_SIZE) / 2.0).round()
 
 func open(player_ref: Player) -> void:
 	_player = player_ref
 	_was_paused = get_tree().paused
 	get_tree().paused = true
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	_center_window()
+	close_popup()
 	_refresh()
 	visible = true
 
 func close() -> void:
+	close_popup()
 	visible = false
 	get_tree().paused = _was_paused
 
-# Settings is a passthrough to HUD's own already-built settings screen
-# rather than a real tab of its own -- rebuilding every slider/checkbox a
-# second time here would just be duplicated, divergence-prone UI for a
-# screen that already works. Also opens the pause menu underneath (same as
-# reaching Settings from the pause menu's own button) rather than calling
-# close(), specifically so Settings' existing Back button has something
-# sane to return to -- neither it nor its Back button touch get_tree().
-# paused themselves (they rely on already being reached from an already-
-# paused pause menu), so landing here with nothing paused-and-visible
-# underneath would strand the game paused with no UI at all once Back is
-# pressed.
 func _on_tab_pressed(tab_name: String) -> void:
-	if tab_name == "Settings":
-		var main := get_parent()
-		visible = false
-		main.menu_open = true
-		main.hud.show_menu()
-		main.settings_open = true
-		main.hud.show_settings()
-		tab_buttons[tab_name].button_pressed = false
-		tab_buttons[active_tab].button_pressed = true
-		return
+	close_popup()
 	_select_tab(tab_name)
 
 func _select_tab(tab_name: String) -> void:
 	active_tab = tab_name
-	for name in tab_buttons:
-		tab_buttons[name].button_pressed = name == tab_name
 	for name in tab_containers:
 		tab_containers[name].visible = name == tab_name
-	if tab_name == "Map" and map_canvas != null:
-		map_canvas.queue_redraw()
+	_style_tab_buttons()
+	_build_tab(tab_name)
+
+# Only the tab you are on shows its name; the rest are just their icon.
+func _style_tab_buttons() -> void:
+	for name in tab_buttons:
+		var b: PixelButton = tab_buttons[name]
+		b.on = name == active_tab
+		b.text = name if name == active_tab else ""
 
 func _refresh() -> void:
 	if _player == null:
 		return
-	for name in tab_containers:
-		for c in tab_containers[name].get_children():
-			c.queue_free()
-	_build_weapons_tab(tab_containers.Weapons)
-	_build_items_tab(tab_containers.Items)
-	_build_talismans_tab(tab_containers.Talismans)
-	_build_party_tab(tab_containers.Party)
-	_build_map_tab(tab_containers.Map)
-	_select_tab(active_tab)
+	_build_tab(active_tab)
+	_refresh_popup()
 
-# --- Weapons tab: Weapons (grid, click to equip) + Armor (single info card,
-# see class comment for why it isn't a grid) + Shields (grid, click to
-# equip). ---------------------------------------------------------------
+func _state(key: String) -> Dictionary:
+	if not view_states.has(key):
+		view_states[key] = {}
+	return view_states[key]
 
-func _build_weapons_tab(container: VBoxContainer) -> void:
-	_add_section_heading(container, "WEAPONS")
-	# Room around the grid for the Legendary/Mythic glow, which spills past a
-	# card's edge and would otherwise be cut off by the scroll area.
-	var weapon_margin := MarginContainer.new()
-	for side in ["left", "right", "top", "bottom"]:
-		weapon_margin.add_theme_constant_override("margin_%s" % side, 10)
-	container.add_child(weapon_margin)
-	var weapon_grid := GridContainer.new()
-	weapon_grid.columns = WEAPON_COLUMNS
-	weapon_grid.add_theme_constant_override("h_separation", 10)
-	weapon_grid.add_theme_constant_override("v_separation", 12)
-	weapon_margin.add_child(weapon_grid)
-	var current_weapon_id: String = _player.current_weapon_base.get("id", "")
-	# Best tier first, then by name, so the good stuff leads instead of sitting in
-	# the order it happened to be bought.
-	var owned_variants: Array = []
-	for id in _player.owned_weapons:
-		var variant: Dictionary = WeaponsScript.get_owned_variant(id)
-		# Party-only weapons (the Staff) live on the Party tab, not here.
-		if not variant.is_empty() and not WeaponsScript.is_ally_only(variant):
-			owned_variants.append(variant)
-	owned_variants.sort_custom(func(a, b):
-		var rank_a: int = _tier_rank(a)
-		var rank_b: int = _tier_rank(b)
-		if rank_a != rank_b:
-			return rank_a > rank_b
-		return WeaponIconsScript.display_name(a) < WeaponIconsScript.display_name(b))
-	for variant in owned_variants:
-		weapon_grid.add_child(_make_weapon_card(variant, variant.get("id", "") == current_weapon_id))
+func _clear(container: Control) -> void:
+	for c in container.get_children():
+		container.remove_child(c)
+		c.queue_free()
 
-	_add_section_heading(container, "ARMOR")
-	# Every armour you own: click one to wear it. Each cuts BODILY harm by a share and adds points of
-	# Fortitude against MAGICAL harm, and most have a trick (hover for the details).
-	var armor_grid := GridContainer.new()
-	armor_grid.columns = GRID_COLUMNS
-	armor_grid.add_theme_constant_override("h_separation", 10)
-	armor_grid.add_theme_constant_override("v_separation", 10)
-	container.add_child(armor_grid)
-	var worn_id: String = _player.equipped_armor.get("id", "")
-	for armor in ArmorScript.TIERS:
-		if not _player.owned_armor.has(armor.id) and armor.id != worn_id:
-			continue
-		var armor_level: int = _player.get_armor_upgrade_level(armor.id)
-		var armor_title: String = armor.name + (" +%d" % armor_level if armor_level > 0 else "")
-		var bodily_pct: int = int(round((float(armor.damage_reduction) + BlacksmithScript.armor_bonus(armor_level)) * 100.0))
-		armor_grid.add_child(_make_grid_cell(
-			ArmorScript.icon_path(armor), armor_title,
-			"+%d Def  %+d Fort" % [bodily_pct, int(armor.fortitude)], armor.id == worn_id,
-			armor.get("description", ""), _on_armor_picked.bind(armor)
-		))
-	_add_plain_label(container, "Bodily harm: -%d%% (Defense %d: armour, clothes, Resilience and shield).   Magical harm: -%d%% (Fortitude %d).   Diminishing returns, never past 80%%." % [int(round(_player.bodily_reduction() * 100.0)), int(round(_player.bodily_defense_points())), int(round(_player.fortitude_reduction() * 100.0)), int(round(_player.fortitude_total()))])
+func _build_tab(tab_name: String) -> void:
+	if _player == null or not tab_containers.has(tab_name):
+		return
+	var container: Control = tab_containers[tab_name]
+	_clear(container)
+	match tab_name:
+		"Gear":
+			gear_view = InvGearView.new()
+			gear_view.size = body.size
+			container.add_child(gear_view)
+			gear_view.setup(self, _player, "gear", {"state": _state("gear"), "cols": 4, "left_w": 568.0, "detail_w": body.size.x - 568.0 - 12.0})
+		"Items":
+			items_view = InvGearView.new()
+			items_view.size = body.size
+			container.add_child(items_view)
+			items_view.setup(self, _player, "items", {"state": _state("items"), "cols": 4, "left_w": 568.0, "detail_w": body.size.x - 568.0 - 12.0})
+		"Party":
+			party_screen = PartyScreen.new()
+			party_screen.size = body.size
+			container.add_child(party_screen)
+			party_screen.setup(self, _player, get_parent())
+		"Map":
+			map_view = InvMapView.new()
+			var frame := PixelKit.panel_box("panel_steel")
+			frame.size = body.size
+			container.add_child(frame)
+			map_view.position = Vector2(8, 8)
+			map_view.size = body.size - Vector2(16, 16)
+			frame.add_child(map_view)
+			map_view.setup(self, _player, get_parent())
+		"Settings":
+			settings_view = InvSettingsView.new()
+			settings_view.size = body.size
+			container.add_child(settings_view)
+			settings_view.setup(self)
 
-	# Clothes: light extra armour pieces from the Flea Market tailor, one
-	# worn per slot -- click any owned piece to wear it (see Player.equip_clothing).
-	_add_section_heading(container, "CLOTHES")
-	if _player.owned_clothing.is_empty():
-		_add_plain_label(container, "None owned. The Flea Market's tailor sells some.")
-	else:
-		var clothes_grid := GridContainer.new()
-		clothes_grid.columns = GRID_COLUMNS
-		clothes_grid.add_theme_constant_override("h_separation", 10)
-		clothes_grid.add_theme_constant_override("v_separation", 10)
-		container.add_child(clothes_grid)
-		for piece in ClothingScript.PIECES:
-			if not _player.owned_clothing.has(piece.id):
-				continue
-			var worn: bool = _player.equipped_clothing.get(piece.slot, "") == piece.id
-			clothes_grid.add_child(_make_grid_cell(
-				"res://assets/%s.png" % piece.icon, piece.name,
-				"%s  +%d Def" % [ClothingScript.SLOT_LABELS[piece.slot], int(round(piece.damage_reduction * 100))], worn,
-				piece.description, func(): _on_clothing_cell_pressed(piece.id)
-			))
+# --- popups ----------------------------------------------------------------------------------------------------------------------------
 
-	_add_section_heading(container, "SHIELDS")
-	if _player.owned_shields.is_empty():
-		_add_plain_label(container, "None owned.")
-	else:
-		var shield_grid := GridContainer.new()
-		shield_grid.columns = GRID_COLUMNS
-		shield_grid.add_theme_constant_override("h_separation", 10)
-		shield_grid.add_theme_constant_override("v_separation", 10)
-		container.add_child(shield_grid)
-		var current_shield_id: String = _player.equipped_shield.get("id", "")
-		for id in _player.owned_shields:
-			var shield: Dictionary = ShieldsScript.SHIELDS.get(id, {})
-			if shield.is_empty():
-				continue
-			var equipped: bool = id == current_shield_id
-			var cell := _make_grid_cell(
-				"res://assets/%s.png" % shield.get("icon", ""), shield.name,
-				"%d%% block" % int(shield.get("block_chance", 0.0) * 100), equipped,
-				shield.get("description", ""), func(): _on_shield_cell_pressed(shield)
-			)
-			shield_grid.add_child(cell)
+func popup_open() -> bool:
+	return popup_view != null and is_instance_valid(popup_view)
 
-# Higher is better; the Club (no tier) sorts last.
-func _tier_rank(variant: Dictionary) -> int:
-	for tier in WeaponsScript.TIERS:
-		if tier.tier_name == variant.get("tier_name", ""):
-			return tier.rank
-	return -1
+func close_popup() -> void:
+	if popup_layer == null:
+		return
+	for c in popup_layer.get_children():
+		popup_layer.remove_child(c)
+		c.queue_free()
+	popup_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	popup_view = null
+	popup_kind = ""
+	popup_member = null
+	popup_category = ""
 
-# A weapon card: tier tag and (if worn) an EQUIPPED marker on top, the icon on a
-# plate tinted with the tier's colour, the name without its tier prefix, damage
-# and any Might requirement underneath. The border is the tier's colour, and
-# Legendary/Mythic add a glow around the card.
-func _make_weapon_card(variant: Dictionary, equipped: bool) -> Button:
-	var id: String = variant.get("id", "")
-	var tier_color: Color = WeaponIconsScript.tier_color(variant)
-	var glowing: bool = WeaponIconsScript.has_glow(variant)
-	var required_might: int = int(variant.get("required_might", 0))
-	var might_locked: bool = required_might > _player.stat_might
-	var required_intimidation: int = int(variant.get("required_intimidation", 0))
-	var intimidation_locked: bool = required_intimidation > _player.stat_intimidation
-	var upgrade_level: int = _player.get_weapon_upgrade_level(id)
-	var rune_id: String = _player.weapon_enchantments.get(id, "")
+# The frame every popup wears: a dimmed backdrop over the window, a panel with a header (icon, title, who it is for, a close button)
+# and an area for the content. Returns that area.
+func _open_popup_frame(icon_name: String, title_text: String, sub_text: String, size_px: Vector2) -> Control:
+	close_popup()
+	popup_layer.mouse_filter = Control.MOUSE_FILTER_STOP
+	var dim := ColorRect.new()
+	dim.color = Color(0.03, 0.02, 0.05, 0.72)
+	dim.size = WINDOW_SIZE
+	dim.position = window.position
+	dim.gui_input.connect(func(ev): if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT: close_popup())
+	popup_layer.add_child(dim)
+	var frame := Panel.new()
+	frame.add_theme_stylebox_override("panel", PixelKit.frame("panel"))
+	frame.size = size_px
+	frame.position = window.position + ((WINDOW_SIZE - size_px) / 2.0).round()
+	popup_layer.add_child(frame)
+	var inner := Control.new()
+	inner.position = Vector2(14, 14)
+	inner.size = size_px - Vector2(28, 28)
+	frame.add_child(inner)
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", 12)
+	head.position = Vector2(0, 0)
+	head.size = Vector2(inner.size.x, 48)
+	inner.add_child(head)
+	if icon_name != "":
+		head.add_child(PixelKit.icon(icon_name, 32))
+	head.add_child(PixelKit.label(title_text, "head", PixelKit.GOLD3))
+	head.add_child(PixelKit.label(sub_text, "body", PixelKit.DIM))
+	var fill := Control.new()
+	fill.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.add_child(fill)
+	var x := PixelButton.make("×", "", close_popup)
+	x.custom_minimum_size = Vector2(52, 48)
+	head.add_child(x)
+	var area := Control.new()
+	area.position = Vector2(0, 56)
+	area.size = Vector2(inner.size.x, inner.size.y - 56.0 - 28.0)
+	inner.add_child(area)
+	var hint := PixelKit.label("Esc  Back", "body", PixelKit.DIM)
+	hint.position = Vector2(0, inner.size.y - 24)
+	inner.add_child(hint)
+	return area
 
-	var card := Button.new()
-	card.custom_minimum_size = WEAPON_CELL_SIZE
-	card.tooltip_text = variant.get("description", "")
-	if might_locked:
-		card.tooltip_text += "\n\nNeeds %d Might to wield (you have %d)." % [required_might, _player.stat_might]
-	if intimidation_locked:
-		card.tooltip_text += "\n\nNeeds %d Intimidation to wield (you have %d)." % [required_intimidation, _player.stat_intimidation]
-	card.pressed.connect(func(): _on_weapon_cell_pressed(variant))
-	_style_weapon_card(card, tier_color, glowing, equipped)
-	if glowing:
-		# Drawn above its neighbours so the glow isn't painted over by the next card.
-		card.z_index = 1
+# The picker for one slot of one unit: the same grid and detail as the Gear tab, with whatever is worn marked.
+func open_gear_popup(member, category: String) -> void:
+	var who := "for you" if member == null else "for %s" % member.name
+	var area := _open_popup_frame(InvData.CATEGORY_ICONS.get(category, "tab_gear"), category, who, POPUP_SIZE)
+	var view := InvGearView.new()
+	view.size = area.size
+	area.add_child(view)
+	view.setup(self, _player, "gear", {"member": member, "fixed": category, "cols": 4, "left_w": 568.0, "detail_w": area.size.x - 568.0 - 12.0, "state": _state("popup_" + category)})
+	popup_view = view
+	popup_kind = "gear"
+	popup_member = member
+	popup_category = category
 
-	var pad := MarginContainer.new()
-	pad.set_anchors_preset(Control.PRESET_FULL_RECT)
-	pad.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	for side in ["left", "right"]:
-		pad.add_theme_constant_override("margin_%s" % side, 8)
-	pad.add_theme_constant_override("margin_top", 7)
-	pad.add_theme_constant_override("margin_bottom", 7)
-	card.add_child(pad)
-	var content := VBoxContainer.new()
-	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	content.add_theme_constant_override("separation", 3)
-	pad.add_child(content)
+func open_talisman_popup(member) -> void:
+	var who := "You" if member == null else str(member.name)
+	var level: int = _player.level if member == null else member.level
+	var slots := InvData.talisman_slots(_player, member)
+	var area := _open_popup_frame("tab_talismans", "Talismans", "%s · Level %d · %d of %d slots open" % [who, level, int(slots.open), talisman_slot_count()], POPUP_SIZE)
+	var view := InvTalismanPopup.new()
+	view.size = area.size
+	area.add_child(view)
+	view.setup(self, _player, member, _state("popup_talismans"))
+	popup_view = view
+	popup_kind = "talisman"
+	popup_member = member
 
-	# Header: tier tag (with any Blacksmith level) left, EQUIPPED right.
-	var header := HBoxContainer.new()
-	header.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	content.add_child(header)
-	var tag_text: String = WeaponIconsScript.tier_label(variant)
-	if upgrade_level > 0:
-		tag_text += " +%d" % upgrade_level
-	var tag := Label.new()
-	tag.text = tag_text
-	tag.add_theme_font_size_override("font_size", 11)
-	tag.add_theme_color_override("font_color", tier_color.lightened(0.25))
-	header.add_child(tag)
-	var header_spacer := Control.new()
-	header_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	header.add_child(header_spacer)
-	if equipped:
-		var worn := Label.new()
-		worn.text = "EQUIPPED"
-		worn.add_theme_font_size_override("font_size", 10)
-		worn.add_theme_color_override("font_color", EQUIPPED_COLOR)
-		header.add_child(worn)
+func talisman_slot_count() -> int:
+	return load("res://scripts/Talismans.gd").SLOT_LEVELS.size() + 1
 
-	# The icon, at 2x on a plate tinted with the tier's colour.
-	var plate := PanelContainer.new()
-	plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	plate.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	plate.add_theme_stylebox_override("panel", _make_stylebox(tier_color.darkened(0.82), tier_color.darkened(0.45), 1, 6))
-	content.add_child(plate)
-	var icon := TextureRect.new()
-	icon.texture = WeaponIconsScript.texture_for(variant)
-	icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	icon.custom_minimum_size = Vector2(64, 64)
-	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	if might_locked:
-		icon.modulate = Color(0.5, 0.5, 0.55)
-	plate.add_child(icon)
+# A short list to choose from: rows of {label, right, disabled, pick (a Callable)}; choosing one runs it and closes the popup.
+func open_pick_popup(title_text: String, sub_text: String, rows: Array) -> void:
+	var area := _open_popup_frame("stat_crit", title_text, sub_text, Vector2(720, minf(120.0 + 52.0 * rows.size(), 560.0)))
+	var scroll := ScrollContainer.new()
+	scroll.size = area.size
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	PixelKit.style_scroll(scroll)
+	area.add_child(scroll)
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 4)
+	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(col)
+	for r in rows:
+		var text := str(r.label) + (("   [%s]" % r.right) if str(r.get("right", "")) != "" else "")
+		var pick: Callable = r.pick
+		var b := PixelButton.make(text, "", func():
+			close_popup()
+			pick.call()
+		)
+		b.disabled = bool(r.get("disabled", false))
+		col.add_child(b)
+	popup_view = scroll
+	popup_kind = "pick"
 
-	var name_label := Label.new()
-	name_label.text = WeaponIconsScript.display_name(variant)
-	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD
-	name_label.max_lines_visible = 2
-	name_label.custom_minimum_size = Vector2(WEAPON_CELL_SIZE.x - 20, 34)
-	name_label.add_theme_font_size_override("font_size", 13)
-	name_label.add_theme_color_override("font_color", EQUIPPED_COLOR if equipped else Color(0.92, 0.92, 0.88))
-	content.add_child(name_label)
+# After any change: rebuild whatever popup is open so it shows the new truth (or close it if what it was for is gone).
+func _refresh_popup() -> void:
+	if not popup_open():
+		return
+	match popup_kind:
+		"gear":
+			if popup_view is InvGearView:
+				popup_view.rebuild()
+		"talisman":
+			if popup_view is InvTalismanPopup:
+				popup_view.rebuild()
 
-	# Damage at your current Strength (tier, material, runes and Blacksmith levels
-	# included), and the Might needed, red while you lack it.
-	var stats := HBoxContainer.new()
-	stats.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	content.add_child(stats)
-	var damage := Label.new()
-	damage.text = "DMG %d" % _player.weapon_damage_preview(variant)
-	damage.add_theme_font_size_override("font_size", 12)
-	damage.add_theme_color_override("font_color", Color(0.9, 0.9, 0.85))
-	stats.add_child(damage)
-	var stats_spacer := Control.new()
-	stats_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	stats.add_child(stats_spacer)
-	if required_might > 0:
-		var might := Label.new()
-		might.text = "MGT %d" % required_might
-		might.add_theme_font_size_override("font_size", 11)
-		might.add_theme_color_override("font_color", Color(1.0, 0.4, 0.4) if might_locked else Color(0.55, 0.6, 0.55))
-		stats.add_child(might)
-	if required_intimidation > 0:
-		var intimidation := Label.new()
-		intimidation.text = "INT %d" % required_intimidation
-		intimidation.add_theme_font_size_override("font_size", 11)
-		intimidation.add_theme_color_override("font_color", Color(1.0, 0.4, 0.4) if intimidation_locked else Color(0.55, 0.6, 0.55))
-		stats.add_child(intimidation)
+# --- input -----------------------------------------------------------------------------------------------------------------------------
 
-	# A rune's name under the stats (a blank line otherwise, so every card is the
-	# same height).
-	var rune_label := Label.new()
-	rune_label.text = EnchantmentsScript.get_rune(rune_id).name if rune_id != "" else ""
-	rune_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	rune_label.add_theme_font_size_override("font_size", 10)
-	rune_label.add_theme_color_override("font_color", Color(0.75, 0.6, 1.0))
-	rune_label.custom_minimum_size = Vector2(0, 13)
-	content.add_child(rune_label)
-	return card
+func _input(event: InputEvent) -> void:
+	if not visible or not (event is InputEventKey) or not event.pressed or event.echo:
+		return
+	# A key rebind that is waiting takes the next key.
+	if active_tab == "Settings" and settings_view != null and is_instance_valid(settings_view) and settings_view.rebinding != "":
+		if settings_view.handle_key(event):
+			get_viewport().set_input_as_handled()
+			return
+	if event.keycode == KEY_ESCAPE and popup_open():
+		close_popup()
+		get_viewport().set_input_as_handled()
+		return
+	var typing := get_viewport().gui_get_focus_owner() is LineEdit
+	if not typing and not popup_open() and (event.keycode == KEY_Q or event.keycode == KEY_E):
+		var i := TABS.find(active_tab)
+		i = posmod(i + (1 if event.keycode == KEY_E else -1), TABS.size())
+		_select_tab(TABS[i])
+		get_viewport().set_input_as_handled()
 
-func _style_weapon_card(button: Button, tier_color: Color, glowing: bool, equipped: bool) -> void:
-	var bg: Color = Color(0.17, 0.15, 0.08, 0.96) if equipped else Color(0.11, 0.11, 0.13, 0.96)
-	var normal := StyleBoxFlat.new()
-	normal.bg_color = bg
-	normal.border_color = tier_color
-	normal.set_border_width_all(3 if glowing else 2)
-	normal.set_corner_radius_all(7)
-	if glowing:
-		var glow: Color = tier_color
-		glow.a = 0.55
-		normal.shadow_color = glow
-		normal.shadow_size = GLOW_SIZE_MYTHIC if tier_color == WeaponIconsScript.TIER_COLORS["Mythic"] else GLOW_SIZE
-		normal.shadow_offset = Vector2.ZERO
-	button.add_theme_stylebox_override("normal", normal)
-	var hover: StyleBoxFlat = normal.duplicate()
-	hover.border_color = tier_color.lightened(0.35)
-	hover.bg_color = bg.lightened(0.08)
-	button.add_theme_stylebox_override("hover", hover)
-	var pressed: StyleBoxFlat = normal.duplicate()
-	pressed.bg_color = bg.darkened(0.12)
-	button.add_theme_stylebox_override("pressed", pressed)
-	var focus := StyleBoxFlat.new()
-	focus.bg_color = Color(0, 0, 0, 0)
-	focus.border_color = Color(1, 1, 1, 0.9)
-	focus.set_border_width_all(2)
-	focus.set_corner_radius_all(7)
-	focus.set_expand_margin_all(2)
-	button.add_theme_stylebox_override("focus", focus)
+# --- doing things to the player ---------------------------------------------------------------------------------------------------------
+
+# Pressing the button under an item (or double-clicking its card) for the unit being dressed.
+func apply_entry_action(member, entry: Dictionary) -> void:
+	var ok := InvData.apply_action(_player, member, entry)
+	_play_sfx("purchase" if ok else "error")
+	_refresh()
+
+func apply_talisman_action(member, entry: Dictionary) -> void:
+	var ok := InvData.talisman_apply(_player, member, entry)
+	_play_sfx("purchase" if ok else "error")
+	_refresh()
 
 func _on_weapon_cell_pressed(variant: Dictionary) -> void:
 	if variant.get("id", "") == _player.current_weapon_base.get("id", ""):
 		return
-	# Same rule as the shop: a weapon needing more Might/Intimidation than you
-	# have cannot be wielded.
-	if int(variant.get("required_might", 0)) > _player.stat_might:
-		_play_sfx("error")
-		return
-	if int(variant.get("required_intimidation", 0)) > _player.stat_intimidation:
+	# Same rule as the shop: a weapon needing more Might/Intimidation than you have cannot be wielded.
+	if not InvData.lacking(_player, variant).is_empty():
 		_play_sfx("error")
 		return
 	_player._equip_weapon(variant)
@@ -494,98 +377,9 @@ func _on_shield_cell_pressed(shield: Dictionary) -> void:
 	_play_sfx("purchase")
 	_refresh()
 
-# --- Items tab: Potions (grid, click to drink) + Arrows (grid, read-only --
-# which type is nocked is only ever chosen live in battle). ---------------
-
-func _build_items_tab(container: VBoxContainer) -> void:
-	_add_section_heading(container, "POTIONS & FOOD")
-	var counts := {}
-	var order := []
-	for id in _player.potion_queue:
-		if not counts.has(id):
-			counts[id] = 0
-			order.append(id)
-		counts[id] += 1
-	if order.is_empty():
-		_add_plain_label(container, "None held.")
-	else:
-		var potion_grid := GridContainer.new()
-		potion_grid.columns = GRID_COLUMNS
-		potion_grid.add_theme_constant_override("h_separation", 10)
-		potion_grid.add_theme_constant_override("v_separation", 10)
-		container.add_child(potion_grid)
-		for id in order:
-			# Potions and food share the queue (see Foods.gd), so one merged lookup.
-			var tier: Dictionary = _player.get_consumable(id)
-			var cell := _make_grid_cell(
-				"res://assets/%s.png" % tier.get("icon", "potion"), "%s x%d" % [tier.get("name", id), counts[id]],
-				"Eat" if tier.has("stamina_amount") else "Use", false, tier.get("description", ""), func(): _on_potion_cell_pressed(id)
-			)
-			potion_grid.add_child(cell)
-
-	_add_section_heading(container, "ARROWS")
-	var arrow_lines_empty := true
-	var arrow_grid := GridContainer.new()
-	arrow_grid.columns = GRID_COLUMNS
-	arrow_grid.add_theme_constant_override("h_separation", 10)
-	arrow_grid.add_theme_constant_override("v_separation", 10)
-	for kind in ["flame", "freeze", "bomb"]:
-		var held: int = _player.owned_arrows.get(kind, 0)
-		if held <= 0:
-			continue
-		arrow_lines_empty = false
-		var info: Dictionary = WeaponsScript.ARROW_TYPES[kind]
-		# No per-type arrow art exists -- every kind shares the one quiver icon.
-		arrow_grid.add_child(_make_grid_cell(
-			"res://assets/quiver.png", "%s x%d" % [info.name, held], "",
-			false, info.get("description", ""), Callable()
-		))
-	if arrow_lines_empty:
-		_add_plain_label(container, "None held.")
-	else:
-		container.add_child(arrow_grid)
-
-# --- Talismans tab: everything bought from the Seer, click to wear / take off.
-# Only talisman_slots() can be worn at once (more open as you level up). ------
-
-func _build_talismans_tab(container: VBoxContainer) -> void:
-	var slots: int = _player.talisman_slots()
-	_add_section_heading(container, "TALISMANS  (%d / %d worn)" % [_player.equipped_talismans.size(), slots])
-	if slots < TalismansScript.SLOT_LEVELS.size() + 1:
-		_add_plain_label(container, "Your next slot opens at level %d." % TalismansScript.level_for_slot(slots + 1))
-	if _player.owned_talismans.is_empty():
-		_add_plain_label(container, "None owned. The Seer in town sells them.")
-		return
-	var grid := GridContainer.new()
-	grid.columns = GRID_COLUMNS
-	grid.add_theme_constant_override("h_separation", 10)
-	grid.add_theme_constant_override("v_separation", 10)
-	container.add_child(grid)
-	# Worn ones first, then the rest in catalog order.
-	var ids: Array = []
-	for id in _player.equipped_talismans:
-		ids.append(id)
-	for item in TalismansScript.ITEMS:
-		if _player.owned_talismans.has(item.id) and not ids.has(item.id):
-			ids.append(item.id)
-	for id in ids:
-		var talisman: Dictionary = TalismansScript.get_talisman(id)
-		if talisman.is_empty():
-			continue
-		var worn: bool = _player.equipped_talismans.has(id)
-		grid.add_child(_make_grid_cell(
-			"res://assets/%s.png" % talisman.icon, talisman.name,
-			"Worn" if worn else talisman.rarity.capitalize(), worn,
-			talisman.description, func(): _on_talisman_cell_pressed(id)
-		))
-
-func _on_talisman_cell_pressed(talisman_id: String) -> void:
-	var ok := false
-	if _player.equipped_talismans.has(talisman_id):
-		ok = _player.unequip_talisman(talisman_id)
-	else:
-		ok = _player.equip_talisman(talisman_id)
-	_play_sfx("purchase" if ok else "error")
+# Wearing an armour (it is owned, so this costs nothing).
+func _on_armor_picked(armor: Dictionary) -> void:
+	_player.try_buy_armor(armor)
 	_refresh()
 
 func _on_potion_cell_pressed(potion_id: String) -> void:
@@ -595,18 +389,14 @@ func _on_potion_cell_pressed(potion_id: String) -> void:
 	_play_sfx("heal")
 	_refresh()
 
-# --- Party tab: read-only roster cards -- the same followers now visible
-# trailing the player in the overworld (see Main.gd:_update_party_followers).
-# ---------------------------------------------------------------------
-
-func _build_party_tab(container: VBoxContainer) -> void:
-	if _player.party.is_empty() and _player.party_members.is_empty():
-		_add_section_heading(container, "PARTY")
-		_add_plain_label(container, "No party members recruited yet.")
-		return
-	var screen := PartyScreenScript.new()
-	container.add_child(screen)
-	screen.setup(self, _player, get_parent())
+func _on_talisman_cell_pressed(talisman_id: String) -> void:
+	var ok := false
+	if _player.equipped_talismans.has(talisman_id):
+		ok = _player.unequip_talisman(talisman_id)
+	else:
+		ok = _player.equip_talisman(talisman_id)
+	_play_sfx("purchase" if ok else "error")
+	_refresh()
 
 func _on_member_weapon_picked(member, weapon_id: String) -> void:
 	var ok := true
@@ -664,201 +454,6 @@ func _on_member_talisman_removed(member, talisman_id: String) -> void:
 	var ok: bool = _player.unequip_ally_talisman(member, talisman_id)
 	_play_sfx("purchase" if ok else "error")
 	_refresh()
-
-# --- Map tab: a schematic (not a live camera capture) of wherever you
-# currently are, scaled to fit -- see _on_map_draw. --------------------
-
-func _build_map_tab(container: VBoxContainer) -> void:
-	_add_section_heading(container, "MAP")
-	map_canvas = Control.new()
-	map_canvas.custom_minimum_size = Vector2(780, 420)
-	map_canvas.draw.connect(_on_map_draw)
-	container.add_child(map_canvas)
-	var legend := Label.new()
-	legend.text = "White dot: you. Red dots: bosses. Gold squares: the castle town, the ranch and the ruins. The land is made of rooms: the one you are in is outlined, the ones you haven't been in are dimmed. Numbered gold dots: shops and services you've found so far."
-	legend.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	legend.custom_minimum_size = Vector2(780, 0)
-	legend.add_theme_font_size_override("font_size", 12)
-	legend.add_theme_color_override("font_color", Color(0.7, 0.7, 0.65))
-	container.add_child(legend)
-
-# One unified wilderness map -- the town is embedded in the same space (see
-# Main.gd:TOWN_AREA_ORIGIN), not a separate view to switch to, so it's just
-# drawn as a labeled region within the whole map rather than its own screen.
-func _on_map_draw() -> void:
-	var main := get_parent()
-	var area_size: Vector2 = main.WORLD_SIZE
-	var canvas_size: Vector2 = map_canvas.size
-	if canvas_size.x <= 0 or canvas_size.y <= 0:
-		return
-	# The map hugs the left edge so the right-hand column stays free for the
-	# numbered legend -- a dozen-plus building labels can't fit inside the
-	# town's own ~220px-wide box on the map.
-	var legend_width := 170.0
-	var scale_factor: float = minf((canvas_size.x - legend_width) / area_size.x, canvas_size.y / area_size.y)
-	var draw_size: Vector2 = area_size * scale_factor
-	var draw_offset: Vector2 = Vector2(0, (canvas_size.y - draw_size.y) / 2.0)
-	var font := ThemeDB.fallback_font
-
-	var to_map := func(world_pos: Vector2) -> Vector2:
-		return draw_offset + world_pos * scale_factor
-
-	map_canvas.draw_rect(Rect2(draw_offset, draw_size), Color(0.16, 0.22, 0.14), true)
-	# The continent: every region of the world map, painted bottom to top, with the big ones named.
-	if main.regional_world:
-		for r in WorldMapScript.regions:
-			var pts := PackedVector2Array()
-			for p in r.polygon:
-				pts.append(to_map.call(p))
-			if pts.size() >= 3 and not Geometry2D.triangulate_polygon(pts).is_empty():
-				map_canvas.draw_colored_polygon(pts, MiniMapScript.region_color(r))
-		# The rooms: rooms you have not been in yet are dimmed (Pathfinder's Compass shows them all), the one you stand in is lit.
-		var all_seen: bool = _player.talisman_bonus("reveal_all_locations") > 0.0
-		for rm in RoomsScript.rooms:
-			var rect := Rect2(to_map.call(rm.rect.position), rm.rect.size * scale_factor)
-			if not all_seen and not main.visited_rooms.has(rm.id):
-				map_canvas.draw_rect(rect, Color(0, 0, 0, 0.42))
-			map_canvas.draw_rect(rect, Color(0, 0, 0, 0.28), false, 1.0)
-		var here: Dictionary = RoomsScript.room_at(_player.global_position)
-		map_canvas.draw_rect(Rect2(to_map.call(here.rect.position), here.rect.size * scale_factor), Color(1.0, 0.95, 0.5, 0.95), false, 2.0)
-		for r in WorldMapScript.regions:
-			if r.id in ["great_expanse", "woods", "volcano_hills", "swamp", "ocean", "frozen_wastes", "voidlands", "desert", "mountains"]:
-				var centre: Vector2 = to_map.call(r.bounds.get_center() if r.id != "great_expanse" else Vector2(WorldMapScript.SIZE.x * 0.62, WorldMapScript.SIZE.y * 0.42))
-				var label_text: String = "Lexian Peaks" if r.id == "mountains" else str(r.name)
-				map_canvas.draw_string(font, centre + Vector2(-60, 0), label_text, HORIZONTAL_ALIGNMENT_CENTER, 120, 12, Color(1, 1, 1, 0.85))
-		for l in WorldMapScript.landmarks:
-			var at: Vector2 = to_map.call(l.pos)
-			if l.kind == "boss":
-				map_canvas.draw_circle(at, 4.0, Color(0.9, 0.2, 0.2))
-				map_canvas.draw_circle(at, 4.0, Color(0, 0, 0, 0.8), false, 1.0)
-			elif l.kind in ["town", "ruins", "ranch"]:
-				map_canvas.draw_rect(Rect2(at - Vector2(3.5, 3.5), Vector2(7, 7)), Color(1.0, 0.85, 0.3))
-	map_canvas.draw_rect(Rect2(draw_offset, draw_size), Color(0.55, 0.55, 0.5), false, 2.0)
-
-	var town_top_left: Vector2 = to_map.call(main.TOWN_AREA_ORIGIN)
-	var town_draw_size: Vector2 = main.TOWN_SIZE * scale_factor
-	map_canvas.draw_rect(Rect2(town_top_left, town_draw_size), Color(0.32, 0.3, 0.27), true)
-	map_canvas.draw_rect(Rect2(town_top_left, town_draw_size), Color(0.7, 0.6, 0.3), false, 2.0)
-	map_canvas.draw_string(font, town_top_left + Vector2(4, -4), "TOWN", HORIZONTAL_ALIGNMENT_LEFT, town_draw_size.x, 12, Color(0.9, 0.8, 0.5))
-
-	# Numbered dots on the map, names in a legend column to its right --
-	# skipped for anywhere the player hasn't actually reached yet, unless
-	# Pathfinder's Compass (talisman) reveals everything up front.
-	var legend_x: float = draw_offset.x + draw_size.x + 16.0
-	var legend_y := 14.0
-	var number := 1
-	var reveal_all: bool = _player.talisman_bonus("reveal_all_locations") > 0.0
-	for key in main.town_building_positions:
-		if not reveal_all and not _player.discovered_locations.get(key, false):
-			continue
-		var p: Vector2 = to_map.call(main.town_building_positions[key])
-		var venue_name: String = main.TOWN_LAYOUT.get(key, {}).get("name", key.capitalize())
-		map_canvas.draw_circle(p, 7, Color(0.9, 0.7, 0.3))
-		map_canvas.draw_string(font, p + Vector2(-8, 4), str(number), HORIZONTAL_ALIGNMENT_CENTER, 16, 11, Color(0.1, 0.08, 0.02))
-		map_canvas.draw_circle(Vector2(legend_x + 8, legend_y - 4), 7, Color(0.9, 0.7, 0.3))
-		map_canvas.draw_string(font, Vector2(legend_x, legend_y), str(number), HORIZONTAL_ALIGNMENT_CENTER, 16, 11, Color(0.1, 0.08, 0.02))
-		map_canvas.draw_string(font, Vector2(legend_x + 22, legend_y), venue_name, HORIZONTAL_ALIGNMENT_LEFT, legend_width - 24, 13, Color(0.92, 0.92, 0.88))
-		legend_y += 24.0
-		number += 1
-
-	var player_p: Vector2 = to_map.call(_player.global_position)
-	if main.regional_world:
-		map_canvas.draw_circle(player_p, 7, Color(0, 0, 0, 0.85))
-		map_canvas.draw_circle(player_p, 5, Color(1, 1, 1))
-	else:
-		map_canvas.draw_circle(player_p, 6, Color(0.3, 0.95, 0.3))
-		map_canvas.draw_circle(player_p, 6, Color(1, 1, 1), false, 1.5)
-
-# Wearing an armour from the grid (it is owned, so this costs nothing).
-func _on_armor_picked(armor: Dictionary) -> void:
-	_player.try_buy_armor(armor)
-	_refresh()
-
-# --- Shared grid-cell builder --------------------------------------------
-
-# icon_path may point at a nonexistent file (blank icon, no crash). An empty
-# on_click Callable makes the cell purely informational (Armor's single
-# card, Arrows) -- still styled like a grid cell for a consistent look, just
-# not clickable.
-func _make_grid_cell(icon_path: String, title: String, subtitle: String, equipped: bool, tooltip: String, on_click: Callable) -> Button:
-	var cell := Button.new()
-	cell.custom_minimum_size = CELL_SIZE
-	cell.tooltip_text = tooltip
-	cell.disabled = not on_click.is_valid()
-	if on_click.is_valid():
-		cell.pressed.connect(on_click)
-	_style_grid_cell(cell, equipped)
-
-	var content := VBoxContainer.new()
-	content.set_anchors_preset(Control.PRESET_FULL_RECT)
-	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	content.add_theme_constant_override("separation", 2)
-	cell.add_child(content)
-
-	var top_pad := Control.new()
-	top_pad.custom_minimum_size = Vector2(0, 6)
-	content.add_child(top_pad)
-
-	if icon_path != "" and ResourceLoader.exists(icon_path):
-		var icon := TextureRect.new()
-		icon.texture = load(icon_path)
-		icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		icon.custom_minimum_size = Vector2(44, 44)
-		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-		content.add_child(icon)
-
-	var title_label := Label.new()
-	title_label.text = title
-	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title_label.autowrap_mode = TextServer.AUTOWRAP_WORD
-	title_label.custom_minimum_size = Vector2(CELL_SIZE.x - 12, 0)
-	title_label.add_theme_font_size_override("font_size", 13)
-	title_label.add_theme_color_override("font_color", EQUIPPED_COLOR if equipped else Color(0.9, 0.9, 0.85))
-	content.add_child(title_label)
-
-	if subtitle != "":
-		var subtitle_label := Label.new()
-		subtitle_label.text = subtitle
-		subtitle_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		subtitle_label.add_theme_font_size_override("font_size", 11)
-		subtitle_label.add_theme_color_override("font_color", Color(0.6, 0.85, 0.6) if equipped else Color(0.65, 0.65, 0.6))
-		content.add_child(subtitle_label)
-
-	return cell
-
-func _style_grid_cell(button: Button, equipped: bool) -> void:
-	var border: Color = EQUIPPED_COLOR if equipped else BORDER_COLOR
-	var bg: Color = Color(0.16, 0.15, 0.08, 0.95) if equipped else Color(0.12, 0.12, 0.14, 0.9)
-	var normal := StyleBoxFlat.new()
-	normal.bg_color = bg
-	normal.border_color = border
-	normal.set_border_width_all(3 if equipped else 2)
-	normal.set_corner_radius_all(6)
-	button.add_theme_stylebox_override("normal", normal)
-	button.add_theme_stylebox_override("disabled", normal)
-	var hover: StyleBoxFlat = normal.duplicate()
-	hover.border_color = Color(1.0, 0.9, 0.3)
-	hover.bg_color = bg.lightened(0.08)
-	button.add_theme_stylebox_override("hover", hover)
-	var pressed: StyleBoxFlat = normal.duplicate()
-	pressed.bg_color = bg.darkened(0.1)
-	button.add_theme_stylebox_override("pressed", pressed)
-	button.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
-
-func _add_section_heading(container: VBoxContainer, text: String) -> void:
-	var heading := Label.new()
-	heading.text = text
-	heading.add_theme_font_size_override("font_size", 16)
-	heading.add_theme_color_override("font_color", Color(1, 0.9, 0.3))
-	container.add_child(heading)
-
-func _add_plain_label(container: VBoxContainer, text: String) -> void:
-	var label := Label.new()
-	label.text = text
-	label.add_theme_font_size_override("font_size", 14)
-	label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.65))
-	container.add_child(label)
 
 func _play_sfx(sfx_name: String) -> void:
 	var parent := get_parent()

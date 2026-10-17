@@ -11,16 +11,48 @@ func _find_all(node: Node, type_name: String, out: Array) -> void:
 
 func _texts(node: Node) -> Array:
 	var out := []
-	for kind in ["Button", "Label", "OptionButton"]:
-		var found := []
-		_find_all(node, kind, found)
-		for n in found:
-			if kind == "OptionButton":
-				for i in n.item_count:
-					out.append(n.get_item_text(i))
-			else:
-				out.append(n.text)
+	_gather_texts(node, out)
 	return out
+
+func _gather_texts(node: Node, out: Array) -> void:
+	if node is OptionButton:
+		for i in node.item_count:
+			out.append(node.get_item_text(i))
+	elif node is Label or node is Button or node is PixelButton:
+		out.append(node.text)
+	for c in node.get_children():
+		_gather_texts(c, out)
+
+# Every PixelButton under `node` that carries the meta key `key`.
+func _buttons_with_meta(node: Node, key: String, out: Array) -> void:
+	if node is PixelButton and node.has_meta(key):
+		out.append(node)
+	for c in node.get_children():
+		_buttons_with_meta(c, key, out)
+
+func _count_buttons(node: Node, wanted: String) -> int:
+	var n := 1 if node is PixelButton and node.text == wanted else 0
+	for c in node.get_children():
+		n += _count_buttons(c, wanted)
+	return n
+
+func _button_named(node: Node, wanted: String):
+	if node is PixelButton and node.text == wanted:
+		return node
+	for c in node.get_children():
+		var found = _button_named(c, wanted)
+		if found != null:
+			return found
+	return null
+
+func _find_meta(node: Node, key: String, value: String):
+	if node.has_meta(key) and str(node.get_meta(key)) == value:
+		return node
+	for c in node.get_children():
+		var found = _find_meta(c, key, value)
+		if found != null:
+			return found
+	return null
 
 func _names(specials: Array) -> Array:
 	return specials.map(func(s): return s.name)
@@ -119,40 +151,94 @@ func _init() -> void:
 	knight.reset_loadout()
 	main.in_battle = false
 	var panel = main.inventory_panel
-	panel.party_selected_id = -1
+	panel.party_selected_id = knight.id
+	panel.party_page = "Stats"
 	panel.open(player)
+	panel._select_tab("Party")
 	await process_frame
-	var texts: Array = _texts(panel.tab_containers.Party)
-	print("The roster lists every member: %s (expected true for Knight, Druid, Fickle Wolf, Guardian)" % [[texts.has("Knight"), texts.has("Druid"), texts.has("Fickle Wolf"), texts.has("Guardian")]])
-	print("The first member's sheet opens by default: heading is the Knight's: %s (expected true)" % [texts.has("Knight") and texts.has("STATS")])
+	var party_node = panel.tab_containers.Party
+	var texts: Array = _texts(party_node)
+	print("The roster lists you and every member: %s (expected true for You, Knight, Druid, Fickle Wolf, Guardian)" % [[texts.has("You"), texts.has("Knight"), texts.has("Druid"), texts.has("Fickle Wolf"), texts.has("Guardian")]])
+	print("The picked member's sheet opens (its name heads the sheet and the Stats page is on): %s (expected true)" % [texts.count("Knight") >= 2 and panel.party_page == "Stats"])
 	print("Her description is on show: %s (expected true)" % [texts.any(func(t): return str(t).begins_with("A veteran who holds the line"))])
-	print("The sheet has the stat rows: %s (expected all true)" % [["Max HP", "Attack", "Defense", "Fortitude", "Speed", "Move", "Reach"].map(func(s): return texts.has(s))])
+	print("The sheet has the stat rows: %s (expected all true)" % [["Max HP", "Attack", "Defense", "FTD", "Speed", "Move", "Reach"].map(func(s): return texts.has(s))])
 	var u2: Dictionary = main.member_preview(knight)
 	print("The numbers are the fight's own: Defense %d (expected 18 = 3 + the Gambeson's 15), shows '%s'" % [int(u2.defense_pct), "18" if texts.has("18") else "?"])
-	print("...with what it means (the diminishing-returns cut): %s (expected true)" % [texts.any(func(t): return str(t).begins_with("bodily harm -"))])
-	print("Equipment and Specials sections are there: %s, %s (expected true, true)" % [texts.has("EQUIPMENT"), texts.has("SPECIALS")])
-	var slot_pickers := 0
-	var option_buttons := []
-	_find_all(panel.tab_containers.Party, "OptionButton", option_buttons)
-	for ob in option_buttons:
-		if ob.get_item_text(0) == "(empty)":
-			slot_pickers += 1
-	print("Three special pickers: %d (expected 3)" % [slot_pickers])
+	print("...with what it means (the diminishing-returns cut): %s (expected true)" % [texts.any(func(t): return str(t).begins_with("bodily harm −"))])
+	print("The member pages are Equipment, Specials and Stats only: %s (expected [true, true, true, false, false])" % [["Equipment", "Specials", "Stats", "Defense", "Run"].map(func(p): return _button_named(party_node, p) != null)])
+
+	# Equipment page: a tile for each thing worn; pressing one opens its picker
+	panel.party_page = "Equipment"
+	panel._refresh()
+	await process_frame
+	texts = _texts(party_node)
+	print("The Equipment page has a tile each for weapon, armour and shield, and the Talismans line: %s (expected all true)" % [["Weapon", "Armour", "Shield", "Talismans"].map(func(s): return texts.has(s))])
+	print("...showing what the Knight wears: %s (expected true for the Gambeson), and no Clothes tile (only you wear clothes): %s (expected false)" % [texts.has("Gambeson"), texts.has("Clothes")])
+	var armour_cell = _find_meta(party_node, "category", "Armour")
+	var click := InputEventMouseButton.new()
+	click.button_index = MOUSE_BUTTON_LEFT
+	click.pressed = true
+	armour_cell.gui_input.emit(click)
+	print("Pressing the Armour tile opens its picker for the Knight: open=%s kind=%s member=%s (expected true, gear, Knight)" % [panel.popup_open(), panel.popup_kind, str(panel.popup_member.name) if panel.popup_member != null else "none"])
+	panel.close_popup()
+	_find_meta(party_node, "category", "Talismans").gui_input.emit(click)
+	print("Pressing the Talismans line opens the talisman popup: open=%s kind=%s (expected true, talisman)" % [panel.popup_open(), panel.popup_kind])
+	panel.close_popup()
+
+	# Specials page: three slots; press one, pick from a list
+	panel.party_page = "Specials"
+	panel._refresh()
+	await process_frame
+	texts = _texts(party_node)
+	var slot_buttons := []
+	_buttons_with_meta(party_node, "slot", slot_buttons)
+	print("Three special slots: %d (expected 3)" % [slot_buttons.size()])
 	print("...listing the three kit specials with their costs: %s (expected true)" % [texts.any(func(t): return str(t).begins_with("Rallying Cry (25 STA)"))])
+	var kpool: Array = _pool_ids(main, knight)
+	slot_buttons.sort_custom(func(a, b): return int(a.get_meta("slot")) < int(b.get_meta("slot")))
+	slot_buttons[1].pressed.emit()
+	print("Pressing a slot opens a pick list: open=%s kind=%s (expected true, pick)" % [panel.popup_open(), panel.popup_kind])
+	_button_named(panel.popup_view, "(empty)").pressed.emit()
+	print("Choosing (empty) empties slot 2 and closes the list: slot='%s' (expected ''), open=%s (expected false)" % [knight.loadout_slot(1, kpool), panel.popup_open()])
+	await process_frame
+	var reset_button = _button_named(party_node, "Reset to default")
+	print("Once a slot is chosen a Reset button appears: %s (expected true)" % [reset_button != null])
+	reset_button.pressed.emit()
+	print("The reset button restores the default: set=%s (expected false), slot 2 back to '%s' (expected knight_charge)" % [knight.loadout_set, knight.loadout_slot(1, kpool)])
 
 	# selecting someone else
 	panel.party_selected_id = druid.id
 	panel._refresh()
 	await process_frame
-	texts = _texts(panel.tab_containers.Party)
-	print("Selecting the Druid shows her sheet (mana pool, her spells): %s, %s (expected true, true)" % [texts.any(func(t): return str(t).ends_with(" mana")), texts.any(func(t): return str(t).begins_with("Restore (40 MP)"))])
+	texts = _texts(party_node)
+	print("Selecting the Druid shows her slots (her spells): %s (expected true for the first)" % [texts.any(func(t): return str(t).begins_with("I CAST FIREBALL"))])
+	var druid_slots := []
+	_buttons_with_meta(party_node, "slot", druid_slots)
+	druid_slots[0].pressed.emit()
+	print("...and her pick list offers the rest of her pool, Restore among them: %s (expected true)" % [_texts(panel.popup_view).any(func(t): return str(t).begins_with("Restore (40 MP)"))])
+	panel.close_popup()
+	panel.party_page = "Stats"
+	panel._refresh()
+	await process_frame
+	texts = _texts(party_node)
+	print("...and her stats show a mana pool and Magic: %s, %s (expected true, true)" % [texts.any(func(t): return str(t).ends_with(" mana")), texts.has("Magic")])
 
 	# a wolf has no equipment
 	panel.party_selected_id = wolf.id
+	panel.party_page = "Equipment"
 	panel._refresh()
 	await process_frame
-	texts = _texts(panel.tab_containers.Party)
+	texts = _texts(party_node)
 	print("A wolf wears and carries nothing: %s (expected true), and shows its loyalty: %s (expected true)" % [texts.any(func(t): return str(t).contains("doesn't wear or carry anything")), texts.any(func(t): return str(t).begins_with("Loyal for"))])
+
+	# you: your own five pages
+	panel.party_selected_id = PartyScreen.HERO_ID
+	panel.party_page = "Stats"
+	panel._refresh()
+	await process_frame
+	texts = _texts(party_node)
+	print("Your sheet has Equipment, Specials, Stats, Defense and Run: %s (expected all true)" % [["Equipment", "Specials", "Stats", "Defense", "Run"].map(func(p): return _button_named(party_node, p) != null)])
+	print("Your stats go by their abbreviations, only the ones that exist: %s (expected MGT STR VGR AGI INT true; RAGE and MAG false as the game has no such stat yet)" % [["MGT", "STR", "VGR", "AGI", "INT"].map(func(s): return texts.has(s)) + [texts.has("RAGE"), texts.has("MAG")]])
 
 	# picks
 	druid.picks = 0
@@ -160,29 +246,22 @@ func _init() -> void:
 	var picks_before: int = druid.picks
 	var hp_before: int = main.member_preview(druid).max_hp
 	panel.party_selected_id = druid.id
+	panel.party_page = "Stats"
 	panel._refresh()
 	await process_frame
-	var plus_buttons := []
-	_find_all(panel.tab_containers.Party, "Button", plus_buttons)
-	var pluses: Array = plus_buttons.filter(func(b): return b.text == "+")
-	print("With a pick banked every pickable stat gets a + button: %d (expected %d)" % [pluses.size(), druid.pickable_stats().size()])
+	var plus_count := _count_buttons(party_node, "+")
+	print("With a pick banked every pickable stat gets a + button: %d (expected %d)" % [plus_count, druid.pickable_stats().size()])
 	panel._on_member_pick_spent(druid, "hp")
 	print("Spending it on HP: picks %d -> %d (expected -1), max HP %d -> %d (expected up)" % [picks_before, druid.picks, hp_before, main.member_preview(druid).max_hp])
 	await process_frame
 	await process_frame
-	var left_over := []
-	_find_all(panel.tab_containers.Party, "Button", left_over)
-	print("...and with none left there are no + buttons: %s (expected true)" % [left_over.filter(func(b): return b.text == "+").is_empty()])
+	print("...and with none left there are no + buttons: %s (expected true)" % [_count_buttons(party_node, "+") == 0])
 
-	# loadout through the panel
-	panel.party_selected_id = knight.id
-	panel._refresh()
-	await process_frame
-	var kpool: Array = _pool_ids(main, knight)
+	# loadout through the panel's handlers (the screen calls these)
 	panel._on_member_special_slot(knight, 1, "")
-	print("Emptying slot 2 through the screen: %s (expected '')" % [knight.loadout_slot(1, kpool)])
+	print("Emptying slot 2 through the handler: '%s' (expected '')" % [knight.loadout_slot(1, kpool)])
 	panel._on_member_loadout_reset(knight)
-	print("The reset button restores the default: %s (expected false)" % [knight.loadout_set])
+	print("The reset handler restores the default: %s (expected false)" % [knight.loadout_set])
 	panel.close()
 
 	# Sandbox loadouts

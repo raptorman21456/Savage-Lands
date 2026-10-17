@@ -154,9 +154,9 @@ var menu_beastiary_button: Button
 var menu_inventory_button: Button
 var menu_settings_button: Button
 var battle_beastiary_button: Button
-# The turn-order strip in the top-right corner of a battle (Main.gd:_turn_order_rows): who acts now and
+# The turn-order strip along the top of a battle (Main.gd:_turn_order_rows): who acts now and
 # who is next, fastest first. Rebuilt on every refresh.
-var turn_order_box: VBoxContainer
+var turn_order_box: HBoxContainer
 var settings_panel: ColorRect
 var settings_master_slider: HSlider
 var settings_sfx_slider: HSlider
@@ -233,6 +233,17 @@ signal battle_evasion_direction_pressed(label: String)
 signal battle_confirm_choice(accepted: bool)
 signal enemy_hovered(index: int)
 signal enemy_unhovered
+# The mouse over a unit on the grid (kind "hero", "ally" or "enemy"; index into the allies / enemies last drawn), and a click on
+# one or on a party card.
+signal unit_hovered(kind: String, index: int)
+signal unit_unhovered
+signal unit_clicked(kind: String, index: int)
+# The mouse or keyboard focus on an entry of an attack list (for the damage preview over the target): the hero's own "attack",
+# "heavy", "special_<i>", or a member's "ally:attack" / "ally:special_<i>".
+signal action_previewed(action: String)
+signal action_preview_cleared
+# Tab: step the details box on to the next unit (the keyboard's way in; see Main.gd:_cycle_battle_details).
+signal inspect_cycled
 signal rock_target_selected(tile: Vector2i)
 signal levelup_choice_pressed(stat_name: String)
 signal event_choice_pressed(accepted: bool)
@@ -303,8 +314,31 @@ var battle_stamina_number_label: Label
 var battle_log_label: Label
 var battle_description_label: Label
 var battle_log_lines := []
-var battle_grid_origin := Vector2(20, 60)
-var battle_tile_size := 56.0
+# The redesigned screen's own pieces (built in _build_battle_shell): the party cards, the plates over every unit, the bottom
+# bar's key-hint line.
+var battle_range_rects := []
+var battle_range_styles := {}
+var battle_history: Array = []                    # [{turn, lines}], the last three turns, newest last
+var battle_history_panel: Panel
+var battle_history_text: RichTextLabel
+var battle_history_button: Button
+var battle_preview: Dictionary = {}               # the damage chip over the target of the attack being considered
+var battle_popup: Dictionary = {}                 # the small card over a hovered unit
+var battle_details: Dictionary = {}               # the big box a click opens at the side
+var battle_status_tooltip: Dictionary = {}        # what a hovered status does
+var battle_hover_key := ""                        # "hero", "ally:<i>", "enemy:<i>" under the mouse ("" = none)
+var battle_units_now: Array = []                  # the last grid state drawn, for finding the unit under the mouse
+var battle_allies_now: Array = []
+var battle_player_tile_now := Vector2i(-1, -1)
+var battle_grid_size_now := Vector2i(6, 6)
+var battle_party_cards := []
+var battle_hero_plate: Dictionary = {}
+var battle_ally_plates := []
+var battle_enemy_plates := []
+var battle_key_hint_label: Label
+var battle_party_rows: Array = []
+var battle_grid_origin := Vector2(348, 68)       # re-centred from the viewport in _build_battle_ui
+var battle_tile_size := 76.0
 # Matches Main.gd:BOSS_BATTLE_GRID_SIZE -- the biggest grid any battle uses
 # (a boss fight), so the tile pool below is sized for the max case. The
 # footprint every grid renders within stays fixed regardless of size (see
@@ -312,11 +346,24 @@ var battle_tile_size := 56.0
 # is what keeps the grid "centered"/stable on screen across every size (6x6
 # through 15x15) rather than the box itself growing or shifting.
 const MAX_BATTLE_GRID_SIZE := 15
-const BATTLE_GRID_FOOTPRINT_PX := 336.0
-# Hand-measured estimate of the battle cluster's own widest row (the main
-# action menu's up to 8 buttons) -- see battle_content_root's construction
-# in _build_battle_ui for why this exists.
-const BATTLE_CONTENT_WIDTH := 650.0
+const BATTLE_GRID_FOOTPRINT_PX := 456.0
+# The redesigned battle screen (see _build_battle_shell): party cards down the left, the grid centred, the turn order along
+# the top, a status/key-hint bar along the bottom. Everything in battle_content_root is placed in screen coordinates.
+const BATTLE_GRID_TOP := 68.0
+const BATTLE_CARD_X := 24.0
+const BATTLE_CARD_W := 200.0
+const BATTLE_CARD_H := 88.0
+const BATTLE_CARD_STEP := 92.0
+const BATTLE_CARD_SLOTS := 7                  # the hero and up to six more (a full roster and the wolf)
+const BATTLE_MENU_X := 240.0
+const BATTLE_BAR_H := 30.0                    # the bottom status/key-hint bar
+const BattleStyleScript := preload("res://scripts/BattleStyle.gd")
+const BATTLE_GOLD := BattleStyleScript.GOLD
+const BATTLE_ALLY_BLUE := BattleStyleScript.ALLY_BLUE
+const BATTLE_ENEMY_RED := BattleStyleScript.ENEMY_RED
+const BATTLE_TEXT := BattleStyleScript.TEXT
+const BATTLE_DIM := BattleStyleScript.DIM
+const BATTLE_MP_COLOR := Color(0.6, 0.36, 0.88)
 # Hand-measured estimate of the overworld HUD block's own widest row (the
 # HP bar reaches to x=314) -- see overworld_hud_root's construction in
 # _ready() for why this exists.
@@ -348,24 +395,29 @@ const FAE_HUT_SPAWN_INTERVAL := 3
 static var water_animated_texture: AnimatedTexture
 static var grass_animated_texture: AnimatedTexture
 
-var battle_main_menu_box: HBoxContainer
-var battle_fight_submenu_box: HBoxContainer
-var battle_move_submenu_box: HBoxContainer
-var battle_arrow_submenu_box: HBoxContainer
-var battle_ally_menu_box: HBoxContainer
+# The action menus are short framed lists that float beside the acting unit (see _build_battle_menus): the root list
+# (Attack / Strategy / Item for the hero; Attack / Magic / Strategy for a member), and the lists they open, each with a round
+# back button on its top-left corner. battle_menus holds {panel, list, back} for each; the *_box vars are their panels.
+var battle_menus := {}
+var battle_main_menu_box: Control
+var battle_strategy_menu_box: Control
+var battle_fight_submenu_box: Control
+var battle_move_submenu_box: Control
+var battle_arrow_submenu_box: Control
+var battle_ally_menu_box: Control
 var battle_ally_buttons := {}
-# The ally's special-move list and the friendly-target picker: a fixed pool of buttons relabelled
+# The ally's attack / magic / strategy lists and the friendly-target picker: a fixed pool of buttons relabelled
 # every refresh from battle_ally_menu_info (set by Main.gd:_refresh_battle_display each frame).
 const ALLY_SPECIAL_SLOTS := 12
 const ALLY_PICK_SLOTS := 24                # Summon the Dead's "how many" picker has a button per number (Main.SUMMON_PICK_LIMIT)
-var battle_ally_special_box: HFlowContainer
+var battle_ally_special_box: Control
 var battle_ally_special_buttons := []
 var battle_ally_special_back: Button
-var battle_ally_pick_box: HFlowContainer
+var battle_ally_pick_box: Control
 var battle_ally_pick_buttons := []
 var battle_ally_pick_back: Button
+var battle_ally_pick_grid: GridContainer
 var battle_ally_menu_info: Dictionary = {}
-var battle_tactics_submenu_box: HBoxContainer
 var battle_evasion_submenu_box: HBoxContainer
 var battle_confirm_box: HBoxContainer
 var battle_confirm_yes_button: Button
@@ -385,6 +437,7 @@ var battle_evasion_buttons := {}
 # reskinnable as everything else instead of being permanently hardcoded.
 static var UI_TEXT := {
 	"battle.main.move": "Reposition on the grid. Doesn't end your turn.",
+	"battle.main.strategy": "Reposition, brace, taunt, vanish into stealth, or retreat.",
 	"battle.main.fight": "Choose an attack: a free regular hit, a costly heavy hit, or one of your weapon's specials.",
 	"battle.main.item": "Use a healing potion.",
 	"battle.main.defend": "Brace for impact -- reduces damage taken this turn and recovers a big chunk of stamina (+15).",
@@ -407,6 +460,9 @@ static var UI_TEXT := {
 	"battle.arrow.back": "Return to the main menu.",
 	"battle.ally.move": "Move this ally on the grid. Doesn't end its turn.",
 	"battle.ally.attack": "This ally attacks with its own weapon and stats.",
+	"battle.ally.open_attack": "This ally's attacks: its plain attack and the weapon and fighting moves that hurt.",
+	"battle.ally.open_magic": "This ally's spells.",
+	"battle.ally.open_strategy": "Reposition this ally, have it guard, or use a tactic.",
 	"battle.ally.special": "Open this ally's special moves (its weapon's, and its own).",
 	"battle.ally.back": "Back to this ally's main menu.",
 	"battle.ally.guard": "This ally braces for impact, taking less damage until its next turn.",
@@ -1180,6 +1236,7 @@ func _ready() -> void:
 # an int index, so the per-frame advance stays framerate-independent instead
 # of revealing in big framerate-dependent jumps.
 func _process(delta: float) -> void:
+	_track_battle_hover()
 	if shopkeeper_revealed_chars >= shopkeeper_full_text.length():
 		return
 	var prev_int: int = int(shopkeeper_revealed_chars)
@@ -1283,14 +1340,22 @@ func _build_battle_ui() -> void:
 	# frame's own stylebox gets its background dropped to fully transparent
 	# (border kept) rather than touching _framed_panel itself, which every
 	# other dialog-style screen in this file also shares.
+	# The gradient lives inside a rounded backdrop that clips it, so the screen's corners are round like its frame.
+	var backdrop := Panel.new()
+	backdrop.position = battle_frame.position
+	backdrop.size = battle_frame.size
+	backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	backdrop.add_theme_stylebox_override("panel", _battle_box(Color(0.02, 0.12, 0.16), Color(0, 0, 0, 0), 0, BattleStyleScript.CORNER + 6))
+	backdrop.clip_children = CanvasItem.CLIP_CHILDREN_AND_DRAW
+	battle_panel.add_child(backdrop)
+	battle_panel.move_child(backdrop, 0)
 	battle_gradient_rect = TextureRect.new()
-	battle_gradient_rect.position = battle_frame.position
+	battle_gradient_rect.position = Vector2.ZERO
 	battle_gradient_rect.size = battle_frame.size
 	battle_gradient_rect.stretch_mode = TextureRect.STRETCH_SCALE
 	battle_gradient_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	battle_panel.add_child(battle_gradient_rect)
-	battle_panel.move_child(battle_gradient_rect, 0)
-	battle_frame.add_theme_stylebox_override("panel", _make_stylebox(Color(0, 0, 0, 0), PANEL_BORDER, 3, 0, 0))
+	backdrop.add_child(battle_gradient_rect)
+	battle_frame.add_theme_stylebox_override("panel", _battle_box(Color(0, 0, 0, 0), PANEL_BORDER, 2, BattleStyleScript.CORNER + 6))
 	_set_battle_gradient(BATTLE_GRADIENT_TOP)
 
 	# Every battle element below (grid, HP/stamina bars, log, menus) was
@@ -1307,10 +1372,13 @@ func _build_battle_ui() -> void:
 	# deliberately anchored to the WINDOW's own corners regardless of this
 	# (Beastiary button, tutorial skip button, tutorial hint bubble) stay
 	# direct battle_panel children instead, so they don't get shifted twice.
+	# (The redesigned screen no longer shifts this: its pieces are placed in screen coordinates -- the grid centred from the
+	# viewport width, the party cards down the left, the bars along the bottom. See _build_battle_shell.)
 	battle_content_root = Control.new()
 	battle_content_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var battle_panel_width: float = get_viewport().get_visible_rect().size.x - 16.0
-	battle_content_root.position = Vector2((battle_panel_width - BATTLE_CONTENT_WIDTH) / 2.0, 0.0)
+	var battle_view: Vector2 = get_viewport().get_visible_rect().size
+	battle_grid_origin = Vector2(roundf((battle_view.x - BATTLE_GRID_FOOTPRINT_PX) / 2.0), BATTLE_GRID_TOP)
+	battle_content_root.position = Vector2.ZERO
 	battle_panel.add_child(battle_content_root)
 
 	# Pooled at the max size any battle can use (a boss fight's 9x9, see
@@ -1350,6 +1418,14 @@ func _build_battle_ui() -> void:
 			marker.visible = false
 			battle_content_root.add_child(marker)
 			battle_tile_markers[t] = marker
+
+	# The tiles a hovered unit could walk to (or the mover's own reach in move mode): drawn over the ground and under the units.
+	for i in MAX_BATTLE_GRID_SIZE * MAX_BATTLE_GRID_SIZE:
+		var range_rect := Panel.new()
+		range_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		range_rect.visible = false
+		battle_content_root.add_child(range_rect)
+		battle_range_rects.append(range_rect)
 
 	# The player's own "@" marker used to double up as battle_unit_markers[0]
 	# (with battle_unit_icons[0] reserved, unused, for a single ally icon) --
@@ -1532,222 +1608,7 @@ func _build_battle_ui() -> void:
 	battle_description_label.add_theme_color_override("font_color", Color(0.85, 0.85, 0.6))
 	battle_content_root.add_child(battle_description_label)
 
-	battle_main_menu_box = HBoxContainer.new()
-	battle_main_menu_box.position = Vector2(20, 425)
-	battle_main_menu_box.add_theme_constant_override("separation", 8)
-	battle_content_root.add_child(battle_main_menu_box)
-	for action in [
-		["Move", "move", UI_TEXT["battle.main.move"]],
-		["Fight", "fight", UI_TEXT["battle.main.fight"]],
-		["Item", "item", UI_TEXT["battle.main.item"]],
-		["Defend", "defend", UI_TEXT["battle.main.defend"]],
-		["Skill", "skill", UI_TEXT["battle.main.skill"]],
-		["Arrow", "arrow", UI_TEXT["battle.main.arrow"]],
-		["Tactics", "tactics", UI_TEXT["battle.main.tactics"]],
-		["Flee", "flee", UI_TEXT["battle.main.flee"]],
-	]:
-		var button := Button.new()
-		button.text = action[0]
-		button.pressed.connect(func(): battle_main_action.emit(action[1]))
-		_setup_hover_button(button, action[2], battle_description_label)
-		_style_standard_button(button)
-		battle_main_menu_box.add_child(button)
-		battle_main_buttons[action[1]] = button
-
-	battle_fight_submenu_box = HBoxContainer.new()
-	battle_fight_submenu_box.position = Vector2(20, 425)
-	battle_fight_submenu_box.add_theme_constant_override("separation", 8)
-	battle_fight_submenu_box.visible = false
-	battle_content_root.add_child(battle_fight_submenu_box)
-	for action in [
-		["Attack", "attack", UI_TEXT["battle.fight.attack"]],
-		["Heavy Attack", "heavy", UI_TEXT["battle.fight.heavy"] % WeaponsScript.HEAVY_STAMINA_COST],
-		["Special 1", "special_0", ""],
-		["Special 2", "special_1", ""],
-		["Special 3", "special_2", ""],
-		["Mine", "mine", UI_TEXT["battle.fight.mine"]],
-		["Back", "back", UI_TEXT["battle.fight.back"]],
-	]:
-		var button := Button.new()
-		button.text = action[0]
-		button.pressed.connect(func(): battle_fight_action.emit(action[1]))
-		_setup_hover_button(button, action[2], battle_description_label)
-		_style_standard_button(button)
-		battle_fight_submenu_box.add_child(button)
-		battle_fight_buttons[action[1]] = button
-
-	battle_tactics_submenu_box = HBoxContainer.new()
-	battle_tactics_submenu_box.position = Vector2(20, 425)
-	battle_tactics_submenu_box.add_theme_constant_override("separation", 8)
-	battle_tactics_submenu_box.visible = false
-	battle_content_root.add_child(battle_tactics_submenu_box)
-	for action in [
-		["Taunt", "taunt", UI_TEXT["battle.tactics.taunt"]],
-		["Stealth", "stealth", UI_TEXT["battle.tactics.stealth"]],
-		["Back", "back", UI_TEXT["battle.tactics.back"]],
-	]:
-		var button := Button.new()
-		button.text = action[0]
-		button.pressed.connect(func(): battle_tactics_action.emit(action[1]))
-		_setup_hover_button(button, action[2], battle_description_label)
-		_style_standard_button(button)
-		battle_tactics_submenu_box.add_child(button)
-		battle_tactics_buttons[action[1]] = button
-
-	battle_move_submenu_box = HBoxContainer.new()
-	battle_move_submenu_box.position = Vector2(20, 425)
-	battle_move_submenu_box.add_theme_constant_override("separation", 8)
-	battle_move_submenu_box.visible = false
-	battle_content_root.add_child(battle_move_submenu_box)
-	for action in [
-		["Confirm (Z)", "confirm", UI_TEXT["battle.move.confirm"]],
-		["Cancel (X)", "cancel", UI_TEXT["battle.move.cancel"]],
-	]:
-		var button := Button.new()
-		button.text = action[0]
-		button.pressed.connect(func(): battle_move_action.emit(action[1]))
-		# Arrows are exclusively grid movement in this menu, so these two
-		# don't take keyboard focus -- mouse hover still highlights them.
-		_setup_hover_button(button, action[2], battle_description_label, false)
-		_style_standard_button(button)
-		battle_move_submenu_box.add_child(button)
-		battle_move_buttons[action[1]] = button
-
-	# Phantom Guard's evasion dodge-roll: shown mid-"enemy" turn, while the
-	# attacker that just missed is paused waiting on the player to pick one
-	# of up to 3 directions relative to it. See update_battle_grid's
-	# is_evasion_prompt param for why this box's visibility isn't gated
-	# behind is_player_turn like the rest. Unlike Move's Confirm/Cancel,
-	# these buttons ARE keyboard-focusable -- there's no grid-walking here
-	# for arrow keys to drive, so Z-activates-focused-button (the same
-	# pattern Main/Fight/etc. use) is how a keyboard player picks one.
-	battle_evasion_submenu_box = HBoxContainer.new()
-	battle_evasion_submenu_box.position = Vector2(20, 425)
-	battle_evasion_submenu_box.add_theme_constant_override("separation", 8)
-	battle_evasion_submenu_box.visible = false
-	battle_content_root.add_child(battle_evasion_submenu_box)
-	for entry in [
-		["back", "Dodge Back", UI_TEXT["battle.evasion.back"]],
-		["left", "Dodge Left", UI_TEXT["battle.evasion.left"]],
-		["right", "Dodge Right", UI_TEXT["battle.evasion.right"]],
-	]:
-		var button := Button.new()
-		button.text = entry[1]
-		button.pressed.connect(func(): battle_evasion_direction_pressed.emit(entry[0]))
-		_setup_hover_button(button, entry[2], battle_description_label)
-		_style_standard_button(button)
-		battle_evasion_submenu_box.add_child(button)
-		battle_evasion_buttons[entry[0]] = button
-
-	# Turtle Shell's water-push confirm -- same box position as the evasion
-	# submenu (the two are never shown at once: one fires mid-enemy-turn on a
-	# dodge, the other fires once the player's own turn is ending).
-	battle_confirm_box = HBoxContainer.new()
-	battle_confirm_box.position = Vector2(20, 425)
-	battle_confirm_box.add_theme_constant_override("separation", 8)
-	battle_confirm_box.visible = false
-	battle_content_root.add_child(battle_confirm_box)
-	battle_confirm_yes_button = Button.new()
-	battle_confirm_yes_button.pressed.connect(func(): battle_confirm_choice.emit(true))
-	_style_standard_button(battle_confirm_yes_button)
-	battle_confirm_box.add_child(battle_confirm_yes_button)
-	battle_confirm_no_button = Button.new()
-	battle_confirm_no_button.pressed.connect(func(): battle_confirm_choice.emit(false))
-	_style_standard_button(battle_confirm_no_button)
-	battle_confirm_box.add_child(battle_confirm_no_button)
-
-	# Arrow submenu -- only ever reachable while the Bow is equipped (see
-	# update_battle_grid's arrow-button visibility gate), same shape as the
-	# Fight submenu: one button per option plus Back. Text/disabled state is
-	# refreshed every update_battle_grid call from the live owned_arrows
-	# count, same as the Fight submenu's specials.
-	battle_arrow_submenu_box = HBoxContainer.new()
-	battle_arrow_submenu_box.position = Vector2(20, 425)
-	battle_arrow_submenu_box.add_theme_constant_override("separation", 8)
-	battle_arrow_submenu_box.visible = false
-	battle_content_root.add_child(battle_arrow_submenu_box)
-	for action in [
-		["Flame", "flame", ""],
-		["Freeze", "freeze", ""],
-		["Bomb", "bomb", ""],
-		["Back", "back", UI_TEXT["battle.arrow.back"]],
-	]:
-		var button := Button.new()
-		button.text = action[0]
-		button.pressed.connect(func(): battle_arrow_action.emit(action[1]))
-		_setup_hover_button(button, action[2], battle_description_label)
-		_style_standard_button(button)
-		battle_arrow_submenu_box.add_child(button)
-		battle_arrow_buttons[action[1]] = button
-
-	# Ally command menu: shown instead of the hero's own main menu while
-	# Main.gd is running a party member's commanded turn (see
-	# battle_commanding_ally) -- 4 generic actions every kind can already do.
-	# Move reuses the hero's own Move submenu below (Confirm/Cancel read the
-	# same either way); Attack/Guard/Skip are self-contained.
-	battle_ally_menu_box = HBoxContainer.new()
-	battle_ally_menu_box.position = Vector2(20, 425)
-	battle_ally_menu_box.add_theme_constant_override("separation", 8)
-	battle_ally_menu_box.visible = false
-	battle_content_root.add_child(battle_ally_menu_box)
-	for action in [
-		["Move", "move", UI_TEXT["battle.ally.move"]],
-		["Attack", "attack", UI_TEXT["battle.ally.attack"]],
-		["Special", "special", UI_TEXT["battle.ally.special"]],
-		["Guard", "guard", UI_TEXT["battle.ally.guard"]],
-		["Skip", "skip", UI_TEXT["battle.ally.skip"]],
-	]:
-		var button := Button.new()
-		button.text = action[0]
-		button.pressed.connect(func(): battle_ally_action.emit(action[1]))
-		_setup_hover_button(button, action[2], battle_description_label)
-		_style_standard_button(button)
-		battle_ally_menu_box.add_child(button)
-		battle_ally_buttons[action[1]] = button
-
-	# The ally's special-move list: one button per special (relabelled live with its mana/stamina
-	# cost), plus Back. Emits "special_<n>" / "back" through the same battle_ally_action signal.
-	battle_ally_special_box = HFlowContainer.new()
-	battle_ally_special_box.position = Vector2(20, 425)
-	# A kit (3) plus a weapon (3) can be six long labels: wrap onto a second row rather than run off screen.
-	battle_ally_special_box.custom_minimum_size = Vector2(1090, 0)
-	battle_ally_special_box.add_theme_constant_override("h_separation", 8)
-	battle_ally_special_box.add_theme_constant_override("v_separation", 4)
-	battle_ally_special_box.visible = false
-	battle_content_root.add_child(battle_ally_special_box)
-	for i in ALLY_SPECIAL_SLOTS:
-		var special_button := Button.new()
-		special_button.pressed.connect(func(): battle_ally_action.emit("special_%d" % i))
-		_setup_hover_button(special_button, "", battle_description_label)
-		_style_standard_button(special_button)
-		battle_ally_special_box.add_child(special_button)
-		battle_ally_special_buttons.append(special_button)
-	battle_ally_special_back = Button.new()
-	battle_ally_special_back.text = "Back"
-	battle_ally_special_back.pressed.connect(func(): battle_ally_action.emit("back"))
-	_setup_hover_button(battle_ally_special_back, UI_TEXT["battle.ally.back"], battle_description_label)
-	_style_standard_button(battle_ally_special_back)
-	battle_ally_special_box.add_child(battle_ally_special_back)
-
-	# The friendly-target picker (Channel: who gets the mana; Revival Blessing: who stands up).
-	battle_ally_pick_box = HFlowContainer.new()
-	battle_ally_pick_box.position = Vector2(20, 425)
-	battle_ally_pick_box.custom_minimum_size = Vector2(1090, 0)
-	battle_ally_pick_box.add_theme_constant_override("h_separation", 8)
-	battle_ally_pick_box.add_theme_constant_override("v_separation", 4)
-	battle_ally_pick_box.visible = false
-	battle_content_root.add_child(battle_ally_pick_box)
-	for i in ALLY_PICK_SLOTS:
-		var pick_button := Button.new()
-		pick_button.pressed.connect(func(): battle_ally_action.emit("pick_%d" % i))
-		_style_standard_button(pick_button)
-		battle_ally_pick_box.add_child(pick_button)
-		battle_ally_pick_buttons.append(pick_button)
-	battle_ally_pick_back = Button.new()
-	battle_ally_pick_back.text = "Back"
-	battle_ally_pick_back.pressed.connect(func(): battle_ally_action.emit("back"))
-	_style_standard_button(battle_ally_pick_back)
-	battle_ally_pick_box.add_child(battle_ally_pick_back)
+	_build_battle_menus()
 
 	# First-ever-battle tutorial hint bubble + its Skip control -- see
 	# Main.gd's tutorial_active/tutorial_step for the sequencing logic that
@@ -1757,7 +1618,7 @@ func _build_battle_ui() -> void:
 	battle_hint_panel.size = Vector2(220, 50)
 	battle_hint_panel.visible = false
 	battle_hint_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	battle_hint_panel.add_theme_stylebox_override("panel", _make_stylebox(PANEL_BG, Color(1.0, 0.9, 0.2, 1.0), 2, 0, 8))
+	battle_hint_panel.add_theme_stylebox_override("panel", _battle_box(PANEL_BG, Color(1.0, 0.9, 0.2, 1.0), 2, BattleStyleScript.CORNER, true))
 	battle_panel.add_child(battle_hint_panel)
 
 	battle_hint_label = Label.new()
@@ -1771,10 +1632,11 @@ func _build_battle_ui() -> void:
 	battle_tutorial_skip_button = Button.new()
 	battle_tutorial_skip_button.text = "Skip Tutorial"
 	battle_tutorial_skip_button.visible = false
-	battle_tutorial_skip_button.position = Vector2(get_viewport().get_visible_rect().size.x - 160, 20)
+	battle_tutorial_skip_button.position = Vector2(get_viewport().get_visible_rect().size.x - 160, 76)
 	battle_tutorial_skip_button.pressed.connect(func(): tutorial_skip_pressed.emit())
 	_add_hover_color(battle_tutorial_skip_button)
 	_style_standard_button(battle_tutorial_skip_button)
+	_round_button(battle_tutorial_skip_button)
 	battle_panel.add_child(battle_tutorial_skip_button)
 
 	# Always visible during battle regardless of menu state or whose turn it
@@ -1783,19 +1645,906 @@ func _build_battle_ui() -> void:
 	# action button already is.
 	battle_beastiary_button = Button.new()
 	battle_beastiary_button.text = "Beastiary"
-	battle_beastiary_button.position = Vector2(get_viewport().get_visible_rect().size.x - 160, 60)
+	battle_beastiary_button.position = Vector2(get_viewport().get_visible_rect().size.x - 160, 20)
 	battle_beastiary_button.pressed.connect(func(): beastiary_pressed.emit())
 	_add_hover_color(battle_beastiary_button)
 	_style_standard_button(battle_beastiary_button)
+	_round_button(battle_beastiary_button)
 	battle_panel.add_child(battle_beastiary_button)
 
-	turn_order_box = VBoxContainer.new()
-	turn_order_box.position = Vector2(get_viewport().get_visible_rect().size.x - 214, 104)
-	turn_order_box.custom_minimum_size = Vector2(198, 0)
-	turn_order_box.add_theme_constant_override("separation", 3)
+	# The turn order runs along the top, centred (anchored to the middle and growing both ways as units are added).
+	turn_order_box = HBoxContainer.new()
+	turn_order_box.anchor_left = 0.5
+	turn_order_box.anchor_right = 0.5
+	turn_order_box.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	turn_order_box.offset_top = 14.0
+	turn_order_box.add_theme_constant_override("separation", 5)
 	turn_order_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	turn_order_box.visible = false
 	battle_panel.add_child(turn_order_box)
+
+	_build_battle_shell()
+
+# --- The redesigned battle screen ---------------------------------------------------------------------------------
+# Built once, after the older pieces above, and it re-places them: the party cards down the left, a plate over every unit,
+# a bar along the bottom with the turn line and the key hints. The old top-left HP/stamina readouts and the battle log are
+# retired -- the hero's card and plate carry that now, and the log lives on as history (battle_log_lines).
+func _build_battle_shell() -> void:
+	var view: Vector2 = get_viewport().get_visible_rect().size
+	var bar_y: float = view.y - 14.0 - BATTLE_BAR_H
+	var grid_bottom: float = battle_grid_origin.y + BATTLE_GRID_FOOTPRINT_PX
+	for n in [battle_hp_heart_label, battle_hp_bar_bg, battle_hp_bar_fill, battle_hp_number_label, battle_stamina_bar_bg, battle_stamina_bar_fill, battle_stamina_number_label, battle_log_label]:
+		n.visible = false
+
+	# The grid sits on a rounded board, so the field reads as one soft shape rather than a hard square block.
+	var board := Panel.new()
+	board.position = battle_grid_origin - Vector2(8, 8)
+	board.size = Vector2(BATTLE_GRID_FOOTPRINT_PX + 16.0, BATTLE_GRID_FOOTPRINT_PX + 16.0)
+	board.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	board.add_theme_stylebox_override("panel", _battle_box(Color(0.04, 0.04, 0.07, 0.8), Color(0.35, 0.28, 0.14), 1, BattleStyleScript.CORNER, true))
+	battle_content_root.add_child(board)
+	battle_content_root.move_child(board, 0)
+	# The bottom bar: whose turn it is on the left, the keys on the right.
+	var bar := Panel.new()
+	bar.position = Vector2(BATTLE_CARD_X, bar_y)
+	bar.size = Vector2(view.x - BATTLE_CARD_X * 2.0, BATTLE_BAR_H)
+	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bar.add_theme_stylebox_override("panel", _battle_box(PANEL_BG, Color(0.35, 0.28, 0.14), 1, BattleStyleScript.CORNER_SMALL + 3))
+	battle_content_root.add_child(bar)
+	battle_content_root.move_child(bar, 0)
+	battle_status_label.position = Vector2(BATTLE_CARD_X + 12.0, bar_y + 3.0)
+	battle_status_label.add_theme_font_size_override("font_size", 16)
+	battle_status_label.add_theme_color_override("font_color", BATTLE_TEXT)
+	battle_key_hint_label = Label.new()
+	battle_key_hint_label.position = Vector2(view.x * 0.38, bar_y + 6.0)
+	battle_key_hint_label.size = Vector2(view.x * 0.62 - BATTLE_CARD_X - 12.0, 20.0)
+	battle_key_hint_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	battle_key_hint_label.add_theme_font_size_override("font_size", 13)
+	battle_key_hint_label.add_theme_color_override("font_color", BATTLE_DIM)
+	battle_key_hint_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	battle_content_root.add_child(battle_key_hint_label)
+
+	# Hover text for the menu buttons sits just above the bar; the Target/Shield/Berserk lines go in the right column.
+	battle_description_label.position = Vector2(BATTLE_MENU_X, bar_y - 24.0)
+	battle_description_label.size = Vector2(view.x - BATTLE_MENU_X - BATTLE_CARD_X, 22.0)
+	battle_description_label.add_theme_font_size_override("font_size", 13)
+	battle_description_label.add_theme_color_override("font_color", Color(0.85, 0.8, 0.55))
+	var grid_right: float = battle_grid_origin.x + BATTLE_GRID_FOOTPRINT_PX
+	battle_status_label2.position = Vector2(grid_right + 16.0, bar_y - 104.0)
+	battle_status_label2.size = Vector2(view.x - grid_right - 16.0 - BATTLE_CARD_X, 96.0)
+	battle_status_label2.autowrap_mode = TextServer.AUTOWRAP_WORD
+	battle_status_label2.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+	battle_status_label2.add_theme_font_size_override("font_size", 14)
+	battle_status_label2.add_theme_color_override("font_color", BATTLE_TEXT)
+
+	# The action lists float beside the acting unit (_place_menu); the two prompts that interrupt an enemy's turn stay a row of
+	# buttons under the grid.
+	for box in [battle_evasion_submenu_box, battle_confirm_box]:
+		box.position = Vector2(BATTLE_MENU_X, grid_bottom + 10.0)
+
+	# Party cards, and a plate over every unit.
+	for i in BATTLE_CARD_SLOTS:
+		battle_party_cards.append(_make_party_card(i))
+	battle_hero_plate = _make_plate()
+	for i in MAX_BATTLE_ALLIES:
+		battle_ally_plates.append(_make_plate())
+	for i in MAX_BATTLE_UNITS:
+		battle_enemy_plates.append(_make_plate())
+	# The lists float above everything on the grid, the plates included.
+	for key in battle_menus:
+		battle_content_root.move_child(battle_menus[key].panel, -1)
+	_build_battle_overlays()
+
+# --- The action menus -------------------------------------------------------------------------------------------
+# Every menu is a short framed list that floats beside the acting unit; picking an entry that opens another list swaps the
+# first for the second, which carries a small round back button on its top-left corner (the keyboard's X does the same).
+const BATTLE_MENU_ROW_H := 34.0
+const BATTLE_MENU_PAD := 5.0
+
+func _list_stylebox(bg: Color, lit: bool) -> StyleBoxFlat:
+	# A softly rounded highlight (a thin gold edge when lit) inside the list's frame.
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = bg
+	sb.set_corner_radius_all(BattleStyleScript.CORNER_SMALL)
+	sb.anti_aliasing = true
+	if lit:
+		sb.border_color = Color(BATTLE_GOLD.r, BATTLE_GOLD.g, BATTLE_GOLD.b, 0.75)
+		sb.set_border_width_all(1)
+	sb.content_margin_left = 12.0
+	sb.content_margin_right = 8.0
+	sb.content_margin_top = 4.0
+	sb.content_margin_bottom = 4.0
+	return sb
+
+# A flat list entry: no box until it is hovered or focused, then a lit bar on its left edge.
+func _style_list_button(button: Button) -> void:
+	var clear := _list_stylebox(Color(0, 0, 0, 0), false)
+	var lit := _list_stylebox(Color(0.2, 0.16, 0.08, 0.96), true)
+	button.add_theme_stylebox_override("normal", clear)
+	button.add_theme_stylebox_override("hover", lit)
+	button.add_theme_stylebox_override("pressed", lit)
+	button.add_theme_stylebox_override("focus", lit)
+	button.add_theme_stylebox_override("disabled", clear)
+	button.add_theme_color_override("font_color", BATTLE_TEXT)
+	button.add_theme_color_override("font_disabled_color", Color(0.42, 0.4, 0.36))
+	button.add_theme_font_size_override("font_size", 16)
+	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+
+func _make_back_circle(on_press: Callable) -> Button:
+	var back := Button.new()
+	back.text = "‹"
+	back.size = Vector2(28, 28)
+	back.focus_mode = Control.FOCUS_NONE
+	back.tooltip_text = "Back"
+	for state in ["normal", "hover", "pressed", "focus", "disabled"]:
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = Color(0.22, 0.18, 0.09) if state == "hover" else Color(0.09, 0.08, 0.12)
+		sb.border_color = BATTLE_GOLD
+		sb.set_border_width_all(2)
+		sb.set_corner_radius_all(14)
+		back.add_theme_stylebox_override(state, sb)
+	back.add_theme_color_override("font_color", BATTLE_GOLD)
+	back.add_theme_font_size_override("font_size", 20)
+	back.pressed.connect(on_press)
+	return back
+
+# A framed list. {panel, list, back}: `back` is the round button on the panel's top-left corner (null for the root list).
+func _make_menu_list(width: float, on_back: Callable = Callable()) -> Dictionary:
+	var panel := Panel.new()
+	panel.size = Vector2(width, BATTLE_MENU_ROW_H + BATTLE_MENU_PAD * 2.0)
+	panel.visible = false
+	panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	panel.add_theme_stylebox_override("panel", _battle_box(PANEL_BG, PANEL_BORDER, 1, BattleStyleScript.CORNER, true))
+	battle_content_root.add_child(panel)
+	var list := VBoxContainer.new()
+	list.position = Vector2(BATTLE_MENU_PAD, BATTLE_MENU_PAD)
+	list.add_theme_constant_override("separation", 0)
+	panel.add_child(list)
+	var menu := {"panel": panel, "list": list, "back": null, "min_w": width}
+	if on_back.is_valid():
+		var back := _make_back_circle(on_back)
+		back.position = Vector2(-13, -13)
+		panel.add_child(back)
+		menu["back"] = back
+	return menu
+
+func _menu_button(list: Control, text: String, description: String, on_press: Callable = Callable(), focusable: bool = true) -> Button:
+	var button := Button.new()
+	button.text = text
+	button.custom_minimum_size = Vector2(0, BATTLE_MENU_ROW_H)
+	_setup_hover_button(button, description, battle_description_label, focusable)
+	_style_list_button(button)
+	list.add_child(button)
+	if on_press.is_valid():
+		button.pressed.connect(on_press)
+	return button
+
+func _build_battle_menus() -> void:
+	# The hero's root list: Attack opens the attack list, Strategy the strategy list, Item drinks a potion.
+	var main := _make_menu_list(150.0)
+	battle_menus["main"] = main
+	battle_main_menu_box = main.panel
+	for action in [
+		["Attack", "fight", UI_TEXT["battle.main.fight"]],
+		["Strategy", "strategy", UI_TEXT["battle.main.strategy"]],
+		["Item", "item", UI_TEXT["battle.main.item"]],
+	]:
+		battle_main_buttons[action[1]] = _menu_button(main.list, action[0], action[2], func(): battle_main_action.emit(action[1]))
+
+	# Strategy: everything that is not an attack -- Move (which does not end the turn), Defend, Taunt, Stealth, the Guardian's
+	# Skill, Flee. Taunt and Stealth are the old Tactics pair; they still emit through battle_tactics_action.
+	var strat := _make_menu_list(190.0, func(): battle_main_action.emit("main_back"))
+	battle_menus["strategy"] = strat
+	battle_strategy_menu_box = strat.panel
+	battle_main_buttons["move"] = _menu_button(strat.list, "Move", UI_TEXT["battle.main.move"], func(): battle_main_action.emit("move"))
+	battle_main_buttons["defend"] = _menu_button(strat.list, "Defend", UI_TEXT["battle.main.defend"], func(): battle_main_action.emit("defend"))
+	battle_tactics_buttons["taunt"] = _menu_button(strat.list, "Taunt", UI_TEXT["battle.tactics.taunt"], func(): battle_tactics_action.emit("taunt"))
+	battle_tactics_buttons["stealth"] = _menu_button(strat.list, "Stealth", UI_TEXT["battle.tactics.stealth"], func(): battle_tactics_action.emit("stealth"))
+	battle_main_buttons["skill"] = _menu_button(strat.list, "Skill", UI_TEXT["battle.main.skill"], func(): battle_main_action.emit("skill"))
+	battle_main_buttons["flee"] = _menu_button(strat.list, "Flee", UI_TEXT["battle.main.flee"], func(): battle_main_action.emit("flee"))
+
+	# The attack list: the plain attack, the heavy one, the weapon's three specials, Mine (Hand Picks), and the arrows (Bow).
+	var fight := _make_menu_list(250.0, func(): battle_fight_action.emit("back"))
+	battle_menus["fight"] = fight
+	battle_fight_submenu_box = fight.panel
+	for action in [
+		["Attack", "attack", UI_TEXT["battle.fight.attack"]],
+		["Heavy Attack", "heavy", UI_TEXT["battle.fight.heavy"] % WeaponsScript.HEAVY_STAMINA_COST],
+		["Special 1", "special_0", ""],
+		["Special 2", "special_1", ""],
+		["Special 3", "special_2", ""],
+		["Mine", "mine", UI_TEXT["battle.fight.mine"]],
+	]:
+		battle_fight_buttons[action[1]] = _menu_button(fight.list, action[0], action[2], func(): battle_fight_action.emit(action[1]))
+	battle_fight_buttons["arrow"] = _menu_button(fight.list, "Arrows", UI_TEXT["battle.main.arrow"], func(): battle_main_action.emit("arrow"))
+	battle_fight_buttons["back"] = fight.back
+	# Resting the mouse (or the focus) on an attack shows what it would do to the target.
+	for key in ["attack", "heavy", "special_0", "special_1", "special_2"]:
+		var attack_button: Button = battle_fight_buttons[key]
+		attack_button.mouse_entered.connect(func(): action_previewed.emit(key))
+		attack_button.focus_entered.connect(func(): action_previewed.emit(key))
+		attack_button.mouse_exited.connect(func(): action_preview_cleared.emit())
+		attack_button.focus_exited.connect(func(): action_preview_cleared.emit())
+
+	var arrow := _make_menu_list(200.0, func(): battle_arrow_action.emit("back"))
+	battle_menus["arrow"] = arrow
+	battle_arrow_submenu_box = arrow.panel
+	for action in [["Flame", "flame"], ["Freeze", "freeze"], ["Bomb", "bomb"]]:
+		battle_arrow_buttons[action[1]] = _menu_button(arrow.list, action[0], "", func(): battle_arrow_action.emit(action[1]))
+	battle_arrow_buttons["back"] = arrow.back
+
+	# Moving: Confirm, with the round button on the corner as Cancel (hero and members alike). Neither takes focus: the
+	# arrow keys are for walking the unit, Z confirms and X cancels.
+	var move := _make_menu_list(150.0, func(): battle_move_action.emit("cancel"))
+	battle_menus["move"] = move
+	battle_move_submenu_box = move.panel
+	battle_move_buttons["confirm"] = _menu_button(move.list, "Confirm", UI_TEXT["battle.move.confirm"], func(): battle_move_action.emit("confirm"), false)
+	battle_move_buttons["cancel"] = move.back
+	move.back.tooltip_text = "Cancel: undo this move"
+
+	# A member's root list: Attack, Magic (only if it has spells), Strategy.
+	var ally_main := _make_menu_list(150.0)
+	battle_menus["ally_main"] = ally_main
+	battle_ally_menu_box = ally_main.panel
+	for action in [
+		["Attack", "attack", "open_attack"],
+		["Magic", "magic", "open_magic"],
+		["Strategy", "strategy", "open_strategy"],
+	]:
+		battle_ally_buttons[action[0].to_lower()] = _menu_button(ally_main.list, action[0], UI_TEXT["battle.ally." + action[2]], func(): battle_ally_action.emit(action[2]))
+
+	# A member's attack / magic / strategy list: one pool of buttons, relabelled every refresh. Each carries the action it sends.
+	var ally_list := _make_menu_list(260.0, func(): battle_ally_action.emit("back"))
+	battle_menus["ally_list"] = ally_list
+	battle_ally_special_box = ally_list.panel
+	battle_ally_special_back = ally_list.back
+	for i in ALLY_SPECIAL_SLOTS:
+		var special_button := _menu_button(ally_list.list, "", "")
+		special_button.pressed.connect(func(): battle_ally_action.emit(str(special_button.get_meta("action", ""))))
+		special_button.mouse_entered.connect(func(): action_previewed.emit("ally:" + str(special_button.get_meta("action", ""))))
+		special_button.focus_entered.connect(func(): action_previewed.emit("ally:" + str(special_button.get_meta("action", ""))))
+		special_button.mouse_exited.connect(func(): action_preview_cleared.emit())
+		special_button.focus_exited.connect(func(): action_preview_cleared.emit())
+		battle_ally_special_buttons.append(special_button)
+
+	# The friendly-target picker (Channel: who gets the mana; Revival Blessing: who stands up; Summon the Dead: how many). A
+	# long list wraps into more columns.
+	var pick := _make_menu_list(240.0, func(): battle_ally_action.emit("back"))
+	battle_menus["ally_pick"] = pick
+	battle_ally_pick_box = pick.panel
+	battle_ally_pick_back = pick.back
+	battle_ally_pick_grid = GridContainer.new()
+	battle_ally_pick_grid.position = Vector2(BATTLE_MENU_PAD, BATTLE_MENU_PAD)
+	battle_ally_pick_grid.add_theme_constant_override("h_separation", 0)
+	battle_ally_pick_grid.add_theme_constant_override("v_separation", 0)
+	pick.panel.add_child(battle_ally_pick_grid)
+	pick.list.visible = false
+	for i in ALLY_PICK_SLOTS:
+		var pick_button := Button.new()
+		pick_button.custom_minimum_size = Vector2(228, BATTLE_MENU_ROW_H)
+		pick_button.pressed.connect(func(): battle_ally_action.emit("pick_%d" % i))
+		_style_list_button(pick_button)
+		battle_ally_pick_grid.add_child(pick_button)
+		battle_ally_pick_buttons.append(pick_button)
+
+	# Phantom Guard's evasion dodge-roll: shown mid-"enemy" turn, while the attacker that just missed is paused waiting on the
+	# player to pick one of up to 3 directions relative to it. These two prompts stay a row of buttons along the bottom; their
+	# buttons are focusable (Z activates the focused one).
+	battle_evasion_submenu_box = HBoxContainer.new()
+	battle_evasion_submenu_box.add_theme_constant_override("separation", 8)
+	battle_evasion_submenu_box.visible = false
+	battle_content_root.add_child(battle_evasion_submenu_box)
+	for entry in [
+		["back", "Dodge Back", UI_TEXT["battle.evasion.back"]],
+		["left", "Dodge Left", UI_TEXT["battle.evasion.left"]],
+		["right", "Dodge Right", UI_TEXT["battle.evasion.right"]],
+	]:
+		var button := Button.new()
+		button.text = entry[1]
+		button.pressed.connect(func(): battle_evasion_direction_pressed.emit(entry[0]))
+		_setup_hover_button(button, entry[2], battle_description_label)
+		_style_standard_button(button)
+		_round_button(button)
+		battle_evasion_submenu_box.add_child(button)
+		battle_evasion_buttons[entry[0]] = button
+
+	# Turtle Shell's water-push confirm -- the same row, never shown at once with the evasion one.
+	battle_confirm_box = HBoxContainer.new()
+	battle_confirm_box.add_theme_constant_override("separation", 8)
+	battle_confirm_box.visible = false
+	battle_content_root.add_child(battle_confirm_box)
+	battle_confirm_yes_button = Button.new()
+	battle_confirm_yes_button.pressed.connect(func(): battle_confirm_choice.emit(true))
+	_style_standard_button(battle_confirm_yes_button)
+	_round_button(battle_confirm_yes_button)
+	battle_confirm_box.add_child(battle_confirm_yes_button)
+	battle_confirm_no_button = Button.new()
+	battle_confirm_no_button.pressed.connect(func(): battle_confirm_choice.emit(false))
+	_style_standard_button(battle_confirm_no_button)
+	_round_button(battle_confirm_no_button)
+	battle_confirm_box.add_child(battle_confirm_no_button)
+
+# Sizes a list to the entries showing now.
+func _fit_menu(menu: Dictionary) -> void:
+	var rows := 0
+	var widest := 0.0
+	for c in menu.list.get_children():
+		if c.visible:
+			rows += 1
+			var button := c as Button
+			if button != null:
+				widest = maxf(widest, button.get_theme_font("font").get_string_size(button.text, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x)
+	# Wide enough for its longest entry (the button's own margins are 12 and 8).
+	var w: float = maxf(float(menu.min_w), widest + 20.0 + BATTLE_MENU_PAD * 2.0 + 6.0)
+	menu.panel.size = Vector2(w, rows * BATTLE_MENU_ROW_H + BATTLE_MENU_PAD * 2.0)
+	menu.list.size = Vector2(w - BATTLE_MENU_PAD * 2.0, rows * BATTLE_MENU_ROW_H)
+
+# Floats a list beside the acting unit: on the side of it with more room, level with its tile, kept clear of the cards and the bar.
+func _place_menu(menu: Dictionary, anchor_tile: Vector2i, grid_w: int) -> void:
+	var view: Vector2 = get_viewport().get_visible_rect().size
+	var panel: Control = menu.panel
+	var tile_px: Vector2 = battle_grid_origin + Vector2(anchor_tile) * battle_tile_size
+	var on_right_half: bool = anchor_tile.x * 2 >= grid_w
+	var x: float = tile_px.x - panel.size.x - 8.0 if on_right_half else tile_px.x + battle_tile_size + 8.0
+	x = clampf(x, BATTLE_CARD_X + BATTLE_CARD_W + 10.0, view.x - panel.size.x - 10.0)
+	var bottom_limit: float = view.y - 14.0 - BATTLE_BAR_H - 30.0
+	var y: float = clampf(tile_px.y - 4.0, BATTLE_GRID_TOP, maxf(BATTLE_GRID_TOP, bottom_limit - panel.size.y))
+	panel.position = Vector2(roundf(x), roundf(y))
+
+func _battle_label(parent: Control, pos: Vector2, size_px: int, color: Color) -> Label:
+	var label := Label.new()
+	label.position = pos
+	label.add_theme_font_size_override("font_size", size_px)
+	label.add_theme_color_override("font_color", color)
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(label)
+	return label
+
+# A rounded box in the battle screen's look (see BattleStyle): `radius` defaults to the panel roundness.
+func _battle_box(bg: Color, border: Color, border_width: int, radius: int = BattleStyleScript.CORNER, shadow: bool = false) -> StyleBoxFlat:
+	return BattleStyleScript.box(bg, border, border_width, radius, shadow)
+
+# A button given the battle screen's rounded look (over whatever _style_standard_button gave it).
+func _round_button(button: Button) -> void:
+	for state in ["normal", "hover", "pressed", "disabled", "focus"]:
+		var sb: StyleBoxFlat = button.get_theme_stylebox(state).duplicate()
+		sb.set_corner_radius_all(BattleStyleScript.CORNER_SMALL + 1)
+		sb.anti_aliasing = true
+		button.add_theme_stylebox_override(state, sb)
+
+func _bar_style(color: Color, height: float) -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = color
+	sb.set_corner_radius_all(int(ceil(height / 2.0)))
+	sb.anti_aliasing = true
+	return sb
+
+# A bar drawn from two rounded Panels (the track and the fill); returns both and its full width.
+func _battle_bar(parent: Control, pos: Vector2, size_px: Vector2, track: Color, fill: Color) -> Dictionary:
+	var bg := Panel.new()
+	bg.add_theme_stylebox_override("panel", _bar_style(track, size_px.y))
+	bg.position = pos
+	bg.size = size_px
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(bg)
+	var fg := Panel.new()
+	fg.add_theme_stylebox_override("panel", _bar_style(fill, size_px.y))
+	fg.position = pos
+	fg.size = size_px
+	fg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(fg)
+	return {"bg": bg, "fill": fg, "width": size_px.x, "height": size_px.y}
+
+func _set_bar_color(bar: Dictionary, color: Color) -> void:
+	var sb: StyleBoxFlat = bar.fill.get_theme_stylebox("panel")
+	if sb.bg_color != color:
+		sb.bg_color = color
+
+func _set_battle_bar(bar: Dictionary, ratio: float, shown: bool = true) -> void:
+	bar.bg.visible = shown
+	bar.fill.visible = shown
+	bar.fill.size = Vector2(float(bar.width) * clampf(ratio, 0.0, 1.0), float(bar.height))
+
+func _make_party_card(i: int) -> Dictionary:
+	var panel := Panel.new()
+	panel.position = Vector2(BATTLE_CARD_X, BATTLE_GRID_TOP + i * BATTLE_CARD_STEP)
+	panel.size = Vector2(BATTLE_CARD_W, BATTLE_CARD_H)
+	panel.mouse_filter = Control.MOUSE_FILTER_PASS
+	panel.visible = false
+	battle_content_root.add_child(panel)
+	var card := {"panel": panel}
+	# Hovering a card is hovering that unit; clicking it opens the unit's details.
+	panel.mouse_entered.connect(func(): _card_hover(i))
+	panel.mouse_exited.connect(func(): battle_card_hover_key = "")
+	panel.gui_input.connect(func(event: InputEvent): _card_input(i, event))
+	# The portrait: the hero is the blue "@", everyone else wears the icon the grid gives them.
+	var frame := Panel.new()
+	frame.position = Vector2(10, 12)
+	frame.size = Vector2(46, 46)
+	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	frame.add_theme_stylebox_override("panel", _battle_box(Color(0.05, 0.05, 0.08), BATTLE_ALLY_BLUE, 1, BattleStyleScript.CORNER_SMALL + 1))
+	panel.add_child(frame)
+	card["frame"] = frame
+	card["at"] = _battle_label(frame, Vector2(11, 3), 30, BATTLE_ALLY_BLUE)
+	card["at"].text = "@"
+	var icon := TextureRect.new()
+	icon.position = Vector2(3, 3)
+	icon.size = Vector2(40, 40)
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	frame.add_child(icon)
+	card["icon"] = icon
+	card["name"] = _battle_label(panel, Vector2(66, 4), 15, BATTLE_TEXT)
+	card["level"] = _battle_label(panel, Vector2(168, 7), 11, BATTLE_DIM)
+	card["hp_bar"] = _battle_bar(panel, Vector2(66, 30), Vector2(76, 9), HEALTH_BAR_BG_COLOR, HEALTH_BAR_FILL_COLOR)
+	card["hp_text"] = _battle_label(panel, Vector2(148, 25), 12, Color(1.0, 0.75, 0.75))
+	card["res_bar"] = _battle_bar(panel, Vector2(66, 48), Vector2(76, 7), STAMINA_BAR_BG_COLOR, STAMINA_BAR_FILL_COLOR)
+	card["res_text"] = _battle_label(panel, Vector2(148, 43), 12, Color(0.7, 0.85, 1.0))
+	card["status"] = _battle_label(panel, Vector2(10, 66), 12, BATTLE_GOLD)
+	card["status"].size = Vector2(BATTLE_CARD_W - 16, 18)
+	card["status"].clip_text = true
+	return card
+
+# A plate over a unit: a health bar with a thin resource bar under it (stamina or mana; none for a foe).
+func _make_plate() -> Dictionary:
+	var plate := {}
+	plate["hp"] = _battle_bar(battle_content_root, Vector2.ZERO, Vector2(40, 6), Color(0.1, 0.03, 0.04, 0.92), HEALTH_BAR_FILL_COLOR)
+	plate["res"] = _battle_bar(battle_content_root, Vector2.ZERO, Vector2(40, 3), Color(0.04, 0.06, 0.12, 0.92), STAMINA_BAR_FILL_COLOR)
+	_set_battle_bar(plate.hp, 0.0, false)
+	_set_battle_bar(plate.res, 0.0, false)
+	return plate
+
+# Puts a plate across the top of a unit's tile(s). res_ratio < 0 = no resource bar.
+func _place_plate(plate: Dictionary, tile_origin: Vector2, span: float, hp_ratio: float, res_ratio: float, res_color: Color) -> void:
+	var w: float = clampf(span * 0.7, 28.0, 64.0)
+	var x: float = tile_origin.x + (span - w) / 2.0
+	var y: float = tile_origin.y + 3.0
+	plate.hp.bg.position = Vector2(x, y)
+	plate.hp.fill.position = Vector2(x, y)
+	plate.hp.width = w
+	plate.hp.bg.size = Vector2(w, 6)
+	_set_battle_bar(plate.hp, hp_ratio)
+	plate.res.bg.position = Vector2(x, y + 7.0)
+	plate.res.fill.position = Vector2(x, y + 7.0)
+	plate.res.width = w
+	plate.res.bg.size = Vector2(w, 3)
+	_set_bar_color(plate.res, res_color)
+	_set_battle_bar(plate.res, maxf(res_ratio, 0.0), res_ratio >= 0.0)
+
+func _hide_plate(plate: Dictionary) -> void:
+	_set_battle_bar(plate.hp, 0.0, false)
+	_set_battle_bar(plate.res, 0.0, false)
+
+# A unit's resource as a plate or card shows it: {ratio (-1 = none), color}. Casters show mana, everyone else stamina, and the
+# Necromancer (whose mana is her HP) none.
+func _unit_res(a: Dictionary) -> Dictionary:
+	if int(a.get("max_mana", 0)) > 0 and not bool(a.get("hp_as_mana", false)):
+		return {"ratio": float(a.get("mana", 0)) / float(a.max_mana), "color": BATTLE_MP_COLOR}
+	if int(a.get("max_stamina", 0)) > 0:
+		return {"ratio": float(a.get("stamina", 0)) / float(a.max_stamina), "color": STAMINA_BAR_FILL_COLOR}
+	return {"ratio": -1.0, "color": STAMINA_BAR_FILL_COLOR}
+
+# "Stealth (2)": a status as the card's chip line shows it.
+func _status_chip_text(e: Dictionary) -> String:
+	var detail: String = str(e.get("detail", ""))
+	if detail.ends_with(" turns") or detail.ends_with(" turn"):
+		return "%s (%s)" % [e.name, detail.split(" ")[0]]
+	return "%s %s" % [e.name, detail] if detail != "" else str(e.name)
+
+# The party cards: rows from Main.gd:_battle_party_rows -- the hero first, then every roster member.
+func set_party_cards(rows: Array) -> void:
+	battle_party_rows = rows
+	for i in battle_party_cards.size():
+		var c: Dictionary = battle_party_cards[i]
+		c.panel.visible = i < rows.size()
+		if i >= rows.size():
+			continue
+		var r: Dictionary = rows[i]
+		var hero: bool = str(r.get("side", "")) == "hero"
+		var acting: bool = bool(r.get("acting", false))
+		var downed: bool = bool(r.get("downed", false))
+		c.panel.add_theme_stylebox_override("panel", _battle_box(PANEL_BG, BATTLE_GOLD if acting else Color(0.36, 0.29, 0.15), 2 if acting else 1, BattleStyleScript.CORNER))
+		c.at.visible = hero
+		c.icon.visible = not hero
+		if not hero:
+			var is_wolf: bool = str(r.get("kind", "")) == "wolf"
+			c.icon.texture = ENEMY_ICONS.get("Wolf", null) if is_wolf else BLADE_ALLY_ICON
+			c.icon.modulate = Color(1, 1, 1) if is_wolf else r.get("tint", Color(1, 1, 1))
+			if downed:
+				c.icon.modulate = c.icon.modulate * Color(0.45, 0.45, 0.5, 0.7)
+		c.name.text = str(r.get("name", "?"))
+		c.name.add_theme_color_override("font_color", BATTLE_GOLD if acting else BATTLE_TEXT)
+		c.level.text = "Lv %d" % int(r.get("level", 1))
+		var max_hp: int = maxi(1, int(r.get("max_hp", 1)))
+		_set_battle_bar(c.hp_bar, float(r.get("hp", 0)) / float(max_hp))
+		c.hp_text.text = "%d/%d" % [int(r.get("hp", 0)), max_hp]
+		var res_kind: String = str(r.get("res_kind", ""))
+		var has_res: bool = res_kind != "" and int(r.get("max_res", 0)) > 0
+		_set_battle_bar(c.res_bar, float(r.get("res", 0)) / float(maxi(1, int(r.get("max_res", 1)))), has_res)
+		_set_bar_color(c.res_bar, BATTLE_MP_COLOR if res_kind == "MP" else STAMINA_BAR_FILL_COLOR)
+		c.res_text.visible = has_res
+		c.res_text.text = "%d/%d" % [int(r.get("res", 0)), int(r.get("max_res", 0))]
+		c.res_text.add_theme_color_override("font_color", Color(0.78, 0.62, 1.0) if res_kind == "MP" else Color(0.7, 0.85, 1.0))
+		var statuses: Array = r.get("statuses", [])
+		var chips: Array = []
+		var any_bad := false
+		var tip_lines: Array = []
+		for e in statuses:
+			if chips.size() < 2:
+				chips.append(_status_chip_text(e))
+			if not bool(e.get("good", false)):
+				any_bad = true
+			tip_lines.append("%s: %s" % [e.name, e.desc])
+		if statuses.size() > 2:
+			chips.append("+%d" % (statuses.size() - 2))
+		c.status.text = "  ".join(chips)
+		c.status.add_theme_color_override("font_color", Color(1.0, 0.6, 0.45) if any_bad else BATTLE_GOLD)
+		# Hovering the card reads out what each status does.
+		c.panel.tooltip_text = "\n".join(tip_lines)
+
+# The bottom bar's key line for the menu showing now.
+func _battle_key_hints(menu_state: String, in_ally_turn: bool, is_player_turn: bool, is_evasion_prompt: bool, is_confirm_prompt: bool) -> String:
+	if is_evasion_prompt:
+		return "Arrows  Choose a direction      Z  Roll"
+	if is_confirm_prompt:
+		return "Z  Confirm      X  Cancel"
+	if not is_player_turn and not in_ally_turn:
+		return ""
+	if menu_state == "move":
+		return "Arrows  Choose a tile      Z  Confirm      X  Cancel"
+	if menu_state == "main":
+		return "Arrows  Select      Z  Confirm      Tab  Inspect      H  History"
+	return "Arrows  Select      Z  Confirm      X  Back      Tab  Inspect"
+
+func _card_hover(i: int) -> void:
+	if i >= battle_party_rows.size():
+		return
+	var row: Dictionary = battle_party_rows[i]
+	battle_card_hover_key = "hero" if str(row.get("side", "")) == "hero" else "ally:%d" % int(row.get("index", 0))
+
+func _card_input(i: int, event: InputEvent) -> void:
+	if i >= battle_party_rows.size() or not (event is InputEventMouseButton) or not event.pressed or event.button_index != MOUSE_BUTTON_LEFT:
+		return
+	var row: Dictionary = battle_party_rows[i]
+	unit_clicked.emit("hero" if str(row.get("side", "")) == "hero" else "ally", int(row.get("index", 0)))
+
+# --- Hovering and clicking units ------------------------------------------------------------------------------------
+# Hovering a unit (on the grid or its party card) raises a small popup over it and lights up where it could walk; clicking one
+# opens the bigger details box at the side, where hovering a status reads what it does. Main.gd answers the signals (it owns
+# the movement rules and the statuses) and calls show_unit_popup / show_unit_details / show_move_range.
+
+# What is on this tile: "hero", "ally:<i>", "enemy:<i>" (an index into the lists last drawn), or "".
+func _battle_unit_key_at(tile: Vector2i) -> String:
+	if tile == battle_player_tile_now:
+		return "hero"
+	for i in battle_allies_now.size():
+		if battle_allies_now[i].tile == tile:
+			return "ally:%d" % i
+	for i in battle_units_now.size():
+		var u: Dictionary = battle_units_now[i]
+		var span: int = int(u.get("size", 1))
+		if tile.x >= u.tile.x and tile.x < u.tile.x + span and tile.y >= u.tile.y and tile.y < u.tile.y + span:
+			return "enemy:%d" % i
+	return ""
+
+func _battle_mouse_tile() -> Vector2i:
+	var rel: Vector2 = (battle_content_root.get_local_mouse_position() - battle_grid_origin) / battle_tile_size
+	var tile := Vector2i(floori(rel.x), floori(rel.y))
+	if tile.x < 0 or tile.y < 0 or tile.x >= battle_grid_size_now.x or tile.y >= battle_grid_size_now.y:
+		return Vector2i(-1, -1)
+	return tile
+
+# Is the mouse over one of the floating lists or the details box (so it is not "over" the unit underneath)?
+func _mouse_over_battle_overlay() -> bool:
+	var mouse: Vector2 = get_viewport().get_mouse_position()
+	for key in battle_menus:
+		var panel: Control = battle_menus[key].panel
+		if panel.visible and Rect2(panel.global_position, panel.size).has_point(mouse):
+			return true
+	if not battle_details.is_empty() and battle_details.panel.visible and Rect2(battle_details.panel.global_position, battle_details.panel.size).has_point(mouse):
+		return true
+	return false
+
+var battle_card_hover_key := ""
+
+func _track_battle_hover() -> void:
+	if battle_panel == null or not battle_panel.visible:
+		if battle_hover_key != "":
+			battle_hover_key = ""
+			unit_unhovered.emit()
+		return
+	var key := battle_card_hover_key
+	if key == "" and not _mouse_over_battle_overlay():
+		var tile: Vector2i = _battle_mouse_tile()
+		if tile.x >= 0:
+			key = _battle_unit_key_at(tile)
+	if key == battle_hover_key:
+		return
+	battle_hover_key = key
+	if key == "":
+		unit_unhovered.emit()
+	else:
+		var parts: PackedStringArray = key.split(":")
+		unit_hovered.emit(parts[0], int(parts[1]) if parts.size() > 1 else 0)
+
+func _battle_click() -> void:
+	if _mouse_over_battle_overlay() or battle_card_hover_key != "":
+		return
+	var tile: Vector2i = _battle_mouse_tile()
+	if tile.x < 0:
+		return
+	var key: String = _battle_unit_key_at(tile)
+	if key == "":
+		unit_clicked.emit("none", 0)          # bare ground: close the details box
+		return
+	var parts: PackedStringArray = key.split(":")
+	unit_clicked.emit(parts[0], int(parts[1]) if parts.size() > 1 else 0)
+
+# The tiles a unit could walk to: blue for one of ours, red for a foe. An empty list clears them.
+func show_move_range(tiles: Array, hostile: bool) -> void:
+	var style: StyleBoxFlat = _range_style(hostile)
+	for i in battle_range_rects.size():
+		var rect: Panel = battle_range_rects[i]
+		if i < tiles.size():
+			# Inset a touch, so each lit tile is its own soft shape.
+			rect.position = battle_grid_origin + Vector2(tiles[i]) * battle_tile_size + Vector2(2, 2)
+			rect.size = Vector2(battle_tile_size - 4.0, battle_tile_size - 4.0)
+			rect.add_theme_stylebox_override("panel", style)
+			rect.visible = true
+		else:
+			rect.visible = false
+
+func _range_style(hostile: bool) -> StyleBoxFlat:
+	var key: String = "hostile" if hostile else "friendly"
+	if not battle_range_styles.has(key):
+		var base: Color = BATTLE_ENEMY_RED if hostile else BATTLE_ALLY_BLUE
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = Color(base.r, base.g, base.b, 0.30)
+		sb.border_color = Color(base.r, base.g, base.b, 0.8)
+		sb.set_border_width_all(1)
+		sb.set_corner_radius_all(6)
+		sb.anti_aliasing = true
+		battle_range_styles[key] = sb
+	return battle_range_styles[key]
+
+# A row, as the popup and the details box take it: {side, name, level?, hp, max_hp, res, max_res, res_kind, statuses, note?}.
+func _fill_unit_bars(p: Dictionary, row: Dictionary) -> void:
+	var max_hp: int = maxi(1, int(row.get("max_hp", 1)))
+	_set_battle_bar(p.hp_bar, float(row.get("hp", 0)) / float(max_hp))
+	p.hp_text.text = "%d/%d HP" % [maxi(0, int(row.get("hp", 0))), max_hp]
+	var res_kind: String = str(row.get("res_kind", ""))
+	var has_res: bool = res_kind != "" and int(row.get("max_res", 0)) > 0
+	_set_battle_bar(p.res_bar, float(row.get("res", 0)) / float(maxi(1, int(row.get("max_res", 1)))), has_res)
+	_set_bar_color(p.res_bar, BATTLE_MP_COLOR if res_kind == "MP" else STAMINA_BAR_FILL_COLOR)
+	p.res_text.visible = has_res
+	p.res_text.text = "%d/%d %s" % [int(row.get("res", 0)), int(row.get("max_res", 0)), res_kind]
+	p.res_text.add_theme_color_override("font_color", Color(0.78, 0.62, 1.0) if res_kind == "MP" else Color(0.7, 0.85, 1.0))
+
+func _build_battle_overlays() -> void:
+	var view: Vector2 = get_viewport().get_visible_rect().size
+	# The popup over a hovered unit.
+	var popup := Panel.new()
+	popup.size = Vector2(184, 96)
+	popup.visible = false
+	popup.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	popup.add_theme_stylebox_override("panel", _battle_box(PANEL_BG, PANEL_BORDER, 1, BattleStyleScript.CORNER, true))
+	battle_panel.add_child(popup)
+	battle_popup = {"panel": popup}
+	battle_popup["name"] = _battle_label(popup, Vector2(8, 3), 15, BATTLE_GOLD)
+	battle_popup["level"] = _battle_label(popup, Vector2(144, 6), 11, BATTLE_DIM)
+	battle_popup["hp_bar"] = _battle_bar(popup, Vector2(8, 28), Vector2(88, 9), HEALTH_BAR_BG_COLOR, HEALTH_BAR_FILL_COLOR)
+	battle_popup["hp_text"] = _battle_label(popup, Vector2(102, 24), 12, Color(1.0, 0.75, 0.75))
+	battle_popup["res_bar"] = _battle_bar(popup, Vector2(8, 46), Vector2(88, 7), STAMINA_BAR_BG_COLOR, STAMINA_BAR_FILL_COLOR)
+	battle_popup["res_text"] = _battle_label(popup, Vector2(102, 41), 12, Color(0.7, 0.85, 1.0))
+	battle_popup["status"] = _battle_label(popup, Vector2(8, 62), 12, BATTLE_GOLD)
+	battle_popup["status"].size = Vector2(170, 30)
+	battle_popup["status"].autowrap_mode = TextServer.AUTOWRAP_WORD
+
+	# The details box a click opens, down the right-hand side.
+	var grid_right: float = battle_grid_origin.x + BATTLE_GRID_FOOTPRINT_PX
+	var box_w: float = view.x - grid_right - 16.0 - BATTLE_CARD_X
+	var box := Panel.new()
+	box.position = Vector2(grid_right + 16.0, BATTLE_GRID_TOP)
+	box.size = Vector2(box_w, 220)
+	box.visible = false
+	box.mouse_filter = Control.MOUSE_FILTER_STOP
+	box.add_theme_stylebox_override("panel", _battle_box(PANEL_BG, PANEL_BORDER, 1, BattleStyleScript.CORNER, true))
+	battle_panel.add_child(box)
+	battle_details = {"panel": box}
+	battle_details["name"] = _battle_label(box, Vector2(14, 8), 19, BATTLE_GOLD)
+	battle_details["sub"] = _battle_label(box, Vector2(14, 34), 13, BATTLE_ALLY_BLUE)
+	var close := Button.new()
+	close.text = "x"
+	close.size = Vector2(24, 24)
+	close.position = Vector2(box_w - 32, 8)
+	close.focus_mode = Control.FOCUS_NONE
+	close.tooltip_text = "Close"
+	_style_standard_button(close, 2)
+	_round_button(close)
+	close.pressed.connect(func(): unit_clicked.emit("none", 0))
+	box.add_child(close)
+	battle_details["hp_bar"] = _battle_bar(box, Vector2(14, 64), Vector2(box_w - 28, 10), HEALTH_BAR_BG_COLOR, HEALTH_BAR_FILL_COLOR)
+	battle_details["hp_text"] = _battle_label(box, Vector2(14, 76), 13, Color(1.0, 0.75, 0.75))
+	battle_details["res_bar"] = _battle_bar(box, Vector2(14, 102), Vector2(box_w - 28, 8), STAMINA_BAR_BG_COLOR, STAMINA_BAR_FILL_COLOR)
+	battle_details["res_text"] = _battle_label(box, Vector2(14, 112), 13, Color(0.7, 0.85, 1.0))
+	battle_details["note"] = _battle_label(box, Vector2(14, 104), 12, BATTLE_DIM)
+	battle_details["caption"] = _battle_label(box, Vector2(14, 140), 11, BATTLE_DIM)
+	battle_details["caption"].text = "STATUS EFFECTS"
+	battle_details["rows"] = []
+	for i in 8:
+		var row := Control.new()
+		row.position = Vector2(8, 160 + i * 38)
+		row.size = Vector2(box_w - 16, 36)
+		row.mouse_filter = Control.MOUSE_FILTER_STOP
+		row.visible = false
+		box.add_child(row)
+		var mark := ColorRect.new()
+		mark.color = BATTLE_GOLD
+		mark.size = Vector2(8, 8)
+		mark.position = Vector2(10, 14)
+		mark.rotation = PI / 4.0
+		mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(mark)
+		var name_label := _battle_label(row, Vector2(26, 2), 14, BATTLE_TEXT)
+		var detail_label := _battle_label(row, Vector2(26, 19), 11, BATTLE_DIM)
+		var entry := {"row": row, "mark": mark, "name": name_label, "detail": detail_label, "desc": ""}
+		row.mouse_entered.connect(func(): _show_status_tooltip(entry))
+		row.mouse_exited.connect(_hide_status_tooltip)
+		battle_details["rows"].append(entry)
+	# The History button (key H) and the panel it opens in the same place: the last three turns, newest first.
+	battle_history_button = Button.new()
+	battle_history_button.text = "History (H)"
+	battle_history_button.position = Vector2(view.x - 300, 20)
+	battle_history_button.focus_mode = Control.FOCUS_NONE
+	battle_history_button.pressed.connect(toggle_history)
+	_add_hover_color(battle_history_button)
+	battle_history_button.focus_mode = Control.FOCUS_NONE
+	_style_standard_button(battle_history_button)
+	_round_button(battle_history_button)
+	battle_panel.add_child(battle_history_button)
+	battle_history_panel = Panel.new()
+	battle_history_panel.position = Vector2(grid_right + 16.0, BATTLE_GRID_TOP)
+	battle_history_panel.size = Vector2(box_w, 430)
+	battle_history_panel.visible = false
+	battle_history_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	battle_history_panel.add_theme_stylebox_override("panel", _battle_box(PANEL_BG, PANEL_BORDER, 1, BattleStyleScript.CORNER, true))
+	battle_panel.add_child(battle_history_panel)
+	var history_title := _battle_label(battle_history_panel, Vector2(14, 8), 12, BATTLE_DIM)
+	history_title.text = "THE LAST THREE TURNS"
+	battle_history_text = RichTextLabel.new()
+	battle_history_text.bbcode_enabled = true
+	battle_history_text.position = Vector2(12, 32)
+	battle_history_text.size = Vector2(box_w - 24, 388)
+	battle_history_text.scroll_active = true
+	battle_history_text.add_theme_font_size_override("normal_font_size", 13)
+	battle_history_text.add_theme_font_size_override("bold_font_size", 13)
+	battle_history_text.mouse_filter = Control.MOUSE_FILTER_PASS
+	battle_history_panel.add_child(battle_history_text)
+
+	# The damage chip over the enemy an attack would hit.
+	var chip := Panel.new()
+	chip.size = Vector2(176, 46)
+	chip.visible = false
+	chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	chip.add_theme_stylebox_override("panel", _battle_box(PANEL_BG, BATTLE_GOLD, 1, BattleStyleScript.CORNER_SMALL + 2, true))
+	battle_panel.add_child(chip)
+	battle_preview = {"panel": chip, "line1": _battle_label(chip, Vector2(10, 4), 14, BATTLE_TEXT), "line2": _battle_label(chip, Vector2(10, 23), 12, BATTLE_GOLD)}
+
+	# What a hovered status does: a card to the left of the box.
+	var tip := Panel.new()
+	tip.size = Vector2(250, 60)
+	tip.visible = false
+	tip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tip.add_theme_stylebox_override("panel", _battle_box(PANEL_BG, BATTLE_GOLD, 1, BattleStyleScript.CORNER_SMALL + 2, true))
+	battle_panel.add_child(tip)
+	battle_status_tooltip = {"panel": tip, "text": _battle_label(tip, Vector2(10, 7), 13, BATTLE_TEXT)}
+	battle_status_tooltip["text"].size = Vector2(230, 46)
+	battle_status_tooltip["text"].autowrap_mode = TextServer.AUTOWRAP_WORD
+
+func show_unit_popup(row: Dictionary, tile: Vector2i, span: int = 1) -> void:
+	var p: Dictionary = battle_popup
+	var statuses: Array = row.get("statuses", [])
+	var has_res: bool = str(row.get("res_kind", "")) != "" and int(row.get("max_res", 0)) > 0
+	p.name.text = str(row.get("name", "?"))
+	p.name.add_theme_color_override("font_color", BATTLE_ENEMY_RED if str(row.get("side", "")) == "enemy" else BATTLE_GOLD)
+	p.level.text = ("Lv %d" % int(row.level)) if int(row.get("level", 0)) > 0 else ""
+	_fill_unit_bars(p, row)
+	var chips: Array = []
+	for e in statuses:
+		chips.append(_status_chip_text(e))
+	p.status.text = "  ".join(chips)
+	p.status.position = Vector2(8, 62 if has_res else 46)
+	# The chip line wraps at about 25 letters; the card grows a line for each.
+	var chip_lines: int = ceili(float(p.status.text.length()) / 25.0) if chips.size() > 0 else 0
+	p.status.size = Vector2(170, maxf(16.0, chip_lines * 15.0))
+	var height: float = (62.0 if has_res else 46.0) + (chip_lines * 15.0 + 6.0 if chips.size() > 0 else 0.0) + 8.0
+	p.panel.size = Vector2(184, height)
+	var origin: Vector2 = battle_grid_origin + Vector2(tile) * battle_tile_size
+	var x: float = origin.x + battle_tile_size * span / 2.0 - 92.0
+	var y: float = origin.y - height - 6.0
+	if y < 4.0:
+		y = origin.y + battle_tile_size * span + 6.0
+	var view: Vector2 = get_viewport().get_visible_rect().size
+	p.panel.position = Vector2(clampf(x, 8.0, view.x - 192.0), y)
+	p.panel.visible = true
+
+func hide_unit_popup() -> void:
+	if not battle_popup.is_empty():
+		battle_popup.panel.visible = false
+
+# The damage chip over the enemy an attack would hit.
+func show_damage_preview(tile: Vector2i, span: int, line1: String, line2: String) -> void:
+	var p: Dictionary = battle_preview
+	p.line1.text = line1
+	p.line2.text = line2
+	p.line2.visible = line2 != ""
+	p.panel.size = Vector2(176, 46 if line2 != "" else 28)
+	var origin: Vector2 = battle_grid_origin + Vector2(tile) * battle_tile_size
+	var view: Vector2 = get_viewport().get_visible_rect().size
+	var y: float = origin.y - p.panel.size.y - 4.0
+	if y < 4.0:
+		y = origin.y + battle_tile_size * span + 4.0
+	p.panel.position = Vector2(clampf(origin.x + battle_tile_size * span / 2.0 - 88.0, 8.0, view.x - 184.0), y)
+	p.panel.visible = true
+
+func hide_damage_preview() -> void:
+	if not battle_preview.is_empty():
+		battle_preview.panel.visible = false
+
+func details_open() -> bool:
+	return not battle_details.is_empty() and battle_details.panel.visible
+
+func show_unit_details(row: Dictionary) -> void:
+	var d: Dictionary = battle_details
+	var enemy: bool = str(row.get("side", "")) == "enemy"
+	d.name.text = str(row.get("name", "?"))
+	d.sub.text = ("Lv %d   " % int(row.level) if int(row.get("level", 0)) > 0 else "") + ("Enemy" if enemy else ("You" if str(row.get("side", "")) == "hero" else "Ally"))
+	d.sub.add_theme_color_override("font_color", BATTLE_ENEMY_RED if enemy else BATTLE_ALLY_BLUE)
+	_fill_unit_bars(d, row)
+	d.res_bar.bg.size = Vector2(d.res_bar.width, 8)
+	var has_res: bool = str(row.get("res_kind", "")) != "" and int(row.get("max_res", 0)) > 0
+	d.note.visible = not has_res
+	d.note.text = str(row.get("note", ""))
+	var statuses: Array = row.get("statuses", [])
+	for i in d.rows.size():
+		var r: Dictionary = d.rows[i]
+		r.row.visible = i < statuses.size()
+		if i < statuses.size():
+			var e: Dictionary = statuses[i]
+			r.name.text = str(e.name)
+			r.detail.text = str(e.get("detail", ""))
+			r.desc = "%s: %s" % [e.name, e.desc]
+			r.mark.color = BATTLE_GOLD if bool(e.get("good", false)) else Color(1.0, 0.55, 0.4)
+	if statuses.is_empty():
+		d.caption.text = "STATUS EFFECTS: none"
+	else:
+		d.caption.text = "STATUS EFFECTS"
+	d.panel.size = Vector2(d.panel.size.x, 160.0 + maxi(0, statuses.size()) * 38.0 + 10.0)
+	d.panel.visible = true
+	# The details box and the History panel share the same place.
+	if battle_history_panel != null:
+		battle_history_panel.visible = false
+
+func hide_unit_details() -> void:
+	if not battle_details.is_empty():
+		battle_details.panel.visible = false
+	_hide_status_tooltip()
+
+func _show_status_tooltip(entry: Dictionary) -> void:
+	var t: Dictionary = battle_status_tooltip
+	t.text.text = str(entry.desc)
+	var row: Control = entry.row
+	var lines: int = maxi(1, ceili(float(str(entry.desc).length()) / 30.0))
+	t.panel.size = Vector2(250, 20.0 + lines * 18.0)
+	t.text.size = Vector2(230, lines * 18.0)
+	t.panel.position = Vector2(row.global_position.x - 258.0, clampf(row.global_position.y - 4.0, 8.0, 560.0))
+	t.panel.visible = true
+
+func _hide_status_tooltip() -> void:
+	if not battle_status_tooltip.is_empty():
+		battle_status_tooltip.panel.visible = false
 
 # Wires up the shared hover/focus behavior every clickable menu button uses
 # across the whole HUD: a yellow highlight and a description shown in
@@ -2020,7 +2769,7 @@ func _make_stylebox(bg: Color, border: Color, border_width: int, corner_radius: 
 	sb.border_color = border
 	sb.set_border_width_all(border_width)
 	sb.set_corner_radius_all(corner_radius)
-	sb.anti_aliasing = false
+	sb.anti_aliasing = corner_radius > 0       # a rounded corner is smoothed; a square one stays crisp
 	sb.set_content_margin_all(content_margin)
 	return sb
 
@@ -2328,30 +3077,44 @@ func show_settings() -> void:
 
 # Relabels the ally special / picker buttons from the info Main.gd handed over this refresh.
 func _refresh_ally_submenus() -> void:
-	var specials: Array = battle_ally_menu_info.get("specials", [])
+	# The attack / magic / strategy list: info.list = [{label, action, disabled, tip}], each button sending its entry's action.
+	var entries: Array = battle_ally_menu_info.get("list", [])
 	for i in battle_ally_special_buttons.size():
 		var button: Button = battle_ally_special_buttons[i]
-		button.visible = i < specials.size()
-		if i < specials.size():
-			button.text = str(specials[i].label)
-			button.disabled = bool(specials[i].disabled)
-			button.set_meta("description", str(specials[i].tip))
+		button.visible = i < entries.size()
+		if i < entries.size():
+			button.text = str(entries[i].label)
+			button.disabled = bool(entries[i].disabled)
+			button.set_meta("action", str(entries[i].action))
+			button.set_meta("description", str(entries[i].tip))
 	var picks: Array = battle_ally_menu_info.get("picks", [])
 	for i in battle_ally_pick_buttons.size():
 		var pick_button: Button = battle_ally_pick_buttons[i]
 		pick_button.visible = i < picks.size()
 		if i < picks.size():
 			pick_button.text = str(picks[i].label)
+	# A long picker (Summon the Dead's numbers) wraps into columns of at most eight.
+	var columns: int = maxi(1, ceili(float(picks.size()) / 8.0))
+	battle_ally_pick_grid.columns = columns
+	var pick_menu: Dictionary = battle_menus["ally_pick"]
+	pick_menu.panel.size = Vector2(columns * 228.0 + BATTLE_MENU_PAD * 2.0, minf(float(picks.size()), 8.0) * BATTLE_MENU_ROW_H + BATTLE_MENU_PAD * 2.0)
+
+# Keyboard focus on the first of these buttons that is showing and enabled.
+func focus_first_usable(buttons: Array) -> void:
+	for b in buttons:
+		if b != null and b.visible and not b.disabled:
+			b.grab_focus()
+			return
 
 # Puts keyboard focus on the first usable button of whichever ally submenu is showing.
 func focus_ally_submenu() -> void:
 	var group: Array = []
 	if battle_ally_pick_box != null and battle_ally_pick_box.visible:
-		group = battle_ally_pick_buttons + [battle_ally_pick_back]
+		group = battle_ally_pick_buttons
 	elif battle_ally_special_box != null and battle_ally_special_box.visible:
-		group = battle_ally_special_buttons + [battle_ally_special_back]
+		group = battle_ally_special_buttons
 	elif battle_ally_menu_box != null and battle_ally_menu_box.visible:
-		group = [battle_ally_buttons["move"], battle_ally_buttons["attack"], battle_ally_buttons["guard"]]
+		group = [battle_ally_buttons["attack"], battle_ally_buttons["magic"], battle_ally_buttons["strategy"]]
 	for b in group:
 		if b.visible and not b.disabled:
 			b.grab_focus()
@@ -2382,6 +3145,17 @@ func _cancel_rebind() -> void:
 		rebinding_action = ""
 
 func _input(event: InputEvent) -> void:
+	# A click on a unit (or on bare ground, which closes the details box) while a battle is up. The click is not consumed:
+	# an enemy's own button still picks it as the target.
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT and battle_panel != null and battle_panel.visible:
+		_battle_click()
+	# H opens and closes the History panel; Tab steps the details box through the units (and is kept from hopping the focus).
+	if event is InputEventKey and event.pressed and not event.echo and battle_panel != null and battle_panel.visible and rebinding_action == "":
+		if event.keycode == KEY_H:
+			toggle_history()
+		elif event.keycode == KEY_TAB:
+			get_viewport().set_input_as_handled()
+			inspect_cycled.emit()
 	if rebinding_action == "" or not (event is InputEventKey) or not event.pressed or event.echo:
 		return
 	get_viewport().set_input_as_handled()
@@ -2664,6 +3438,9 @@ func show_spells_tab(note: String, rows: Array) -> void:
 # a parameter rather than removed outright so callers don't need touching.
 func show_battle(background_color: Color = Color(0.05, 0.05, 0.05)) -> void:
 	battle_log_lines.clear()
+	battle_history.clear()
+	if battle_history_panel != null:
+		battle_history_panel.visible = false
 	_set_battle_gradient(background_color)
 	# The thin 8px ring around the inset frame (battle_panel's own raw
 	# fill) -- matches the gradient's own top stop so it reads as a
@@ -2733,6 +3510,11 @@ func update_battle_grid(grid_w: int, grid_h: int, terrain: Dictionary, player_ti
 	# are already that ally's own numbers in this case, not the hero's; only the name
 	# and which menu box shows need to branch on it here.
 	var in_ally_turn: bool = commanding_ally_name != ""
+	# What is on the grid now, for finding the unit under the mouse.
+	battle_units_now = units
+	battle_allies_now = allies
+	battle_player_tile_now = player_tile
+	battle_grid_size_now = Vector2i(grid_w, grid_h)
 	# The grid always renders within the same on-screen footprint regardless
 	# of size (a boss fight's bigger grid_w/grid_h -- see
 	# Main.gd:BOSS_BATTLE_GRID_SIZE -- just packs in smaller tiles) rather
@@ -2797,6 +3579,12 @@ func update_battle_grid(grid_w: int, grid_h: int, terrain: Dictionary, player_ti
 	player_marker.add_theme_color_override("font_color", Color(0.4, 0.7, 1.0))
 	player_marker.position = battle_grid_origin + Vector2(player_tile.x, player_tile.y) * battle_tile_size + Vector2(battle_tile_size / 2.0 - 8, battle_tile_size / 2.0 - 14)
 	player_marker.visible = true
+	# The hero's plate: his own health and stamina (the numbers passed in are the commanded ally's during its turn).
+	var hero_row: Dictionary = battle_party_rows[0] if not battle_party_rows.is_empty() else {}
+	if hero_row.is_empty():
+		_hide_plate(battle_hero_plate)
+	else:
+		_place_plate(battle_hero_plate, battle_grid_origin + Vector2(player_tile.x, player_tile.y) * battle_tile_size, battle_tile_size, float(hero_row.hp) / float(maxi(1, int(hero_row.max_hp))), float(hero_row.res) / float(maxi(1, int(hero_row.max_res))), STAMINA_BAR_FILL_COLOR)
 
 	# Party members now have a real tile of their own (Main.gd:battle_allies)
 	# -- rendered the same way as an enemy icon (tile origin + padding), plus
@@ -2827,25 +3615,25 @@ func update_battle_grid(grid_w: int, grid_h: int, terrain: Dictionary, player_ti
 			if a.get("downed", false):
 				ally_icon.modulate = ally_icon.modulate * Color(0.45, 0.45, 0.5, 0.7)
 
-			var bar_width: float = battle_tile_size - a_padding * 2
-			var bar_height := 5.0
-			var bar_pos: Vector2 = a_tile_origin + Vector2(a_padding, battle_tile_size - a_padding - bar_height)
-			hp_bg.position = bar_pos
-			hp_bg.size = Vector2(bar_width, bar_height)
-			hp_bg.visible = not a.get("downed", false)
-			var hp_ratio: float = clampf(float(a.hp) / float(max(1, a.max_hp)), 0.0, 1.0)
-			hp_fill.position = bar_pos
-			hp_fill.size = Vector2(bar_width * hp_ratio, bar_height)
-			hp_fill.visible = not a.get("downed", false)
+			# The plate over the unit carries the health (and stamina/mana) bars now; the old one under the icon is retired.
+			hp_bg.visible = false
+			hp_fill.visible = false
+			if a.get("downed", false):
+				_hide_plate(battle_ally_plates[i])
+			else:
+				var res: Dictionary = _unit_res(a)
+				_place_plate(battle_ally_plates[i], a_tile_origin, battle_tile_size, float(a.hp) / float(max(1, a.max_hp)), res.ratio, res.color)
 		else:
 			ally_icon.visible = false
 			hp_bg.visible = false
 			hp_fill.visible = false
+			_hide_plate(battle_ally_plates[i])
 
 	for i in battle_unit_markers.size():
 		battle_unit_markers[i].visible = false
 		battle_unit_icons[i].visible = false
 		battle_unit_aware_markers[i].visible = false
+		_hide_plate(battle_enemy_plates[i])
 
 	# Live Gnome pack count -- units is battle_units itself, so counting
 	# same-named entries here mirrors exactly what Main.gd's own live
@@ -2875,6 +3663,7 @@ func update_battle_grid(grid_w: int, grid_h: int, terrain: Dictionary, player_ti
 		# rather than tinting it a flat color that'd wash out the art.
 		icon.modulate = Color(1.3, 1.15, 0.6, 1.0) if is_target else Color(1, 1, 1, 1)
 		icon.visible = icon.texture_normal != null
+		_place_plate(battle_enemy_plates[i], tile_origin, footprint_span, float(u.hp) / float(maxi(1, int(u.get("max_hp", 1)))), -1.0, STAMINA_BAR_FILL_COLOR)
 
 		# One shared badge slot per unit, same as the "!" windup marker --
 		# priority order below picks whichever single status is most urgent
@@ -2971,17 +3760,19 @@ func update_battle_grid(grid_w: int, grid_h: int, terrain: Dictionary, player_ti
 	# (see Main.gd:battle_commanding_ally) -- in_ally_turn is what actually tells
 	# the hero's own menus and the ally's apart, not turn itself.
 	var is_player_turn: bool = turn == "player" and not in_ally_turn
-	battle_main_menu_box.visible = is_player_turn and menu_state == "main" and not is_evasion_prompt and not is_confirm_prompt
-	battle_ally_menu_box.visible = in_ally_turn and menu_state == "main" and not is_evasion_prompt and not is_confirm_prompt
-	battle_ally_special_box.visible = in_ally_turn and menu_state == "ally_special" and not is_evasion_prompt and not is_confirm_prompt
-	battle_ally_pick_box.visible = in_ally_turn and menu_state == "ally_pick" and not is_evasion_prompt and not is_confirm_prompt
+	battle_key_hint_label.text = _battle_key_hints(menu_state, in_ally_turn, is_player_turn, is_evasion_prompt, is_confirm_prompt)
+	var prompt_free: bool = not is_evasion_prompt and not is_confirm_prompt
+	battle_main_menu_box.visible = is_player_turn and menu_state == "main" and prompt_free
+	battle_strategy_menu_box.visible = is_player_turn and (menu_state == "strategy" or menu_state == "tactics") and prompt_free
+	battle_ally_menu_box.visible = in_ally_turn and menu_state == "main" and prompt_free
+	battle_ally_special_box.visible = in_ally_turn and menu_state == "ally_special" and prompt_free
+	battle_ally_pick_box.visible = in_ally_turn and menu_state == "ally_pick" and prompt_free
 	_refresh_ally_submenus()
-	battle_fight_submenu_box.visible = is_player_turn and menu_state == "fight" and not is_evasion_prompt and not is_confirm_prompt
+	battle_fight_submenu_box.visible = is_player_turn and menu_state == "fight" and prompt_free
 	# Move is the one submenu shared by both -- Confirm/Cancel behave the same
 	# shape for an ally as for the hero (see Main.gd's _on_battle_move_action).
-	battle_move_submenu_box.visible = (is_player_turn or in_ally_turn) and menu_state == "move" and not is_evasion_prompt and not is_confirm_prompt
-	battle_arrow_submenu_box.visible = is_player_turn and menu_state == "arrow" and not is_evasion_prompt and not is_confirm_prompt
-	battle_tactics_submenu_box.visible = is_player_turn and menu_state == "tactics" and not is_evasion_prompt and not is_confirm_prompt
+	battle_move_submenu_box.visible = (is_player_turn or in_ally_turn) and menu_state == "move" and prompt_free
+	battle_arrow_submenu_box.visible = is_player_turn and menu_state == "arrow" and prompt_free
 	# Independent of is_player_turn -- this shows mid-"enemy" turn, the one
 	# moment the player acts without it technically being their turn. Only
 	# whichever directions are actually free tiles (evasion_options, from
@@ -2996,10 +3787,8 @@ func update_battle_grid(grid_w: int, grid_h: int, terrain: Dictionary, player_ti
 
 	battle_main_buttons["item"].disabled = healing_items <= 0 or feared_unreachable
 	battle_main_buttons["move"].disabled = moves_left <= 0
-	battle_ally_buttons["move"].disabled = moves_left <= 0 or bool(battle_ally_menu_info.get("move_disabled", false))
-	battle_ally_buttons["attack"].text = str(battle_ally_menu_info.get("attack_label", "Attack"))
-	battle_ally_buttons["attack"].disabled = bool(battle_ally_menu_info.get("attack_disabled", false))
-	battle_ally_buttons["special"].visible = bool(battle_ally_menu_info.get("has_specials", false))
+	# A member with no spells has no Magic entry at all.
+	battle_ally_buttons["magic"].visible = bool(battle_ally_menu_info.get("has_magic", false))
 	# Disarmed (Spear's Target Practice miss, Dagger's Knife Throw): Fight is
 	# off-limits until you're standing back on the tile your weapon landed on
 	# -- everything else (Move/Item/Defend/Flee/Skill/Arrow) stays available.
@@ -3010,15 +3799,15 @@ func update_battle_grid(grid_w: int, grid_h: int, terrain: Dictionary, player_ti
 	# Only the Bow can fire arrows -- the button is hidden (not just
 	# disabled) the same way Skill is gated on has_guardian_skill.
 	var is_bow_equipped: bool = current_weapon.get("id", "").begins_with("bow")
-	battle_main_buttons["arrow"].visible = is_bow_equipped
-	battle_main_buttons["arrow"].disabled = feared_unreachable
+	battle_fight_buttons["arrow"].visible = is_bow_equipped
+	battle_fight_buttons["arrow"].disabled = feared_unreachable
 	# Fear, target out of reach (Main.gd:battle_feared_unreachable): Move/
 	# Defend/Flee stay available (Defend specifically so a kiting enemy that
 	# never re-enters weapon range can't force a real soft-lock where Flee
-	# is the only repeatable option turn after turn) -- Tactics has no
-	# disabled-state of its own otherwise, so this is the only place it
-	# needs one.
-	battle_main_buttons["tactics"].disabled = feared_unreachable
+	# is the only repeatable option turn after turn) -- Taunt and Stealth have
+	# no disabled-state of their own otherwise, so this is the only place they
+	# need one.
+	battle_tactics_buttons["taunt"].disabled = feared_unreachable
 	# Mine only shows up with Hand Picks equipped AND an actual rock/rubble
 	# in reach -- can_mine already folds both checks together (see Main.gd:
 	# _refresh_battle_display).
@@ -3035,7 +3824,7 @@ func update_battle_grid(grid_w: int, grid_h: int, terrain: Dictionary, player_ti
 	battle_fight_buttons["heavy"].text = "Heavy Attack (%d STA)" % heavy_cost
 	battle_fight_buttons["heavy"].disabled = stamina < heavy_cost
 	battle_tactics_buttons["stealth"].text = "Stealth (%d STA)" % stealth_cost
-	battle_tactics_buttons["stealth"].disabled = stamina < stealth_cost
+	battle_tactics_buttons["stealth"].disabled = stamina < stealth_cost or feared_unreachable
 	for i in special_keys.size():
 		var button: Button = battle_fight_buttons[special_keys[i]]
 		if i < specials.size():
@@ -3063,11 +3852,66 @@ func update_battle_grid(grid_w: int, grid_h: int, terrain: Dictionary, player_ti
 		arrow_button.disabled = held <= 0
 		arrow_button.set_meta("description", info.description)
 
+	# Float whichever list is showing beside the unit whose turn it is, now that every entry's visibility is settled.
+	var anchor: Vector2i = player_tile
+	for a in allies:
+		if a.get("acting", false):
+			anchor = a.tile
+	for key in ["main", "strategy", "fight", "arrow", "move", "ally_main", "ally_list", "ally_pick"]:
+		var menu: Dictionary = battle_menus[key]
+		if menu.panel.visible:
+			if key != "ally_pick":
+				_fit_menu(menu)
+			_place_menu(menu, anchor, grid_w)
+
 func battle_log(msg: String) -> void:
+	# There is no log on the screen any more: the lines are kept (the last 80 flat, and the last three turns by turn, for the
+	# History panel).
 	battle_log_lines.append(msg)
-	if battle_log_lines.size() > 4:
+	if battle_log_lines.size() > 80:
 		battle_log_lines.pop_front()
-	battle_log_label.text = "\n".join(battle_log_lines)
+	if battle_history.is_empty():
+		battle_history.append({"turn": 1, "lines": []})
+	battle_history[battle_history.size() - 1].lines.append(msg)
+	if battle_history_panel != null and battle_history_panel.visible:
+		_refresh_history()
+
+# A new turn of the battle begins (the hero's turn comes round): start a fresh block of history, keeping the last three.
+func battle_history_new_turn(turn: int) -> void:
+	if not battle_history.is_empty() and battle_history[battle_history.size() - 1].lines.is_empty():
+		battle_history[battle_history.size() - 1].turn = turn
+		return
+	battle_history.append({"turn": turn, "lines": []})
+	while battle_history.size() > 3:
+		battle_history.pop_front()
+	if battle_history_panel != null and battle_history_panel.visible:
+		_refresh_history()
+
+func _refresh_history() -> void:
+	var text := ""
+	for i in range(battle_history.size() - 1, -1, -1):
+		var block: Dictionary = battle_history[i]
+		text += "[color=#%s]Turn %d%s[/color]\n" % [BATTLE_GOLD.to_html(false) if i == battle_history.size() - 1 else BATTLE_TEXT.to_html(false), int(block.turn), "  (now)" if i == battle_history.size() - 1 else ""]
+		if block.lines.is_empty():
+			text += "[color=#%s]  Nothing yet.[/color]\n" % BATTLE_DIM.to_html(false)
+		for line in block.lines:
+			text += "[color=#%s]  %s[/color]\n" % [BATTLE_DIM.to_html(false), str(line).replace("[", "(").replace("]", ")")]
+		text += "\n"
+	battle_history_text.text = text
+
+func toggle_history() -> void:
+	if battle_history_panel == null:
+		return
+	if battle_history_panel.visible:
+		battle_history_panel.visible = false
+		return
+	unit_clicked.emit("none", 0)          # closes any open details box: the two share a place
+	hide_unit_details()
+	_refresh_history()
+	battle_history_panel.visible = true
+
+func history_open() -> bool:
+	return battle_history_panel != null and battle_history_panel.visible
 
 # The turn-order strip: rows = [{side: "hero"|"ally"|"enemy", name, current, hp_frac, kind?, tint?}], the one
 # in progress first. Hero rows are gold-blue, allies green, enemies red; whoever acts now is lit up.
@@ -3081,42 +3925,44 @@ func set_turn_order(rows: Array) -> void:
 	if rows.is_empty():
 		return
 	var title := Label.new()
-	title.text = "TURN ORDER"
+	title.text = "TURN"
 	title.add_theme_font_size_override("font_size", 12)
-	title.add_theme_color_override("font_color", Color(0.75, 0.72, 0.6))
+	title.add_theme_color_override("font_color", BATTLE_DIM)
+	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	title.custom_minimum_size = Vector2(0, 44)
 	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	turn_order_box.add_child(title)
 	for r in rows:
 		turn_order_box.add_child(_make_turn_order_row(r))
 
+# One tile of the turn-order strip: the unit's picture in a frame (blue for the hero and allies' side, red for foes, gold and
+# larger for whoever is acting) with a thin health bar under it. Hover for its name.
 func _make_turn_order_row(r: Dictionary) -> Control:
 	var side: String = str(r.get("side", "enemy"))
-	var accent := Color(0.95, 0.5, 0.45)
-	if side == "hero":
-		accent = Color(0.45, 0.72, 1.0)
-	elif side == "ally":
-		accent = Color(0.5, 0.9, 0.55)
+	var accent: Color = BATTLE_ENEMY_RED if side == "enemy" else BATTLE_ALLY_BLUE
 	var current: bool = bool(r.get("current", false))
+	var px: float = 38.0 if current else 30.0
 	var panel := PanelContainer.new()
-	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var border: Color = Color(1.0, 0.9, 0.3) if current else accent * Color(1, 1, 1, 0.55)
-	var bg: Color = Color(0.2, 0.17, 0.08, 0.97) if current else PANEL_BG
-	panel.add_theme_stylebox_override("panel", _make_stylebox(bg, border, 3 if current else 1, 0, 3))
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 6)
-	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	panel.add_child(row)
+	panel.tooltip_text = str(r.get("name", "?"))
+	panel.mouse_filter = Control.MOUSE_FILTER_PASS
+	panel.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	panel.add_theme_stylebox_override("panel", _battle_box(PANEL_BG, BATTLE_GOLD if current else accent * Color(1, 1, 1, 0.8), 2 if current else 1, BattleStyleScript.CORNER_SMALL, false))
+	(panel.get_theme_stylebox("panel") as StyleBoxFlat).set_content_margin_all(3)
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 2)
+	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_child(column)
 	# The unit's picture: the hero is the blue "@", everyone else wears the icon the battle grid gives them.
 	var icon_holder := Control.new()
-	icon_holder.custom_minimum_size = Vector2(28, 28)
+	icon_holder.custom_minimum_size = Vector2(px, px)
 	icon_holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	row.add_child(icon_holder)
+	column.add_child(icon_holder)
 	if side == "hero":
 		var at := Label.new()
 		at.text = "@"
-		at.add_theme_font_size_override("font_size", 22)
+		at.add_theme_font_size_override("font_size", int(px * 0.85))
 		at.add_theme_color_override("font_color", accent)
-		at.position = Vector2(5, -3)
+		at.position = Vector2(px * 0.2, -px * 0.12)
 		at.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		icon_holder.add_child(at)
 	else:
@@ -3127,35 +3973,30 @@ func _make_turn_order_row(r: Dictionary) -> Control:
 		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		icon.size = Vector2(28, 28)
+		icon.size = Vector2(px, px)
 		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		icon_holder.add_child(icon)
-	var text_box := VBoxContainer.new()
-	text_box.add_theme_constant_override("separation", 1)
-	text_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	text_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	row.add_child(text_box)
-	var name_label := Label.new()
-	name_label.text = str(r.get("name", "?"))
-	name_label.add_theme_font_size_override("font_size", 14 if current else 13)
-	name_label.add_theme_color_override("font_color", Color(1.0, 0.95, 0.7) if current else Color(0.88, 0.88, 0.85))
-	name_label.clip_text = true
-	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	text_box.add_child(name_label)
 	var bar_bg := ColorRect.new()
 	bar_bg.color = Color(0.15, 0.15, 0.15)
-	bar_bg.custom_minimum_size = Vector2(0, 4)
+	bar_bg.custom_minimum_size = Vector2(px, 3)
 	bar_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	text_box.add_child(bar_bg)
+	column.add_child(bar_bg)
 	var bar_fill := ColorRect.new()
-	bar_fill.color = accent
-	bar_fill.size = Vector2(150.0 * clampf(float(r.get("hp_frac", 1.0)), 0.0, 1.0), 4)
+	bar_fill.color = HEALTH_BAR_FILL_COLOR if side == "enemy" else Color(0.5, 0.9, 0.55)
+	bar_fill.size = Vector2(px * clampf(float(r.get("hp_frac", 1.0)), 0.0, 1.0), 3)
 	bar_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bar_bg.add_child(bar_fill)
 	return panel
 
 func hide_battle() -> void:
 	battle_panel.visible = false
+	battle_card_hover_key = ""
+	hide_unit_popup()
+	hide_unit_details()
+	hide_damage_preview()
+	show_move_range([], false)
+	if battle_history_panel != null:
+		battle_history_panel.visible = false
 
 # Positioned fresh every call (not cached) -- called from Main.gd's
 # _refresh_battle_display, which already recomputes the rest of the battle

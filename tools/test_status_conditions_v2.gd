@@ -281,6 +281,7 @@ func _init() -> void:
 	# option turn after turn. A rejected action's only observable effect is
 	# the "Fear holds you" log line, so its absence here confirms Defend's
 	# real body (brace, regen stamina, end the turn) actually ran instead.
+	main.hud.battle_log_lines.clear()      # (the log keeps far more than four lines now, so drop the earlier rejection's)
 	main._on_battle_main_action("defend")
 	var log_text: String = "\n".join(main.hud.battle_log_lines)
 	print("...Defend is allowed through too, not just Move/Flee: rejected=%s (expected false)" % [

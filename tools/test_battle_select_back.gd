@@ -51,8 +51,8 @@ func _init() -> void:
 	main.trigger_battle(goblin)
 	await process_frame
 
-	print("main menu starts with Move focused: %s (native ui_accept then activates it on Z, same as Enter/Space)" % [
-		main.hud.battle_main_buttons["move"].has_focus()
+	print("main menu starts with Attack focused (Move now lives under Strategy): %s (native ui_accept then activates it on Z, same as Enter/Space)" % [
+		main.hud.battle_main_buttons["fight"].has_focus()
 	])
 
 	# X backs out of the Fight submenu to the main menu.
@@ -65,6 +65,23 @@ func _init() -> void:
 	print("X backs out of the fight submenu: menu_state=%s (expected main)" % [main.battle_menu_state])
 	_press_key(KEY_X, false)
 	await process_frame
+
+	# The same for the Strategy list: it opens on Move, and X (like the round button on its corner) goes back.
+	main.hud.battle_main_buttons["strategy"].pressed.emit()
+	await process_frame
+	print("Strategy opens its list on Move: menu_state=%s (expected strategy), list showing=%s (expected true), Move focused=%s (expected true)" % [
+		main.battle_menu_state, main.hud.battle_strategy_menu_box.visible, main.hud.battle_main_buttons["move"].has_focus()
+	])
+	_press_key(KEY_X, true)
+	await process_frame
+	await process_frame
+	await process_frame
+	print("X backs out of the strategy list: menu_state=%s (expected main), root list showing=%s (expected true)" % [main.battle_menu_state, main.hud.battle_main_menu_box.visible])
+	_press_key(KEY_X, false)
+	await process_frame
+	main.hud.battle_main_buttons["strategy"].pressed.emit()
+	main.hud.battle_menus["strategy"].back.pressed.emit()
+	print("The round back button does the same: menu_state=%s (expected main)" % [main.battle_menu_state])
 
 	# Entering move mode releases focus, so a stale focused button (e.g. the
 	# Move button itself) can't be silently re-triggered by the Z-is-

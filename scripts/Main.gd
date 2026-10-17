@@ -59,6 +59,7 @@ const DefenseMinigameScript := preload("res://scripts/DefenseMinigame.gd")
 const AttackTimingsScript := preload("res://scripts/AttackTimings.gd")
 const AttackMinigameScript := preload("res://scripts/AttackMinigame.gd")
 const PartyRulesScript := preload("res://scripts/PartyRules.gd")
+const BattleStatusesScript := preload("res://scripts/BattleStatuses.gd")
 const PartyKitsScript := preload("res://scripts/PartyKits.gd")
 const DefenseScript := preload("res://scripts/Defense.gd")
 const MaterialsScript := preload("res://scripts/Materials.gd")
@@ -977,6 +978,8 @@ var battle_downed_allies: Array = []
 # The friendly-target picker: the special waiting for its target, the candidates offered
 # ({"label", "target"}), and the chosen target while the action resolves ("hero" or an ally unit).
 var battle_ally_pending_action: Dictionary = {}
+# Which of a member's lists is open in state "ally_special": "attack", "magic", "strategy" (or "" = every special, the old way).
+var battle_ally_category := ""
 var battle_ally_pick_candidates: Array = []
 var battle_ally_target = null
 # PartyMembers knocked out this battle, for the faint/harvest rules at battle end.
@@ -2912,6 +2915,12 @@ func _build_hud() -> void:
 	hud.battle_ally_action.connect(_on_battle_ally_action)
 	hud.enemy_hovered.connect(_on_enemy_hovered)
 	hud.enemy_unhovered.connect(_on_enemy_unhovered)
+	hud.unit_hovered.connect(_on_unit_hovered)
+	hud.unit_unhovered.connect(_on_unit_unhovered)
+	hud.unit_clicked.connect(_on_unit_clicked)
+	hud.action_previewed.connect(_on_action_previewed)
+	hud.action_preview_cleared.connect(_on_action_preview_cleared)
+	hud.inspect_cycled.connect(_cycle_battle_details)
 	hud.battle_evasion_direction_pressed.connect(func(label: String): evasion_direction_chosen.emit(battle_evasion_options.get(label, Vector2i.ZERO)))
 	hud.battle_confirm_choice.connect(func(accepted: bool): water_push_prompt_choice.emit(accepted))
 	hud.rock_target_selected.connect(_on_rock_target_selected)
@@ -4310,6 +4319,10 @@ func _setup_battle_grid(squad: Array) -> void:
 	player_concussed_turns = 0
 	player_bleed_turns = 0
 	player_blind_turns = 0
+	battle_hover = {}
+	battle_details_unit = {}
+	battle_preview_action = ""
+	battle_history_turn = 1
 	battle_feared_by_index = -1
 	battle_fear_cascade_depth = 0
 	battle_feared_unreachable = false
@@ -5145,6 +5158,15 @@ func _handle_battle(_delta: float) -> void:
 		if back_pressed and not prev_battle_keys.get("cancel", false):
 			_on_battle_arrow_action("back")
 		prev_battle_keys["cancel"] = back_pressed
+	elif battle_menu_state in ["strategy", "tactics", "ally_special", "ally_pick"]:
+		# X backs out of every list (the round button on its corner does the same for the mouse).
+		var back_pressed: bool = settings.is_action_pressed("cancel")
+		if back_pressed and not prev_battle_keys.get("cancel", false):
+			if battle_commanding_ally != null:
+				_on_battle_ally_action("back")
+			else:
+				_on_battle_main_action("main_back")
+		prev_battle_keys["cancel"] = back_pressed
 
 	if in_battle:
 		_refresh_battle_display()
@@ -5165,10 +5187,19 @@ func _on_battle_main_action(action: String) -> void:
 	# move trying (and failing) to close the distance leaves moves_left at 0
 	# for the rest of that turn, and Flee-only-forever to survive a fight
 	# you can never otherwise progress is exactly the complaint this fixes.
-	if battle_feared_unreachable and action != "move" and action != "flee" and action != "defend":
+	if battle_feared_unreachable and action != "move" and action != "flee" and action != "defend" and action != "strategy" and action != "main_back":
 		hud.battle_log("Fear holds you -- you can only move, defend, or flee!")
 		return
 	match action:
+		"strategy":
+			# Move, Defend, Taunt, Stealth, Skill and Flee live behind this one entry.
+			battle_menu_state = "strategy"
+			_focus_battle_strategy_menu()
+			_refresh_battle_display()
+		"main_back":
+			battle_menu_state = "main"
+			_focus_battle_main_menu()
+			_refresh_battle_display()
 		"move":
 			if player.talisman_bonus("ironclad_ward") > 0.0 and not battle_ironclad_move_allowed:
 				hud.battle_log("Ironclad Ward roots you to the spot this turn.")
@@ -5305,9 +5336,17 @@ func _on_battle_move_action(action: String) -> void:
 # mouse click.
 func _focus_battle_main_menu() -> void:
 	if tutorial_active:
-		hud.battle_main_buttons[["move", "fight", "defend"][tutorial_step]].grab_focus()
+		# Move and Defend now sit under Strategy, so the tutorial's first and last steps point at it.
+		hud.battle_main_buttons[["strategy", "fight", "strategy"][tutorial_step]].grab_focus()
 	else:
-		hud.battle_main_buttons["move"].grab_focus()
+		hud.battle_main_buttons["fight"].grab_focus()
+
+# The Strategy list opens on its first usable entry (in the tutorial, the one the step asks for).
+func _focus_battle_strategy_menu() -> void:
+	if tutorial_active:
+		hud.battle_main_buttons[["move", "move", "defend"][tutorial_step]].grab_focus()
+	else:
+		hud.focus_first_usable([hud.battle_main_buttons["move"], hud.battle_main_buttons["defend"], hud.battle_tactics_buttons["taunt"], hud.battle_tactics_buttons["stealth"], hud.battle_main_buttons["flee"]])
 
 func _focus_battle_fight_menu() -> void:
 	hud.battle_fight_buttons["attack"].grab_focus()
@@ -5316,7 +5355,7 @@ func _focus_battle_arrow_menu() -> void:
 	hud.battle_arrow_buttons["flame"].grab_focus()
 
 func _focus_battle_tactics_menu() -> void:
-	hud.battle_tactics_buttons["taunt"].grab_focus()
+	_focus_battle_strategy_menu()
 
 # Whichever of the (up to 3) offered dodge-roll directions comes first in
 # this preference order -- back is favored since it's the most intuitive
@@ -5425,17 +5464,20 @@ func _on_enemy_hovered(idx: int) -> void:
 	if idx < 0 or idx >= battle_units.size():
 		return
 	var u: Dictionary = battle_units[idx]
-	var sight_range: int = STEALTH_SIGHT_RANGE if player.stealth_turns_remaining > 0 else ENEMY_SIGHT_RANGE
+	# The yellow "where it can see" tiles only while you are hiding (the red "where it can walk" tiles the hover raises
+	# would otherwise be buried under them); the stat line under the grid is always shown.
 	var tiles: Array = []
-	for dx in range(-sight_range, sight_range + 1):
-		for dy in range(-sight_range, sight_range + 1):
-			if abs(dx) + abs(dy) > sight_range:
-				continue
-			var tile: Vector2i = u.tile + Vector2i(dx, dy)
-			if not _in_battle_bounds(tile):
-				continue
-			if _has_line_of_sight(u.tile, tile):
-				tiles.append(tile)
+	if player.stealth_turns_remaining > 0:
+		var sight_range: int = STEALTH_SIGHT_RANGE
+		for dx in range(-sight_range, sight_range + 1):
+			for dy in range(-sight_range, sight_range + 1):
+				if abs(dx) + abs(dy) > sight_range:
+					continue
+				var tile: Vector2i = u.tile + Vector2i(dx, dy)
+				if not _in_battle_bounds(tile):
+					continue
+				if _has_line_of_sight(u.tile, tile):
+					tiles.append(tile)
 	hud.show_sight_tiles(tiles)
 	hud.show_enemy_stats(_enemy_stat_summary(u))
 
@@ -7165,7 +7207,7 @@ func _ally_command_over() -> void:
 	_timeline_advance()
 
 func _focus_battle_ally_menu() -> void:
-	hud.battle_ally_buttons["move"].grab_focus()
+	hud.battle_ally_buttons["attack"].grab_focus()
 
 # What a member regains at the start of its own command: stamina per turn (the Astral Full Breath
 # plus its talismans) and HP from regeneration talismans (Moss Charm).
@@ -7218,8 +7260,10 @@ func _on_battle_ally_action(action: String) -> void:
 				hud.battle_log("Your %s can't attack right now." % u.name)
 				return
 			_ally_perform(_ally_regular_action(u))
-		"special":
-			if _ally_specials(u).is_empty():
+		"special", "open_attack", "open_magic", "open_strategy":
+			# The redesigned menu opens its three lists through here (Attack / Magic / Strategy); the old "special" opens every special.
+			battle_ally_category = action.substr(5) if action.begins_with("open_") else ""
+			if battle_ally_category == "" and _ally_specials(u).is_empty():
 				hud.battle_log("Your %s has no special moves." % u.name)
 				return
 			battle_menu_state = "ally_special"
@@ -7530,7 +7574,7 @@ func _battle_ally_attack() -> void:
 
 # What the HUD's ally menu shows this frame: button labels, which are disabled, and the picker.
 func _ally_menu_info() -> Dictionary:
-	var info := {"specials": [], "picks": [], "attack_disabled": false, "move_disabled": false, "has_specials": false, "attack_label": "Attack"}
+	var info := {"specials": [], "picks": [], "attack_disabled": false, "move_disabled": false, "has_specials": false, "attack_label": "Attack", "list": [], "has_magic": false}
 	var u = battle_commanding_ally
 	if u == null:
 		return info
@@ -7543,7 +7587,8 @@ func _ally_menu_info() -> Dictionary:
 	var specials: Array = _ally_specials(u)
 	# After Drive-By only a plain attack is left; after the Rogue's strike only moving is.
 	info.has_specials = not specials.is_empty() and not bool(u.get("attacked", false)) and not bool(u.get("bonus_attack", false))
-	for special in specials:
+	for i in specials.size():
+		var special: Dictionary = specials[i]
 		var cost: int = int(special.get("stamina_cost", 0))
 		var reason: String = str(special.get("disabled_reason", ""))
 		# Summon the Dead's price is per skeleton (the picker asks how many); the rest show their whole cost.
@@ -7554,10 +7599,42 @@ func _ally_menu_info() -> Dictionary:
 			"label": str(special.name) + cost_text,
 			"disabled": (disarmed and not special.get("kit", false)) or reason != "" or not _unit_can_pay(u, cost),
 			"tip": str(special.get("description", "")) + ((" (" + reason + ")") if reason != "" else ""),
+			"action": "special_%d" % i,
+			"category": _ally_special_category(special),
 		})
 	for c in battle_ally_pick_candidates:
 		info.picks.append({"label": str(c.label)})
+	# The redesigned menu: Attack (the plain attack and the moves that hurt), Magic (spells), Strategy (Move, Defend, the
+	# tactics, Skip). The list for the open one, each entry carrying the action it sends (the old "special" opens them all).
+	for e in info.specials:
+		if e.category == "magic" and info.has_specials:
+			info.has_magic = true
+	var entries: Array = []
+	var hud_text: Dictionary = hud.UI_TEXT
+	match battle_ally_category:
+		"attack":
+			entries.append({"label": info.attack_label, "action": "attack", "disabled": info.attack_disabled, "tip": hud_text["battle.ally.attack"]})
+		"strategy":
+			entries.append({"label": "Move", "action": "move", "disabled": info.move_disabled, "tip": hud_text["battle.ally.move"]})
+			entries.append({"label": "Defend", "action": "guard", "disabled": false, "tip": hud_text["battle.ally.guard"]})
+	for e in info.specials:
+		if battle_ally_category == "" or e.category == battle_ally_category:
+			var shown: Dictionary = e.duplicate()
+			shown["disabled"] = bool(e.disabled) or not info.has_specials
+			entries.append(shown)
+	if battle_ally_category == "strategy":
+		entries.append({"label": "Skip turn", "action": "skip", "disabled": false, "tip": hud_text["battle.ally.skip"]})
+	info.list = entries
 	return info
+
+# Where a member's special sits in the redesigned menu: the twelve spells are Magic; Taunt and Stealth are Strategy; every other
+# move (weapon specials, fighters' techniques and buffs, Pickpocket) is an Attack.
+func _ally_special_category(special: Dictionary) -> String:
+	if SpellUpgradesScript.has(str(special.get("id", ""))):
+		return "magic"
+	if str(special.get("effect", "")) in ["taunt", "ally_stealth"]:
+		return "strategy"
+	return "attack"
 
 # --- Ally stealth -------------------------------------------------------------------------------
 # Every party member can slip out of sight, like the hero (_battle_player_stealth): for a few of its own turns an enemy that
@@ -9508,6 +9585,9 @@ func _hero_turn_skipped() -> void:
 # Everything that happens when the hero's turn comes round: the damage-over-time statuses tick, every
 # per-turn buff counts down, then (unless Fear takes the turn over) the main menu opens.
 func _begin_hero_turn() -> void:
+	# A new turn for the History panel: everything until the hero's turn comes round again is filed under it.
+	battle_history_turn += 1
+	hud.battle_history_new_turn(battle_history_turn)
 	# Poison Bog's lingering DOT (reserved terrain) -- ticks every round
 	# regardless of battle_player_turns_to_skip below, same "doesn't skip a
 	# turn on its own" shape as the enemy-side burning/poison ticks.
@@ -9849,6 +9929,295 @@ func _turn_order_row(kind: String, u: Dictionary, current: bool) -> Dictionary:
 		row["tint"] = u.member.rules().get("tint", Color(1, 1, 1))
 	return row
 
+# --- The battle screen's party cards (HUD.set_party_cards) -----------------------------------------------------
+# The hero's own afflictions and blessings, gathered from the several places Main keeps them, for BattleStatuses.
+func _hero_status_state() -> Dictionary:
+	return {
+		"defending": battle_player_defending, "taunting": battle_player_taunting,
+		"stealth": player.stealth_turns_remaining, "berserk": player.berserk_turns_remaining,
+		"buff": battle_hero_buff_turns, "bloodrage": battle_bloodrage_stacks,
+		"potion_attack": player.potion_attack_turns, "potion_resilience": player.potion_resilience_turns, "potion_energy": player.potion_energy_turns,
+		"poison": player_poison_turns, "burning": player_burning, "bleed": player_bleed_turns, "blind": player_blind_turns,
+		"concussed": player_concussed_turns, "disarmed": player.disarmed_tile != Vector2i(-1, -1), "skip": battle_player_turns_to_skip,
+	}
+
+# Everyone on our side the grid draws, in the order the HUD gets them: the living, then the downed.
+func _battle_display_allies() -> Array:
+	var out: Array = battle_allies.duplicate()
+	for d in battle_downed_allies:
+		out.append(d)
+	return out
+
+func _hero_info_row() -> Dictionary:
+	return {
+		"side": "hero", "name": "You", "level": player.level, "hp": player.health, "max_hp": player.max_health,
+		"res": player.stamina, "max_res": player.max_stamina, "res_kind": "STA",
+		"statuses": BattleStatusesScript.for_hero(_hero_status_state()),
+		"acting": battle_commanding_ally == null and battle_turn == "player", "index": 0, "note": "",
+	}
+
+# One of our units as the cards, popups and details show it. `index` is its place in _battle_display_allies.
+func _ally_info_row(a: Dictionary, index: int) -> Dictionary:
+	var res_kind := ""
+	var res := 0
+	var max_res := 0
+	if int(a.get("max_mana", 0)) > 0 and not bool(a.get("hp_as_mana", false)):
+		res_kind = "MP"
+		res = int(a.mana)
+		max_res = int(a.max_mana)
+	elif int(a.get("max_stamina", 0)) > 0:
+		res_kind = "STA"
+		res = int(a.stamina)
+		max_res = int(a.max_stamina)
+	var row := {
+		"side": "ally", "name": str(a.name), "kind": str(a.get("kind", "")), "level": int(a.member.level) if a.has("member") else 0,
+		"hp": maxi(0, int(a.hp)), "max_hp": int(a.max_hp), "res": res, "max_res": max_res, "res_kind": res_kind,
+		"statuses": BattleStatusesScript.for_ally(a), "acting": a == battle_commanding_ally,
+		"downed": bool(a.get("downed", false)), "index": index,
+		"note": "Her HP is her mana." if bool(a.get("hp_as_mana", false)) else "No stamina pool.",
+	}
+	row["tint"] = a.member.rules().get("tint", Color(1, 1, 1)) if a.has("member") else Color(1, 1, 1)
+	return row
+
+func _enemy_info_row(u: Dictionary) -> Dictionary:
+	return {
+		"side": "enemy", "name": str(u.name), "level": 0, "hp": maxi(0, int(u.hp)), "max_hp": int(u.get("max_hp", 1)),
+		"res": 0, "max_res": 0, "res_kind": "", "statuses": BattleStatusesScript.for_enemy(u), "note": "No stamina pool.",
+	}
+
+# One row per party card: the hero first, then every roster member (living or downed). Summoned skeletons and other units
+# with no roster entry have no card -- only the plate over them on the grid.
+func _battle_party_rows() -> Array:
+	var rows: Array = [_hero_info_row()]
+	var all: Array = _battle_display_allies()
+	for i in all.size():
+		if all[i].has("member"):
+			rows.append(_ally_info_row(all[i], i))
+	return rows
+
+# --- Hovering and clicking units (the popup, the details box, the tiles a unit could walk to) -----------------------
+var battle_hover := {}                  # {kind: "hero"|"ally"|"enemy", index} under the mouse; {} = none
+var battle_details_unit := {}           # whose details box is open; {} = closed
+var battle_preview_action := ""         # the attack-list entry resting under the mouse/focus ("" = none): the damage chip shows for it
+var battle_history_turn := 1            # which turn the History panel files lines under (see _begin_hero_turn)
+
+# Tab: the details box steps on to the next unit -- you, then each member, then each foe -- and shuts after the last.
+func _cycle_battle_details() -> void:
+	if not in_battle:
+		return
+	var order: Array = [{"kind": "hero", "index": 0}]
+	for i in _battle_display_allies().size():
+		order.append({"kind": "ally", "index": i})
+	for i in battle_units.size():
+		order.append({"kind": "enemy", "index": i})
+	var at := -1
+	for i in order.size():
+		if order[i] == battle_details_unit:
+			at = i
+	var next: int = at + 1
+	battle_details_unit = order[next] if next < order.size() else {}
+	_update_battle_overlays()
+
+func _on_action_previewed(action: String) -> void:
+	battle_preview_action = action
+	_update_battle_overlays()
+
+func _on_action_preview_cleared() -> void:
+	battle_preview_action = ""
+	_update_battle_overlays()
+
+# A rough "what would this hit do" for the chip over the target: [lowest, highest] -- the lowest a plain landing, the highest a
+# crit. It follows the main multipliers of _apply_single_hit (weapon, move, flat bonuses, shield, the talisman and low-HP
+# percentages, berserk, potion, Empower, then the target's cover, frost, vulnerability and Rallying Cry) but not every proc,
+# so the chip says "about". `ally` is the member attacking (null = the hero).
+func _estimate_hit(target: Dictionary, move_mult: float, ally = null) -> Vector2i:
+	var is_hero: bool = ally == null
+	var weapon: Dictionary = player.current_weapon if is_hero else ally.get("weapon", {})
+	var base_attack: float
+	if is_hero:
+		base_attack = float(player.attack_damage)
+	elif bool(weapon.get("uses_magic", false)):
+		base_attack = float(ally.get("magic", 0.0))
+	else:
+		base_attack = float(ally.get("attack", 0.0))
+	var dmg: float = float(int(round(base_attack * float(weapon.get("damage_mult", 1.0)) * move_mult)))
+	if not is_hero:
+		dmg = maxf(1.0, dmg)
+	else:
+		dmg += float(int(round(player.coin_scaled_attack_bonus())))
+	if is_hero and player.shield_damage_penalty_pct() > 0.0:
+		dmg = float(int(round(dmg * (1.0 - player.shield_damage_penalty_pct()))))
+	elif not is_hero:
+		if float(ally.get("shield_penalty", 0.0)) > 0.0:
+			dmg = float(int(round(dmg * (1.0 - float(ally.shield_penalty)))))
+		if float(ally.get("shield_damage_mult", 1.0)) != 1.0:
+			dmg = float(int(round(dmg * float(ally.shield_damage_mult))))
+	if player.temp_damage_bonus_pct != 0.0:
+		dmg *= 1.0 + player.temp_damage_bonus_pct
+	var pct: float = player.talisman_bonus("damage_pct") if is_hero else _unit_effect(ally, "damage_pct")
+	if pct != 0.0:
+		dmg *= 1.0 + pct
+	if is_hero:
+		if player.berserk_turns_remaining > 0:
+			dmg *= 1.0 + BERSERK_DAMAGE_BONUS_PCT + player.meta_rage_bonus_pct
+		if player.potion_attack_turns > 0:
+			dmg *= 1.0 + ATTACK_POTION_DAMAGE_BONUS_PCT
+		if battle_hero_buff_turns > 0:
+			dmg *= battle_hero_buff_mult
+	elif int(ally.get("buff_turns", 0)) > 0:
+		dmg *= float(ally.get("buff_mult", PartyKitsScript.DRUID_BUFF_MULT))
+	var crit_mult: float = player.crit_damage_mult() if is_hero else 2.0 + _unit_effect(ally, "crit_damage_mult_bonus")
+	var low: float = dmg
+	var high: float = dmg * crit_mult
+	# What the target does to it: cover blunts a plain hit (a crit ignores it), frost and a mark make it worse, a rally worse still.
+	if _has_adjacent_rock(target.tile):
+		low *= 1.0 - ROCK_COVER_REDUCTION
+	var after: float = 1.0
+	if int(target.get("frozen_turns", 0)) > 0:
+		after *= 1.2
+	if int(target.get("vulnerable_turns", 0)) > 0:
+		after *= 1.0 + VULNERABLE_DAMAGE_TAKEN_BONUS_PCT
+	if battle_rally_turns > 0:
+		after *= 1.0 + PartyKitsScript.RALLY_DAMAGE_BONUS
+	return Vector2i(maxi(0, int(round(low * after))), maxi(0, int(round(high * after))))
+
+# The chip over the target for the attack-list entry under the mouse/focus: only for the plain Attack and Heavy Attack and the
+# moves that are a straight multiplier (effect ""), where "damage" means one number.
+func _update_damage_preview() -> void:
+	var shown := false
+	if battle_preview_action != "" and in_battle and battle_turn == "player":
+		var target_idx := -1
+		var move_mult := -1.0
+		var ally = null
+		var action: String = battle_preview_action
+		if action.begins_with("ally:") and battle_commanding_ally != null and battle_menu_state == "ally_special":
+			ally = battle_commanding_ally
+			target_idx = _ally_effective_target_index(ally)
+			action = action.substr(5)
+			if action == "attack":
+				move_mult = 1.0
+			elif action.begins_with("special_"):
+				var specials: Array = _ally_specials(ally)
+				var si: int = int(action.substr(8))
+				if si >= 0 and si < specials.size() and str(specials[si].get("effect", "")) == "" and float(specials[si].get("dmg_mult", 0.0)) > 0.0:
+					move_mult = float(specials[si].dmg_mult)
+		elif not action.begins_with("ally:") and battle_commanding_ally == null and battle_menu_state == "fight":
+			target_idx = _effective_target_index()
+			if action == "attack":
+				move_mult = 1.0
+			elif action == "heavy":
+				move_mult = WeaponsScript.HEAVY_DAMAGE_MULT
+			elif action.begins_with("special_"):
+				var weapon_specials: Array = player.current_weapon.get("specials", [])
+				var wi: int = int(action.substr(8))
+				if wi >= 0 and wi < weapon_specials.size() and str(weapon_specials[wi].get("effect", "")) == "" and float(weapon_specials[wi].get("dmg_mult", 0.0)) > 0.0:
+					move_mult = float(weapon_specials[wi].dmg_mult)
+		if target_idx >= 0 and target_idx < battle_units.size() and move_mult > 0.0:
+			var target: Dictionary = battle_units[target_idx]
+			var est: Vector2i = _estimate_hit(target, move_mult, ally)
+			var hp: int = int(target.hp)
+			var line1: String = ("Damage about %d" % est.x) if est.x == est.y else ("Damage about %d-%d" % [est.x, est.y])
+			var line2 := ""
+			if est.x >= hp:
+				line2 = "Defeats it (%d HP)" % hp
+			elif est.y >= hp:
+				line2 = "A crit would defeat it (%d HP)" % hp
+			hud.show_damage_preview(target.tile, int(target.get("size", 1)), line1, line2)
+			shown = true
+	if not shown:
+		hud.hide_damage_preview()
+
+func _on_unit_hovered(kind: String, index: int) -> void:
+	battle_hover = {"kind": kind, "index": index}
+	_update_battle_overlays()
+
+func _on_unit_unhovered() -> void:
+	battle_hover = {}
+	_update_battle_overlays()
+
+# A click on a unit opens (or switches) the details box; "none" -- bare ground, or the box's own close button -- shuts it.
+func _on_unit_clicked(kind: String, index: int) -> void:
+	battle_details_unit = {} if kind == "none" else {"kind": kind, "index": index}
+	_update_battle_overlays()
+
+# {row, tile, span, tiles, hostile} for a unit named by kind and index; {} if it is no longer there.
+func _unit_overlay_info(ref: Dictionary) -> Dictionary:
+	match str(ref.get("kind", "")):
+		"hero":
+			var budget: int = battle_player_moves_left if (battle_commanding_ally == null and battle_turn == "player") else _battle_player_move_range()
+			return {"row": _hero_info_row(), "tile": battle_player_tile, "span": 1, "hostile": false, "tiles": _reachable_tiles(battle_player_tile, budget)}
+		"ally":
+			var all: Array = _battle_display_allies()
+			var i: int = int(ref.index)
+			if i < 0 or i >= all.size():
+				return {}
+			var a: Dictionary = all[i]
+			var downed: bool = bool(a.get("downed", false))
+			var ally_budget: int = battle_ally_moves_left if a == battle_commanding_ally else int(a.get("move_range", 2))
+			return {"row": _ally_info_row(a, i), "tile": a.tile, "span": 1, "hostile": false, "tiles": [] if downed else _reachable_tiles(a.tile, ally_budget, 1, null, a.tile)}
+		"enemy":
+			var j: int = int(ref.index)
+			if j < 0 or j >= battle_units.size():
+				return {}
+			var u: Dictionary = battle_units[j]
+			var span: int = int(u.get("size", 1))
+			return {"row": _enemy_info_row(u), "tile": u.tile, "span": span, "hostile": true, "tiles": _reachable_tiles(u.tile, int(u.get("move_range", 2)), span, u.get("ref", null))}
+	return {}
+
+# Every tile a unit could walk to within `budget` moves, by the very step rules it moves under (rocks and other units block,
+# ledges and cliffs hop, caltrops cost a second move). A big unit (the Brute) shifts its whole footprint and ignores terrain.
+func _reachable_tiles(origin: Vector2i, budget: int, span: int = 1, self_ref = null, ignore_tile = null) -> Array:
+	var cost := {origin: 0}
+	var open: Array = [origin]
+	while not open.is_empty():
+		var best := 0
+		for i in open.size():
+			if cost[open[i]] < cost[open[best]]:
+				best = i
+		var cur: Vector2i = open[best]
+		open.remove_at(best)
+		for dir in CARDINAL_DIRS:
+			var step: Dictionary = _resolve_big_unit_step(cur, span, dir, self_ref) if span > 1 else _resolve_battle_step(cur, dir, ignore_tile)
+			if not step.moved:
+				continue
+			var spent: int = int(cost[cur]) + (2 if step.get("extra_cost", false) else 1)
+			if spent > budget:
+				continue
+			if not cost.has(step.tile) or spent < int(cost[step.tile]):
+				cost[step.tile] = spent
+				open.append(step.tile)
+	var tiles: Array = cost.keys()
+	tiles.erase(origin)
+	return tiles
+
+# Draws what the hover and the open details box call for: the hovered unit's popup and reach, the mover's own reach while
+# moving, the details box. Called whenever either changes and on every battle refresh.
+func _update_battle_overlays() -> void:
+	if not in_battle:
+		return
+	var tiles: Array = []
+	var hostile := false
+	if battle_menu_state == "move" and battle_turn == "player":
+		if battle_commanding_ally != null:
+			tiles = _reachable_tiles(battle_commanding_ally.tile, battle_ally_moves_left, 1, null, battle_commanding_ally.tile)
+		else:
+			tiles = _reachable_tiles(battle_player_tile, battle_player_moves_left)
+	var hover_info: Dictionary = _unit_overlay_info(battle_hover) if not battle_hover.is_empty() else {}
+	if tiles.is_empty() and not hover_info.is_empty():
+		tiles = hover_info.tiles
+		hostile = bool(hover_info.hostile)
+	hud.show_move_range(tiles, hostile)
+	if hover_info.is_empty():
+		hud.hide_unit_popup()
+	else:
+		hud.show_unit_popup(hover_info.row, hover_info.tile, int(hover_info.span))
+	var details_info: Dictionary = _unit_overlay_info(battle_details_unit) if not battle_details_unit.is_empty() else {}
+	if details_info.is_empty():
+		hud.hide_unit_details()
+	else:
+		hud.show_unit_details(details_info.row)
+	_update_damage_preview()
+
 # The enemy whose own attack range currently reaches the player, among any
 # with ENEMY_TRAITS["inflicts_fear"] -- mirrors _sweep_targets' footprint/
 # range-distance shape. -1 if none qualify.
@@ -10113,8 +10482,10 @@ func _refresh_battle_display() -> void:
 	var display_moves_left: int = battle_ally_moves_left if battle_commanding_ally != null else battle_player_moves_left
 	var display_target_index: int = _ally_effective_target_index(battle_commanding_ally) if battle_commanding_ally != null else _effective_target_index()
 	var commanding_ally_name: String = battle_commanding_ally.name if battle_commanding_ally != null else ""
+	hud.set_party_cards(_battle_party_rows())
 	hud.update_battle_grid(BATTLE_GRID_W, BATTLE_GRID_H, battle_terrain, battle_player_tile, battle_units, display_hp, display_max_hp, player.level, battle_turn, display_target_index, display_moves_left, player.stamina, player.max_stamina, player.current_weapon, battle_menu_state, player.healing_items, battle_move_trail, display_allies, player.has_guardian_skill, battle_skill_cooldown, player.disarmed_tile != Vector2i(-1, -1), player.owned_arrows, battle_awaiting_evasion, can_mine, player.equipped_shield.get("name", ""), player.shield_block_chance(), player.berserk_turns_remaining, player.stealth_turns_remaining, STEALTH_STAMINA_COST, battle_evasion_options, battle_feared_unreachable, battle_awaiting_water_confirm, commanding_ally_name)
 	hud.set_turn_order(_turn_order_rows())
+	_update_battle_overlays()
 	if tutorial_active and battle_turn == "player":
 		hud.show_battle_hint(_tutorial_hint_text(), _tutorial_hint_target_button())
 	else:
@@ -10125,6 +10496,9 @@ func _refresh_battle_display() -> void:
 # completable). tutorial_step: 0=Move, 1=Fight, 2=Defend. ---------------
 
 func _tutorial_action_allowed(action: String) -> bool:
+	# Move and Defend sit under Strategy now, so opening (and leaving) that list is always fine.
+	if action == "strategy" or action == "main_back":
+		return true
 	match tutorial_step:
 		0:
 			return action == "move"
@@ -10137,25 +10511,35 @@ func _tutorial_action_allowed(action: String) -> bool:
 func _tutorial_hint_text() -> String:
 	match tutorial_step:
 		0:
+			if battle_menu_state == "strategy":
+				return "Press Move, then tap a highlighted tile and Confirm to reposition."
+			if battle_menu_state == "main":
+				return "Open Strategy, then press Move."
 			return "Press Move, then tap a highlighted tile and Confirm to reposition."
 		1:
 			if battle_menu_state == "fight":
 				return "Choose Attack to strike the enemy."
-			return "Open Fight to attack the enemy."
+			return "Open Attack to strike the enemy."
 		2:
-			return "Choose Defend to brace for the enemy's turn."
+			if battle_menu_state == "strategy":
+				return "Choose Defend to brace for the enemy's turn."
+			return "Open Strategy, then choose Defend to brace for the enemy's turn."
 	return ""
 
 func _tutorial_hint_target_button() -> Control:
 	match tutorial_step:
 		0:
-			return hud.battle_main_buttons["move"]
+			if battle_menu_state == "strategy":
+				return hud.battle_main_buttons["move"]
+			return hud.battle_main_buttons["strategy"]
 		1:
 			if battle_menu_state == "fight":
 				return hud.battle_fight_buttons["attack"]
 			return hud.battle_main_buttons["fight"]
 		2:
-			return hud.battle_main_buttons["defend"]
+			if battle_menu_state == "strategy":
+				return hud.battle_main_buttons["defend"]
+			return hud.battle_main_buttons["strategy"]
 	return null
 
 func _advance_tutorial_hint() -> void:

@@ -1,251 +1,613 @@
-extends HBoxContainer
+extends Control
 class_name PartyScreen
 
-# The Party screen -- the Inventory's Party tab. A roster down the left; for whoever is selected, a sheet on
-# the right: portrait, description, stats (with the level-up picks to spend), the gear they wear (weapon,
-# armour, shield, talismans) and the specials they bring into a fight (PartyRules.SPECIAL_SLOTS of them,
-# chosen from their kit plus the equipped weapon).
+# The Party tab, with YOU and your recruits on one page: a roster of portraits across the top ("You" first), a sheet down the left
+# (portrait, name, level, vitals) and, at the right, small pages -- Equipment (a tile for each thing worn; press one to pick what goes
+# there, the Talismans line opens the talisman screen), Specials, Stats, and for you also Defense and Run. A recruit's specials are the
+# three loadout slots it brings into a fight, chosen from its own kit and its weapon.
 #
-# This only draws and reports clicks: every change goes back through InventoryPanel's _on_member_* handlers
-# (which call Player / PartyMember and then rebuild), and every number shown comes from
-# Main.member_preview(), the same battle unit the fight itself uses.
+# This only draws and reports clicks: every change goes back through InventoryPanel's handlers (which call Player / PartyMember and
+# then rebuild), and every number shown for a recruit comes from Main.member_preview(), the same battle unit the fight itself uses.
 
 const PartyRulesScript := preload("res://scripts/PartyRules.gd")
 const DefenseScript := preload("res://scripts/Defense.gd")
-const ArmorScript := preload("res://scripts/Armor.gd")
-const ShieldsScript := preload("res://scripts/Shields.gd")
-const WeaponsScript := preload("res://scripts/Weapons.gd")
 const TalismansScript := preload("res://scripts/Talismans.gd")
+const UIIconsScript := preload("res://scripts/UIIcons.gd")
 
+const HERO_ID := -2
 const BLADE_ALLY_ICON := preload("res://assets/blade_ally.png")
 const WOLF_ICON := preload("res://assets/enemy_wolf.png")
 
-const GOLD := Color(1, 0.9, 0.3)
-const DIM := Color(0.7, 0.7, 0.65)
-const TEXT := Color(0.9, 0.9, 0.86)
-const GOOD := Color(0.5, 0.9, 0.55)
-const LIST_WIDTH := 214.0
-const STAT_LABELS := {"hp": "Max HP", "attack": "Attack", "defense": "Defense", "speed": "Speed", "magic": "Magic", "fortitude": "Fortitude"}
+# The stat pages: member stat -> its icon and label (the members' own stat names, not the hero's level-up stats).
+const MEMBER_STAT_ICONS := {"hp": "stat_health", "attack": "stat_damage", "defense": "stat_defense", "fortitude": "stat_fortitude", "speed": "stat_speed", "magic": "stat_magic"}
+const MEMBER_STAT_LABELS := {"hp": "Max HP", "attack": "Attack", "defense": "Defense", "fortitude": "FTD", "speed": "Speed", "magic": "Magic"}
 
-var panel = null        # the InventoryPanel (handlers + sfx)
+var panel = null          # the InventoryPanel (handlers, popups, sfx)
 var player: Player = null
-var main = null         # Main (member_preview / member_special_pool)
-var selected_id := -1   # the PartyMember.id on show
+var main = null           # Main (member_preview / member_special_pool / the run's stats)
+var selected_id := HERO_ID
+var page := "Equipment"
+var roster_tiles: Dictionary = {}   # id -> its tile
+var content_root: VBoxContainer = null
+var left_panel: Control = null
 
 func setup(inventory_panel, player_ref: Player, main_ref) -> void:
 	panel = inventory_panel
 	player = player_ref
 	main = main_ref
 	selected_id = panel.party_selected_id
-	add_theme_constant_override("separation", 18)
-	size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	page = panel.party_page
 	rebuild()
 
-func rebuild() -> void:
-	for c in get_children():
-		remove_child(c)
-		c.queue_free()
-	var members: Array = player.party
-	if not members.is_empty() and _member_by_id(selected_id) == null:
-		selected_id = members[0].id
-		panel.party_selected_id = selected_id
-	_build_roster(members)
-	var detail := VBoxContainer.new()
-	detail.add_theme_constant_override("separation", 14)
-	detail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	add_child(detail)
-	var member = _member_by_id(selected_id)
-	if member == null:
-		detail.add_child(_label("No party members recruited yet.", 14, DIM))
-		return
-	_build_header(detail, member)
-	_build_stats(detail, member)
-	if member.can_carry_gear():
-		_build_equipment(detail, member)
-	else:
-		detail.add_child(_heading("EQUIPMENT"))
-		detail.add_child(_label("%s doesn't wear or carry anything." % member.name, 13, DIM))
-	_build_specials(detail, member)
+func unit_member():
+	return _member_by_id(selected_id)
 
 func _member_by_id(id: int):
+	if id == HERO_ID:
+		return null
 	for m in player.party:
 		if m.id == id:
 			return m
 	return null
 
-# --- small builders ----------------------------------------------------------------------
+func is_hero() -> bool:
+	return selected_id == HERO_ID or _member_by_id(selected_id) == null
 
-func _label(text: String, size: int = 14, color: Color = TEXT) -> Label:
-	var l := Label.new()
-	l.text = text
-	l.add_theme_font_size_override("font_size", size)
-	l.add_theme_color_override("font_color", color)
-	return l
+func pages_for(member) -> Array:
+	if member == null:
+		return ["Equipment", "Specials", "Stats", "Defense", "Run"]
+	return ["Equipment", "Specials", "Stats"]
 
-func _heading(text: String) -> Label:
-	return _label(text, 16, GOLD)
-
-func _wrapped(text: String, width: float, size: int = 13, color: Color = DIM) -> Label:
-	var l := _label(text, size, color)
-	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	l.custom_minimum_size = Vector2(width, 0)
-	return l
-
-func _style(bg: Color, border: Color, border_width: int = 2, radius: int = 6) -> StyleBoxFlat:
-	var s := StyleBoxFlat.new()
-	s.bg_color = bg
-	s.border_color = border
-	s.set_border_width_all(border_width)
-	s.set_corner_radius_all(radius)
-	s.set_content_margin_all(6)
-	return s
-
-# Whatever picture a member has: assets/portrait_<kind>.png once the art exists, otherwise a stand-in --
-# the shared companion icon in the member's colours (the wolf wears its own).
+# A portrait for a kind: its face if one is drawn, else a stand-in (the shared companion icon, the wolf's own).
 func portrait_texture(kind: String) -> Texture2D:
-	var path := "res://assets/portrait_%s.png" % kind
-	if ResourceLoader.exists(path):
-		return load(path)
+	var tex: Texture2D = UIIconsScript.texture("face_%s" % kind)
+	if tex != null:
+		return tex
 	return WOLF_ICON if PartyRulesScript.is_wolf(kind) else BLADE_ALLY_ICON
 
-func _portrait(member, px: float) -> Control:
-	var frame := PanelContainer.new()
-	frame.add_theme_stylebox_override("panel", _style(Color(0.1, 0.1, 0.13), Color(0.45, 0.42, 0.3), 2, 6))
-	frame.custom_minimum_size = Vector2(px, px)
-	var tex := TextureRect.new()
-	tex.texture = portrait_texture(member.kind)
-	tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	tex.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	tex.custom_minimum_size = Vector2(px - 16, px - 16)
-	if not ResourceLoader.exists("res://assets/portrait_%s.png" % member.kind) and not member.is_wolf():
-		tex.modulate = member.rules().get("tint", Color(1, 1, 1))
-	frame.add_child(tex)
-	return frame
+func rebuild() -> void:
+	for c in get_children():
+		remove_child(c)
+		c.queue_free()
+	roster_tiles.clear()
+	var member = _member_by_id(selected_id)
+	if selected_id != HERO_ID and member == null:
+		selected_id = HERO_ID
+		panel.party_selected_id = HERO_ID
+	var pages := pages_for(member)
+	if not pages.has(page):
+		page = "Equipment"
+	panel.party_page = page
+	_build_roster()
+	_build_left(member)
+	_build_right(member, pages)
 
-# --- the roster ----------------------------------------------------------------------------
+# --- the roster ------------------------------------------------------------------------------------------------------------------------
 
-func _build_roster(members: Array) -> void:
-	var col := VBoxContainer.new()
-	col.add_theme_constant_override("separation", 8)
-	col.custom_minimum_size = Vector2(LIST_WIDTH, 0)
-	add_child(col)
-	col.add_child(_heading("PARTY  %d / %d" % [members.size(), player.party_capacity()]))
-	for member in members:
-		col.add_child(_roster_card(member))
-	# The older flat companions (a recruited Warrior...) have no sheet of their own.
-	for ally in player.party_members:
-		var card := PanelContainer.new()
-		card.add_theme_stylebox_override("panel", _style(Color(0.1, 0.1, 0.12), Color(0.3, 0.3, 0.33), 1, 6))
-		var box := VBoxContainer.new()
-		card.add_child(box)
-		box.add_child(_label(str(ally.get("name", "Ally")), 14, TEXT))
-		box.add_child(_label("%d%% damage" % int(float(ally.get("dmg_mult", 1.0)) * 100.0), 12, DIM))
-		col.add_child(card)
-
-func _roster_card(member) -> Button:
-	var b := Button.new()
-	b.toggle_mode = true
-	b.button_pressed = member.id == selected_id
-	b.custom_minimum_size = Vector2(LIST_WIDTH, 66)
-	b.focus_mode = Control.FOCUS_NONE
-	b.add_theme_stylebox_override("normal", _style(Color(0.12, 0.12, 0.15), Color(0.4, 0.4, 0.45)))
-	b.add_theme_stylebox_override("hover", _style(Color(0.18, 0.17, 0.12), GOLD))
-	b.add_theme_stylebox_override("pressed", _style(Color(0.22, 0.18, 0.05), Color(1.0, 0.85, 0.2), 3))
-	b.pressed.connect(func(): _select(member.id))
+func _build_roster() -> void:
 	var row := HBoxContainer.new()
-	row.set_anchors_preset(Control.PRESET_FULL_RECT)
-	row.add_theme_constant_override("separation", 8)
-	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	b.add_child(row)
-	var icon := _portrait(member, 54)
-	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	row.add_child(icon)
-	var text := VBoxContainer.new()
-	text.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	text.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_child(text)
-	var name_label := _label(member.name, 15, GOLD if member.id == selected_id else TEXT)
+	row.add_theme_constant_override("separation", 12)
+	add_child(row)
+	row.add_child(_roster_tile(HERO_ID, "You", "face_you", "Level %d" % player.level))
+	for m in player.party:
+		var sub := "Level %d" % m.level if m.levels() else ""
+		if m.picks > 0:
+			sub = "%d pick%s" % [m.picks, "" if m.picks == 1 else "s"]
+		row.add_child(_roster_tile(m.id, str(m.name), "face_%s" % m.kind, sub))
+	var cap := PixelKit.label("Party  %d / %d" % [player.party.size(), player.party_capacity()], "body", PixelKit.DIM)
+	cap.position = Vector2(size.x - 190.0, 4)
+	add_child(cap)
+	# The older flat companions have no sheet of their own: one dim line.
+	if not player.party_members.is_empty():
+		var names: Array = []
+		for ally in player.party_members:
+			names.append("%s (%d%% damage)" % [str(ally.get("name", "Ally")), int(float(ally.get("dmg_mult", 1.0)) * 100.0)])
+		var also := PixelKit.label("Also with you: " + ", ".join(names), "body", PixelKit.DIM)
+		also.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		also.custom_minimum_size = Vector2(180, 0)
+		also.position = Vector2(size.x - 190.0, 30)
+		also.size = Vector2(180, 0)
+		add_child(also)
+
+func _roster_tile(id: int, unit_name: String, face: String, sub: String) -> Control:
+	var on: bool = id == selected_id
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 0)
+	col.custom_minimum_size = Vector2(96, 0)
+	col.mouse_filter = Control.MOUSE_FILTER_STOP
+	col.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	col.modulate = Color(1, 1, 1, 1) if on else Color(1, 1, 1, 0.62)
+	var tile := Panel.new()
+	tile.custom_minimum_size = Vector2(80, 80)
+	tile.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	tile.add_theme_stylebox_override("panel", PixelKit.frame("card_worn" if on else "card"))
+	tile.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var inner := ColorRect.new()
+	inner.color = PixelKit.V0
+	inner.position = Vector2(12, 12)
+	inner.size = Vector2(56, 56)
+	inner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tile.add_child(inner)
+	var face_tex: Texture2D = UIIconsScript.texture(face)
+	if face_tex == null:
+		face_tex = portrait_texture(face.trim_prefix("face_"))
+	var face_rect := PixelKit.art(face_tex, 32)
+	face_rect.position = Vector2(12, 12)
+	inner.add_child(face_rect)
+	col.add_child(tile)
+	var name_label := PixelKit.label(unit_name, "body", PixelKit.GOLD3 if on else PixelKit.DIM)
+	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	text.add_child(name_label)
-	var sub := "%d battles left" % member.battles_left if member.is_wolf() and member.battles_left >= 0 else ("Lv %d" % member.level if member.levels() else "")
-	if member.picks > 0:
-		sub += "  ·  %d pick%s" % [member.picks, "" if member.picks == 1 else "s"]
-	var sub_label := _label(sub, 12, GOOD if member.picks > 0 else DIM)
-	sub_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	text.add_child(sub_label)
-	return b
+	col.add_child(name_label)
+	col.gui_input.connect(func(ev): if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT: _select(id))
+	col.tooltip_text = sub
+	roster_tiles[id] = col
+	return col
 
 func _select(id: int) -> void:
 	selected_id = id
 	panel.party_selected_id = id
-	if panel != null and panel.has_method("_play_sfx"):
-		panel._play_sfx("menu_move")
+	panel._play_sfx("menu_move")
 	rebuild()
 
-# --- the header: portrait, name, level, picks to spend, description --------------------------
+# --- the sheet on the left -------------------------------------------------------------------------------------------------------------
 
-func _build_header(detail: VBoxContainer, member) -> void:
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 16)
-	detail.add_child(row)
-	row.add_child(_portrait(member, 128))
+func _build_left(member) -> void:
+	var box := PixelKit.panel("panel_steel", 8, 4)
+	box.position = Vector2(0, 104)
+	box.size = Vector2(288, size.y - 104.0)
+	box.custom_minimum_size = box.size
+	add_child(box)
+	left_panel = box
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 0)
+	box.add_child(col)
+	var portrait := PixelKit.panel("inset")
+	portrait.custom_minimum_size = Vector2(144, 144)
+	portrait.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	var face_name := "face_you" if member == null else "face_%s" % member.kind
+	var face_tex: Texture2D = UIIconsScript.texture(face_name)
+	if face_tex == null and member != null:
+		face_tex = portrait_texture(member.kind)
+	var face := PixelKit.art(face_tex, 128)
+	face.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	face.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	portrait.add_child(face)
+	col.add_child(portrait)
+	var title := PixelKit.label("You" if member == null else str(member.name), "head", PixelKit.GOLD3)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	col.add_child(title)
+	var level_text := ""
+	var xp_ratio := -1.0
+	var xp_text := ""
+	if member == null:
+		level_text = "Level %d" % player.level
+		xp_ratio = float(player.xp) / maxf(1.0, float(player.xp_to_next))
+		xp_text = "XP %d / %d" % [player.xp, player.xp_to_next]
+	elif member.is_wolf():
+		level_text = "Companion · never levels"
+	else:
+		level_text = "Level %d" % member.level
+		xp_ratio = float(member.xp) / maxf(1.0, float(member.xp_to_next()))
+		xp_text = "XP %d / %d" % [member.xp, member.xp_to_next()]
+	var lv := HBoxContainer.new()
+	lv.alignment = BoxContainer.ALIGNMENT_CENTER
+	lv.add_theme_constant_override("separation", 8)
+	if member == null or not member.is_wolf():
+		lv.add_child(PixelKit.icon("stat_level", 32))
+	lv.add_child(PixelKit.label(level_text, "body", PixelKit.DIM))
+	col.add_child(lv)
+	if xp_ratio >= 0.0:
+		var bar_row := HBoxContainer.new()
+		bar_row.alignment = BoxContainer.ALIGNMENT_CENTER
+		bar_row.add_child(PixelKit.bar(200, xp_ratio))
+		col.add_child(bar_row)
+		var xp := PixelKit.label(xp_text, "body", PixelKit.DIM)
+		xp.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		col.add_child(xp)
+	var vitals := VBoxContainer.new()
+	vitals.add_theme_constant_override("separation", 0)
+	col.add_child(vitals)
+	if member == null:
+		InvWidgets.icon_row(vitals, "stat_health", "HP", "%d/%d" % [player.health, player.max_health])
+		InvWidgets.icon_row(vitals, "stat_stamina", "Stamina", "%d/%d" % [player.stamina, player.max_stamina])
+	else:
+		var u: Dictionary = main.member_preview(member)
+		InvWidgets.icon_row(vitals, "stat_health", "HP", "%d" % int(u.max_hp))
+		if bool(u.get("hp_as_mana", false)):
+			vitals.add_child(PixelKit.label("Her mana is her HP.", "body", PixelKit.DIM))
+		elif int(u.max_mana) > 0:
+			InvWidgets.icon_row(vitals, "stat_mana", "Mana", "%d" % int(u.max_mana))
+		elif int(u.max_stamina) > 0:
+			InvWidgets.icon_row(vitals, "stat_stamina", "Stamina", "%d" % int(u.max_stamina))
+		if member.is_wolf():
+			# a wolf stays only so many battles, and is lost for good if it faints too often
+			var stays := "no limit" if member.battles_left < 0 else "%d battle%s" % [member.battles_left, "" if member.battles_left == 1 else "s"]
+			InvWidgets.icon_row(vitals, "", "Loyal for", stays, "Battles left before the wolf leaves your pack.")
+			InvWidgets.icon_row(vitals, "", "Fainted", "%d of %d" % [member.faints, PartyRulesScript.WOLF_MAX_FAINTS], "A wolf that faints this many times is gone for good.")
+		if member.picks > 0:
+			var picks := HBoxContainer.new()
+			picks.alignment = BoxContainer.ALIGNMENT_CENTER
+			picks.add_child(PixelKit.label("%d bonus pick%s to spend" % [member.picks, "" if member.picks == 1 else "s"], "body", PixelKit.GOOD))
+			col.add_child(picks)
+
+# --- the pages on the right -----------------------------------------------------------------------------------------------------------
+
+func _build_right(member, pages: Array) -> void:
+	var box := PixelKit.panel("panel_steel", 8, 4)
+	box.position = Vector2(304, 104)
+	box.size = Vector2(size.x - 304.0, size.y - 104.0)
+	box.custom_minimum_size = box.size
+	add_child(box)
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 4)
-	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_child(col)
-	col.add_child(_label(member.name, 26, GOLD))
-	var sub := ""
-	if member.is_wolf():
-		sub = "Companion  ·  never levels"
-	else:
-		sub = "Level %d" % member.level
-	col.add_child(_label(sub, 14, DIM))
-	if member.levels():
-		col.add_child(_label("XP %d / %d" % [member.xp, member.xp_to_next()], 13, DIM))
-	if member.picks > 0:
-		col.add_child(_label("%d bonus pick%s to spend -- press + beside a stat below" % [member.picks, "" if member.picks == 1 else "s"], 13, GOOD))
-	if member.is_wolf():
-		var left := "no limit" if member.battles_left < 0 else "%d battles" % member.battles_left
-		col.add_child(_label("Loyal for %s  ·  fainted %d of %d times" % [left, member.faints, PartyRulesScript.WOLF_MAX_FAINTS], 13, DIM))
-	col.add_child(_wrapped(str(member.rules().get("description", "")), 430, 13, TEXT))
+	box.add_child(col)
+	var tabs := HBoxContainer.new()
+	tabs.add_theme_constant_override("separation", 0)
+	col.add_child(tabs)
+	var icons := {"Equipment": "tab_gear", "Specials": "stat_crit", "Stats": "stat_strength", "Defense": "stat_defense", "Run": "stat_speed"}
+	for p in pages:
+		tabs.add_child(PixelButton.make(p, icons[p], _on_page.bind(p), p == page))
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	PixelKit.style_scroll(scroll)
+	col.add_child(scroll)
+	content_root = VBoxContainer.new()
+	content_root.add_theme_constant_override("separation", 6)
+	content_root.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(content_root)
+	match page:
+		"Equipment":
+			_page_equipment(member)
+		"Specials":
+			_page_specials(member)
+		"Stats":
+			_page_stats(member)
+		"Defense":
+			_page_defense()
+		"Run":
+			_page_run()
 
-# --- the stats sheet --------------------------------------------------------------------------
+func _on_page(p: String) -> void:
+	page = p
+	panel.party_page = p
+	panel._play_sfx("menu_move")
+	rebuild()
 
-func _build_stats(detail: VBoxContainer, member) -> void:
-	detail.add_child(_heading("STATS"))
-	var u: Dictionary = main.member_preview(member)
+# --- Equipment: a tile for everything worn ---------------------------------------------------------------------------------------------
+
+func _page_equipment(member) -> void:
+	if member != null and not member.can_carry_gear():
+		content_root.add_child(InvWidgets.paragraph("%s doesn't wear or carry anything." % member.name))
+		return
+	var who := InvData.unit_name(member)
+	var cell_w := (size.x - 304.0 - 16.0 - 16.0 - 12.0) / 2.0
+	var cells: Array = []
+	cells.append(["sub_weapons", "Weapon", "Weapons"])
+	cells.append(["sub_armour", "Armour", "Armour"])
+	if member == null:
+		cells.append(["sub_clothes", "Clothes", "Clothes"])
+	cells.append(["sub_shields", "Shield", "Shields"])
 	var grid := GridContainer.new()
-	grid.columns = 4
+	grid.columns = 2
 	grid.add_theme_constant_override("h_separation", 12)
-	grid.add_theme_constant_override("v_separation", 3)
-	detail.add_child(grid)
+	grid.add_theme_constant_override("v_separation", 4)
+	content_root.add_child(grid)
+	for c in cells:
+		var worn: Array = InvData.gear_entries(player, c[2], member).filter(func(e): return e.holders.has(who))
+		grid.add_child(_slot_cell(c[0], c[1], c[2], worn, member, cell_w))
+	content_root.add_child(_talisman_line(member))
+	content_root.add_child(InvWidgets.paragraph("Press a tile to change what %s. Talisman slots open at levels %s." % ["you wear" if member == null else "%s wears" % member.name, ", ".join(["1"] + TalismansScript.SLOT_LEVELS.map(func(l): return str(l)))]))
+
+func _slot_cell(icon_name: String, label: String, category: String, worn: Array, member, width: float) -> Control:
+	var cell := PanelContainer.new()
+	cell.custom_minimum_size = Vector2(width, 0)
+	cell.mouse_filter = Control.MOUSE_FILTER_STOP
+	cell.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	cell.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cell.add_child(row)
+	var shown: Dictionary = worn[0] if not worn.is_empty() else {}
+	var tile_info := {"art": shown.get("art", null), "quality": str(shown.get("quality", "")) if str(shown.get("quality", "")) != "Starter" else "", "key": str(shown.get("key", category))}
+	var tile := InvCard.tile(tile_info, 104, "card", 22.0)
+	tile.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(tile)
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 0)
+	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	col.alignment = BoxContainer.ALIGNMENT_CENTER
+	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(col)
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", 8)
+	head.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	head.add_child(PixelKit.icon(icon_name, 32))
+	head.add_child(PixelKit.label(label, "body", PixelKit.DIM))
+	col.add_child(head)
+	if worn.is_empty():
+		col.add_child(PixelKit.label("—", "body", PixelKit.DIM))
+	else:
+		for e in worn:
+			var n := PixelKit.label(str(e.name), "myth" if bool(e.mythic) else "body", PixelKit.QUALITY_TEXT.Mythic if bool(e.mythic) else PixelKit.CREAM)
+			n.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			n.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			col.add_child(n)
+		if worn.size() == 1 and str(shown.get("sub", "")) != "":   # (two pieces of clothing: the first one's slot would say nothing about the second)
+			col.add_child(PixelKit.label(str(shown.sub), "body", PixelKit.QUALITY_TEXT.get(str(shown.quality), PixelKit.DIM)))
+	var arrow := PixelKit.label("›", "head", PixelKit.GOLD3)
+	arrow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(arrow)
+	cell.gui_input.connect(func(ev): if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT: panel.open_gear_popup(member, category))
+	cell.set_meta("category", category)
+	return cell
+
+func _talisman_line(member) -> Control:
+	var slots := InvData.talisman_slots(player, member)
+	var line := PanelContainer.new()
+	line.mouse_filter = Control.MOUSE_FILTER_STOP
+	line.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	line.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	line.add_child(row)
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", 8)
+	head.custom_minimum_size = Vector2(190, 0)
+	head.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	head.add_child(PixelKit.icon("tab_talismans", 32))
+	head.add_child(PixelKit.label("Talismans", "body", PixelKit.DIM))
+	row.add_child(head)
+	var pips := HBoxContainer.new()
+	pips.add_theme_constant_override("separation", 8)
+	pips.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(pips)
+	var all := InvData.talisman_entries(player)
+	for i in TalismansScript.SLOT_LEVELS.size() + 1:
+		var tile := Panel.new()
+		tile.custom_minimum_size = Vector2(64, 64)
+		tile.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		if i < slots.worn.size():
+			tile.add_theme_stylebox_override("panel", PixelKit.frame("card_worn"))
+			var worn_entry: Dictionary = {}
+			for e in all:
+				if str(e.id) == str(slots.worn[i]):
+					worn_entry = e
+			var inner := ColorRect.new()
+			inner.color = Color(PixelKit.RARITY_COLORS.get(str(worn_entry.get("rarity", "common")), PixelKit.CREAM), 0.2)
+			inner.position = Vector2(12, 12)
+			inner.size = Vector2(40, 40)
+			inner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			tile.add_child(inner)
+			var art := PixelKit.art(worn_entry.get("art", null), 32)
+			art.position = Vector2(4, 4)
+			inner.add_child(art)
+		elif i < int(slots.open):
+			tile.add_theme_stylebox_override("panel", PixelKit.frame("inset"))
+		else:
+			tile.add_theme_stylebox_override("panel", PixelKit.frame("inset"))
+			var l := PixelKit.label("Lv %d" % TalismansScript.level_for_slot(i + 1), "body", PixelKit.DIM)
+			l.position = Vector2(8, 18)
+			l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			tile.add_child(l)
+		pips.add_child(tile)
+	var spacer := Control.new()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(spacer)
+	row.add_child(PixelKit.label("%d / %d slots" % [slots.worn.size(), int(slots.open)], "body", PixelKit.DIM))
+	var arrow := PixelKit.label("›", "head", PixelKit.GOLD3)
+	arrow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(arrow)
+	line.gui_input.connect(func(ev): if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT: panel.open_talisman_popup(member))
+	line.set_meta("category", "Talismans")
+	return line
+
+# --- Specials -------------------------------------------------------------------------------------------------------------------------
+
+func _page_specials(member) -> void:
+	if member == null:
+		_hero_specials()
+	else:
+		_member_specials(member)
+
+# Yours: the equipped weapon's three, greyed where you have not learned them at the Dojo.
+func _hero_specials() -> void:
+	var weapon: Dictionary = player.current_weapon_base
+	if weapon.is_empty():
+		content_root.add_child(InvWidgets.paragraph("You are bare-handed: no specials."))
+		return
+	var entry := InvData.weapon_entry(player, weapon, null)
+	content_root.add_child(InvWidgets.caption("From your %s" % str(entry.name)))
+	if entry.specials.is_empty():
+		var bow: bool = str(weapon.get("id", "")) == "bow"
+		content_root.add_child(InvWidgets.paragraph("The Bow has no specials of its own: you fire the special arrows you carry." if bow else "No specials."))
+		return
+	var list: Array = []
+	for s in entry.specials:
+		var item: Dictionary = {"n": s.n, "c": s.c, "d": s.d}
+		if not bool(s.learned):
+			item["lock"] = "Dojo"
+			item["hint"] = "Not learned yet: learn it at the Dojo."
+		list.append(item)
+	var box := SpecialsBox.new()
+	content_root.add_child(box)
+	box.setup(list, 0)
+
+# A recruit's: PartyRules.SPECIAL_SLOTS slots, each filled from its kit and weapon; press a slot to change it.
+func _member_specials(member) -> void:
+	var pool: Array = main.member_special_pool(member)
+	var pool_ids: Array = pool.map(func(e): return str(e.special.get("id", "")))
+	var slots := PartyRulesScript.SPECIAL_SLOTS
+	var filled := 0
+	for i in slots:
+		if member.loadout_slot(i, pool_ids) != "":
+			filled += 1
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", 12)
+	content_root.add_child(head)
+	head.add_child(PixelKit.label("%d / %d slots  ·  from %d it could bring" % [filled, slots, pool.size()], "body", PixelKit.DIM))
+	if member.loadout_set:
+		head.add_child(PixelButton.make("Reset to default", "", func(): panel._on_member_loadout_reset(member)))
+	content_root.add_child(InvWidgets.paragraph("Mix its own kit's specials and the equipped weapon's. Only the ones in a slot appear in its command menu."))
+	for i in slots:
+		content_root.add_child(_special_slot(member, i, pool, pool_ids))
+
+func _special_slot(member, slot: int, pool: Array, pool_ids: Array) -> Control:
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 2)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	box.add_child(row)
+	var cap := PixelKit.label("Slot %d" % (slot + 1), "body", PixelKit.DIM)
+	cap.custom_minimum_size = Vector2(90, 0)
+	row.add_child(cap)
+	var current: String = member.loadout_slot(slot, pool_ids)
+	var current_entry: Dictionary = {}
+	for e in pool:
+		if str(e.special.get("id", "")) == current:
+			current_entry = e
+	var text := "(empty)" if current_entry.is_empty() else "%s%s" % [str(current_entry.special.get("name", current)), str(current_entry.cost_text)]
+	var button := PixelButton.make(text, "", func(): _pick_special(member, slot, pool, pool_ids), not current_entry.is_empty())
+	button.set_meta("slot", slot)
+	row.add_child(button)
+	if not current_entry.is_empty():
+		var source := "kit" if bool(current_entry.special.get("kit", false)) else "weapon"
+		row.add_child(PixelKit.label("[%s]" % source, "body", PixelKit.DIM))
+		var d := InvWidgets.paragraph(str(current_entry.special.get("description", "")).replace("%%", "%"))
+		var indent := MarginContainer.new()
+		indent.add_theme_constant_override("margin_left", 102)
+		indent.add_child(d)
+		box.add_child(indent)
+	return box
+
+func _pick_special(member, slot: int, pool: Array, pool_ids: Array) -> void:
+	var rows: Array = [{"label": "(empty)", "right": "", "disabled": false, "pick": func(): panel._on_member_special_slot(member, slot, "")}]
+	for e in pool:
+		var s: Dictionary = e.special
+		var id := str(s.get("id", ""))
+		var in_other := -1
+		for j in PartyRulesScript.SPECIAL_SLOTS:
+			if j != slot and member.loadout_slot(j, pool_ids) == id:
+				in_other = j
+		rows.append({
+			"label": "%s%s" % [str(s.get("name", id)), str(e.cost_text)],
+			"right": ("in slot %d" % (in_other + 1)) if in_other >= 0 else ("kit" if bool(s.get("kit", false)) else "weapon"),
+			"disabled": in_other >= 0, "pick": func(): panel._on_member_special_slot(member, slot, id),
+		})
+	panel.open_pick_popup("Slot %d" % (slot + 1), "%s's specials" % member.name, rows)
+
+# --- Stats ----------------------------------------------------------------------------------------------------------------------------
+
+func _page_stats(member) -> void:
+	if member == null:
+		_hero_stats()
+	else:
+		_member_stats(member)
+
+# Your level-up stats: the always-there five, then Resilience / Reflexes / Dexterity / Fortitude once their unlocks are owned
+# (the same set the level-up screen offers). Rage, Magic and Intelligence have no stat in the game yet, so they are not listed.
+func _hero_stats() -> void:
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 24)
+	grid.add_theme_constant_override("v_separation", 0)
+	content_root.add_child(grid)
+	for id in hero_stat_ids():
+		var row := _stat_line(UIIconsScript.stat_icon(id), UIIconsScript.stat_abbr(id), str(UIIconsScript.STAT_INFO[id].does), str(player.get("stat_%s" % id)), UIIconsScript.stat_tooltip(id))
+		row.custom_minimum_size = Vector2((size.x - 304.0 - 16.0 - 16.0 - 24.0) / 2.0, 36)
+		grid.add_child(row)
+	content_root.add_child(InvWidgets.paragraph("Hover a stat for more."))
+
+func hero_stat_ids() -> Array:
+	var ids: Array = ["might", "strength", "vigor", "agility", "intimidation"]
+	if player.meta_dexterity_unlocked:
+		ids.append("dexterity")
+	if player.meta_resilience_unlocked:
+		ids.append("resilience")
+	if player.meta_reflexes_unlocked:
+		ids.append("reflexes")
+	if player.meta_fortitude_unlocked:
+		ids.append("fortitude")
+	return ids
+
+func _stat_line(icon_name: String, abbr: String, does: String, value: String, tip: String) -> Control:
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 0)
+	box.tooltip_text = tip
+	box.mouse_filter = Control.MOUSE_FILTER_PASS
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	row.custom_minimum_size = Vector2(0, 36)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(row)
+	row.add_child(PixelKit.icon(icon_name, 32))
+	var ab := PixelKit.label(abbr)
+	ab.custom_minimum_size = Vector2(64, 0)
+	row.add_child(ab)
+	var d := PixelKit.label(does, "body", PixelKit.DIM)
+	d.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(d)
+	row.add_child(PixelKit.label(value, "body", PixelKit.GOLD3))
+	box.add_child(PixelKit.rule())
+	return box
+
+func _member_stats(member) -> void:
+	var u: Dictionary = main.member_preview(member)
 	var defense_cut: float = DefenseScript.reduction(float(u.defense_pct), float(u.get("defense_cap", DefenseScript.BASE_CAP)))
 	var fort_cut: float = DefenseScript.reduction(float(u.fortitude), float(u.get("defense_cap", DefenseScript.BASE_CAP)))
-	_stat_row(grid, member, "hp", "%d" % int(u.max_hp), "")
-	_stat_row(grid, member, "attack", "%.1f" % float(u.attack), "")
-	_stat_row(grid, member, "defense", "%.0f" % float(u.defense_pct), "bodily harm -%d%%" % int(round(defense_cut * 100.0)))
-	_stat_row(grid, member, "fortitude", "%.0f" % float(u.fortitude), "magical harm %s%d%%" % ["-" if fort_cut >= 0.0 else "+", absi(int(round(fort_cut * 100.0)))])
-	_stat_row(grid, member, "speed", "%.1f" % float(u.get("speed", 5.0)), "acts %s often" % _speed_word(float(u.get("speed", 5.0))))
+	var rows: Array = [
+		["hp", "%d" % int(u.max_hp), ""],
+		["attack", "%.1f" % float(u.attack), ""],
+		["defense", "%.0f" % float(u.defense_pct), "bodily harm −%d%%" % int(round(defense_cut * 100.0))],
+		["fortitude", "%.0f" % float(u.fortitude), "magical harm %s%d%%" % ["−" if fort_cut >= 0.0 else "+", absi(int(round(fort_cut * 100.0)))]],
+		["speed", "%.1f" % float(u.get("speed", 5.0)), "acts %s often" % _speed_word(float(u.get("speed", 5.0)))],
+	]
 	if float(u.get("magic", 0.0)) > 0.0 or member.is_caster():
-		_stat_row(grid, member, "magic", "%.1f" % float(u.magic), "")
-	_plain_row(grid, "Move", "%d tile%s" % [int(u.move_range), "" if int(u.move_range) == 1 else "s"], "", "How far it walks in a turn")
-	_plain_row(grid, "Reach", "%d" % int(u.attack_range), "tiles away it can attack", "")
-	var pool_text := ""
+		rows.append(["magic", "%.1f" % float(u.magic), ""])
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 0)
+	content_root.add_child(col)
+	for r in rows:
+		col.add_child(_member_stat_row(member, str(r[0]), str(r[1]), str(r[2])))
+	var extras: Array = [["Move", "%d tile%s" % [int(u.move_range), "" if int(u.move_range) == 1 else "s"], "how far it walks in a turn"], ["Reach", "%d" % int(u.attack_range), "tiles away it can attack"]]
 	if bool(u.get("hp_as_mana", false)):
-		pool_text = "spells cost HP"
+		extras.append(["Pool", "spells cost HP", ""])
 	elif int(u.max_mana) > 0:
-		pool_text = "%d mana" % int(u.max_mana)
+		extras.append(["Pool", "%d mana" % int(u.max_mana), ""])
 	elif int(u.max_stamina) > 0:
-		pool_text = "%d stamina" % int(u.max_stamina)
-	if pool_text != "":
-		_plain_row(grid, "Pool", pool_text, "", "")
+		extras.append(["Pool", "%d stamina" % int(u.max_stamina), ""])
 	if float(u.get("dodge_chance", 0.0)) > 0.0:
-		_plain_row(grid, "Dodge", "%d%%" % int(round(float(u.dodge_chance) * 100.0)), "", "")
+		extras.append(["Dodge", "%d%%" % int(round(float(u.dodge_chance) * 100.0)), ""])
 	if float(u.get("shield_block", 0.0)) > 0.0:
-		_plain_row(grid, "Block", "%d%%" % int(round(float(u.shield_block) * 100.0)), "with its shield", "")
+		extras.append(["Block", "%d%%" % int(round(float(u.shield_block) * 100.0)), "with its shield"])
+	# the smaller facts sit two to a line (their explanation in a tooltip) so the member's description still fits under them
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 24)
+	grid.add_theme_constant_override("v_separation", 0)
+	content_root.add_child(grid)
+	for x in extras:
+		var line := _stat_line("", str(x[0]), "", str(x[1]), str(x[2]).substr(0, 1).to_upper() + str(x[2]).substr(1))
+		line.custom_minimum_size = Vector2((size.x - 304.0 - 16.0 - 16.0 - 24.0 - 20.0) / 2.0, 36)
+		grid.add_child(line)
+	var desc := str(member.rules().get("description", ""))
+	if desc != "":
+		content_root.add_child(InvWidgets.paragraph(desc))
 
-# Speed as the user will feel it in the turn order strip: relative to the hero's 5.
+func _member_stat_row(member, stat: String, value: String, detail: String) -> Control:
+	var growth: float = PartyRulesScript.growth(member.kind, stat)
+	var line := _stat_line(MEMBER_STAT_ICONS[stat], MEMBER_STAT_LABELS[stat], detail, value, "Levels up at x%s the usual rate." % _trim(growth))
+	if member.picks > 0 and stat in member.pickable_stats():
+		var row: HBoxContainer = line.get_child(0)
+		var plus := PixelButton.make("+", "", func(): panel._on_member_pick_spent(member, stat))
+		plus.tooltip_text = "Spend a bonus pick on %s." % MEMBER_STAT_LABELS[stat]
+		row.add_child(plus)
+	return line
+
 func _speed_word(speed: float) -> String:
 	if speed >= 8.0:
 		return "much more"
@@ -257,212 +619,58 @@ func _speed_word(speed: float) -> String:
 		return "less"
 	return "far less"
 
-func _stat_row(grid: GridContainer, member, stat: String, value: String, detail_text: String) -> void:
-	var growth: float = PartyRulesScript.growth(member.kind, stat)
-	var name_label := _label(STAT_LABELS[stat], 14, TEXT)
-	name_label.custom_minimum_size = Vector2(96, 26)
-	name_label.tooltip_text = "Levels up at x%s the usual rate." % _trim(growth)
-	name_label.mouse_filter = Control.MOUSE_FILTER_STOP
-	grid.add_child(name_label)
-	var value_label := _label(value, 14, GOLD)
-	value_label.custom_minimum_size = Vector2(60, 0)
-	grid.add_child(value_label)
-	var detail_label := _label(detail_text, 12, DIM)
-	detail_label.custom_minimum_size = Vector2(250, 0)
-	grid.add_child(detail_label)
-	if member.picks > 0 and stat in member.pickable_stats():
-		var plus := Button.new()
-		plus.text = "+"
-		plus.custom_minimum_size = Vector2(30, 24)
-		plus.tooltip_text = "Spend a bonus pick on %s." % STAT_LABELS[stat]
-		plus.pressed.connect(func(): panel._on_member_pick_spent(member, stat))
-		grid.add_child(plus)
-	else:
-		grid.add_child(Control.new())
-
-func _plain_row(grid: GridContainer, name_text: String, value: String, detail_text: String, tip: String) -> void:
-	var name_label := _label(name_text, 14, TEXT)
-	name_label.custom_minimum_size = Vector2(0, 26)
-	name_label.tooltip_text = tip
-	grid.add_child(name_label)
-	grid.add_child(_label(value, 14, GOLD))
-	grid.add_child(_label(detail_text, 12, DIM))
-	grid.add_child(Control.new())
-
 static func _trim(x: float) -> String:
 	var s := "%.2f" % x
 	while s.ends_with("0") and s.contains("."):
 		s = s.substr(0, s.length() - 1)
 	return s.trim_suffix(".")
 
-# --- equipment ---------------------------------------------------------------------------------
+# --- Defense (yours) and Run (yours) -----------------------------------------------------------------------------------------------------
 
-func _build_equipment(detail: VBoxContainer, member) -> void:
-	detail.add_child(_heading("EQUIPMENT"))
-	detail.add_child(_wrapped("From your own collection -- each item can only be with one of you at a time.", 560, 12, DIM))
+func _page_defense() -> void:
+	var cols := HBoxContainer.new()
+	cols.add_theme_constant_override("separation", 24)
+	content_root.add_child(cols)
+	var bodily := VBoxContainer.new()
+	bodily.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bodily.add_theme_constant_override("separation", 0)
+	cols.add_child(bodily)
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", 8)
+	head.add_child(PixelKit.icon("stat_defense", 32))
+	head.add_child(PixelKit.label("Bodily harm  −%d%%" % int(round(player.bodily_reduction() * 100.0)), "head", PixelKit.GOLD3))
+	bodily.add_child(head)
+	var armor_name := str(player.equipped_armor.get("name", "none"))
+	InvWidgets.icon_row(bodily, "sub_armour", "Armour (%s)" % armor_name, "+%d" % int(round(player.armor_tier_damage_reduction() * 100.0)))
+	InvWidgets.icon_row(bodily, "sub_clothes", "Clothes", "+%d" % int(round(player.clothing_damage_reduction() * 100.0)))
+	InvWidgets.icon_row(bodily, "sub_shields", "Shield", "+%d" % int(round(player.shield_damage_reduction_pct() * 100.0)))
+	InvWidgets.icon_row(bodily, "stat_resilience", "RES", "+%d" % int(round(player.resilience_reduction * 100.0)))
+	bodily.add_child(InvWidgets.paragraph("%d points of Defense, with diminishing returns, never past 80%%." % int(round(player.bodily_defense_points()))))
+	var magical := VBoxContainer.new()
+	magical.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	magical.add_theme_constant_override("separation", 0)
+	cols.add_child(magical)
+	var head2 := HBoxContainer.new()
+	head2.add_theme_constant_override("separation", 8)
+	head2.add_child(PixelKit.icon("stat_fortitude", 32))
+	head2.add_child(PixelKit.label("Magical harm  −%d%%" % int(round(player.fortitude_reduction() * 100.0)), "head", PixelKit.BLUE))
+	magical.add_child(head2)
+	InvWidgets.icon_row(magical, "sub_armour", "Armour", "%+d" % int(player.equipped_armor.get("fortitude", 0)))
+	InvWidgets.icon_row(magical, "sub_shields", "Shield", "%+d" % int(round(player.shield_fortitude())))
+	InvWidgets.icon_row(magical, "stat_fortitude", "FTD", "%+d" % int(player.stat_fortitude))
+	magical.add_child(InvWidgets.paragraph("%d points of Fortitude." % int(round(player.fortitude_total()))))
 
-	var weapon_pick := OptionButton.new()
-	weapon_pick.custom_minimum_size = Vector2(330, 0)
-	weapon_pick.add_item("(bare hands)")
-	weapon_pick.set_item_metadata(0, "")
-	var current_id: String = member.weapon_id()
-	var ids: Array = player.owned_weapons.keys()
-	ids.sort_custom(func(a, b): return str(WeaponsScript.get_owned_variant(a).get("name", a)) < str(WeaponsScript.get_owned_variant(b).get("name", b)))
-	for id in ids:
-		var variant: Dictionary = WeaponsScript.get_owned_variant(id)
-		if variant.is_empty():
-			continue
-		var reason: String = player.ally_weapon_block_reason(member, id)
-		var idx: int = weapon_pick.item_count
-		weapon_pick.add_item(str(variant.get("name", id)) if reason == "" else "%s  (%s)" % [variant.get("name", id), reason])
-		weapon_pick.set_item_metadata(idx, id)
-		weapon_pick.set_item_disabled(idx, reason != "")
-		if id == current_id:
-			weapon_pick.select(idx)
-	weapon_pick.item_selected.connect(func(i): panel._on_member_weapon_picked(member, str(weapon_pick.get_item_metadata(i))))
-	detail.add_child(_gear_row("Weapon", weapon_pick))
-
-	var armor_pick := OptionButton.new()
-	armor_pick.custom_minimum_size = Vector2(330, 0)
-	armor_pick.add_item("(none)")
-	armor_pick.set_item_metadata(0, "")
-	for armor in ArmorScript.TIERS:
-		if armor.id == "armor_rags" or not player.owned_armor.has(armor.id):
-			continue
-		var armor_reason: String = player.ally_armor_block_reason(member, armor.id)
-		var armor_idx: int = armor_pick.item_count
-		var armor_text: String = "%s  (+%d Def, %+d Fort)" % [armor.name, int(round(player.armor_defense_fraction(armor) * 100.0)), int(armor.fortitude)]
-		armor_pick.add_item(armor_text if armor_reason == "" else "%s  (%s)" % [armor.name, armor_reason])
-		armor_pick.set_item_metadata(armor_idx, armor.id)
-		armor_pick.set_item_disabled(armor_idx, armor_reason != "")
-		if armor.id == member.armor_id():
-			armor_pick.select(armor_idx)
-	armor_pick.item_selected.connect(func(i): panel._on_member_armor_picked(member, str(armor_pick.get_item_metadata(i))))
-	armor_pick.tooltip_text = "Defense is bent into a damage cut with diminishing returns. Fortitude does the same against magic."
-	detail.add_child(_gear_row("Armour", armor_pick))
-
-	var shield_pick := OptionButton.new()
-	shield_pick.custom_minimum_size = Vector2(330, 0)
-	shield_pick.add_item("(none)")
-	shield_pick.set_item_metadata(0, "")
-	for shield_id in ShieldsScript.SHIELD_IDS:
-		var shield_reason: String = player.ally_shield_block_reason(member, shield_id)
-		if shield_reason == "You don't own that shield.":
-			continue
-		var shield_data: Dictionary = ShieldsScript.SHIELDS[shield_id]
-		var shield_idx: int = shield_pick.item_count
-		shield_pick.add_item(str(shield_data.name) if shield_reason == "" else "%s  (%s)" % [shield_data.name, shield_reason])
-		shield_pick.set_item_metadata(shield_idx, shield_id)
-		shield_pick.set_item_disabled(shield_idx, shield_reason != "")
-		if shield_id == member.shield_id():
-			shield_pick.select(shield_idx)
-	shield_pick.item_selected.connect(func(i): panel._on_member_shield_picked(member, str(shield_pick.get_item_metadata(i))))
-	var shield_row := _gear_row("Shield", shield_pick)
-	if member.shield_id() != "" and not member.shield_usable():
-		shield_row.add_child(_label("(needs a free hand -- it does nothing with this weapon)", 12, Color(0.85, 0.6, 0.45)))
-	detail.add_child(shield_row)
-
-	var talisman_row := HBoxContainer.new()
-	talisman_row.add_theme_constant_override("separation", 8)
-	var talisman_label := _label("Talismans  %d / %d" % [member.talisman_ids().size(), member.talisman_slot_count()], 14, TEXT)
-	talisman_label.custom_minimum_size = Vector2(100, 0)
-	talisman_row.add_child(talisman_label)
-	for id in member.talisman_ids():
-		var talisman: Dictionary = TalismansScript.get_talisman(id)
-		var worn_button := Button.new()
-		worn_button.text = "%s  ✕" % talisman.get("name", id)
-		worn_button.tooltip_text = "%s (click to take it off)" % talisman.get("description", "")
-		worn_button.pressed.connect(func(): panel._on_member_talisman_removed(member, id))
-		talisman_row.add_child(worn_button)
-	if member.talisman_ids().size() < member.talisman_slot_count():
-		var add_pick := OptionButton.new()
-		add_pick.add_item("+ add a talisman")
-		add_pick.set_item_metadata(0, "")
-		for item in TalismansScript.ITEMS:
-			if player.ally_talisman_block_reason(member, item.id) == "":
-				var tidx: int = add_pick.item_count
-				add_pick.add_item(item.name)
-				add_pick.set_item_metadata(tidx, item.id)
-		if add_pick.item_count > 1:
-			add_pick.item_selected.connect(func(i): panel._on_member_talisman_added(member, str(add_pick.get_item_metadata(i))))
-			talisman_row.add_child(add_pick)
-	else:
-		talisman_row.add_child(_label("(slots full)", 13, DIM))
-	detail.add_child(talisman_row)
-
-func _gear_row(caption: String, picker: Control) -> HBoxContainer:
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 10)
-	var l := _label(caption, 14, TEXT)
-	l.custom_minimum_size = Vector2(100, 0)
-	row.add_child(l)
-	row.add_child(picker)
-	return row
-
-# --- the specials loadout ----------------------------------------------------------------------
-
-func _build_specials(detail: VBoxContainer, member) -> void:
-	var pool: Array = main.member_special_pool(member)
-	var pool_ids: Array = pool.map(func(e): return str(e.special.get("id", "")))
-	var slots := PartyRulesScript.SPECIAL_SLOTS
-	var heading_row := HBoxContainer.new()
-	heading_row.add_theme_constant_override("separation", 14)
-	heading_row.add_child(_heading("SPECIALS"))
-	var filled := 0
-	for i in slots:
-		if member.loadout_slot(i, pool_ids) != "":
-			filled += 1
-	heading_row.add_child(_label("%d / %d slots  ·  from %d it could bring" % [filled, slots, pool.size()], 13, DIM))
-	if member.loadout_set:
-		var reset := Button.new()
-		reset.text = "Reset to default"
-		reset.tooltip_text = "Go back to the first %d of its kit and weapon specials." % slots
-		reset.pressed.connect(func(): panel._on_member_loadout_reset(member))
-		heading_row.add_child(reset)
-	detail.add_child(heading_row)
-	detail.add_child(_wrapped("Mix and match: its own kit's specials and the equipped weapon's. Only the ones in a slot appear in its command menu.", 560, 12, DIM))
-	for i in slots:
-		detail.add_child(_special_slot_row(member, i, pool, pool_ids))
-
-func _special_slot_row(member, slot: int, pool: Array, pool_ids: Array) -> VBoxContainer:
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 2)
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 10)
-	box.add_child(row)
-	var cap := _label("Slot %d" % (slot + 1), 14, TEXT)
-	cap.custom_minimum_size = Vector2(100, 0)
-	row.add_child(cap)
-	var current: String = member.loadout_slot(slot, pool_ids)
-	var pick := OptionButton.new()
-	pick.custom_minimum_size = Vector2(430, 0)
-	pick.add_item("(empty)")
-	pick.set_item_metadata(0, "")
-	var selected_description := ""
-	for entry in pool:
-		var s: Dictionary = entry.special
-		var id := str(s.get("id", ""))
-		var idx: int = pick.item_count
-		var source := "kit" if bool(s.get("kit", false)) else "weapon"
-		var in_other := -1
-		for j in PartyRulesScript.SPECIAL_SLOTS:
-			if j != slot and member.loadout_slot(j, pool_ids) == id:
-				in_other = j
-		var text := "%s%s   [%s]" % [str(s.get("name", id)), str(entry.cost_text), source]
-		if in_other >= 0:
-			text += "   (in slot %d)" % (in_other + 1)
-		pick.add_item(text)
-		pick.set_item_metadata(idx, id)
-		pick.set_item_disabled(idx, in_other >= 0)
-		if id == current:
-			pick.select(idx)
-			selected_description = str(s.get("description", ""))
-	pick.item_selected.connect(func(i): panel._on_member_special_slot(member, slot, str(pick.get_item_metadata(i))))
-	row.add_child(pick)
-	if selected_description != "":
-		var d := _wrapped(selected_description, 470, 12, DIM)
-		var indent := MarginContainer.new()
-		indent.add_theme_constant_override("margin_left", 110)
-		indent.add_child(d)
-		box.add_child(indent)
-	return box
+func _page_run() -> void:
+	var kills := 0
+	for n in main.run_kills_by_name:
+		kills += int(main.run_kills_by_name[n])
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 0)
+	col.custom_minimum_size = Vector2(520, 0)
+	content_root.add_child(col)
+	col.add_child(InvWidgets.caption("This run"))
+	InvWidgets.icon_row(col, "stat_intimidation", "Foes defeated", str(kills))
+	InvWidgets.icon_row(col, "stat_level", "Bosses beaten", str(int(main.run_bosses_defeated)))
+	InvWidgets.icon_row(col, "stat_damage", "Waves cleared", str(maxi(0, int(main.wave) - 1)))
+	InvWidgets.icon_row(col, "stat_coin", "Coins", str(int(player.coins)))
+	InvWidgets.icon_row(col, "stat_shard", "Runic shards", str(int(player.runic_shards)))

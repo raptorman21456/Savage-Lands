@@ -13,16 +13,17 @@ func _find_all(node: Node, type_name: String, out: Array) -> void:
 
 func _texts(node: Node) -> Array:
 	var out := []
-	for kind in ["Button", "Label", "OptionButton"]:
-		var found := []
-		_find_all(node, kind, found)
-		for n in found:
-			if kind == "OptionButton":
-				for i in n.item_count:
-					out.append(n.get_item_text(i))
-			else:
-				out.append(n.text)
+	_gather_texts(node, out)
 	return out
+
+func _gather_texts(node: Node, out: Array) -> void:
+	if node is OptionButton:
+		for i in node.item_count:
+			out.append(node.get_item_text(i))
+	elif node is Label or node is Button or node is PixelButton:
+		out.append(node.text)
+	for c in node.get_children():
+		_gather_texts(c, out)
 
 func _init() -> void:
 	seed(20261006)
@@ -63,25 +64,37 @@ func _init() -> void:
 	var panel = main.inventory_panel
 	panel.open(player)
 	await process_frame
-	var weapons_tab_texts: Array = _texts(panel.tab_containers.Weapons)
-	print("The Staff does NOT clutter your own Weapons tab: %s (expected true)" % [not weapons_tab_texts.any(func(t): return str(t).contains("Staff"))])
-	var party_texts: Array = _texts(panel.tab_containers.Party)
-	print("The Party tab lists EQUIPMENT with a weapon picker that offers the Staff: %s / %s (expected true, true)" % [party_texts.has("EQUIPMENT"), party_texts.any(func(t): return str(t).begins_with("Staff") or str(t).contains(" Staff"))])
-	panel._on_member_weapon_picked(druid, offer.id)
-	print("Picking it equips it on her: %s (expected %s)" % [druid.weapon_id(), offer.id])
+	var own_card_names: Array = panel.gear_view.cards.map(func(c): return str(c.info.name))
+	print("The Staff does NOT clutter your own Weapons tab: %s (expected true)" % [not own_card_names.has("Staff") and not InvData.gear_entries(player, "Weapons").any(func(e): return str(e.name) == "Staff")])
+	panel.party_selected_id = druid.id
+	panel.party_page = "Equipment"
+	panel._select_tab("Party")
 	await process_frame
-	var selected_ok := false
-	var option_buttons := []
-	_find_all(panel.tab_containers.Party, "OptionButton", option_buttons)
-	for ob in option_buttons:
-		if ob.get_item_text(ob.selected).contains("Staff") and ob.item_count > 2:
-			selected_ok = true
-	print("...and the picker shows it selected after the rebuild: %s (expected true)" % [selected_ok])
+	var party_texts: Array = _texts(panel.tab_containers.Party)
+	print("The Party tab's Equipment page has a weapon tile and a Talismans line: %s / %s (expected true, true)" % [party_texts.has("Weapon"), party_texts.has("Talismans")])
+	panel.open_gear_popup(druid, "Weapons")
+	await process_frame
+	var staff_entry := {}
+	for e in panel.popup_view.shown:
+		if str(e.name) == "Staff":
+			staff_entry = e
+	print("Her weapon picker offers the Staff: %s (expected true)" % [not staff_entry.is_empty()])
+	var staff_action: Dictionary = InvData.action_for(player, druid, staff_entry)
+	print("...with an enabled Equip button: label=%s enabled=%s (expected Equip, true)" % [staff_action.label, staff_action.enabled])
+	panel.apply_entry_action(druid, staff_entry)
+	print("Pressing it equips it on her: %s (expected %s)" % [druid.weapon_id(), offer.id])
+	await process_frame
+	print("...and the picker shows it worn after the rebuild: %s (expected true)" % [panel.popup_view.cards.any(func(c): return c.worn and str(c.info.name) == "Staff")])
+	panel.close_popup()
 	player.owned_talismans["moss_charm"] = true
 	panel._on_member_talisman_added(druid, "moss_charm")
 	print("Adding a talisman puts it on her: %s (expected [moss_charm])" % [druid.talisman_ids()])
+	panel._state("popup_talismans")["sel"] = "moss_charm"
+	panel.open_talisman_popup(druid)
 	await process_frame
-	print("...her row shows it with a remove button: %s (expected true)" % [_texts(panel.tab_containers.Party).any(func(t): return str(t).begins_with("Moss Charm"))])
+	var popup_texts: Array = _texts(panel.popup_view)
+	print("...her talisman popup shows it with a Take off button: name=%s take_off=%s (expected true, true)" % [popup_texts.has("Moss Charm"), popup_texts.has("Take off")])
+	panel.close_popup()
 	panel._on_member_talisman_removed(druid, "moss_charm")
 	panel._on_member_weapon_picked(druid, "")
 	print("Removing both leaves her empty-handed: weapon='%s' talismans=%s (expected '' and [])" % [druid.weapon_id(), druid.talisman_ids()])

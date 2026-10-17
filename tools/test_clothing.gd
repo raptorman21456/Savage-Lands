@@ -5,6 +5,12 @@ extends SceneTree
 # Player.gd:armor_damage_reduction). Covers the Player rules, the tailor tab,
 # the real incoming-damage path, and the Inventory's Clothes section.
 
+func _piece_entry(player, id: String) -> Dictionary:
+	for e in InvData.gear_entries(player, "Clothes"):
+		if str(e.id) == id:
+			return e
+	return {}
+
 func _init() -> void:
 	# Fixed seed: every random roll below repeats run to run, so a changed result
 	# is a real change, not luck.
@@ -111,22 +117,24 @@ func _init() -> void:
 	print("can't afford the Fur Cloak (50): ok=%s (expected false)" % [market.use_clothing("cloth_cloak")])
 	market.close()
 
-	# --- Inventory's Clothes section. ---
+	# --- Inventory's Clothes sub-tab (Gear tab). ---
 	var panel = main.inventory_panel
 	panel.open(player)
-	var weapons_tab = panel.tab_containers.Weapons
-	var found_heading := false
-	for c in weapons_tab.get_children():
-		if c is Label and c.text == "CLOTHES":
-			found_heading = true
-	print("the Weapons tab has a CLOTHES section: %s (expected true)" % [found_heading])
+	panel.gear_view._on_category("Clothes")
+	var owned_pieces: Array = InvData.gear_entries(player, "Clothes")
+	print("the Gear tab has a Clothes sub-tab with a card per owned piece: cards=%d (expected %d)" % [panel.gear_view.cards.size(), owned_pieces.size()])
 	player.equip_clothing("cloth_boots")
 	panel._on_clothing_cell_pressed("cloth_boots")
-	print("clicking the worn piece is a harmless no-op: %s (expected cloth_boots)" % [player.equipped_clothing.feet])
+	print("clicking the worn piece through the old handler is a harmless no-op: %s (expected cloth_boots)" % [player.equipped_clothing.feet])
 	player.try_buy_clothing("cloth_sandals")
 	player.equip_clothing("cloth_boots")
-	panel._on_clothing_cell_pressed("cloth_sandals")
-	print("clicking another owned piece swaps to it: feet=%s (expected cloth_sandals)" % [player.equipped_clothing.feet])
+	var sandals := _piece_entry(player, "cloth_sandals")
+	print("an owned piece you aren't wearing offers Equip: %s (expected Equip)" % [InvData.action_for(player, null, sandals).label])
+	panel.apply_entry_action(null, sandals)
+	print("pressing it swaps to it: feet=%s (expected cloth_sandals)" % [player.equipped_clothing.feet])
+	print("the worn piece's button now says Take off: %s (expected Take off)" % [InvData.action_for(player, null, _piece_entry(player, "cloth_sandals")).label])
+	panel.apply_entry_action(null, _piece_entry(player, "cloth_sandals"))
+	print("pressing it takes the piece off, keeping it owned: feet='%s' (expected empty), owned=%s (expected true)" % [player.equipped_clothing.feet, player.owned_clothing.has("cloth_sandals")])
 	panel.close()
 
 	quit()

@@ -11,6 +11,7 @@ extends CanvasLayer
 signal finished
 
 const AttackTimingsScript := preload("res://scripts/AttackTimings.gd")
+const BattleStyleScript := preload("res://scripts/BattleStyle.gd")
 
 # Test hook: while this holds entries, run() skips the UI and input and answers from here
 # (a result string or a result dictionary per call, consumed from the front).
@@ -41,39 +42,46 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	visible = false
 	_settings = get_node_or_null("/root/Settings")
+	# The battle screen's dark-fantasy frame (BattleStyle), with its inner trim line -- the same as the defense popup.
 	_panel = Panel.new()
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.05, 0.05, 0.08, 0.93)
-	style.border_color = Color(0.7, 0.62, 0.35)
-	style.set_border_width_all(3)
-	style.set_corner_radius_all(8)
-	_panel.add_theme_stylebox_override("panel", style)
-	_panel.size = Vector2(440, 250)
+	_panel.add_theme_stylebox_override("panel", BattleStyleScript.panel_style())
+	_panel.size = BattleStyleScript.POPUP_SIZE
 	add_child(_panel)
+	var trim := Panel.new()
+	trim.position = Vector2(4, 4)
+	trim.size = _panel.size - Vector2(8, 8)
+	trim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var trim_style := StyleBoxFlat.new()
+	trim_style.bg_color = Color(0, 0, 0, 0)
+	trim_style.border_color = BattleStyleScript.PANEL_TRIM
+	trim_style.set_border_width_all(1)
+	trim_style.set_corner_radius_all(BattleStyleScript.CORNER - 4)
+	trim_style.anti_aliasing = true
+	trim.add_theme_stylebox_override("panel", trim_style)
+	_panel.add_child(trim)
 	_title = Label.new()
-	_title.position = Vector2(16, 8)
-	_title.add_theme_font_size_override("font_size", 22)
+	_title.position = Vector2(14, 8)
+	_title.add_theme_font_size_override("font_size", 18)
 	_title.add_theme_color_override("font_color", ACCENT)
 	_panel.add_child(_title)
 	_hint = Label.new()
-	_hint.position = Vector2(16, 40)
-	_hint.size = Vector2(408, 40)
+	_hint.position = Vector2(14, 34)
+	_hint.size = Vector2(292, 40)
 	_hint.autowrap_mode = TextServer.AUTOWRAP_WORD
-	_hint.add_theme_font_size_override("font_size", 13)
-	_hint.add_theme_color_override("font_color", Color(0.78, 0.78, 0.82))
+	_hint.add_theme_font_size_override("font_size", 12)
+	_hint.add_theme_color_override("font_color", BattleStyleScript.DIM)
 	_panel.add_child(_hint)
 	_canvas = Control.new()
-	_canvas.position = Vector2(16, 84)
-	_canvas.size = Vector2(408, 150)
+	_canvas.position = BattleStyleScript.POPUP_CANVAS_POS
+	_canvas.size = BattleStyleScript.POPUP_CANVAS_SIZE
 	_canvas.draw.connect(_draw_telegraph)
 	_panel.add_child(_canvas)
 	get_viewport().size_changed.connect(_place_panel)
 	_place_panel()
 
 func _place_panel() -> void:
-	var vs: Vector2 = get_viewport().get_visible_rect().size
-	# Bottom-right, same spot as the defense popup: the battle grid sits on the left.
-	_panel.position = Vector2(maxf(vs.x * 0.56, vs.x - _panel.size.x - 24.0), vs.y - _panel.size.y - 30.0).round()
+	# The right-hand column, clear of the grid and above the bottom bar -- the same spot as the defense popup.
+	_panel.position = BattleStyleScript.popup_position(get_viewport().get_visible_rect().size, _panel.size)
 
 # ---------------------------------------------------------------- running a popup
 func run(command: Dictionary, opts: Dictionary = {}) -> Dictionary:

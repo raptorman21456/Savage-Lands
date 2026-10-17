@@ -997,14 +997,24 @@ func _init() -> void:
 	player.owned_talismans["stone_amulet"] = true
 	var panel = main.inventory_panel
 	panel.open(player)
-	panel._select_tab("Talismans")
-	print("the Inventory has a Talismans tab: %s (expected true), active=%s (expected Talismans)" % [panel.tab_containers.has("Talismans"), panel.active_tab])
+	panel.open_talisman_popup(null)
+	print("the Inventory has no Talismans tab, its talismans are a popup: tab=%s (expected false), popup open=%s kind=%s (expected true, talisman)" % [panel.tab_containers.has("Talismans"), panel.popup_open(), panel.popup_kind])
 	panel._on_talisman_cell_pressed("ember_charm")
 	panel._on_talisman_cell_pressed("wolf_fang")
 	panel._on_talisman_cell_pressed("stone_amulet")
 	print("clicking wears up to the slot limit (2 at level 4): %s (expected [ember_charm, wolf_fang])" % [player.equipped_talismans])
 	panel._on_talisman_cell_pressed("ember_charm")
 	print("clicking a worn one takes it off: %s (expected [wolf_fang])" % [player.equipped_talismans])
+	var amulet := {}
+	for e in InvData.talisman_entries(player):
+		if str(e.id) == "stone_amulet":
+			amulet = e
+	print("the popup's button for a free slot says Wear: label=%s enabled=%s (expected Wear, true)" % [InvData.talisman_action(player, null, amulet).label, InvData.talisman_action(player, null, amulet).enabled])
+	panel.apply_talisman_action(null, amulet)
+	print("pressing it wears it: %s (expected [wolf_fang, stone_amulet])" % [player.equipped_talismans])
+	print("with the slots full the button says so: label=%s enabled=%s (expected No free slot, false)" % [InvData.talisman_action(player, null, InvData.talisman_entries(player).filter(func(e): return str(e.id) == "ember_charm")[0]).label, InvData.talisman_action(player, null, InvData.talisman_entries(player).filter(func(e): return str(e.id) == "ember_charm")[0]).enabled])
+	var unfound: Array = InvData.talisman_entries(player).filter(func(e): return not e.owned)
+	print("talismans you haven't found are listed as not owned (shown as black shapes): %d of %d (expected 35 of 38 with three owned)" % [unfound.size(), InvData.talisman_entries(player).size()])
 	panel.close()
 
 	quit()

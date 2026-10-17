@@ -134,7 +134,7 @@ func _init() -> void:
 	player.meta_shield_block_bonus_pct = 0.1
 	main._refresh_battle_display()
 	print("An equipped shield surfaces its name and live block chance: status_has_line=%s (expected true, %s)" % [
-		hud.battle_status_label2.text.contains("Iron Bulwark (18% block)"), hud.battle_status_label2.text
+		hud.battle_status_label2.text.contains("Iron Bulwark (28% block)"), hud.battle_status_label2.text
 	])
 
 	quit()

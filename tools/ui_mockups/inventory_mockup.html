@@ -1,0 +1,553 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Savage Lands - inventory mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Jersey+10&family=Jersey+15&family=Jacquard+12&display=swap" rel="stylesheet">
+<!--
+  Design mockup of the new inventory window (not part of the game).
+
+  ONE pixel language for everything. One art pixel = 2 screen pixels (the stage is 1280x720, i.e. a 640x360 game at 2x), and every
+  sprite, frame and border is a multiple of that: icons 16 -> 32, weapon art 32 -> 64, the 16px item art 16 -> 64 (4x), frames drawn
+  by tools/gen_ui_kit.gd with the same near-black outline, palette ramps and top-left light as the icons (tools/gen_ui_icons.gd).
+  Text is Jersey 10 at 20px (2 screen px per font pixel) with a hard 2px shadow; names and titles are Jacquard 12 at 24px.
+  Loads the real pictures from ../../assets (serve the project folder, e.g. tools/battle_sim/serve.ps1) or use the self-contained copy.
+  Numbers are placeholders; Rage and Magic have no mechanics yet; the talisman lore lines are drafts.
+-->
+<style>
+:root{--ink:#16100e;--v0:#0d0918;--v1:#1c1433;--v2:#30254f;--v3:#54419a;--v4:#8a6fdc;--g1:#94661a;--g3:#efc23c;--g4:#fff3a8;--cream:#f2eee4;--dim:#a39d8c;--good:#8be08f;--bad:#f2676a}
+html,body{margin:0;background:#0b0a10}
+#modebar{display:flex;justify-content:center;align-items:center;gap:8px;padding:8px 0;font:13px system-ui,sans-serif;color:#a39d8c}
+#modebar button{font:inherit;padding:3px 12px;background:#1c1433;color:#a39d8c;border:1px solid #30254f;cursor:pointer;white-space:nowrap}
+.iv{font:20px/22px 'Jersey 10',ui-monospace,Consolas,monospace;color:var(--cream);text-shadow:2px 2px 0 var(--v0);image-rendering:pixelated}
+.iv *{box-sizing:border-box;font-family:inherit}
+.iv .px,.iv canvas{image-rendering:pixelated}
+.iv .px{display:block;flex:none}
+.iv .h{font-family:'Jersey 15','Jersey 10',monospace;font-size:30px;line-height:32px;color:var(--g3)}
+/* the ornate blackletter is kept for Mythic weapons alone: their name wherever it appears */
+.iv .myth{font-family:'Jacquard 12','Jersey 10',serif!important;font-size:24px;line-height:26px;color:#f2677f}
+.iv .card .nm.myth{font-size:24px;line-height:22px}
+.iv .dim{color:var(--dim)}.iv .gold{color:var(--g3)}.iv .good{color:var(--good)}.iv .bad{color:var(--bad)}
+/* ---- frames: 9-slice sprites from assets/ui/kit, drawn 2x, never smoothed ---- */
+.iv .fr{border-style:solid;border-color:transparent;border-image-outset:0;border-image-repeat:stretch;image-rendering:pixelated}
+.iv .f-panel{border-width:14px;border-image-source:url(../../assets/ui/kit/panel.png);border-image-slice:7 fill;border-image-width:14px}
+.iv .f-steel{border-width:8px;border-image-source:url(../../assets/ui/kit/panel_steel.png);border-image-slice:4 fill;border-image-width:8px}
+.iv .f-inset{border-width:8px;border-image-source:url(../../assets/ui/kit/inset.png);border-image-slice:4 fill;border-image-width:8px}
+.iv .btn{border-width:8px;border-image-source:url(../../assets/ui/kit/button.png);border-image-slice:4 fill;border-image-width:8px;display:inline-flex;align-items:center;gap:8px;padding:0 6px;height:40px;margin:0 8px 0 0;cursor:pointer;color:var(--cream);background:none;font:inherit;text-shadow:2px 2px 0 var(--v0);white-space:nowrap;flex:none}
+.iv .btn.ic2{height:48px}
+.iv .btn:hover{border-image-source:url(../../assets/ui/kit/button_hover.png)}
+.iv .btn.on{border-image-source:url(../../assets/ui/kit/button_on.png);color:var(--g4)}
+.iv .btn:active{border-image-source:url(../../assets/ui/kit/button_press.png);padding-top:2px}
+.iv .btn.off{opacity:.5;cursor:default}
+.iv .card{position:relative;border-width:12px;border-image-source:url(../../assets/ui/kit/card.png);border-image-slice:6;border-image-width:12px;background:var(--v1);background-clip:padding-box;cursor:pointer;flex:none}
+.iv .card:hover{border-image-source:url(../../assets/ui/kit/card_hover.png)}
+.iv .card.eq{border-image-source:url(../../assets/ui/kit/card_worn.png)}
+.iv .card.sel{border-image-source:url(../../assets/ui/kit/card_pick.png)}
+.iv .card.eq.sel{border-image-source:url(../../assets/ui/kit/card_worn_pick.png)}
+.iv .card .ic{position:absolute;left:0;right:0;top:0;bottom:44px;overflow:hidden;display:flex;align-items:center;justify-content:center}
+.iv .card .nm{position:absolute;left:0;right:0;bottom:0;height:44px;padding:0 4px;display:flex;align-items:center;justify-content:center;text-align:center;line-height:20px}
+.iv .ic{display:flex;align-items:center;justify-content:center}
+/* small flat chips (the number on a card, who wears it): outline, bevel, nothing soft */
+.iv .chip{position:absolute;z-index:2;min-width:28px;height:28px;padding:0 6px;display:flex;align-items:center;justify-content:center;background:var(--v1);color:var(--g3);box-shadow:0 0 0 2px var(--ink),inset 2px 2px 0 var(--v3),inset -2px -2px 0 var(--v0)}
+.iv input[type=text]{border-width:8px;border-image-source:url(../../assets/ui/kit/inset.png);border-image-slice:4 fill;border-image-width:8px;background:none;color:var(--cream);font:inherit;text-shadow:2px 2px 0 var(--v0);height:40px;padding:0 6px;outline:none;margin:0 8px 0 0}
+.iv input[type=text]::placeholder{color:var(--dim);opacity:1}
+.iv .lbl{color:var(--dim)}
+.iv .sr{display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:36px;padding:0 4px;border-bottom:2px solid #241a3f}
+.iv .sr b{font-weight:400;display:inline-flex;align-items:center;gap:8px}
+.iv .sr>span{text-align:right}
+.iv .sr i{font-style:normal;margin-left:10px}
+.iv .spr{display:flex;align-items:center;gap:8px;min-height:36px;padding:0 8px;cursor:pointer}
+.iv .spr small{margin-left:auto;color:var(--dim);font-size:inherit;white-space:nowrap}
+.iv .spr.on,.iv .spr:hover{background:var(--v2);box-shadow:inset 2px 2px 0 var(--v3),inset -2px -2px 0 var(--v1)}
+.iv .spr.locked{color:var(--dim)}.iv .spr.locked small{color:var(--bad)}
+.iv .dbox{min-height:72px;margin-top:8px}
+.iv .lore{color:var(--dim);text-align:center;margin-top:6px}
+.iv .dcol{display:flex;flex-direction:column}
+.iv .stat{display:flex;align-items:center;gap:8px;min-height:34px;padding:0 4px;border-bottom:2px solid #241a3f;cursor:help}
+.iv .stat .ab{width:64px}.iv .stat .dd{flex:1;min-width:0;color:var(--dim);white-space:nowrap}
+.iv .div{height:4px;margin:8px 0;background:linear-gradient(var(--v0) 0 2px,var(--v2) 2px 4px)}
+@keyframes blink{50%{opacity:0}}
+.iv .cur{animation:blink 1s steps(1) infinite}
+@media (prefers-reduced-motion:reduce){.iv .cur{animation:none!important}}
+</style>
+</head>
+<body>
+<div id="modebar">Zoom
+ <button data-z="auto">Fit</button><button data-z="0.5">½×</button><button data-z="1">1×</button><button data-z="1.5">1½×</button></div>
+<div class="iv" id="wrap" style="position:relative;overflow:hidden">
+<div id="stage" style="width:1280px;height:720px;position:relative;transform-origin:0 0;background:#0b1a1f"></div>
+</div>
+<script>
+const W=1280,H=720;
+const A='../../assets/';
+const T0=performance.now();
+const stage=document.getElementById('stage');
+// --- pictures: always shown at a whole multiple of the art pixel (2 screen px) --------------------------------------
+function im(path,px,css){const i=document.createElement('img');i.src=A+path+'.png';i.width=px;i.height=px;i.draggable=false;i.className='px';i.alt='';if(css)i.style.cssText=css;return i;}
+const ico=(n,px)=>im('ui/'+n,px||32);
+const TABS=[['Gear','tab_gear'],['Items','tab_items'],['Party','tab_party'],['Map','tab_map'],['Settings','tab_settings']];
+const SUBI={Weapons:'sub_weapons',Armour:'sub_armour',Clothes:'sub_clothes',Shields:'sub_shields',Potions:'sub_potions',Food:'sub_food',Arrows:'sub_arrows',Audio:'sub_audio',Controls:'sub_controls',Gameplay:'sub_gameplay',Equipment:'tab_gear',Specials:'stat_crit',Stats:'stat_strength',Defense:'stat_defense',Run:'stat_speed'};
+// --- the stats: short name, full name, what it is for, placeholder value, icon, longer note (only where the game already has one)
+const STATS=[
+ ['MGT','Might','heavy weapons',6,'stat_might','Better weapons need more Might; it also boosts party damage.'],
+ ['STR','Strength','attack power',5,'stat_strength','+1 damage per point on every attack you land.'],
+ ['VGR','Vigor','HP',8,'stat_vigor','+1 max HP per point.'],
+ ['AGI','Agility','speed',7,'stat_agility','Overworld speed, faster attacks, more battle move.'],
+ ['RAGE','Rage','upgrades berserk',2,'stat_rage',''],
+ ['DXT','Dexterity','crit',4,'stat_dexterity','0.75% crit chance per point (capped at 15%).'],
+ ['MAG','Magic','magic power',3,'stat_magic',''],
+ ['INTL','Intelligence','learn specials; staffs',4,'stat_intelligence','Needed to learn a weapon’s specials in the first place, and what staffs ask for in place of Might. (INTL is a provisional short name: INT is Intimidation’s.)'],
+ ['INT','Intimidation','shop prices',1,'stat_intimidation','-1% shop prices per point (capped at 75%).'],
+ ['RES','Resilience','defense',3,'stat_resilience','1% damage reduction per point (capped at 20%).'],
+ ['RFL','Reflexes','dodge chance',2,'stat_reflexes','0.75% dodge chance per point (capped at 15%).'],
+ ['FTD','Fortitude','magical defense',3,'stat_fortitude','Protection against magical harm; unlocked at the Church.']];
+const FULL={};const RI={};const STATV={};
+STATS.forEach(s=>{FULL[s[0]]=s[1]+' ('+s[0]+'): '+s[2];RI[s[0]]=s[4];STATV[s[0]]=s[3];});
+// which of the stats a weapon asks for you do not have enough of (Might for heavy weapons, Intimidation for a Mythic, Intelligence for a staff)
+function lacks(it){const a=[];if(it.m&&it.m>STATV.MGT)a.push('MGT');if(it.mi&&it.mi>STATV.INT)a.push('INT');if(it.intl&&it.intl>STATV.INTL)a.push('INTL');return a;}
+Object.assign(RI,{Passive:'stat_crit',HP:'stat_health',Stamina:'stat_stamina',Damage:'stat_damage',Attack:'stat_damage',Defense:'stat_defense','Bodily harm':'stat_defense','Block chance':'stat_defense','Damage taken':'stat_defense','Life steal':'stat_health','HP each turn':'stat_health','XP gained':'stat_level'});
+// --- quality: shown by the picture's glow (turning pixel rays), never in the name. Worn has none; Broken's is dark. ----------
+const QUAL=['Broken','Worn','Fine','Masterwork','Legendary','Mythic'];
+const GLOW={
+ Broken:{c:'#0a0710',plate:'#342c46',n:8,op:.95},        // a dark glow: black rays on a faintly lighter disc
+ Fine:{c:'#cfcfd8',n:8,op:.85},                            // grey
+ Masterwork:{c:'#4aa3ff',n:10,op:.9},                      // blue
+ Legendary:{c:'#ffd84a',n:12,op:.95},                      // yellow
+ Mythic:{c:'#b3203f',n:14,op:1,two:1}};                    // maroon, with a second ring turning the other way
+const QTXT={Starter:'#a39d8c',Broken:'#9a88b0',Worn:'#d8d2c2',Fine:'#cfcfd8',Masterwork:'#7fb0ff',Legendary:'#ffd84a',Mythic:'#f2677f'};
+const qrank=q=>QUAL.indexOf(q);
+// each picture's rays turn at their own speed, one full turn every 26-72 seconds, in their own direction, from their own angle
+const RP={};
+function rparams(key){if(!RP[key]){RP[key]=[0,1].map(()=>({d:26+Math.random()*46,dir:Math.random()<.5?1:-1,ph:Math.random()*100}));}return RP[key];}
+// the rays are drawn as chunky pixels: a small canvas shown with no smoothing, one canvas pixel = 2 screen pixels, redrawn a dozen times a second
+const RAYC=[];let rayLast=0;
+const REDUCED=window.matchMedia&&matchMedia('(prefers-reduced-motion:reduce)').matches;
+function hexRGB(h){return [parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)];}
+function rays(parent,q,R,key){
+ const g=GLOW[q];if(!g)return null;
+ const N=R,half=N/2;
+ const cv=document.createElement('canvas');cv.width=N;cv.height=N;
+ cv.style.cssText='position:absolute;left:50%;top:50%;width:'+(2*R)+'px;height:'+(2*R)+'px;margin:'+(-R)+'px 0 0 '+(-R)+'px;pointer-events:none';
+ parent.appendChild(cv);
+ const ctx=cv.getContext('2d');const img=ctx.createImageData(N,N);
+ const rr=new Float32Array(N*N),th=new Float32Array(N*N);
+ for(let y=0;y<N;y++)for(let x=0;x<N;x++){const dx=x+.5-half,dy=y+.5-half;rr[y*N+x]=Math.hypot(dx,dy);th[y*N+x]=Math.atan2(dy,dx);}
+ const c={cv:cv,ctx:ctx,img:img,rr:rr,th:th,N:N,half:half,g:g,rp:rparams(key),rgb:hexRGB(g.c)};
+ RAYC.push(c);drawRays(c,performance.now()-T0);return cv;}
+function drawRays(c,now){
+ const g=c.g,rp=c.rp,rr=c.rr,th=c.th,d=c.img.data,half=c.half,N=c.N,rgb=c.rgb;d.fill(0);
+ for(let L=0;L<(g.two?2:1);L++){
+  const n=L?Math.round(g.n*.7):g.n,out=half*(L?.72:.98),inn=half*(L?.36:.44),sector=2*Math.PI/n;
+  const rot=(rp[L].dir*(L?-1:1))*((now/1000+rp[L].ph)/rp[L].d)*2*Math.PI;
+  for(let i=0;i<N*N;i++){const r=rr[i];if(r<inn||r>out)continue;
+   const ph=th[i]-rot;const k=Math.floor(ph/sector);const loc=ph-k*sector-sector/2;const idx=((k%n)+n)%n;
+   const len=idx%2===0?out:out*.68;if(r>len)continue;
+   const t=(r-inn)/(len-inn);if(Math.abs(loc)>.15*(1-t)+.03)continue;
+   const p=i*4;d[p]=rgb[0];d[p+1]=rgb[1];d[p+2]=rgb[2];d[p+3]=Math.round(255*(t<.55?g.op:g.op*.55));}}
+ c.ctx.putImageData(c.img,0,0);}
+function rayLoop(t){if(t-rayLast>=80){rayLast=t;if(!REDUCED){for(let i=0;i<RAYC.length;i++){if(RAYC[i].cv.isConnected)drawRays(RAYC[i],performance.now()-T0);}}}requestAnimationFrame(rayLoop);}
+requestAnimationFrame(rayLoop);
+// the plate behind a picture: flat glow colour in the quality's tint, the turning rays, then the picture (always 64px: weapon art at 2x, the 16px art at 4x)
+function plateBg(it,kind){if(kind==='gear'){const g=GLOW[it.q];return g?(g.plate||g.c+'2e'):'var(--v1)';}return it.c+'33';}
+function iconPlate(pl,it,kind,R){
+ pl.style.background=plateBg(it,kind);
+ if(kind==='gear'&&GLOW[it.q])rays(pl,it.q,R,it.n);
+ pl.appendChild(im(it.g,64,'position:relative;z-index:1;'+(it.f?'filter:'+it.f:'')));}
+// --- gear. Titles are the plain weapon type (or a Mythic's own name); material and quality show in the art. -----------------
+const DEF_NOW=26,FORT_NOW=8;
+const harm=p=>Math.round(80*p/(p+73));
+// a special: name, cost, what it does, and (optionally) the Intelligence you need to learn it in the first place
+const SP=(n,c,d,li)=>({n:n,c:c,d:d,li:li});
+const GEAR={
+ Weapons:[
+  {n:'Club',q:'Starter',mat:'Wood',v:8,m:0,g:'weapons/club',by:'You',fl:'Subtle as a falling tree.',x:[SP('Thy Kneecaps are Mine','30 STA','120% damage that ignores rock cover, and permanently slows the target by 1 tile of movement (down to a minimum of 1).'),SP('Second Wind','35 STA','60% damage, and heals you for about 10% of your max HP.'),SP('Heavy Swing','30 STA','130% damage, plus 50% more against a target still at full HP.')]},
+  {n:'Spear',q:'Masterwork',mat:'Obsidian',v:16,m:8,g:'weapons/spear_obsidian',fl:'Black glass on a long shaft.',x:[SP('Piercing Thrust','25 STA','140% damage that ignores rock cover and pierces through to a second enemy one tile beyond the first.'),SP('Wombo Combo','45 STA','5-10 rapid jabs at 18% damage each. The odds of extra hits rise with your Fortune.'),SP('Target Practice','60 STA','30% chance to instantly kill a regular enemy (5% vs. a boss). On a miss, your spear flies to a random tile and you can’t Fight until you reach it.',6)]},
+  {n:'Dagger',q:'Fine',mat:'Silver',v:14,m:0,g:'weapons/dagger_silver',by:'Rogue',fl:'Quick and quiet.',x:[SP('Slicing Flurry','40 STA','8-13 lightning-fast slices at 10% damage each.'),SP('Bleeding Cut','60 STA','Full damage, with an independent 50% chance to cause Bleeding and a separate 50% chance to land as a guaranteed crit.'),SP('Knife Throw','25 STA','300% damage, but if it kills the target you’re left disarmed, weapon flung to a random tile.')]},
+  {n:'Greatsword',q:'Worn',mat:'Steel',v:17,m:0,g:'weapons/greatsword_steel',by:'Knight',fl:'Too heavy to be elegant.',x:[SP('Whirlwind Strike','75 STA','2-5 spinning passes, each dealing 40% damage to every enemy in range.'),SP('Low Sweep','20 STA','70% damage, with an 80% chance to sweep the target’s legs out, halving its movement for the rest of the battle.'),SP('Wide Cleave','35 STA','150% damage to everyone standing in the 3 tiles directly toward your target. Refused outright if cover blocks the way.')]},
+  {n:'Hand Picks',q:'Broken',mat:'Bone',v:6,m:0,g:'weapons/hand_picks_bone',fl:'Built for breaking rock.',x:[SP('Pichaku','0 STA','Costs your turn. For the rest of the battle, your attacks deal 80% damage but every regular or heavy attack has a 1-in-3 chance to strike twice.'),SP('DIAMONDS','100 STA','Jump onto any enemy on the grid, ignoring terrain. 250% damage, knocking them back a tile as you land, but a 20% chance to miss entirely, costing you 20% of your max HP.',8),SP('Minernado','55 STA','4-7 whirling pickaxe strikes at 20% damage each.')]},
+  {n:'Knuckle Gloves',q:'Masterwork',mat:'Gold',v:15,m:8,g:'weapons/knuckle_gloves_gold',fl:'Remembers every brawl.',x:[SP('The ‘Ol One-Two','35 STA','Hits your target twice at 75% damage each, or, if a second enemy is in range, splits between both at 70% each.'),SP('Wrist Strike','20 STA','65% damage, and knocks the target’s weapon loose: it can’t attack until it reaches the tile it lands on.'),SP('Clotheslined','55 STA','230% damage, hurling the target to the tile directly behind you.')]},
+  {n:'Battle Axe',q:'Fine',mat:'Steel',v:18,m:0,g:'weapons/battle_axe_steel',fl:'Made for one job.',x:[SP('Devastating Slash','65 STA','230% damage, but the follow-through leaves you unable to act next turn.'),SP('Execution','50 STA','Instantly kills an armorless enemy. Deals no damage at all against an armored one.',5),SP('Oldest Trick in the Book','15 STA','40% damage, and the target loses its next turn.')]},
+  {n:'Hammer',q:'Legendary',mat:'Gold',v:30,m:15,g:'weapons/hammer_gold',fl:'It remembers every wall.',x:[SP('Crushing Collision','25 STA','80% damage, and permanently shatters the target’s armor.'),SP('Maracas','35 STA','130% damage, or 200% if the target is armored.'),SP('BONK','30 STA','110% damage. Leaves the target Concussed: a 33% chance to hit itself instead of you for the next few turns.',6)]},
+  {n:'The Great Toothpicke',q:'Mythic',mat:'Gold',v:42,m:50,mi:20,g:'weapons/spear_gold',fl:'It has outlived everyone who named it.',ps:'25% chance per landed hit to heal a flat 5 HP.',x:[SP('Piercing Thrust','25 STA','140% damage that ignores rock cover and pierces through to a second enemy one tile beyond the first.'),SP('Wombo Combo','45 STA','5-10 rapid jabs at 18% damage each. The odds of extra hits rise with your Fortune.'),SP('Target Practice','60 STA','30% chance to instantly kill a regular enemy (5% vs. a boss). On a miss, your spear flies to a random tile and you can’t Fight until you reach it.',6)]},
+  {n:'Staff',q:'Worn',mat:'Wood',v:5,intl:3,g:'weapons/staff_wood',by:'Druid',fl:'A branch that remembers being a tree.'}],
+ Armour:[{n:'Leather Vest',q:'Worn',v:8,f:0,g:'armor_leather',by:'You',fl:'Boiled hide.',d:'Cuts bodily harm a little.'},{n:'Iron Plate',q:'Fine',v:18,f:-4,g:'armor_iron',by:'Knight',fl:'Heavy, honest, and hot in summer.',d:'Strong against steel, thin against magic.'},{n:'Spellward Robes',q:'Masterwork',v:5,f:25,g:'armor_rags',by:'Necromancer',fl:'Stitched with something that listens.',d:'The first magical hit of every battle is negated. Each magical hit that lands gives back 10 stamina.'},{n:'Scout Leathers',q:'Fine',v:6,f:2,g:'armor_leather',by:'Rogue',fl:'Quiet at every seam.',d:'Light enough that nobody hears you coming.'},{n:'Bloodrage Hide',q:'Legendary',v:10,f:26,g:'armor_dragonskin',fl:'Still warm, somehow.',d:'Every hit you take adds +10% damage dealt (5 stacks, 2 turns).'}],
+ Clothes:[{n:'Wanderer’s Hood',q:'Worn',v:2,s:'Head',g:'cloth_head',by:'You',fl:'Keeps the rain off.',d:'Keeps the rain and the worst of the dust off.'},{n:'Traveller’s Boots',q:'Worn',v:1,s:'Feet',g:'cloth_feet',by:'You',fl:'Resoled twice.',d:'Resoled twice.'},{n:'Wool Cloak',q:'Fine',v:3,s:'Back',g:'cloth_body',fl:'Heavy, itchy, warm.',d:'Heavy, itchy, warm.'}],
+ Shields:[{n:'Wooden Buckler',q:'Worn',v:12,g:'shield_buckler',by:'You',fl:'Better than a bare arm.',d:'Blocks a share of hits outright.'},{n:'Iron Bulwark',q:'Fine',v:28,g:'shield_bulwark',by:'Knight',fl:'A slow, steady wall.',d:'Blocks a share of hits outright.'},{n:'Brawler’s Buckler',q:'Masterwork',v:18,g:'shield_brawler',fl:'Dented in all the right places.',d:'After a block, your next regular or heavy attack hits harder.'}]
+};
+const ITEMS={Potions:[{n:'Potion',q:3,g:'ui/tab_items',f:'none',c:'#d85a5a',d:'A plain healing draught.',eff:[['HP','18','30','+12']]},{n:'Cleansing Potion',q:1,g:'ui/tab_items',f:'hue-rotate(150deg)',c:'#5ad8c0',d:'Also clears poison, burns, bleeding, concussion and blindness.',eff:[['HP','18','30','+12']]},{n:'Attack Potion',q:2,g:'ui/tab_items',f:'hue-rotate(32deg)',c:'#e0a040',d:'Bitter, and it works.',eff:[['Damage','','+25%','3 turns']]},{n:'Resilience Potion',q:1,g:'ui/tab_items',f:'hue-rotate(215deg)',c:'#6a8be0',d:'Thick as paste.',eff:[['Damage taken','','−20%','3 turns']]}],
+ Food:[{n:'Cooked Fish',q:2,g:'food_fish',f:'none',c:'#d8a070',d:'Better than it looks.',eff:[['Stamina','40','60','+20']]},{n:'Hard Bread',q:4,g:'food_bread',f:'none',c:'#c8a060',d:'Keeps forever.',eff:[['Stamina','40','52','+12']]}],
+ Arrows:[{n:'Flame Arrow',q:6,g:'ui/sub_arrows',f:'hue-rotate(30deg)',c:'#ff7a3a',d:'Sets the target burning. Chosen and fired in battle.'},{n:'Freeze Arrow',q:3,g:'ui/sub_arrows',f:'hue-rotate(185deg)',c:'#7ad0ff',d:'Freezes the target. Chosen and fired in battle.'},{n:'Bomb Arrow',q:2,g:'ui/sub_arrows',f:'grayscale(1)',c:'#c0c0c0',d:'Explodes on impact. Chosen and fired in battle.'}]};
+// --- talismans: all 38 from scripts/Talismans.gd in the game's order: [name, rarity, group, what it does (overview), lore (draft)] ---
+const RC={common:'#d9d9cc',uncommon:'#73d973',rare:'#73a6ff',epic:'#d980ff'};
+const TIMG={common:'talisman_common',uncommon:'talisman_uncommon',rare:'talisman_rare',epic:'talisman_epic'};
+const SLOT_LV=[1,4,8,12];
+function slotsOpen(L){return SLOT_LV.filter(l=>L>=l).length;}
+const TAL=[
+ ['Ember Charm','common','Offense','10% chance for an attack to set the target on fire (2% per hit on multi-hit moves).','A coal that never went out, sewn into a scrap of cloth.'],
+ ['Wolf Fang','common','Offense','Traitor Wolves turn up more often and are likelier to join you. Adds a party slot only a Fickle Wolf can fill; wolves stay 5 battles longer.','Pulled from a wolf that chose the wrong pack. It still listens for a howl.'],
+ ['Berserker’s Knot','uncommon','Offense','+100% damage while at or below 20% HP.','Tie it tight and stop counting your wounds.'],
+ ['Duelist’s Coin','uncommon','Offense','-15% damage on every hit, but crits deal 300% damage and land 5% more often.','Heads, you win by a hair. Tails, you were never going to lose.'],
+ ['Whetstone Pendant','common','Offense','Whoever lands the first hit each battle (you or an ally) deals 50% more damage with it.','Hums faintly whenever a blade is drawn.'],
+ ['Fletcher’s Ring','common','Offense','No limit on carried special arrows, but they cost 10% more.','Worn smooth by a thousand nocks.'],
+ ['Stone Amulet','uncommon','Defense','Doubles what your weapon’s material does: its damage, price and stamina swings, and its passive.','Cold, heavy, and certain of itself.'],
+ ['Turtle Shell','common','Defense','The current can’t sweep you off a water tile without asking first.','Slow is a kind of safe.'],
+ ['Wind Chime','uncommon','Defense','Your Taunt enrages enemies past reason: each attacks whoever is nearest, even each other.','A pretty sound that makes the wrong people very angry.'],
+ ['Guardian Knot','common','Defense','Your allies gain +40 Defense and Fortitude.','Tied by someone who wanted you protected.'],
+ ['Iron Will Band','rare','Defense','10% chance to survive a killing blow with 1 HP (once a battle).','Stubbornness, hammered flat and worn on the wrist.'],
+ ['Cliffwalker’s Bead','common','Defense','Cliff falls deal no damage, and you can attack up a ledge or cliff with any weapon.','Strung by someone who never once looked down.'],
+ ['Moss Charm','uncommon','Sustain','Regain 1 HP at the start of each of your turns, plus 1 more for every 20 max HP.','Soft, damp, quietly mending.'],
+ ['Healer’s Knot','common','Sustain','Potions and food heal 25% more.','A bandage someone never took off.'],
+ ['Bloodstone','uncommon','Sustain','Heal 3 HP whenever an enemy falls.','It drinks what the battlefield spills, and shares.'],
+ ['Second Wind Whistle','common','Sustain','Regain 5 extra stamina each battle turn.','One short note, and your lungs remember how.'],
+ ['Deep Lung Charm','common','Sustain','Every weapon special costs 5 less stamina.','A breath held longer than any sailor’s.'],
+ ['Lucky Clover','uncommon','Economy','Doubles the chance of every secondary effect: burning, bleeding, stuns, extra strikes and other on-hit procs.','Four leaves, and the fourth is the lucky one.'],
+ ['Merchant’s Coin','common','Economy','+10% coins from every source.','Spent ten thousand times, and it always comes home.'],
+ ['Haggler’s Tooth','uncommon','Economy','-10% off every shop price.','Bared at the counter, it does most of the talking.'],
+ ['Gilded Scarab','rare','Economy','+0.125 attack power and +0.1 damage reduction for every coin you are holding.','Hungry for coins.'],
+ ['Tax Collector’s Seal','rare','Economy','20% chance for any landed hit to drop an extra coin (bosses excluded).','Stamped on every wound it ever caused.'],
+ ['Scholar’s Quill','common','Utility','+30% experience gained.','Knowledge is heavy; it pays well.'],
+ ['Swift Feather','common','Utility','+35% movement speed in the field.','Lighter than the thought of leaving.'],
+ ['Pathfinder’s Compass','rare','Utility','Every town and outskirts venue shows on your map immediately.','Its needle points to where you haven’t been yet.'],
+ ['Gambler’s Die','uncommon','Utility','Better odds at the Wishing Well and the horse races.','Every face is a six if you believe hard enough.'],
+ ['Angler’s Hook','rare','Utility','A wider bite window and rarer catches at the fishing hole.','Patience, barbed.'],
+ ['Phoenix Ash','epic','Utility','Once per run, survive a killing blow with 1 HP.','What is left when something refuses to end.'],
+ ['Glass Cannon Charm','epic','Wildcard','-50% max HP, but +75% damage on everything you deal.','Beautiful, brittle, and loud.'],
+ ['Vampire’s Pact','epic','Wildcard','Heal 25% of the damage you deal, but potions and food no longer work on you.','It always takes its cut back.'],
+ ['Momentum Chain','epic','Wildcard','Each hit you land without being hit adds +8% damage, uncapped. Being hit breaks the chain and stuns you.','Every link is a promise not to flinch.'],
+ ['Whirlwind Charm','epic','Wildcard','Every melee attack strikes twice, but all damage is cut to 40%.','Two strikes, half the weight, all the noise.'],
+ ['Weapon Whisperer','epic','Wildcard','Choose any 3 learned specials from any weapon as your loadout, but every special costs 30% more stamina.','Every blade tells it a secret, and it keeps them all.'],
+ ['Chaos Shard','rare','Wildcard','Every hit deals between 50% and 160% of its normal damage, rerolled each time.','A piece of a larger thing that never held still.'],
+ ['Last Stand Idol','epic','Wildcard','Every attack instantly kills a regular enemy (bosses unaffected), but your HP is locked at 1.','It grants the only wish worth making, and takes everything else.'],
+ ['Bloodmoon Fang','epic','Wildcard','Each hit you land stacks Bloodlust (+5% damage, +7.5% move speed). 3 turns with no hit landed by anyone crashes it, halving all your stats.','Sharpened under a red sky; always hungry.'],
+ ['Ironclad Ward','epic','Wildcard','You can only Move every other turn, but your defense is multiplied by 250%.','A wall that agreed to follow you around.'],
+ ['Wildfire Core','epic','Wildcard','A burning enemy that dies explodes for 3x its fire damage, hurting and igniting everything nearby, allies and you included.','A spark that learned to hunt.']];
+const OWN=new Set(['Scholar’s Quill','Moss Charm','Guardian Knot','Vampire’s Pact','Gilded Scarab','Wildfire Core','Merchant’s Coin','Healer’s Knot','Swift Feather','Berserker’s Knot']);
+const PARTY=[
+ {n:'Knight',L:6,hp:'40/40',at:12,df:9,fo:14,sd:4,p:2,sp:[SP('Rallying Cry','25 STA','A roar that rattles every enemy: they all take +25% damage from everyone for 3 turns.'),SP('CHARGE!!','50 STA','Run 3 tiles in one direction, over any terrain, hitting everything in the way for 2x defense plus 2/3 of attack.'),SP('Stalwart','10 STA','Brace: damage taken until the next turn is halved, each hit taken restores 20% of max stamina, and nothing can knock the Knight back.')]},
+ {n:'Necromancer',L:5,hp:'15/15',at:1,df:2,fo:20,sd:5,p:0,sp:[SP('Curse of Rot','10 HP + 15%','Rots an enemy from within: it loses 10% of its max HP every turn for 5 turns, and if it dies while cursed the kill is the Necromancer’s.'),SP('Revival Blessing','all but 1 HP','Raise a downed ally to full HP. It takes everything the Necromancer has: HP drops to 1.'),SP('Summon the Dead','5 HP each','Raise 1 HP skeletons (4 damage) for 5 HP each. You choose how many, up to one per enemy slain last battle. They charge the nearest enemy.')]},
+ {n:'Druid',L:6,hp:'18/18',at:2,df:1,fo:12,sd:5,p:1,sp:[SP('Restore','40 MP','Heal an ally for 25% of their max HP plus a third of the Druid’s magic. The Wizard’s Tower can upgrade it twice.'),SP('Empower','30 MP','An ally deals 1.5x damage for 3 turns.'),SP('Vitalize','40 MP','Doesn’t end the turn: double the Druid’s movement, but her attack drops to a flat (attack / 2) + 5.')]},
+ {n:'Rogue',L:5,hp:'20/20',at:9,df:2,fo:3,sd:8,p:0,sp:[SP('Pickpocket','free','No damage: steal 3 coins. Ends the turn, but the Rogue moves 1 extra tile next turn.'),SP('Aim for the Jugular!','40 STA','Always a crit, and the wound bleeds.'),SP('London’s Welcome','50 STA','3-7 quick slashes at 60% damage. If one misses they all miss.')]}];
+// You and the party are one list: "You" first, then the recruits.
+const HERO={n:'You',face:'face_you',L:7,hero:1,hp:'34/34',df:DEF_NOW,fo:FORT_NOW,res:['stat_stamina','Stamina','100 / 100']};
+PARTY.forEach(m=>{m.face='face_'+m.n.toLowerCase();m.res=m.n==='Druid'?['stat_mana','Mana','100 / 100']:(m.n==='Necromancer'?null:['stat_stamina','Stamina','100 / 100']);});
+const UNITS=[HERO].concat(PARTY);
+const ROOMS=[['Great Expanse','#3f6a35'],['Great Expanse','#3f6a35'],['Whispering Woods','#2a5a3a'],['Whispering Woods','#2a5a3a'],['Lavaridge','#8a3d22'],['Lavaridge','#8a3d22'],['Frozen Wastes','#9ab8c8'],['Frozen Wastes','#9ab8c8'],
+ ['Great Expanse','#3f6a35'],['Castle Town','#b09040'],['Great Expanse','#3f6a35'],['Whispering Woods','#2a5a3a'],['Lavaridge','#8a3d22'],['Heart of the Mountain','#6a2a1a'],['Frozen Wastes','#9ab8c8'],['Lexian Peaks','#7a7a85'],
+ ['Sunken Coast','#2a5a8a'],['Great Expanse','#3f6a35'],['Pesca','#3a7aa0'],['Swamp','#4a5a2a'],['Swamp','#4a5a2a'],['Desert','#c8a860'],['Desert','#c8a860'],['Lexian Peaks','#7a7a85'],
+ ['Open Sea','#1f4a78'],['Sunken Coast','#2a5a8a'],['Leviathan’s Shore','#2a6a9a'],['Swamp','#4a5a2a'],['Desert','#c8a860'],['Desert','#c8a860'],['Voidlands','#3a2a4a'],['Voidlands','#3a2a4a']];
+const PINS={9:'town',2:'town',18:'harbour',13:'boss',26:'boss',5:'chest',21:'chest'};const HERE=10;
+let S={tab:'Gear',sub:{Gear:'Weapons',Items:'Potions',Settings:'Audio',Party:'Equipment'},sel:{},sort:0,q:'',tw:{'You':['Scholar’s Quill','Moss Charm'],'Knight':['Guardian Knot'],'Necromancer':[],'Druid':['Healer’s Knot'],'Rogue':['Swift Feather']},unit:0,pop:'',gcat:'Weapons',tsel:'Scholar’s Quill',zoom:1,spi:0};
+const SORTS=['Best quality','Number','Name','Newest'];
+function el(p,css,txt,cls){const e=document.createElement('div');if(cls)e.className=cls;e.style.cssText=css||'';if(txt!==undefined)e.textContent=txt;p.appendChild(e);return e;}
+// a button as wide as its words: a frame sprite, the icon at 2x, the label; nothing is ever cut off
+function btn(p,txt,cls,fn,css,icon){const b=document.createElement('button');b.className='btn fr '+(cls||'')+(icon?' ic2':'');if(icon)b.appendChild(ico(icon));if(txt!==''){const s=document.createElement('span');s.textContent=txt;b.appendChild(s);}b.onclick=fn;if(css)b.style.cssText=css;p.appendChild(b);return b;}
+// a text field exactly as wide as what is in it (or its placeholder), never wider than the room it has
+function fitInput(inp,maxW){const m=document.createElement('span');m.style.cssText='position:absolute;visibility:hidden;white-space:pre';m.textContent=inp.value||inp.placeholder;stage.appendChild(m);const w=Math.min(maxW,Math.max(120,m.offsetWidth+16+12+8));m.remove();inp.style.width=w+'px';}
+const sgn=v=>(v>=0?'+':'−')+Math.abs(v);
+// one line of "what it does to you": icon(s) + label, from -> to, and what changes
+function statRow(p,label,from,to,note,icons){
+ const r=el(p,'','','sr');if(FULL[label])r.title=FULL[label];
+ const b=document.createElement('b');(icons||(RI[label]?[RI[label]]:[])).forEach(n=>b.appendChild(ico(n)));const t=document.createElement('span');t.textContent=label;b.appendChild(t);r.appendChild(b);
+ const v=document.createElement('span');v.textContent=(from!==''?from+' → ':'')+to;
+ if(note!==''&&note!=null){const i=document.createElement('i');i.textContent=note;i.className=(String(note)[0]==='+')?'good':(String(note)[0]==='−'?'bad':'dim');v.appendChild(i);}
+ r.appendChild(v);return r;}
+function adds(p,rows){const box=el(p,'margin-top:8px');rows.forEach(r=>statRow(box,r[0],r[1],r[2],r[3],r[4]));}
+function iconRow(p,icon,left,right,css){const r=el(p,css||'','','sr');const l=document.createElement('b');if(icon)l.appendChild(ico(icon));else el(l,'width:32px;flex:none');const t=document.createElement('span');t.textContent=left;l.appendChild(t);r.appendChild(l);el(r,'',right,'gold');return r;}
+function specials(p,list,key){
+ el(p,'margin-top:10px;margin-bottom:4px','Specials','lbl');
+ if(!list.length){el(p,'','No specials.','dim');return;}
+ const rows=el(p,'');const box=el(p,'','','dbox f-inset fr');
+ if(S.spk!==key){S.spk=key;S.spi=0;}
+ // the pointing arrow marks the special being read
+ // a special you are not yet clever enough to learn is greyed, shows the Intelligence it needs instead of its cost, and says so
+ const locked=s=>s.li&&s.li>STATV.INTL;
+ const show=i=>{S.spi=i;[...rows.children].forEach((r,j)=>{r.classList.toggle('on',j===i);r.firstChild.style.visibility=j===i?'visible':'hidden';});box.textContent=(locked(list[i])?'Needs INTL '+list[i].li+' to learn it (you have '+STATV.INTL+'). ':'')+list[i].d;};
+ if(S.spi>=list.length)S.spi=0;
+ list.forEach((s,i)=>{const r=el(rows,'','','spr'+(locked(s)?' locked':''));const cu=im('ui/ui_cursor',32,'visibility:hidden');cu.className+=' cur';r.appendChild(cu);const a=document.createElement('span');a.textContent=s.n;r.appendChild(a);const c=document.createElement('small');if(locked(s)){c.textContent='INTL '+s.li;}else c.textContent=s.c;r.appendChild(c);r.onmouseenter=()=>show(i);r.onclick=()=>show(i);});
+ show(S.spi);
+}
+function render(){
+ stage.innerHTML='';RAYC.length=0;
+ const win=el(stage,'position:absolute;left:20px;top:15px;width:1240px;height:690px','','f-panel fr');
+ el(win,'position:absolute;left:14px;top:14px','Inventory','h');
+ const tabs=el(win,'position:absolute;left:230px;top:4px;display:flex');
+ TABS.forEach(t=>{const on=S.tab===t[0];btn(tabs,on?t[0]:'','tb'+(on?' on':''),()=>{S.tab=t[0];S.pop='';render();},'',t[1]).title=t[0];});
+ btn(win,'×','',()=>{},'position:absolute;right:6px;top:6px;margin:0;width:48px;height:48px;justify-content:center;font-size:28px');
+ const body=el(win,'position:absolute;left:14px;right:14px;top:64px;bottom:40px');
+ el(win,'position:absolute;left:14px;bottom:8px','Q / E  Tabs      Arrows  Move      Z  Select      X  Close','dim');
+ ({Gear:gear,Items:items,Party:party,Map:map,Settings:settings})[S.tab](body);
+ if(S.pop==='tal')talPopup();else if(S.pop==='gear')gearPopup();
+}
+document.addEventListener('keydown',e=>{if(!S.pop)return;if(e.key==='Escape'||(e.key==='x'&&e.target.tagName!=='INPUT')){S.pop='';render();}});
+function subtabs(p,names){const r=el(p,'display:flex;flex-wrap:wrap;margin-bottom:8px');names.forEach(n=>btn(r,n,S.sub[S.tab]===n?'on':'',()=>{S.sub[S.tab]=n;S.q='';render();},'',SUBI[n]));return r;}
+// --- the grid + detail view, used by the Gear and Items tabs and by the gear picker popup -----------------------------------
+// o: {unit (who is dressing), fixed (a single category, no sub-tabs), cols, left (grid width), dw (detail width)}
+function listPane(body,source,kind,o){
+ o=Object.assign({unit:'You',fixed:null,cols:5,left:688,dw:480},o||{});
+ const left=el(body,'position:absolute;left:0;top:0;width:'+o.left+'px;bottom:0');
+ let sub;if(o.fixed)sub=o.fixed;else{subtabs(left,Object.keys(source));sub=S.sub[S.tab];}
+ const tool=el(left,'display:flex;align-items:center;flex-wrap:wrap;margin-bottom:12px;gap:4px 0');
+ if(kind==='gear'){btn(tool,'Sort: '+SORTS[S.sort],'s',()=>{S.sort=(S.sort+1)%SORTS.length;render();});if(sub==='Weapons')['Can wield','Has rune'].forEach(c=>btn(tool,c,'s',()=>{}));}
+ else el(tool,'margin-right:12px','Click an item to use it.','dim');
+ el(tool,'flex:1;min-width:4px');
+ const inp=document.createElement('input');inp.type='text';inp.className='fr';inp.placeholder='Search';inp.value=S.q;tool.appendChild(inp);fitInput(inp,o.left-20);
+ const grid=el(left,'display:grid;grid-template-columns:repeat('+o.cols+',128px);gap:12px;align-content:start');
+ inp.oninput=()=>{S.q=inp.value;fitInput(inp,o.left-20);renderGrid();};
+ function renderGrid(){
+  grid.innerHTML='';
+  let l=source[sub].filter(i=>i.n.toLowerCase().includes(S.q.toLowerCase()));
+  if(kind==='gear'){if(S.sort===0)l.sort((a,b)=>qrank(b.q)-qrank(a.q));if(S.sort===1)l.sort((a,b)=>b.v-a.v);if(S.sort===2)l.sort((a,b)=>a.n.localeCompare(b.n));}
+  if(!S.sel[sub]||!l.find(i=>i.n===S.sel[sub]))S.sel[sub]=l.length?l[0].n:'';
+  l.forEach(i=>{const mine=kind==='gear'&&i.by===o.unit;const c=el(grid,'width:128px;height:152px','','card fr'+(S.sel[sub]===i.n?' sel':'')+(mine?' eq':''));c.title=i.n;
+   const pl=el(c,'','','ic');iconPlate(pl,i,kind,56);
+   el(c,'top:2px;right:2px',kind==='gear'?String(i.v):'x'+i.q,'chip');
+   if(kind==='gear'&&i.by&&i.by!==o.unit)el(c,'top:2px;left:2px;min-width:28px',i.by[0],'chip').title='Worn by '+i.by;
+   el(c,'',i.n,'nm'+(i.q==='Mythic'?' myth':''));
+   if(kind==='gear'&&o.unit==='You'&&lacks(i).length)c.style.opacity='.55';
+   c.onclick=()=>{S.sel[sub]=i.n;if(kind==='items'&&sub!=='Arrows'){i.q=Math.max(0,i.q-1);}render();};});
+  if(!l.length)el(grid,'grid-column:1/'+(o.cols+1)+';padding:30px 0;text-align:center','Nothing here matches.','dim');
+  detail(body,source[sub].find(i=>i.n===S.sel[sub]),sub,kind,source[sub],o);
+ }
+ renderGrid();
+}
+// the picture of the selected thing, sitting on the top edge of its detail card
+function emblem(body,dw,it,kind){
+ const o=body.querySelector('.dicon');if(o)o.remove();
+ const e=el(body,'position:absolute;right:'+(dw/2-56)+'px;top:0;width:112px;height:112px;z-index:3','','card sel fr dicon');
+ const inner=el(e,'position:absolute;inset:0;overflow:hidden','','ic');iconPlate(inner,it,kind,44);return e;
+}
+function giveGear(it,cat,unit){GEAR[cat].forEach(i=>{if(i.by===unit&&(cat!=='Clothes'||i.s===it.s))i.by=null;});it.by=unit;}
+// what wearing this does to the unit it is being dressed on, against what that unit wears now
+function gearRows(it,cat,unit){
+ const rows=[];const u=UNITS.find(x=>x.n===unit);const hero=unit==='You';
+ const cur=GEAR[cat].find(i=>i.by===unit&&(cat!=='Clothes'||i.s===it.s));const mine=it.by===unit;
+ const change=(label,base,after,suf)=>{suf=suf||'';return mine?[label,'',base+suf,'equipped']:[label,base+suf,after+suf,sgn(after-base)+suf];};
+ if(cat==='Weapons')rows.push(mine?['Damage','',it.v,'equipped']:['Damage',cur?cur.v:'',it.v,cur?sgn(it.v-cur.v):'']);
+ if(cat==='Armour'){const dn=u.df-(cur?cur.v:0)+it.v,fn=u.fo-(cur?cur.f:0)+it.f;
+  rows.push(change('Defense',u.df,dn));rows.push(change('FTD',u.fo,fn));
+  rows.push(['Bodily harm',mine?'':'−'+harm(u.df)+'%','−'+harm(mine?u.df:dn)+'%','']);}
+ if(cat==='Clothes'){const dn=u.df-(cur?cur.v:0)+it.v;rows.push(change('Defense',u.df,dn));}
+ if(cat==='Shields'){const bn=cur?cur.v:0;rows.push(mine?['Block chance','',it.v+'%','equipped']:['Block chance',cur?bn+'%':'',it.v+'%',cur?sgn(it.v-bn)+'%':'']);}
+ // what it asks of you, on one line: Might for heavy weapons, Intimidation too for a Mythic, Intelligence in place of Might for a staff
+ if(it.m||it.mi||it.intl){const ic=[],txt=[],lack=[];
+  if(it.m){ic.push('stat_might');txt.push('MGT '+it.m);if(hero&&it.m>STATV.MGT)lack.push('MGT '+STATV.MGT);}
+  if(it.mi){ic.push('stat_intimidation');txt.push('INT '+it.mi);if(hero&&it.mi>STATV.INT)lack.push('INT '+STATV.INT);}
+  if(it.intl){ic.push('stat_intelligence');txt.push('INTL '+it.intl);if(hero&&it.intl>STATV.INTL)lack.push('INTL '+STATV.INTL);}
+  rows.push(['Needs','',txt.join(' · '),lack.length?'you have '+lack.join(' · '):'',ic]);}
+ return rows;}
+function detail(body,it,sub,kind,all,o){
+ const old=body.querySelector('.det');if(old)old.remove();
+ const d=el(body,'position:absolute;right:0;top:56px;width:'+o.dw+'px;bottom:0;padding:60px 8px 28px','','det dcol f-steel fr');
+ if(!it){el(d,'','Select something.','dim');return;}
+ const gear=kind==='gear';
+ emblem(body,o.dw,it,kind);
+ el(d,'text-align:center',it.n,'h'+(it.q==='Mythic'?' myth':''));
+ // the plain name above; material and quality in small type beneath, since the picture already says both
+ el(d,'text-align:center;color:'+(gear?QTXT[it.q]:it.c),gear?(it.mat?it.mat+' · ':'')+it.q:'x'+it.q);
+ if(it.fl)el(d,'',it.fl,'lore');
+ const rows=gear?gearRows(it,sub,o.unit):(it.eff||[]).slice();
+ if(it.ps)rows.push(['Passive','',it.ps,'']);
+ if(rows.length)adds(d,rows);
+ if(it.x)specials(d,it.x,it.n);
+ else if(it.d)el(d,'','','dbox f-inset fr').textContent=it.d;
+ if(gear){
+  // the Equip button hangs off the bottom edge of the card, like the picture sits on the top edge
+  const mine=it.by===o.unit;const locked=o.unit==='You'&&lacks(it).length>0;
+  const label=mine?'Take off':(it.by?'Take from '+it.by:'Equip');
+  const bw=el(d,'position:absolute;left:0;right:0;bottom:-32px;display:flex;justify-content:center;z-index:4');
+  const b=btn(bw,label,mine?'':'on',()=>{if(mine)it.by=null;else giveGear(it,sub,o.unit);render();},'margin:0;padding:0 14px');
+  if(locked&&!mine){b.classList.add('off');b.onclick=null;}
+ }
+ else if(kind==='items'&&sub!=='Arrows')el(d,'margin-top:auto;text-align:center','Click it in the grid to use it.','dim');
+}
+function gear(b){listPane(b,GEAR,'gear',{unit:'You'});}
+function items(b){listPane(b,ITEMS,'items',{});}
+// ---- Party: You and the recruits on one page -------------------------------------------------------------------------
+function wearer(name){const u=UNITS.find(x=>(S.tw[x.n]||[]).includes(name));return u?u.n:null;}
+// one talisman can be worn by one unit at a time: wearing it here takes it from whoever had it
+function wearToggle(unit,name){const u=UNITS.find(x=>x.n===unit);const mine=S.tw[unit];const i=mine.indexOf(name);
+ if(i>=0){mine.splice(i,1);return;}
+ if(mine.length>=slotsOpen(u.L))return;
+ const w=wearer(name);if(w)S.tw[w].splice(S.tw[w].indexOf(name),1);
+ mine.push(name);}
+// a charm slot: a worn one is a white-framed tile with its art, an empty one a sunken box, a locked one says when it opens
+function pip(p,kind,v){
+ const s=el(p,'width:64px;height:64px;flex:none;margin-right:8px;display:flex;align-items:center;justify-content:center','',kind==='worn'?'card eq fr':'f-inset fr');
+ if(kind==='worn'){s.style.background=RC[v[1]]+'33';s.style.backgroundClip='padding-box';s.appendChild(im(TIMG[v[1]],32));s.title=v[0];}
+ else if(kind==='open'){s.title='Empty slot';}
+ else{s.style.color='var(--dim)';s.textContent='Lv '+v;s.title='Opens at level '+v;}
+ return s;}
+function worn(unit,cat){return GEAR[cat].filter(i=>i.by===unit);}
+function party(b){
+ const u=UNITS[S.unit];
+ const top=el(b,'position:absolute;left:0;right:0;top:0;height:104px;display:flex;gap:12px');
+ UNITS.forEach((m,i)=>{const on=i===S.unit;const c=el(top,'width:96px;text-align:center;cursor:pointer;opacity:'+(on?1:.6));c.onclick=()=>{S.unit=i;render();};
+  const tile=el(c,'width:80px;height:80px;margin:0 auto;display:flex;align-items:center;justify-content:center;background:var(--v0);background-clip:padding-box','','card fr'+(on?' eq':''));tile.appendChild(im('ui/'+m.face,32));
+  el(c,'margin-top:-2px;color:'+(on?'var(--g3)':'var(--dim)'),m.n);});
+ const L=el(b,'position:absolute;left:0;top:112px;width:288px;bottom:0;padding:8px;text-align:center','','f-steel fr');
+ const pb=el(L,'width:160px;height:160px;margin:0 auto 6px;display:flex;align-items:center;justify-content:center;background:var(--v0)','','f-inset fr');pb.appendChild(im('ui/'+u.face,128));
+ el(L,'',u.n,'h');
+ const lv=el(L,'display:flex;align-items:center;justify-content:center;gap:8px;color:var(--dim)');lv.appendChild(ico('stat_level'));lv.appendChild(document.createTextNode('Level '+u.L));
+ if(u.hero){const bar=el(L,'height:32px;margin:2px auto 0;width:200px','','f-inset fr');el(bar,'height:16px;width:65%;background:#7fb0ff;box-shadow:inset 0 -4px 0 #3d6fd8, inset 0 4px 0 #c6e0ff');el(L,'color:var(--dim)','XP 340 / 520');}
+ const vit=el(L,'margin-top:6px;text-align:left');
+ iconRow(vit,'stat_health','HP',u.hp);
+ if(u.res)iconRow(vit,u.res[0],u.res[1],u.res[2]);
+ else el(vit,'padding:6px 4px','Her mana is her HP.','dim');
+ if(!u.hero&&u.p){const bp=el(L,'margin-top:6px;display:flex;align-items:center;justify-content:center;gap:8px','','good');bp.appendChild(ico('stat_level'));bp.appendChild(document.createTextNode(u.p+' bonus pick'+(u.p>1?'s':'')+' to spend'));}
+ const R=el(b,'position:absolute;left:304px;right:0;top:112px;bottom:0;padding:8px 12px','','f-steel fr');
+ const names=u.hero?['Equipment','Specials','Stats','Defense','Run']:['Equipment','Specials','Stats'];
+ if(!names.includes(S.sub.Party))S.sub.Party='Equipment';
+ subtabs(R,names);
+ const sub=S.sub.Party;
+ if(sub==='Equipment')equipment(R,u);
+ else if(sub==='Specials'){const w=worn(u.n,'Weapons')[0];specials(R,(u.sp||[]).concat(w&&w.x?w.x:[]),u.n+(w?w.n:''));}
+ else if(sub==='Stats')statsPage(R,u);else if(sub==='Defense')defensePage(R);else runPage(R);
+}
+// one slot of the Equipment page: a tile with what is worn, its name, a pointing arrow; press it to choose what goes there
+function slotCell(parent,icon,label,cat,u,w){
+ const its=worn(u.n,cat);
+ const c=el(parent,'width:'+w+'px;display:flex;align-items:center;gap:12px;cursor:pointer;padding:4px 6px;margin-bottom:6px');
+ c.onclick=()=>{S.pop='gear';S.gcat=cat;S.q='';render();};
+ c.onmouseenter=()=>{c.style.background='var(--v2)';c.style.boxShadow='inset 2px 2px 0 var(--v3),inset -2px -2px 0 var(--v1)';};c.onmouseleave=()=>{c.style.background='';c.style.boxShadow='';};
+ const tile=el(c,'width:104px;height:104px;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;background:var(--v1);background-clip:padding-box','','card fr');
+ if(its.length){const i=its[0];const g=GLOW[i.q];tile.style.background=g?(g.plate||g.c+'2e'):'var(--v1)';tile.style.backgroundClip='padding-box';if(g)rays(tile,i.q,44,i.n);tile.appendChild(im(i.g,64,'position:relative;z-index:1'));}
+ const t=el(c,'flex:1;min-width:0');
+ const lab=el(t,'display:flex;align-items:center;gap:8px','','dim');lab.appendChild(ico(icon));lab.appendChild(document.createTextNode(label));
+ el(t,its.length&&its[0].q==='Mythic'?'':'color:'+(its.length?'var(--cream)':'var(--dim)'),its.length?its.map(i=>i.n).join(' · '):'—',its.length&&its[0].q==='Mythic'?'myth':'');
+ el(c,'font-size:28px','›','gold');
+ return c;}
+function equipment(R,u){
+ const row1=el(R,'display:flex;gap:12px');slotCell(row1,'sub_weapons','Weapon','Weapons',u,418);slotCell(row1,'sub_armour','Armour','Armour',u,418);
+ const row2=el(R,'display:flex;gap:12px');
+ if(u.hero){slotCell(row2,'sub_clothes','Clothes','Clothes',u,418);slotCell(row2,'sub_shields','Shield','Shields',u,418);}
+ else slotCell(row2,'sub_shields','Shield','Shields',u,418);
+ // Talismans: the charm slots in a row, pressed to open the talisman popup
+ const mine=S.tw[u.n],open=slotsOpen(u.L);
+ const tl=el(R,'display:flex;align-items:center;gap:12px;cursor:pointer;padding:4px 6px;margin-top:2px');
+ tl.onclick=()=>{S.pop='tal';S.tsel=mine.length?mine[0]:(S.tsel&&OWN.has(S.tsel)?S.tsel:'Scholar’s Quill');render();};
+ tl.onmouseenter=()=>{tl.style.background='var(--v2)';tl.style.boxShadow='inset 2px 2px 0 var(--v3),inset -2px -2px 0 var(--v1)';};tl.onmouseleave=()=>{tl.style.background='';tl.style.boxShadow='';};
+ const lab=el(tl,'width:150px;display:flex;align-items:center;gap:8px','','dim');lab.appendChild(ico('tab_talismans'));lab.appendChild(document.createTextNode('Talismans'));
+ const pips=el(tl,'display:flex');
+ for(let i=0;i<4;i++){if(i<mine.length)pip(pips,'worn',TAL.find(x=>x[0]===mine[i]));else if(i<open)pip(pips,'open',null);else pip(pips,'locked',SLOT_LV[i]);}
+ el(tl,'margin-left:auto',mine.length+' / '+open+' slots','dim');el(tl,'font-size:28px;margin-left:8px','›','gold');
+ el(R,'margin-top:6px','Press a tile to change what '+(u.hero?'you wear':u.n+' wears')+'. Talisman slots open at levels 1, 4, 8 and 12.','dim');
+}
+function statsPage(R,u){
+ if(u.hero){
+  const cols=el(R,'display:grid;grid-template-columns:1fr 1fr;gap:0 24px;margin-top:4px');
+  STATS.forEach(s=>{const r=el(cols,'','','stat');r.title=FULL[s[0]]+(s[5]?'\n'+s[5]:'');r.appendChild(ico(s[4]));el(r,'',s[0],'ab');el(r,'',s[2],'dd');el(r,'',String(s[3]),'gold');});
+  el(R,'margin-top:10px','Hover a stat for more.','dim');
+ }else{
+  const c=el(R,'width:480px;margin-top:4px');
+  [['stat_health','HP',u.hp],['stat_damage','Attack',u.at],['stat_defense','Defense',u.df],['stat_fortitude','FTD',u.fo],['stat_speed','Speed',u.sd]].forEach(s=>{const r=iconRow(c,s[0],s[1],s[2]);if(FULL[s[1]])r.title=FULL[s[1]];});
+ }
+}
+function defensePage(R){
+ const cols=el(R,'display:grid;grid-template-columns:1fr 1fr;gap:0 24px;margin-top:4px');
+ const a=el(cols,'');const h1=el(a,'display:flex;align-items:center;gap:8px;margin-bottom:6px','','h');h1.appendChild(ico('stat_defense'));h1.appendChild(document.createTextNode('Bodily harm − 21%'));
+ [['sub_armour','Armour (Leather Vest)','+8'],['sub_clothes','Clothes','+3'],['sub_shields','Shield (Wooden Buckler)','+12'],['stat_resilience','RES','+3']].forEach(r=>iconRow(a,r[0],r[1],r[2]));
+ el(a,'margin-top:6px','26 points of Defense, with diminishing returns.','dim');
+ const b=el(cols,'');const h2=el(b,'display:flex;align-items:center;gap:8px;margin-bottom:6px;color:#7fb0ff','','h');h2.style.color='#7fb0ff';h2.appendChild(ico('stat_fortitude'));h2.appendChild(document.createTextNode('Magical harm − 8%'));
+ [['sub_armour','Armour','+0'],['sub_shields','Shield','+5'],['stat_fortitude','FTD','+3']].forEach(r=>iconRow(b,r[0],r[1],r[2]));
+ el(b,'margin-top:6px','8 points of Fortitude.','dim');
+}
+function runPage(R){
+ const c=el(R,'width:560px;margin-top:4px');el(c,'margin-bottom:4px','This run','lbl');
+ [['stat_intimidation','Foes defeated',48],['stat_level','Bosses beaten',1],['stat_coin','Coins earned',612],['stat_damage','Waves cleared',4],['stat_shard','Essence earned','31 (kept)']].forEach(r=>iconRow(c,r[0],r[1],String(r[2])));
+}
+// ---- popups ----------------------------------------------------------------------------------------------------------------
+function overlay(w,h){
+ const ov=el(stage,'position:absolute;left:20px;top:15px;width:1240px;height:690px;background:rgba(8,6,12,.72);z-index:20');
+ ov.onclick=e=>{if(e.target===ov){S.pop='';render();}};
+ const pp=el(ov,'position:absolute;left:'+((1240-w)/2)+'px;top:'+((690-h)/2)+'px;width:'+w+'px;height:'+h+'px','','f-panel fr');
+ return pp;}
+function popHead(pp,icon,title,sub){
+ const hd=el(pp,'position:absolute;left:8px;right:8px;top:0;height:52px;display:flex;align-items:center;gap:12px');
+ hd.appendChild(ico(icon));el(hd,'',title,'h');el(hd,'',sub,'dim');el(hd,'flex:1');
+ btn(hd,'×','',()=>{S.pop='';render();},'margin:0;width:48px;height:48px;justify-content:center;font-size:28px');
+ return hd;}
+// The gear picker: the same grid and detail as the Gear tab, for one slot of one unit. Whatever someone else wears is marked with their initial.
+function gearPopup(){
+ const u=UNITS[S.unit];
+ const pp=overlay(1200,670);
+ popHead(pp,SUBI[S.gcat],S.gcat,(u.hero?'for you':'for '+u.n)+' · Level '+u.L);
+ const body=el(pp,'position:absolute;left:8px;right:8px;top:56px;bottom:34px');
+ listPane(body,GEAR,'gear',{unit:u.n,fixed:S.gcat,cols:4,left:548,dw:580});
+ el(pp,'position:absolute;left:8px;bottom:2px','Z  Equip / take off      X  Close','dim');
+}
+// The talisman popup: this unit's slots on top, every talisman below in a fixed order, the picked one at the right.
+function talPopup(){
+ const u=UNITS[S.unit];const open=slotsOpen(u.L);const mine=S.tw[u.n];
+ const pp=overlay(1200,670);
+ popHead(pp,'tab_talismans','Talismans',u.n+' · Level '+u.L+' · '+open+' of 4 slots open');
+ const bd=el(pp,'position:absolute;left:8px;right:8px;top:60px;bottom:34px;display:flex;gap:16px');
+ const lf=el(bd,'width:664px;flex:none');
+ el(lf,'margin-bottom:4px','Charm slots','lbl');
+ const slots=el(lf,'display:flex;margin-bottom:10px');
+ for(let i=0;i<4;i++){
+  if(i<mine.length){const t=TAL.find(x=>x[0]===mine[i]);const p=pip(slots,'worn',t);p.style.cursor='pointer';p.onclick=()=>{S.tsel=t[0];render();};}
+  else if(i<open)pip(slots,'open',null);
+  else pip(slots,'locked',SLOT_LV[i]);}
+ el(lf,'margin-bottom:4px','All talismans  ('+OWN.size+' of '+TAL.length+' found)','lbl');
+ const grid=el(lf,'display:grid;grid-template-columns:repeat(8,72px);gap:8px');
+ TAL.forEach(t=>{const own=OWN.has(t[0]);const w=wearer(t[0]);
+  const c=el(grid,'width:72px;height:72px;position:relative;display:flex;align-items:center;justify-content:center;background:'+(own?RC[t[1]]+'33':'#07060b')+';background-clip:padding-box','','card fr'+(w===u.n?' eq':'')+(S.tsel===t[0]?' sel':''));
+  c.appendChild(im(TIMG[t[1]],32,own?'':'filter:brightness(0)'));
+  if(w&&w!==u.n){c.firstChild.style.opacity='.45';el(c,'right:-6px;bottom:-6px;min-width:24px;height:24px;padding:0 4px',w[0],'chip');}
+  c.onclick=()=>{S.tsel=t[0];render();};
+  c.ondblclick=()=>{if(own){wearToggle(u.n,t[0]);render();}};});
+ // the picked one
+ const t=TAL.find(x=>x[0]===S.tsel)||TAL[0];const own=OWN.has(t[0]);const w=wearer(t[0]);
+ const d=el(bd,'flex:1;min-width:0;padding:8px 10px','','dcol f-steel fr');
+ const em=el(d,'width:96px;height:96px;margin:0 auto 6px;flex:none;display:flex;align-items:center;justify-content:center;background:'+(own?RC[t[1]]+'33':'#07060b')+';background-clip:padding-box','','card sel fr');em.appendChild(im(TIMG[t[1]],64,own?'':'filter:brightness(0)'));
+ if(own){
+  el(d,'text-align:center',t[0],'h');
+  el(d,'text-align:center;color:'+RC[t[1]],t[1][0].toUpperCase()+t[1].slice(1)+' · '+t[2]);
+  el(d,'',t[4],'lore');                                  // the lore
+  el(d,'margin-top:10px;flex:none','What it does','lbl');
+  el(d,'flex:1;margin-top:2px;min-height:0','','f-inset fr dbox').textContent=t[3];   // the overview
+  el(d,'text-align:center;margin:6px 0;flex:none',w?'Worn by '+(w===u.n?(u.hero?'you':u.n):w):'Not worn','dim');
+  let label,dis=false;
+  if(w===u.n)label='Take off';else if(mine.length>=open){label='No free slot';dis=true;}else label=w?'Take from '+w:'Wear';
+  const bt=btn(d,label,dis?'off':'on',()=>{wearToggle(u.n,t[0]);render();},'margin:0 auto;padding:0 14px');if(dis)bt.onclick=null;
+ }else{el(d,'text-align:center','???','h');el(d,'margin-top:12px;text-align:center','You have not found this one yet.','dim');}
+ el(pp,'position:absolute;left:8px;bottom:2px','Z  Wear / take off      X  Close','dim');
+}
+function map(b){
+ const holder=el(b,'position:absolute;left:0;top:0;right:0;bottom:0;overflow:hidden;background:#0a0f12','','f-steel fr');
+ const inner=el(holder,'position:absolute;left:50%;top:50%;width:1120px;height:440px;margin-left:-560px;margin-top:-240px;display:grid;grid-template-columns:repeat(8,1fr);transition:transform .2s;transform:scale('+S.zoom+')');
+ const tip=el(holder,'position:absolute;left:14px;top:10px;pointer-events:none','','gold');
+ ROOMS.forEach((r,i)=>{const seen=i%3!==2;const c=el(inner,'background:'+r[1]+';box-shadow:inset 0 0 0 2px rgba(0,0,0,.4);position:relative;display:flex;align-items:center;justify-content:center;'+(seen?'':'filter:brightness(.4)'));
+  if(PINS[i]&&seen)c.appendChild(im('ui/pin_'+PINS[i],64));
+  if(i===HERE)c.appendChild(im('ui/pin_here',64));
+  c.onmouseenter=()=>tip.textContent=seen?r[0]:'Not visited yet';c.onmouseleave=()=>tip.textContent='';});
+ const z=el(holder,'position:absolute;right:10px;top:10px;display:flex;flex-direction:column;gap:4px');
+ btn(z,'+','',()=>{S.zoom=Math.min(2.2,S.zoom+.4);render();},'margin:0;width:48px;justify-content:center;font-size:28px');btn(z,'−','',()=>{S.zoom=Math.max(1,S.zoom-.4);render();},'margin:0;width:48px;justify-content:center;font-size:28px');
+ const key=el(holder,'position:absolute;left:10px;bottom:10px;display:flex;align-items:center;gap:6px 18px;flex-wrap:wrap;padding:6px 12px','','f-inset fr');
+ [['town','town or shop'],['harbour','harbour'],['chest','chest'],['boss','boss'],['here','you are here']].forEach(k=>{const kk=el(key,'display:flex;align-items:center;gap:6px');kk.appendChild(im('ui/pin_'+k[0],32));kk.appendChild(document.createTextNode(k[1]));});
+ el(key,'','drag to pan, + / − to zoom','dim');
+}
+function settings(b){
+ const left=el(b,'position:absolute;left:0;top:0;width:900px;bottom:0');
+ subtabs(left,['Audio','Controls','Gameplay']);
+ const p=el(left,'padding:12px 16px;height:430px','','f-steel fr');const sub=S.sub.Settings;
+ const rowcss='display:flex;align-items:center;gap:16px;min-height:60px;border-bottom:2px solid #241a3f';
+ if(sub==='Audio'){[['Master volume',80],['Effects',70],['Music',55]].forEach(s=>{const r=el(p,rowcss);el(r,'width:260px',s[0]);
+  const tr=el(r,'flex:1;height:32px;position:relative','','f-inset fr');el(tr,'height:16px;width:'+s[1]+'%;background:var(--g3);box-shadow:inset 0 -4px 0 var(--g1),inset 0 4px 0 var(--g4)');
+  el(r,'width:80px;text-align:right',s[1]+'%','gold');});}
+ if(sub==='Controls'){[['Move','Arrow keys'],['Confirm','Z'],['Cancel / back','X'],['Block','Space'],['Inventory','I'],['Menu','C']].forEach(s=>{const r=el(p,'display:flex;align-items:center;min-height:52px;border-bottom:2px solid #241a3f');el(r,'flex:1',s[0]);btn(r,s[1],'',()=>{},'margin:0;min-width:140px;justify-content:center');});el(p,'margin-top:8px','Click a key, then press the new one.','dim');}
+ if(sub==='Gameplay'){[['Dodge and block popups in battle',1],['Attack timing popup in battle',1],['Show damage numbers',1]].forEach(s=>{const r=el(p,rowcss);el(r,'flex:1',s[0]);el(r,'width:40px;height:40px;display:flex;align-items:center;justify-content:center;color:var(--g3);font-size:28px','✓','f-inset fr');});}
+}
+// zoom: Fit picks the biggest whole step (½x, 1x, 1½x, 2x) that fits the window, so the pixels stay sharp
+let ZOOM='auto';
+function fit(){const cw=document.documentElement.clientWidth;let k;
+ if(ZOOM==='auto'){k=0.5;[0.5,1,1.5,2].forEach(c=>{if(W*c<=cw)k=c;});if(cw<W*0.5)k=cw/W;}else k=+ZOOM;
+ stage.style.transform='scale('+k+')';const w=document.getElementById('wrap');w.style.height=(H*k)+'px';w.style.width=(W*k)+'px';w.style.margin='0 auto';
+ document.querySelectorAll('#modebar button').forEach(b=>{const on=b.dataset.z===String(ZOOM);b.style.color=on?'#efc23c':'#a39d8c';b.style.borderColor=on?'#efc23c':'#30254f';});}
+document.querySelectorAll('#modebar button').forEach(b=>{b.onclick=()=>{ZOOM=b.dataset.z;fit();};});
+fit();render();window.addEventListener('resize',fit);
+</script>
+</body>
+</html>

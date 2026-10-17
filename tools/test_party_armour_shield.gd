@@ -14,16 +14,24 @@ func _find_all(node: Node, type_name: String, out: Array) -> void:
 
 func _texts(node: Node) -> Array:
 	var out := []
-	for kind in ["Button", "Label", "OptionButton"]:
-		var found := []
-		_find_all(node, kind, found)
-		for n in found:
-			if kind == "OptionButton":
-				for i in n.item_count:
-					out.append(n.get_item_text(i))
-			else:
-				out.append(n.text)
+	_gather_texts(node, out)
 	return out
+
+func _gather_texts(node: Node, out: Array) -> void:
+	if node is OptionButton:
+		for i in node.item_count:
+			out.append(node.get_item_text(i))
+	elif node is Label or node is Button or node is PixelButton:
+		out.append(node.text)
+	for c in node.get_children():
+		_gather_texts(c, out)
+
+# The Armour card's entry for `id`, as `member` would see it in the picker.
+func _armour_entry(player, member, id: String) -> Dictionary:
+	for e in InvData.gear_entries(player, "Armour", member):
+		if str(e.id) == id:
+			return e
+	return {}
 
 func _foe(main, tile: Vector2i, range_: int = 1, hp: int = 999) -> Dictionary:
 	var g = load("res://scripts/Enemy.gd").new()
@@ -385,10 +393,21 @@ func _init() -> void:
 	var panel = main.inventory_panel
 	main.in_battle = false
 	panel.open(player)
+	panel.party_selected_id = knight.id
+	panel.party_page = "Equipment"
+	panel._select_tab("Party")
 	await process_frame
 	var party_texts: Array = _texts(panel.tab_containers.Party)
-	print("The Party tab has Armour and Shield rows for every member: %s, %s (expected true, true)" % [party_texts.has("Armour"), party_texts.has("Shield")])
-	print("...the armour picker lists your Gambeson with its numbers: %s (expected true)" % [party_texts.any(func(t): return str(t).begins_with("Gambeson") and str(t).contains("+15 Def"))])
+	print("The Party tab has Armour and Shield tiles for a member: %s, %s (expected true, true)" % [party_texts.has("Armour"), party_texts.has("Shield")])
+	panel.open_gear_popup(knight, "Armour")
+	await process_frame
+	var gambeson_entry := {}
+	for e in panel.popup_view.shown:
+		if str(e.id) == "armor_gambeson":
+			gambeson_entry = e
+	var gambeson_rows: Array = InvData.rows(player, knight, gambeson_entry)
+	print("...the armour picker lists your Gambeson with its numbers: %s (expected true, +15 Defense)" % [not gambeson_entry.is_empty() and gambeson_rows.any(func(r): return r[0] == "Defense" and r[2] == "+15")])
+	panel.close_popup()
 	panel._on_member_armor_picked(knight, "armor_gambeson")
 	panel._on_member_shield_picked(knight, "shield_heavy")
 	print("Picking them dresses the Knight: armour=%s shield=%s (expected armor_gambeson, shield_heavy)" % [knight.armor_id(), knight.shield_id()])
@@ -397,6 +416,20 @@ func _init() -> void:
 	panel._on_member_armor_picked(knight, "")
 	panel._on_member_shield_picked(knight, "")
 	print("Choosing (none) takes them off: armour='%s' shield='%s' (expected '' and '')" % [knight.armor_id(), knight.shield_id()])
+	# The picker's own buttons: "Take from <ally>" moves it, but what YOU wear is never taken from you.
+	panel._on_member_armor_picked(knight, "armor_gambeson")
+	var held := _armour_entry(player, druid, "armor_gambeson")
+	var take: Dictionary = InvData.action_for(player, druid, held)
+	print("The picker offers the Druid 'Take from Knight': label=%s enabled=%s (expected Take from Knight, true)" % [take.label, take.enabled])
+	panel.apply_entry_action(druid, held)
+	print("...pressing it moves the armour over: druid=%s knight='%s' (expected armor_gambeson, '')" % [druid.armor_id(), knight.armor_id()])
+	panel._on_member_armor_picked(druid, "")
+	var before_armor: Dictionary = player.equipped_armor
+	player.try_buy_armor(armor_script.find("armor_gambeson"))
+	var yours := _armour_entry(player, knight, "armor_gambeson")
+	var refused: Dictionary = InvData.action_for(player, knight, yours)
+	print("...but what you wear can't be taken from you: enabled=%s reason='%s' (expected false, You are wearing it.)" % [refused.enabled, refused.reason])
+	player.try_buy_armor(before_armor)
 	panel.close()
 
 	var cfg: Dictionary = SandboxScript.default_config()
