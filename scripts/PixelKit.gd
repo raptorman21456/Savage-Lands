@@ -42,10 +42,12 @@ const RARITY_COLORS := {
 const FONT_PATHS := {
 	"body": "res://assets/fonts/Jersey10-Regular.ttf",
 	"head": "res://assets/fonts/Jersey15-Regular.ttf",
+	"big": "res://assets/fonts/Jersey15-Regular.ttf",
 	"myth": "res://assets/fonts/Jacquard12-Regular.ttf",
 }
-# Each font at its native grid: body 10 -> 20px, headings 15 -> 30px, blackletter 12 -> 24px (2 screen pixels per font pixel).
-const FONT_SIZES := {"body": 20, "head": 30, "myth": 24}
+# Each font at its native grid: body 10 -> 20px, headings 15 -> 30px, blackletter 12 -> 24px (2 screen pixels per font pixel); "big" is the
+# heading font at 3 screen pixels per font pixel (45px), for the title screen menu.
+const FONT_SIZES := {"body": 20, "head": 30, "myth": 24, "big": 45}
 
 static var _fonts := {}
 static var _frames := {}

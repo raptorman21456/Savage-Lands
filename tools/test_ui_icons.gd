@@ -26,6 +26,8 @@ func _init() -> void:
 	var empty: Array = []
 	var unoutlined: Array = []
 	for icon_name in names:
+		if icons.OVERRIDES.has(icon_name):
+			continue   # hand-drawn at 32x32 (checked below), not part of the 16x16 set
 		var tex: Texture2D = icons.texture(icon_name)
 		if tex == null:
 			missing.append(icon_name)
@@ -55,8 +57,16 @@ func _init() -> void:
 		var tex2: Texture2D = icons.texture(icon_name)
 		if tex2 != null:
 			uniques[tex2.get_image().get_data().hex_encode()] = icon_name
-	# Weapons/Armour/Shields/Potions deliberately share a picture with the stat or tab they stand for.
-	print("icons are distinct apart from the four shared on purpose: %d distinct of %d (expected %d)" % [uniques.size(), names.size(), names.size() - 4])
+	# Weapons and Potions deliberately share a picture with the stat or tab they stand for (Armour and Shields have drawings of their own now).
+	print("icons are distinct apart from the two shared on purpose: %d distinct of %d (expected %d)" % [uniques.size(), names.size(), names.size() - 2])
+
+	# --- The hand-drawn stand-ins (32x32, drawn on a finer grid) ---
+	var made_ok := true
+	for made_name in icons.OVERRIDES:
+		var made_tex: Texture2D = icons.texture(made_name)
+		if made_tex == null or made_tex.get_width() != 32 or made_tex.get_height() != 32 or icons.path_for(made_name) != icons.OVERRIDES[made_name]:
+			made_ok = false
+	print("the hand-drawn Armour and Shield icons are the ones used, 32x32: %s (expected true, %s)" % [made_ok, ", ".join(icons.OVERRIDES.keys())])
 
 	# --- Stat names ---
 	var expected := {"strength": "STR", "vigor": "VGR", "agility": "AGI", "rage": "RAGE", "dexterity": "DXT", "magic": "MAG", "intimidation": "INT", "resilience": "RES", "reflexes": "RFL", "fortitude": "FTD", "might": "MGT", "intelligence": "INTL"}

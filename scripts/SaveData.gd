@@ -263,9 +263,15 @@ static func slot_summary(n: int) -> Dictionary:
 		if d.id == difficulty_id:
 			difficulty_name = d.name
 			break
+	# How many Church upgrade levels the file owns in all (what the file select shows beside its Essence).
+	var upgrade_levels := 0
+	var owned: Dictionary = parsed.get("upgrades", {}) if typeof(parsed.get("upgrades", {})) == TYPE_DICTIONARY else {}
+	for id in owned:
+		upgrade_levels += int(owned[id])
 	return {
 		"name": parsed.get("name", "Slot %d" % n),
 		"essence": parsed.get("essence", 0),
+		"upgrades": upgrade_levels,
 		"best_wave": parsed.get("best_wave", 0),
 		"difficulty_id": difficulty_id,
 		"difficulty_name": difficulty_name,

@@ -133,8 +133,8 @@ func _init() -> void:
 	print("Stats button shows the stats screen and hides the main menu: stats_visible=%s main_menu_visible=%s (expected true, false)" % [
 		title.stats_box.visible, title.main_menu_box.visible
 	])
-	print("stats_label reflects the lifetime file: has_3=%s has_6=%s has_nothingness=%s (expected true, true, true)" % [
-		title.stats_label.text.contains("3"), title.stats_label.text.contains("6"), title.stats_label.text.contains("Nothingness")
+	print("the stats rows reflect the lifetime file: runs=%s (expected 3), kills=%s (expected 6), bosses=%s (expected 3), world=%s (expected Nothingness)" % [
+		title.stats_rows.runs.text, title.stats_rows.kills.text, title.stats_rows.bosses.text, title.stats_rows.world.text
 	])
 	title._on_stats_back_pressed()
 	print("Back returns to the main menu: main_menu_visible=%s stats_visible=%s (expected true, false)" % [

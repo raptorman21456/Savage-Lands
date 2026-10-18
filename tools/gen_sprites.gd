@@ -3097,7 +3097,7 @@ func _init() -> void:
 
 	make_icon_potion().save_png("res://assets/potion.png")
 
-	make_icon_armor_rags().save_png("res://assets/armor_rags.png")
+	# (armor_rags.png is hand-drawn art now, a 32x32 jacket: it is no longer generated here)
 	make_icon_armor_leather().save_png("res://assets/armor_leather.png")
 	make_icon_armor_iron().save_png("res://assets/armor_iron.png")
 	make_icon_armor_steel().save_png("res://assets/armor_steel.png")

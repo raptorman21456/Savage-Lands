@@ -60,6 +60,8 @@ func _title_screens() -> void:
 	SaveDataScript.active_slot = 1
 	var title = load("res://TitleScreen.tscn").instantiate()
 	root.add_child(title)
+	await _shot("title_splash", 170)
+	title._leave_splash()
 	await _shot("title_select_save", 55)
 	title._on_slot_pressed(3)
 	await _shot("title_new_save_difficulty", 55)

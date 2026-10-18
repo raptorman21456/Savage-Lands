@@ -157,7 +157,8 @@ func _init() -> void:
 	root.add_child(title)
 	await process_frame
 	await process_frame
-	print("Select Save is the first screen shown: select_save_visible=%s main_menu_visible=%s (expected true, false)" % [
+	title._leave_splash()
+	print("Select a File is the first screen after the splash: select_save_visible=%s main_menu_visible=%s (expected true, false)" % [
 		title.select_save_box.visible, title.main_menu_box.visible
 	])
 	print("a filled slot's button reflects its summary: %s (expected true, contains 'Apocalyptic')" % [
@@ -231,8 +232,8 @@ func _init() -> void:
 	print("Copy shows the destination picker naming the source: visible=%s header=%s (expected true, 'Copy Slot 1 to...')" % [
 		title.copy_target_box.visible, title.copy_target_header.text
 	])
-	print("...listing the other 2 slots as destinations -- the occupied one named, the empty one marked [Empty]: dest0_named=%s dest1_empty=%s (expected true, true)" % [
-		title.copy_target_buttons[0].text.contains("My Barbarian"), title.copy_target_buttons[1].text.contains("[Empty]")
+	print("...listing the other 2 slots as destinations -- the occupied one named, the empty one marked Empty: dest0_named=%s dest1_empty=%s (expected true, true)" % [
+		title.copy_target_buttons[0].text.contains("My Barbarian"), title.copy_target_buttons[1].text.contains("Empty")
 	])
 
 	# Destination slot 3 is empty -- copying into it needs no confirmation.

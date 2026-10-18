@@ -75,8 +75,19 @@ static func stat_tooltip(stat_id: String) -> String:
 static func stat_icon(stat_id: String) -> String:
 	return "stat_" + stat_id
 
+# Hand-drawn pictures that stand in for a generated one, wherever they were saved. These two are 32x32 (drawn on a finer grid than the
+# 16x16 set), so at the usual 32 screen pixels they show one-to-one. Delete the file and the generated icon comes back.
+const OVERRIDES := {
+	"sub_armour": "res://assets/icon_armour.png",
+	"sub_shields": "res://assets/icon_shield.png",
+}
+
 # The file for an icon name ("stat_health", "tab_gear", "sub_potions"), or "" when there is none.
 static func path_for(icon: String) -> String:
+	if OVERRIDES.has(icon):
+		var made: String = OVERRIDES[icon]
+		if ResourceLoader.exists(made) or FileAccess.file_exists(made):
+			return made
 	var path := "%s/%s.png" % [dir, icon]
 	if ResourceLoader.exists(path) or FileAccess.file_exists(path):
 		return path
