@@ -86,7 +86,7 @@ func _build_shell() -> void:
 	content.add_child(title_row)
 	title_label = Label.new()
 	title_label.text = _panel_title()
-	title_label.add_theme_font_size_override("font_size", 26)
+	PixelKit.fit(title_label, 26)
 	title_label.add_theme_color_override("font_color", Color(1, 0.9, 0.3))
 	title_row.add_child(title_label)
 	var spacer := Control.new()
@@ -130,7 +130,7 @@ func _make_label(text: String, font_size: int = 14, color: Color = Color(0.85, 0
 	var label := Label.new()
 	label.text = text
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD
-	label.add_theme_font_size_override("font_size", font_size)
+	PixelKit.fit(label, font_size)
 	label.add_theme_color_override("font_color", color)
 	return label
 
@@ -171,7 +171,7 @@ func _make_shop_row(icon_name: String, title: String, description: String, price
 	hbox.add_child(text_box)
 	var title_label_row := Label.new()
 	title_label_row.text = title
-	title_label_row.add_theme_font_size_override("font_size", 16)
+	PixelKit.fit(title_label_row, 16)
 	title_label_row.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2) if highlight else Color(0.92, 0.92, 0.88))
 	text_box.add_child(title_label_row)
 	text_box.add_child(_make_label(description, 12, Color(0.7, 0.7, 0.65)))
@@ -179,7 +179,7 @@ func _make_shop_row(icon_name: String, title: String, description: String, price
 	if price_text != "":
 		var price_label := Label.new()
 		price_label.text = price_text
-		price_label.add_theme_font_size_override("font_size", 14)
+		PixelKit.fit(price_label, 14)
 		price_label.add_theme_color_override("font_color", Color(1.0, 0.85, 0.3))
 		price_label.custom_minimum_size = Vector2(64, 0)
 		price_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT

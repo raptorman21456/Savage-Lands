@@ -75,7 +75,7 @@ class Sim {
   _battle_player_move_range() {
     let bonus = Math.max(0, Math.trunc((this.player.stat_agility - PC.AGILITY_START) / MC.AGILITY_PER_EXTRA_MOVE));
     // Berserk: an extra tile of reach for as long as it lasts.
-    if (this.player.berserk_turns_remaining > 0) bonus += MC.BERSERK_MOVE_BONUS;
+    if (this.player.berserk_turns_remaining > 0) bonus += this._berserk_move_bonus();
     if (this.player.potion_energy_turns > 0) bonus += MC.ENERGY_POTION_MOVE_BONUS;
     bonus += Math.trunc(this.player.talisman_bonus("move_range"));
     // Armour: Windrunner's Jerkin +1, Fortress Plate -1.

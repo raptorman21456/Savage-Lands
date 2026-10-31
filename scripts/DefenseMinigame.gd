@@ -16,6 +16,9 @@ signal finished
 
 const AttackPatternsScript := preload("res://scripts/AttackPatterns.gd")
 const BattleStyleScript := preload("res://scripts/BattleStyle.gd")
+const PixelFxScript := preload("res://scripts/PixelFx.gd")
+# The popup's circles, rings and lines are built from squares this many pixels across (PixelFx), not smooth curves.
+const PIXEL_CELL := 2.0
 
 # Test hook: while this holds entries, run() skips the UI and input entirely and answers from
 # here (a string outcome or a result dictionary per impact, consumed from the front).
@@ -65,19 +68,18 @@ func _ready() -> void:
 	trim_style.bg_color = Color(0, 0, 0, 0)
 	trim_style.border_color = BattleStyleScript.PANEL_TRIM
 	trim_style.set_border_width_all(1)
-	trim_style.set_corner_radius_all(BattleStyleScript.CORNER - 4)
-	trim_style.anti_aliasing = true
+	BattleStyleScript.chamfer(trim_style, BattleStyleScript.CORNER - 2)
 	trim.add_theme_stylebox_override("panel", trim_style)
 	_panel.add_child(trim)
 	_title = Label.new()
 	_title.position = Vector2(14, 8)
-	_title.add_theme_font_size_override("font_size", 18)
+	PixelKit.fit(_title, 18)
 	_panel.add_child(_title)
 	_hint = Label.new()
 	_hint.position = Vector2(14, 34)
 	_hint.size = Vector2(292, 40)
 	_hint.autowrap_mode = TextServer.AUTOWRAP_WORD
-	_hint.add_theme_font_size_override("font_size", 12)
+	PixelKit.fit(_hint, 12)
 	_hint.add_theme_color_override("font_color", BattleStyleScript.DIM)
 	_panel.add_child(_hint)
 	_canvas = Control.new()
@@ -253,23 +255,23 @@ func _draw_telegraph() -> void:
 		"ring":
 			var target_r := 30.0
 			var r: float = lerpf(target_r + 78.0, target_r, p)
-			_canvas.draw_arc(center, target_r, 0, TAU, 48, Color(1, 1, 1, 0.55), 3.0)
+			PixelFxScript.draw_ring(_canvas, center, target_r, 3.0, Color(1, 1, 1, 0.55), PIXEL_CELL)
 			if active:
-				_canvas.draw_arc(center, r, 0, TAU, 64, accent, 5.0)
+				PixelFxScript.draw_ring(_canvas, center, r, 5.0, accent, PIXEL_CELL)
 		"sweep":
 			var radius := minf(area.size.x, area.size.y) * 0.46
-			_canvas.draw_arc(center, radius, 0, TAU, 64, Color(1, 1, 1, 0.25), 2.0)
-			_canvas.draw_arc(center, radius, -PI / 2.0 - 0.28, -PI / 2.0 + 0.28, 16, Color(1, 1, 1, 0.9), 6.0)
+			PixelFxScript.draw_ring(_canvas, center, radius, 2.0, Color(1, 1, 1, 0.25), PIXEL_CELL)
+			PixelFxScript.draw_ring(_canvas, center, radius, 6.0, Color(1, 1, 1, 0.9), PIXEL_CELL, -PI / 2.0 - 0.28, -PI / 2.0 + 0.28)
 			var angle: float = lerpf(-PI / 2.0 - PI * 1.5, -PI / 2.0, p)
 			if active:
-				_canvas.draw_line(center, center + Vector2(cos(angle), sin(angle)) * radius, accent, 5.0)
+				PixelFxScript.draw_line_px(_canvas, center, center + Vector2(cos(angle), sin(angle)) * radius, 5.0, accent, PIXEL_CELL)
 		"flash":
 			var pulse: float = pow(p, 3.0)
 			var fill := Color(accent.r, accent.g, accent.b, 0.08 + pulse * 0.30)
 			if active and p >= 1.0:
 				fill = Color(1, 1, 1, 0.95)
-			_canvas.draw_circle(center, 44.0, fill)
-			_canvas.draw_arc(center, 44.0, 0, TAU, 48, Color(1, 1, 1, 0.5), 3.0)
+			PixelFxScript.draw_disc(_canvas, center, 44.0, fill, PIXEL_CELL)
+			PixelFxScript.draw_ring(_canvas, center, 44.0, 3.0, Color(1, 1, 1, 0.5), PIXEL_CELL)
 		_:
 			var track := Rect2(10, center.y - 14, size.x - 20, 28)
 			_canvas.draw_rect(track, Color(1, 1, 1, 0.08))
@@ -294,5 +296,5 @@ func _draw_telegraph() -> void:
 		_canvas.draw_rect(Rect2(x - 2, bar.position.y - 5, 4, bar.size.y + 10), Color(0.5, 1.0, 0.6) if done else Color.WHITE)
 	_canvas.draw_rect(Rect2(bar.position.x + bar.size.x * clampf(now / total, 0.0, 1.0) - 1, bar.position.y - 2, 3, bar.size.y + 4), accent)
 	if now < _flash_until_ms and _flash_text != "":
-		var font := ThemeDB.fallback_font
+		var font := PixelKit.font("body")
 		_canvas.draw_string(font, Vector2(0, center.y - 54.0), _flash_text, HORIZONTAL_ALIGNMENT_CENTER, size.x, 30, _flash_color)

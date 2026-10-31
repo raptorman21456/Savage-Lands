@@ -112,7 +112,7 @@ func _build_content(outer: VBoxContainer) -> void:
 		finish_line.size = Vector2(4, LANE_HEIGHT)
 		lane.add_child(finish_line)
 		var name_tag := Label.new()
-		name_tag.add_theme_font_size_override("font_size", 11)
+		PixelKit.fit(name_tag, 11)
 		name_tag.add_theme_color_override("font_color", Color(1, 1, 1, 0.85))
 		name_tag.position = Vector2(4, 8)
 		lane.add_child(name_tag)

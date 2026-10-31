@@ -270,6 +270,7 @@ signal tutorial_skip_pressed
 
 var battle_panel: ColorRect
 var battle_gradient_rect: TextureRect
+var battle_berserk_vignette: TextureRect
 var battle_content_root: Control
 var overworld_hud_root: Control
 var battle_hint_panel: Panel
@@ -359,6 +360,9 @@ const BATTLE_MENU_X := 240.0
 const BATTLE_BAR_H := 30.0                    # the bottom status/key-hint bar
 const BattleStyleScript := preload("res://scripts/BattleStyle.gd")
 const BattleStatusesScript := preload("res://scripts/BattleStatuses.gd")
+const PixelFxScript := preload("res://scripts/PixelFx.gd")
+# The red of the Berserk vignette (a stepped, dithered pixel vignette round the whole battle screen while Berserk lasts).
+const BERSERK_VIGNETTE_COLOR := Color(0.86, 0.06, 0.1)
 const UIIconsScript := preload("res://scripts/UIIcons.gd")
 const IconStripScript := preload("res://scripts/IconStrip.gd")
 # Battle status pictures are 16x16 art: shown one-to-one beside a card's chip line or a popup's, and doubled in the details box's rows.
@@ -483,7 +487,7 @@ static var UI_TEXT := {
 	"levelup.might": "Better weapons require higher Might to equip; boosts recruited party/wolf damage.",
 	"levelup.resilience": "+1 Defense per point, pooled with your armour and bent into less BODILY harm with diminishing returns (never past 80%).",
 	"levelup.fortitude": "+1 Fortitude per point, on top of your armour's, bent into less MAGICAL harm with diminishing returns (never past 80%).",
-	"levelup.rage": "+1 Rage per point. While Berserk lasts, each point adds +1% damage dealt, 0.5% less damage taken and a quarter point of speed.",
+	"levelup.rage": "+1 Rage per point. Every point makes everything Berserk gives you 5% bigger: its damage, its damage cut, its extra tile and your turn speed.",
 	"levelup.reflexes": "0.75% dodge chance per point, capped at 15%.",
 	"levelup.dexterity": "0.75% crit chance per point (double damage, ignores cover), capped at 15%.",
 }
@@ -504,17 +508,10 @@ func _ready() -> void:
 	vignette.set_anchors_preset(Control.PRESET_FULL_RECT)
 	vignette.stretch_mode = TextureRect.STRETCH_SCALE
 	vignette.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var vignette_gradient := Gradient.new()
-	vignette_gradient.set_color(0, Color(0, 0, 0, 0))
-	vignette_gradient.set_color(1, Color(0, 0, 0, 0.5))
-	var vignette_tex := GradientTexture2D.new()
-	vignette_tex.gradient = vignette_gradient
-	vignette_tex.fill = GradientTexture2D.FILL_RADIAL
-	vignette_tex.fill_from = Vector2(0.5, 0.5)
-	vignette_tex.fill_to = Vector2(1.0, 1.0)
-	vignette_tex.width = 64
-	vignette_tex.height = 64
-	vignette.texture = vignette_tex
+	# Stepped pixel bands, not a smooth gradient (see PixelFx.vignette): dark at the corners, clear in the middle.
+	vignette.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	vignette.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	vignette.texture = PixelFxScript.vignette(Color(0, 0, 0), 0.5, 64, 36, 4, 0.4, true)
 	add_child(vignette)
 
 	if water_animated_texture == null:
@@ -561,7 +558,7 @@ func _ready() -> void:
 	level_badge.add_theme_stylebox_override("panel", _make_stylebox(Color(0.22, 0.17, 0.05, 1.0), Color(1.0, 0.85, 0.2), 2, 0, 5))
 	card_top.add_child(level_badge)
 	level_label = Label.new()
-	level_label.add_theme_font_size_override("font_size", 18)
+	PixelKit.fit(level_label, 18)
 	level_label.add_theme_color_override("font_color", Color(1.0, 0.9, 0.35))
 	level_label.custom_minimum_size = Vector2(44, 0)
 	level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -578,7 +575,7 @@ func _ready() -> void:
 	bars.add_child(hp_row)
 	health_heart_label = Label.new()
 	health_heart_label.text = "♥"
-	health_heart_label.add_theme_font_size_override("font_size", 18)
+	PixelKit.fit(health_heart_label, 18)
 	health_heart_label.add_theme_color_override("font_color", HEALTH_BAR_FILL_COLOR)
 	hp_row.add_child(health_heart_label)
 	health_bar_bg = ColorRect.new()
@@ -595,7 +592,7 @@ func _ready() -> void:
 	health_label.set_anchors_preset(Control.PRESET_FULL_RECT)
 	health_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	health_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	health_label.add_theme_font_size_override("font_size", 13)
+	PixelKit.fit(health_label, 13)
 	health_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
 	health_label.add_theme_constant_override("outline_size", 4)
 	health_bar_bg.add_child(health_label)
@@ -620,13 +617,13 @@ func _ready() -> void:
 	xp_bar_bg.add_child(xp_bar_fill)
 
 	xp_label = Label.new()
-	xp_label.add_theme_font_size_override("font_size", 11)
+	PixelKit.fit(xp_label, 11)
 	xp_label.add_theme_color_override("font_color", Color(0.6, 0.62, 0.8))
 	xp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	card_box.add_child(xp_label)
 
 	stats_label = Label.new()
-	stats_label.add_theme_font_size_override("font_size", 12)
+	PixelKit.fit(stats_label, 12)
 	stats_label.add_theme_color_override("font_color", Color(0.78, 0.76, 0.68))
 	card_box.add_child(stats_label)
 
@@ -649,7 +646,7 @@ func _ready() -> void:
 	quiver_icon.mouse_exited.connect(func(): quiver_tooltip_label.text = "")
 	quiver_row.add_child(quiver_icon)
 	quiver_tooltip_label = Label.new()
-	quiver_tooltip_label.add_theme_font_size_override("font_size", 12)
+	PixelKit.fit(quiver_tooltip_label, 12)
 	quiver_tooltip_label.add_theme_color_override("font_color", Color(0.85, 0.85, 0.6))
 	quiver_row.add_child(quiver_tooltip_label)
 
@@ -673,13 +670,13 @@ func _ready() -> void:
 	banner.add_child(banner_box)
 
 	world_label = Label.new()
-	world_label.add_theme_font_size_override("font_size", 19)
+	PixelKit.fit(world_label, 19)
 	world_label.add_theme_color_override("font_color", Color(1.0, 0.92, 0.62))
 	world_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	world_label.custom_minimum_size = Vector2(MiniMapScript.MAP_PX.x, 0)
 	banner_box.add_child(world_label)
 	room_label = Label.new()
-	room_label.add_theme_font_size_override("font_size", 13)
+	PixelKit.fit(room_label, 13)
 	room_label.add_theme_color_override("font_color", Color(0.78, 0.76, 0.7))
 	room_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	room_label.custom_minimum_size = Vector2(MiniMapScript.MAP_PX.x, 0)
@@ -693,7 +690,7 @@ func _ready() -> void:
 	banner_box.add_child(danger_row)
 	danger_caption = Label.new()
 	danger_caption.text = "Danger"
-	danger_caption.add_theme_font_size_override("font_size", 11)
+	PixelKit.fit(danger_caption, 11)
 	danger_caption.add_theme_color_override("font_color", Color(0.65, 0.63, 0.58))
 	danger_row.add_child(danger_caption)
 	danger_pips = []
@@ -718,7 +715,7 @@ func _ready() -> void:
 	coin_icon.custom_minimum_size = Vector2(16, 16)
 	purse_row.add_child(coin_icon)
 	coins_label = Label.new()
-	coins_label.add_theme_font_size_override("font_size", 17)
+	PixelKit.fit(coins_label, 17)
 	coins_label.add_theme_color_override("font_color", Color(1, 0.85, 0.3))
 	purse_row.add_child(coins_label)
 	var purse_gap := Control.new()
@@ -732,7 +729,7 @@ func _ready() -> void:
 	item_icon.custom_minimum_size = Vector2(18, 18)
 	purse_row.add_child(item_icon)
 	items_label = Label.new()
-	items_label.add_theme_font_size_override("font_size", 17)
+	PixelKit.fit(items_label, 17)
 	items_label.add_theme_color_override("font_color", Color(0.6, 1.0, 0.6))
 	purse_row.add_child(items_label)
 
@@ -742,11 +739,11 @@ func _ready() -> void:
 	tally_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	banner_box.add_child(tally_row)
 	wave_label = Label.new()
-	wave_label.add_theme_font_size_override("font_size", 12)
+	PixelKit.fit(wave_label, 12)
 	wave_label.add_theme_color_override("font_color", Color(0.75, 0.74, 0.7))
 	tally_row.add_child(wave_label)
 	enemies_label = Label.new()
-	enemies_label.add_theme_font_size_override("font_size", 12)
+	PixelKit.fit(enemies_label, 12)
 	enemies_label.add_theme_color_override("font_color", Color(0.9, 0.55, 0.5))
 	tally_row.add_child(enemies_label)
 
@@ -769,14 +766,14 @@ func _ready() -> void:
 	message_toast.visible = false
 	overworld_hud_root.add_child(message_toast)
 	message_label = Label.new()
-	message_label.add_theme_font_size_override("font_size", 20)
+	PixelKit.fit(message_label, 20)
 	message_label.add_theme_color_override("font_color", Color(1, 0.9, 0.3))
 	message_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	message_toast.add_child(message_label)
 
 	var help_label := Label.new()
 	help_label.text = "Arrows move   ·   WASD attack   ·   C menu   ·   I inventory"
-	help_label.add_theme_font_size_override("font_size", 12)
+	PixelKit.fit(help_label, 12)
 	help_label.add_theme_color_override("font_color", Color(0.85, 0.85, 0.8, 0.5))
 	help_label.anchor_top = 1.0
 	help_label.anchor_bottom = 1.0
@@ -796,7 +793,7 @@ func _ready() -> void:
 
 	var menu_label := Label.new()
 	menu_label.position = Vector2(300, 250)
-	menu_label.add_theme_font_size_override("font_size", 32)
+	PixelKit.fit(menu_label, 32)
 	menu_label.text = "PAUSED"
 	menu_panel.add_child(menu_label)
 
@@ -847,7 +844,7 @@ func _ready() -> void:
 
 	levelup_label = Label.new()
 	levelup_label.position = Vector2(230, 200)
-	levelup_label.add_theme_font_size_override("font_size", 26)
+	PixelKit.fit(levelup_label, 26)
 	levelup_label.add_theme_color_override("font_color", Color(1, 0.9, 0.3))
 	levelup_panel.add_child(levelup_label)
 
@@ -860,7 +857,7 @@ func _ready() -> void:
 	levelup_description_label.position = Vector2(230, 598)
 	levelup_description_label.size = Vector2(400, 60)
 	levelup_description_label.autowrap_mode = TextServer.AUTOWRAP_WORD
-	levelup_description_label.add_theme_font_size_override("font_size", 14)
+	PixelKit.fit(levelup_description_label, 14)
 	levelup_description_label.add_theme_color_override("font_color", Color(0.85, 0.85, 0.6))
 	levelup_panel.add_child(levelup_description_label)
 
@@ -881,7 +878,7 @@ func _ready() -> void:
 
 	event_label = Label.new()
 	event_label.position = Vector2(230, 200)
-	event_label.add_theme_font_size_override("font_size", 26)
+	PixelKit.fit(event_label, 26)
 	event_label.add_theme_color_override("font_color", Color(0.6, 0.85, 1.0))
 	event_panel.add_child(event_label)
 
@@ -889,7 +886,7 @@ func _ready() -> void:
 	event_description_label.position = Vector2(230, 250)
 	event_description_label.size = Vector2(400, 80)
 	event_description_label.autowrap_mode = TextServer.AUTOWRAP_WORD
-	event_description_label.add_theme_font_size_override("font_size", 16)
+	PixelKit.fit(event_description_label, 16)
 	event_description_label.add_theme_color_override("font_color", Color(0.85, 0.85, 0.85))
 	event_panel.add_child(event_description_label)
 
@@ -993,7 +990,7 @@ func _ready() -> void:
 	shop_keeper_textbox = Label.new()
 	shop_keeper_textbox.autowrap_mode = TextServer.AUTOWRAP_WORD
 	shop_keeper_textbox.vertical_alignment = VERTICAL_ALIGNMENT_TOP
-	shop_keeper_textbox.add_theme_font_size_override("font_size", 15)
+	PixelKit.fit(shop_keeper_textbox, 15)
 	shop_keeper_textbox.add_theme_color_override("font_color", Color(0.9, 0.9, 0.85))
 	shop_keeper_textbox_frame.add_child(shop_keeper_textbox)
 
@@ -1007,7 +1004,7 @@ func _ready() -> void:
 
 	shop_title_label = Label.new()
 	shop_title_label.text = "SHOP"
-	shop_title_label.add_theme_font_size_override("font_size", 28)
+	PixelKit.fit(shop_title_label, 28)
 	shop_title_label.add_theme_color_override("font_color", Color(1, 0.9, 0.3))
 	shop_title_row.add_child(shop_title_label)
 
@@ -1023,7 +1020,7 @@ func _ready() -> void:
 	shop_title_row.add_child(shop_coin_icon)
 
 	shop_coins_label = Label.new()
-	shop_coins_label.add_theme_font_size_override("font_size", 24)
+	PixelKit.fit(shop_coins_label, 24)
 	shop_coins_label.add_theme_color_override("font_color", Color(1, 0.85, 0.3))
 	shop_title_row.add_child(shop_coins_label)
 
@@ -1034,7 +1031,7 @@ func _ready() -> void:
 	shop_title_row.add_child(shop_shard_icon)
 
 	shop_shards_label = Label.new()
-	shop_shards_label.add_theme_font_size_override("font_size", 24)
+	PixelKit.fit(shop_shards_label, 24)
 	shop_shards_label.add_theme_color_override("font_color", Color(0.75, 0.55, 1.0))
 	shop_title_row.add_child(shop_shards_label)
 
@@ -1133,7 +1130,7 @@ func _ready() -> void:
 	shop_enchant_scroll.add_child(shop_enchant_column)
 
 	shop_enchant_weapon_label = Label.new()
-	shop_enchant_weapon_label.add_theme_font_size_override("font_size", 16)
+	PixelKit.fit(shop_enchant_weapon_label, 16)
 	shop_enchant_weapon_label.add_theme_color_override("font_color", Color(0.85, 0.85, 0.9))
 	shop_enchant_column.add_child(shop_enchant_weapon_label)
 
@@ -1154,7 +1151,7 @@ func _ready() -> void:
 	shop_spells_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	shop_spells_scroll.add_child(shop_spells_column)
 	shop_spells_note_label = Label.new()
-	shop_spells_note_label.add_theme_font_size_override("font_size", 14)
+	PixelKit.fit(shop_spells_note_label, 14)
 	shop_spells_note_label.add_theme_color_override("font_color", Color(0.85, 0.85, 0.9))
 	shop_spells_note_label.autowrap_mode = TextServer.AUTOWRAP_WORD
 	shop_spells_column.add_child(shop_spells_note_label)
@@ -1166,7 +1163,7 @@ func _ready() -> void:
 	shop_description_label = Label.new()
 	shop_description_label.custom_minimum_size = Vector2(0, 36)
 	shop_description_label.autowrap_mode = TextServer.AUTOWRAP_WORD
-	shop_description_label.add_theme_font_size_override("font_size", 14)
+	PixelKit.fit(shop_description_label, 14)
 	shop_description_label.add_theme_color_override("font_color", Color(0.85, 0.85, 0.6))
 	shop_column.add_child(shop_description_label)
 
@@ -1193,7 +1190,7 @@ func _ready() -> void:
 	shop_footer_label = Label.new()
 	shop_footer_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	shop_footer_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	shop_footer_label.add_theme_font_size_override("font_size", 13)
+	PixelKit.fit(shop_footer_label, 13)
 	shop_footer_label.add_theme_color_override("font_color", Color(0.6, 0.6, 0.6))
 	shop_footer_label.text = "[1-9] Buy   [R] Reroll   [Enter/Esc] Leave"
 	shop_column.add_child(shop_footer_label)
@@ -1207,7 +1204,7 @@ func _ready() -> void:
 
 	game_over_label = Label.new()
 	game_over_label.position = Vector2(230, 130)
-	game_over_label.add_theme_font_size_override("font_size", 26)
+	PixelKit.fit(game_over_label, 26)
 	game_over_label.add_theme_color_override("font_color", Color(1, 0.3, 0.3))
 	game_over_panel.add_child(game_over_label)
 
@@ -1273,7 +1270,7 @@ func _build_unlock_popup() -> void:
 	unlock_popup_name_label = Label.new()
 	unlock_popup_name_label.position = Vector2(10, 8)
 	unlock_popup_name_label.size = Vector2(260, 22)
-	unlock_popup_name_label.add_theme_font_size_override("font_size", 16)
+	PixelKit.fit(unlock_popup_name_label, 16)
 	unlock_popup_name_label.add_theme_color_override("font_color", Color(1.0, 0.9, 0.2))
 	unlock_popup_panel.add_child(unlock_popup_name_label)
 
@@ -1281,7 +1278,7 @@ func _build_unlock_popup() -> void:
 	unlock_popup_desc_label.position = Vector2(10, 32)
 	unlock_popup_desc_label.size = Vector2(260, 50)
 	unlock_popup_desc_label.autowrap_mode = TextServer.AUTOWRAP_WORD
-	unlock_popup_desc_label.add_theme_font_size_override("font_size", 13)
+	PixelKit.fit(unlock_popup_desc_label, 13)
 	unlock_popup_desc_label.add_theme_color_override("font_color", Color(1.0, 0.95, 0.8))
 	unlock_popup_panel.add_child(unlock_popup_desc_label)
 
@@ -1387,6 +1384,17 @@ func _build_battle_ui() -> void:
 	battle_grid_origin = Vector2(roundf((battle_view.x - BATTLE_GRID_FOOTPRINT_PX) / 2.0), BATTLE_GRID_TOP)
 	battle_content_root.position = Vector2.ZERO
 	battle_panel.add_child(battle_content_root)
+	# Berserk: a red vignette round the whole screen while it lasts. It sits over the battle's own parts and under the popups and
+	# lists that are added after it, so the edges glow red without muddying anything you read.
+	battle_berserk_vignette = TextureRect.new()
+	battle_berserk_vignette.set_anchors_preset(Control.PRESET_FULL_RECT)
+	battle_berserk_vignette.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	battle_berserk_vignette.stretch_mode = TextureRect.STRETCH_SCALE
+	battle_berserk_vignette.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	battle_berserk_vignette.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	battle_berserk_vignette.texture = PixelFxScript.vignette(BERSERK_VIGNETTE_COLOR, 0.55, 64, 36, 4, 0.45, true)
+	battle_berserk_vignette.visible = false
+	battle_panel.add_child(battle_berserk_vignette)
 
 	# Pooled at the max size any battle can use (a boss fight's 9x9, see
 	# Main.gd:BOSS_BATTLE_GRID_SIZE) -- position/size aren't set here since
@@ -1421,7 +1429,7 @@ func _build_battle_ui() -> void:
 			battle_tile_icons[t] = tile_icon
 
 			var marker := Label.new()
-			marker.add_theme_font_size_override("font_size", 18)
+			PixelKit.fit(marker, 18)
 			marker.visible = false
 			battle_content_root.add_child(marker)
 			battle_tile_markers[t] = marker
@@ -1441,7 +1449,7 @@ func _build_battle_ui() -> void:
 	# label instead, and the enemy pool below goes back to a clean 1:1
 	# mapping with no reserved slot.
 	player_marker = Label.new()
-	player_marker.add_theme_font_size_override("font_size", 24)
+	PixelKit.fit(player_marker, 24)
 	player_marker.visible = false
 	battle_content_root.add_child(player_marker)
 
@@ -1468,7 +1476,7 @@ func _build_battle_ui() -> void:
 
 	for i in MAX_BATTLE_UNITS:
 		var unit_marker := Label.new()
-		unit_marker.add_theme_font_size_override("font_size", 24)
+		PixelKit.fit(unit_marker, 24)
 		unit_marker.visible = false
 		battle_content_root.add_child(unit_marker)
 		battle_unit_markers.append(unit_marker)
@@ -1479,7 +1487,7 @@ func _build_battle_ui() -> void:
 	# corner badge slot) so the two can be visible on the same unit at once.
 	for i in MAX_BATTLE_UNITS:
 		var aware_marker := Label.new()
-		aware_marker.add_theme_font_size_override("font_size", 22)
+		PixelKit.fit(aware_marker, 22)
 		aware_marker.add_theme_color_override("font_color", Color(0.9, 0.15, 0.15))
 		aware_marker.visible = false
 		battle_content_root.add_child(aware_marker)
@@ -1527,7 +1535,7 @@ func _build_battle_ui() -> void:
 	# than enough slots for any realistic move range.
 	for i in 8:
 		var trail_marker := Label.new()
-		trail_marker.add_theme_font_size_override("font_size", 20)
+		PixelKit.fit(trail_marker, 20)
 		trail_marker.add_theme_color_override("font_color", Color(0.4, 0.9, 1.0))
 		trail_marker.visible = false
 		battle_content_root.add_child(trail_marker)
@@ -1540,7 +1548,7 @@ func _build_battle_ui() -> void:
 	# battle_log_label starting at x=400.
 	battle_status_label = Label.new()
 	battle_status_label.position = Vector2(20, 20)
-	battle_status_label.add_theme_font_size_override("font_size", 18)
+	PixelKit.fit(battle_status_label, 18)
 	battle_status_label.add_theme_color_override("font_color", Color(1, 1, 1))
 	battle_content_root.add_child(battle_status_label)
 
@@ -1549,7 +1557,7 @@ func _build_battle_ui() -> void:
 	battle_hp_heart_label = Label.new()
 	battle_hp_heart_label.text = "♥"
 	battle_hp_heart_label.position = Vector2(20, 39)
-	battle_hp_heart_label.add_theme_font_size_override("font_size", 16)
+	PixelKit.fit(battle_hp_heart_label, 16)
 	battle_hp_heart_label.add_theme_color_override("font_color", HEALTH_BAR_FILL_COLOR)
 	battle_content_root.add_child(battle_hp_heart_label)
 
@@ -1567,7 +1575,7 @@ func _build_battle_ui() -> void:
 
 	battle_hp_number_label = Label.new()
 	battle_hp_number_label.position = Vector2(136, 39)
-	battle_hp_number_label.add_theme_font_size_override("font_size", 15)
+	PixelKit.fit(battle_hp_number_label, 15)
 	battle_hp_number_label.add_theme_color_override("font_color", Color(1.0, 0.75, 0.75))
 	battle_content_root.add_child(battle_hp_number_label)
 
@@ -1587,7 +1595,7 @@ func _build_battle_ui() -> void:
 
 	battle_stamina_number_label = Label.new()
 	battle_stamina_number_label.position = Vector2(306, 39)
-	battle_stamina_number_label.add_theme_font_size_override("font_size", 15)
+	PixelKit.fit(battle_stamina_number_label, 15)
 	battle_stamina_number_label.add_theme_color_override("font_color", Color(0.7, 0.85, 1.0))
 	battle_content_root.add_child(battle_stamina_number_label)
 
@@ -1597,13 +1605,13 @@ func _build_battle_ui() -> void:
 	# (battle_grid_origin.y == 60).
 	battle_status_label2 = Label.new()
 	battle_status_label2.position = Vector2(20, 58)
-	battle_status_label2.add_theme_font_size_override("font_size", 18)
+	PixelKit.fit(battle_status_label2, 18)
 	battle_status_label2.add_theme_color_override("font_color", Color(1, 1, 1))
 	battle_content_root.add_child(battle_status_label2)
 
 	battle_log_label = Label.new()
 	battle_log_label.position = Vector2(400, 60)
-	battle_log_label.add_theme_font_size_override("font_size", 15)
+	PixelKit.fit(battle_log_label, 15)
 	battle_log_label.add_theme_color_override("font_color", Color(0.85, 0.85, 0.85))
 	battle_content_root.add_child(battle_log_label)
 
@@ -1611,7 +1619,7 @@ func _build_battle_ui() -> void:
 	battle_description_label.position = Vector2(20, 470)
 	battle_description_label.size = Vector2(560, 40)
 	battle_description_label.autowrap_mode = TextServer.AUTOWRAP_WORD
-	battle_description_label.add_theme_font_size_override("font_size", 14)
+	PixelKit.fit(battle_description_label, 14)
 	battle_description_label.add_theme_color_override("font_color", Color(0.85, 0.85, 0.6))
 	battle_content_root.add_child(battle_description_label)
 
@@ -1632,7 +1640,7 @@ func _build_battle_ui() -> void:
 	battle_hint_label.position = Vector2(8, 6)
 	battle_hint_label.size = Vector2(204, 38)
 	battle_hint_label.autowrap_mode = TextServer.AUTOWRAP_WORD
-	battle_hint_label.add_theme_font_size_override("font_size", 14)
+	PixelKit.fit(battle_hint_label, 14)
 	battle_hint_label.add_theme_color_override("font_color", Color(1.0, 0.95, 0.8))
 	battle_hint_panel.add_child(battle_hint_label)
 
@@ -1700,13 +1708,13 @@ func _build_battle_shell() -> void:
 	battle_content_root.add_child(bar)
 	battle_content_root.move_child(bar, 0)
 	battle_status_label.position = Vector2(BATTLE_CARD_X + 12.0, bar_y + 3.0)
-	battle_status_label.add_theme_font_size_override("font_size", 16)
+	PixelKit.fit(battle_status_label, 16)
 	battle_status_label.add_theme_color_override("font_color", BATTLE_TEXT)
 	battle_key_hint_label = Label.new()
 	battle_key_hint_label.position = Vector2(view.x * 0.38, bar_y + 6.0)
 	battle_key_hint_label.size = Vector2(view.x * 0.62 - BATTLE_CARD_X - 12.0, 20.0)
 	battle_key_hint_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	battle_key_hint_label.add_theme_font_size_override("font_size", 13)
+	PixelKit.fit(battle_key_hint_label, 13)
 	battle_key_hint_label.add_theme_color_override("font_color", BATTLE_DIM)
 	battle_key_hint_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	battle_content_root.add_child(battle_key_hint_label)
@@ -1714,14 +1722,14 @@ func _build_battle_shell() -> void:
 	# Hover text for the menu buttons sits just above the bar; the Target/Shield/Berserk lines go in the right column.
 	battle_description_label.position = Vector2(BATTLE_MENU_X, bar_y - 24.0)
 	battle_description_label.size = Vector2(view.x - BATTLE_MENU_X - BATTLE_CARD_X, 22.0)
-	battle_description_label.add_theme_font_size_override("font_size", 13)
+	PixelKit.fit(battle_description_label, 13)
 	battle_description_label.add_theme_color_override("font_color", Color(0.85, 0.8, 0.55))
 	var grid_right: float = battle_grid_origin.x + BATTLE_GRID_FOOTPRINT_PX
 	battle_status_label2.position = Vector2(grid_right + 16.0, bar_y - 104.0)
 	battle_status_label2.size = Vector2(view.x - grid_right - 16.0 - BATTLE_CARD_X, 96.0)
 	battle_status_label2.autowrap_mode = TextServer.AUTOWRAP_WORD
 	battle_status_label2.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
-	battle_status_label2.add_theme_font_size_override("font_size", 14)
+	PixelKit.fit(battle_status_label2, 14)
 	battle_status_label2.add_theme_color_override("font_color", BATTLE_TEXT)
 
 	# The action lists float beside the acting unit (_place_menu); the two prompts that interrupt an enemy's turn stay a row of
@@ -1752,8 +1760,7 @@ func _list_stylebox(bg: Color, lit: bool) -> StyleBoxFlat:
 	# A softly rounded highlight (a thin gold edge when lit) inside the list's frame.
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = bg
-	sb.set_corner_radius_all(BattleStyleScript.CORNER_SMALL)
-	sb.anti_aliasing = true
+	BattleStyleScript.chamfer(sb, BattleStyleScript.CORNER_SMALL)
 	if lit:
 		sb.border_color = Color(BATTLE_GOLD.r, BATTLE_GOLD.g, BATTLE_GOLD.b, 0.75)
 		sb.set_border_width_all(1)
@@ -1774,7 +1781,7 @@ func _style_list_button(button: Button) -> void:
 	button.add_theme_stylebox_override("disabled", clear)
 	button.add_theme_color_override("font_color", BATTLE_TEXT)
 	button.add_theme_color_override("font_disabled_color", Color(0.42, 0.4, 0.36))
-	button.add_theme_font_size_override("font_size", 16)
+	PixelKit.fit(button, 16)
 	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 
 func _make_back_circle(on_press: Callable) -> Button:
@@ -1791,7 +1798,7 @@ func _make_back_circle(on_press: Callable) -> Button:
 		sb.set_corner_radius_all(14)
 		back.add_theme_stylebox_override(state, sb)
 	back.add_theme_color_override("font_color", BATTLE_GOLD)
-	back.add_theme_font_size_override("font_size", 20)
+	PixelKit.fit(back, 20)
 	back.pressed.connect(on_press)
 	return back
 
@@ -1980,7 +1987,7 @@ func _fit_menu(menu: Dictionary) -> void:
 			rows += 1
 			var button := c as Button
 			if button != null:
-				widest = maxf(widest, button.get_theme_font("font").get_string_size(button.text, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x)
+				widest = maxf(widest, button.get_theme_font("font").get_string_size(button.text, HORIZONTAL_ALIGNMENT_LEFT, -1, button.get_theme_font_size("font_size")).x)
 	# Wide enough for its longest entry (the button's own margins are 12 and 8).
 	var w: float = maxf(float(menu.min_w), widest + 20.0 + BATTLE_MENU_PAD * 2.0 + 6.0)
 	menu.panel.size = Vector2(w, rows * BATTLE_MENU_ROW_H + BATTLE_MENU_PAD * 2.0)
@@ -2001,7 +2008,7 @@ func _place_menu(menu: Dictionary, anchor_tile: Vector2i, grid_w: int) -> void:
 func _battle_label(parent: Control, pos: Vector2, size_px: int, color: Color) -> Label:
 	var label := Label.new()
 	label.position = pos
-	label.add_theme_font_size_override("font_size", size_px)
+	PixelKit.fit(label, size_px)
 	label.add_theme_color_override("font_color", color)
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	parent.add_child(label)
@@ -2015,15 +2022,13 @@ func _battle_box(bg: Color, border: Color, border_width: int, radius: int = Batt
 func _round_button(button: Button) -> void:
 	for state in ["normal", "hover", "pressed", "disabled", "focus"]:
 		var sb: StyleBoxFlat = button.get_theme_stylebox(state).duplicate()
-		sb.set_corner_radius_all(BattleStyleScript.CORNER_SMALL + 1)
-		sb.anti_aliasing = true
+		BattleStyleScript.chamfer(sb, BattleStyleScript.CORNER_SMALL + 1)
 		button.add_theme_stylebox_override(state, sb)
 
 func _bar_style(color: Color, height: float) -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = color
-	sb.set_corner_radius_all(int(ceil(height / 2.0)))
-	sb.anti_aliasing = true
+	BattleStyleScript.chamfer(sb, 0)   # a pixel bar is a plain rectangle
 	return sb
 
 # A bar drawn from two rounded Panels (the track and the fill); returns both and its full width.
@@ -2339,8 +2344,7 @@ func _range_style(hostile: bool) -> StyleBoxFlat:
 		sb.bg_color = Color(base.r, base.g, base.b, 0.30)
 		sb.border_color = Color(base.r, base.g, base.b, 0.8)
 		sb.set_border_width_all(1)
-		sb.set_corner_radius_all(6)
-		sb.anti_aliasing = true
+		BattleStyleScript.chamfer(sb, 3)
 		battle_range_styles[key] = sb
 	return battle_range_styles[key]
 
@@ -2460,8 +2464,8 @@ func _build_battle_overlays() -> void:
 	battle_history_text.position = Vector2(12, 32)
 	battle_history_text.size = Vector2(box_w - 24, 388)
 	battle_history_text.scroll_active = true
-	battle_history_text.add_theme_font_size_override("normal_font_size", 13)
-	battle_history_text.add_theme_font_size_override("bold_font_size", 13)
+	battle_history_text.add_theme_font_size_override("normal_font_size", PixelKit.snap(13))
+	battle_history_text.add_theme_font_size_override("bold_font_size", PixelKit.snap(13))
 	battle_history_text.mouse_filter = Control.MOUSE_FILTER_PASS
 	battle_history_panel.add_child(battle_history_text)
 
@@ -2636,7 +2640,7 @@ func _build_settings_panel() -> void:
 
 	var title_label := Label.new()
 	title_label.position = Vector2(280, 30)
-	title_label.add_theme_font_size_override("font_size", 28)
+	PixelKit.fit(title_label, 28)
 	title_label.text = "SETTINGS"
 	settings_panel.add_child(title_label)
 
@@ -2726,7 +2730,7 @@ func _build_settings_panel() -> void:
 
 	var controls_label := Label.new()
 	controls_label.position = Vector2(60, 322)
-	controls_label.add_theme_font_size_override("font_size", 18)
+	PixelKit.fit(controls_label, 18)
 	controls_label.text = "Controls"
 	settings_panel.add_child(controls_label)
 
@@ -3032,7 +3036,7 @@ func _populate_game_over_stats(essence_earned: int, total_essence: int, stats: D
 	for line in summary_lines:
 		var row := Label.new()
 		row.text = line
-		row.add_theme_font_size_override("font_size", 15)
+		PixelKit.fit(row, 15)
 		row.add_theme_color_override("font_color", Color(0.85, 0.85, 0.85))
 		game_over_stats_box.add_child(row)
 
@@ -3040,7 +3044,7 @@ func _populate_game_over_stats(essence_earned: int, total_essence: int, stats: D
 	if not kills_by_name.is_empty():
 		var kills_header := Label.new()
 		kills_header.text = "Kills:"
-		kills_header.add_theme_font_size_override("font_size", 15)
+		PixelKit.fit(kills_header, 15)
 		kills_header.add_theme_color_override("font_color", Color(1, 0.9, 0.3))
 		game_over_stats_box.add_child(kills_header)
 
@@ -3054,7 +3058,7 @@ func _populate_game_over_stats(essence_earned: int, total_essence: int, stats: D
 		for enemy_name in names:
 			var kill_row := Label.new()
 			kill_row.text = "  %s x%d" % [enemy_name, kills_by_name[enemy_name]]
-			kill_row.add_theme_font_size_override("font_size", 14)
+			PixelKit.fit(kill_row, 14)
 			kill_row.add_theme_color_override("font_color", Color(0.75, 0.75, 0.75))
 			game_over_stats_box.add_child(kill_row)
 
@@ -3296,7 +3300,7 @@ func show_shop(coins: int, runic_shards: int, offering: Array, prices: Array, cu
 		if intimidation_locked:
 			stat_lock_label = ("%s/INM %d" % [stat_lock_label, required_intimidation]) if stat_lock_label != "" else ("INM %d" % required_intimidation)
 		price_label.text = stat_lock_label if stat_locked else ("OWNED" if already_owned else "%d" % prices[i])
-		price_label.add_theme_font_size_override("font_size", 15)
+		PixelKit.fit(price_label, 15)
 		price_label.add_theme_color_override("font_color", Color(1, 0.4, 0.4) if stat_locked else (Color(0.55, 0.85, 0.4) if already_owned else Color(1, 0.85, 0.3)))
 		button.add_child(price_label)
 
@@ -3356,7 +3360,7 @@ func show_shop(coins: int, runic_shards: int, offering: Array, prices: Array, cu
 			arrow_price_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 			arrow_price_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			arrow_price_label.text = "MAX" if at_cap else "%d" % price
-			arrow_price_label.add_theme_font_size_override("font_size", 15)
+			PixelKit.fit(arrow_price_label, 15)
 			arrow_price_label.add_theme_color_override("font_color", Color(0.55, 0.85, 0.4) if at_cap else Color(1, 0.85, 0.3))
 			buy_button.add_child(arrow_price_label)
 
@@ -3452,7 +3456,7 @@ func show_enchant_tab(coins: int, runic_shards: int, current_weapon_name: String
 		cost_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		cost_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		cost_label.text = "%d + %d" % [rune.cost_shards, rune.cost_coins]
-		cost_label.add_theme_font_size_override("font_size", 15)
+		PixelKit.fit(cost_label, 15)
 		cost_label.add_theme_color_override("font_color", Color(0.75, 0.55, 1.0) if affordable else Color(0.6, 0.6, 0.6))
 		button.add_child(cost_label)
 
@@ -3484,7 +3488,7 @@ func show_spells_tab(note: String, rows: Array) -> void:
 		cost_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		cost_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		cost_label.text = row.price_text
-		cost_label.add_theme_font_size_override("font_size", 15)
+		PixelKit.fit(cost_label, 15)
 		cost_label.add_theme_color_override("font_color", Color(0.75, 0.55, 1.0) if (bool(row.can_buy) and not bool(row.maxed)) else Color(0.6, 0.6, 0.6))
 		button.add_child(cost_label)
 		shop_spells_row_nodes.append(button)
@@ -3517,17 +3521,10 @@ func show_battle(background_color: Color = Color(0.05, 0.05, 0.05)) -> void:
 const BATTLE_GRADIENT_TOP := Color(0.0, 0.22, 0.3)
 const BATTLE_GRADIENT_BOTTOM := Color(0.02, 0.18, 0.1)
 func _set_battle_gradient(_base_color: Color) -> void:
-	var gradient := Gradient.new()
-	gradient.set_color(0, BATTLE_GRADIENT_TOP)
-	gradient.set_color(1, BATTLE_GRADIENT_BOTTOM)
-	var tex := GradientTexture2D.new()
-	tex.gradient = gradient
-	tex.fill = GradientTexture2D.FILL_LINEAR
-	tex.fill_from = Vector2(0, 0)
-	tex.fill_to = Vector2(0, 1)
-	tex.width = 8
-	tex.height = 8
-	battle_gradient_rect.texture = tex
+	# Flat bands rather than a smooth blend (see PixelFx.bands), shown with nearest filtering.
+	battle_gradient_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	battle_gradient_rect.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	battle_gradient_rect.texture = PixelFxScript.bands(BATTLE_GRADIENT_TOP, BATTLE_GRADIENT_BOTTOM, 9)
 
 # Hover-LOS overlay -- see enemy_hovered/enemy_unhovered and
 # Main.gd:_on_enemy_hovered/_on_enemy_unhovered.
@@ -3747,7 +3744,7 @@ func update_battle_grid(grid_w: int, grid_h: int, terrain: Dictionary, player_ti
 
 		marker.text = badge_text
 		marker.add_theme_color_override("font_color", badge_color)
-		marker.add_theme_font_size_override("font_size", 22 if size > 1 else 18)
+		PixelKit.fit(marker, 22 if size > 1 else 18)
 		marker.position = tile_origin + Vector2(footprint_span - 20, -4)
 		marker.visible = badge_text != ""
 
@@ -3795,6 +3792,7 @@ func update_battle_grid(grid_w: int, grid_h: int, terrain: Dictionary, player_ti
 	# Berserk: a strong, short-lived state (more damage, less damage taken,
 	# an extra tile), so it's surfaced prominently rather than left to the
 	# battle log alone.
+	battle_berserk_vignette.visible = berserk_turns > 0
 	if berserk_turns > 0:
 		if battle_status_label2.text != "":
 			battle_status_label2.text += "\n"
@@ -3985,7 +3983,7 @@ func set_turn_order(rows: Array) -> void:
 		return
 	var title := Label.new()
 	title.text = "TURN"
-	title.add_theme_font_size_override("font_size", 12)
+	PixelKit.fit(title, 12)
 	title.add_theme_color_override("font_color", BATTLE_DIM)
 	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	title.custom_minimum_size = Vector2(0, 44)
@@ -4019,7 +4017,7 @@ func _make_turn_order_row(r: Dictionary) -> Control:
 	if side == "hero":
 		var at := Label.new()
 		at.text = "@"
-		at.add_theme_font_size_override("font_size", int(px * 0.85))
+		PixelKit.fit(at, int(px * 0.85))
 		at.add_theme_color_override("font_color", accent)
 		at.position = Vector2(px * 0.2, -px * 0.12)
 		at.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -4049,6 +4047,7 @@ func _make_turn_order_row(r: Dictionary) -> Control:
 
 func hide_battle() -> void:
 	battle_panel.visible = false
+	battle_berserk_vignette.visible = false
 	battle_card_hover_key = ""
 	hide_unit_popup()
 	hide_unit_details()

@@ -130,11 +130,11 @@ func _init() -> void:
 	player.stat_rage = 10
 	g_dmg.hp = 999999
 	main._apply_single_hit(0, 1.0, "", weapons_script.CLUB)
-	print("...Rage 10 adds +10%%: %d (expected round(normal*1.35)=%d)" % [999999 - g_dmg.hp, int(round(normal_dmg * 1.35))])
+	print("...Rage 10 SCALES the bonus by 1.5 (25%% becomes 37.5%%, not 35%%): %d (expected round(normal*1.375)=%d)" % [999999 - g_dmg.hp, int(round(normal_dmg * 1.375))])
 	player.meta_rage_bonus_pct = 0.3
 	g_dmg.hp = 999999
 	main._apply_single_hit(0, 1.0, "", weapons_script.CLUB)
-	print("...and the Church's RAGE node stacks on top of both: %d (expected round(normal*1.65)=%d)" % [999999 - g_dmg.hp, int(round(normal_dmg * 1.65))])
+	print("...and the Church's RAGE node stacks on top of both: %d (expected round(normal*1.675)=%d)" % [999999 - g_dmg.hp, int(round(normal_dmg * 1.675))])
 	g_dmg.hp = 999999
 	main._apply_single_hit(0, 1.0, "", weapons_script.CLUB, "Knight")
 	print("...but an ally's own hit through the same function is not boosted: ally=%d (expected %d)" % [999999 - g_dmg.hp, normal_dmg])
@@ -148,7 +148,7 @@ func _init() -> void:
 	var taken_berserk: int = main._apply_incoming_reductions(100, {})
 	print("Berserk takes 25%% off a hit: normal=%d berserk=%d (expected %d)" % [taken_normal, taken_berserk, int(round(taken_normal * 0.75))])
 	player.stat_rage = 20
-	print("...Rage 20 takes 10%% more off: %d (expected %d)" % [main._apply_incoming_reductions(100, {}), int(round(taken_normal * 0.65))])
+	print("...Rage 20 doubles the cut (25%% becomes 50%%): %d (expected %d)" % [main._apply_incoming_reductions(100, {}), int(round(taken_normal * 0.5))])
 	player.stat_rage = 1000
 	print("...and it never takes more than 60%% off, however much Rage: %d (expected %d)" % [main._apply_incoming_reductions(100, {}), int(round(taken_normal * 0.4))])
 	print("a magical hit is cut too: %d (expected 40, the same 60%% off)" % [main._apply_incoming_reductions(100, {"harm": "magical"})])
@@ -207,10 +207,13 @@ func _init() -> void:
 	var move_normal: int = main._battle_player_move_range()
 	var speed_normal: float = main._hero_speed()
 	player.berserk_turns_remaining = 2
-	print("Berserk is one tile more movement: %d -> %d (expected +%d)" % [move_normal, main._battle_player_move_range(), main.BERSERK_MOVE_BONUS])
+	print("Berserk is one tile more movement: %d -> %d (expected +1)" % [move_normal, main._battle_player_move_range()])
 	print("...and no faster a turn without Rage: speed %.2f -> %.2f (expected equal)" % [speed_normal, main._hero_speed()])
 	player.stat_rage = 8
-	print("...Rage 8 adds %.2f to the hero's speed: %.2f -> %.2f (expected +2.00)" % [main._berserk_speed_bonus(), speed_normal, main._hero_speed()])
+	print("...Rage 8 (scale 1.4) raises the hero's turn speed by 20%% (half the extra scale): %.2f -> %.2f (expected 5.00 -> 6.00)" % [speed_normal, main._hero_speed()])
+	player.stat_rage = 19
+	print("...the +1 tile is multiplied by the scale and rounded down: Rage 19 (1.95x) still +%d, Rage 20 (2x) +%d (expected +1, +2)" % [main._berserk_move_bonus(), (func(): player.stat_rage = 20; return main._berserk_move_bonus()).call()])
+	player.stat_rage = 8
 	player.berserk_turns_remaining = 0
 	print("...and none of it outside Berserk: move %d, speed %.2f (expected %d, %.2f)" % [main._battle_player_move_range(), main._hero_speed(), move_normal, speed_normal])
 	player.stat_rage = 0
@@ -240,7 +243,7 @@ func _init() -> void:
 	for e in entries:
 		if e.id == "berserk":
 			berserk_entry = e
-	print("the status says what it is worth with Rage 4: '%s' (expected +29%% damage, 27%% less damage taken, 1 tile, Rage mentioned)" % [berserk_entry.get("desc", "")])
+	print("the status says what it is worth with Rage 4: '%s' (expected +30%% damage, 30%% less damage taken, 1 tile, Rage 4 = 20%% stronger)" % [berserk_entry.get("desc", "")])
 	player.berserk_turns_remaining = 0
 	player.berserk_kills = 3
 	main._refresh_battle_display()

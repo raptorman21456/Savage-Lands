@@ -348,7 +348,7 @@ func _add_next_card(level: int, max_level: int, cost: int, stats: Array, method:
 	row.add_child(text_col)
 	var title := Label.new()
 	title.text = "Fully forged" if maxed else "Upgrade to +%d" % (level + 1)
-	title.add_theme_font_size_override("font_size", 18)
+	PixelKit.fit(title, 18)
 	title.add_theme_color_override("font_color", TownUIScript.GOLD if maxed else Color(0.94, 0.93, 0.88))
 	text_col.add_child(title)
 	if maxed:
@@ -372,28 +372,28 @@ func _make_stat_row(label_text: String, now: String, after: String, note: String
 	var name_label := Label.new()
 	name_label.text = label_text
 	name_label.custom_minimum_size = Vector2(130, 0)
-	name_label.add_theme_font_size_override("font_size", 14)
+	PixelKit.fit(name_label, 14)
 	name_label.add_theme_color_override("font_color", TownUIScript.DIM)
 	row.add_child(name_label)
 	var now_label := Label.new()
 	now_label.text = now
-	now_label.add_theme_font_size_override("font_size", 16)
+	PixelKit.fit(now_label, 16)
 	now_label.add_theme_color_override("font_color", Color(0.94, 0.93, 0.88))
 	row.add_child(now_label)
 	if after != "":
 		var arrow := Label.new()
 		arrow.text = "->"
-		arrow.add_theme_font_size_override("font_size", 14)
+		PixelKit.fit(arrow, 14)
 		arrow.add_theme_color_override("font_color", TownUIScript.DIM)
 		row.add_child(arrow)
 		var after_label := Label.new()
 		after_label.text = after
-		after_label.add_theme_font_size_override("font_size", 16)
+		PixelKit.fit(after_label, 16)
 		after_label.add_theme_color_override("font_color", TownUIScript.GOOD)
 		row.add_child(after_label)
 	var note_label := Label.new()
 	note_label.text = note
-	note_label.add_theme_font_size_override("font_size", 11)
+	PixelKit.fit(note_label, 11)
 	note_label.add_theme_color_override("font_color", Color(0.55, 0.55, 0.6))
 	row.add_child(note_label)
 	return row
@@ -419,19 +419,19 @@ func _add_level_row(level: int, chips: Array) -> void:
 		var name_label := Label.new()
 		name_label.text = "+%d" % (i + 1)
 		name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		name_label.add_theme_font_size_override("font_size", 20)
+		PixelKit.fit(name_label, 20)
 		name_label.add_theme_color_override("font_color", TownUIScript.GOLD if reached else (Color(0.94, 0.93, 0.88) if is_next else Color(0.5, 0.5, 0.55)))
 		col.add_child(name_label)
 		var effect := Label.new()
 		effect.text = chips[i].effect
 		effect.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		effect.add_theme_font_size_override("font_size", 11)
+		PixelKit.fit(effect, 11)
 		effect.add_theme_color_override("font_color", TownUIScript.DIM if not reached else Color(0.85, 0.75, 0.45))
 		col.add_child(effect)
 		var price := Label.new()
 		price.text = "done" if reached else "%d c" % chips[i].cost
 		price.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		price.add_theme_font_size_override("font_size", 12)
+		PixelKit.fit(price, 12)
 		price.add_theme_color_override("font_color", TownUIScript.GOLD if reached else Color(0.7, 0.62, 0.36))
 		col.add_child(price)
 		row.add_child(chip)

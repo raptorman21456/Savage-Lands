@@ -61,7 +61,7 @@ func _build_content(outer: VBoxContainer) -> void:
 	# opaque backdrop: the overworld behind the sandbox is irrelevant
 	window.get_parent().color = Color(0.03, 0.03, 0.05, 1.0)
 	title_label.text = "SANDBOX  -  pick any build, any enemies, then fight a real battle (nothing here is saved)"
-	title_label.add_theme_font_size_override("font_size", 20)
+	PixelKit.fit(title_label, 20)
 
 	result_label = _make_label("", 14, Color(0.7, 0.9, 1.0))
 	outer.add_child(result_label)
@@ -112,7 +112,7 @@ func _build_content(outer: VBoxContainer) -> void:
 	start_button = Button.new()
 	start_button.text = "Start battle"
 	start_button.custom_minimum_size = Vector2(200, 40)
-	start_button.add_theme_font_size_override("font_size", 18)
+	PixelKit.fit(start_button, 18)
 	start_button.pressed.connect(_start_battle)
 	bar.add_child(start_button)
 

@@ -757,7 +757,7 @@ const SIM_DATA = {
 			"xp_reward": 715
 		}
 	],
-	"exported": "2026-10-30T19:47:28",
+	"exported": "2026-10-30T22:35:50",
 	"foods": [
 		{
 			"description": "Heals 5 HP and restores 15 stamina.",
@@ -874,6 +874,7 @@ const SIM_DATA = {
 		"ARROW_FREEZE_FLAT_DMG": 5,
 		"ARROW_FREEZE_MAX_TURNS": 4,
 		"ARROW_FREEZE_MIN_TURNS": 2,
+		"ATTACK_MARKER_STRIKE_MULT": 0.45,
 		"ATTACK_POTION_DAMAGE_BONUS_PCT": 0.25,
 		"ATTACK_TIMING_HIT_MULT": 1.0,
 		"ATTACK_TIMING_MISS_MULT": 0.8,
@@ -1334,9 +1335,8 @@ const SIM_DATA = {
 			"monster_slayer",
 			"treasure_hunter"
 		],
-		"RAGE_DAMAGE_PCT_PER_POINT": 0.01,
-		"RAGE_SPEED_PER_POINT": 0.25,
-		"RAGE_TAKEN_CUT_PER_POINT": 0.005,
+		"RAGE_SCALE_PER_POINT": 0.05,
+		"RAGE_SPEED_SHARE": 0.5,
 		"REGION_ENEMY_SCRIPTS": {
 			"archer": null,
 			"brute": null,
@@ -5985,7 +5985,7 @@ class Sim {
   _battle_player_move_range() {
     let bonus = Math.max(0, Math.trunc((this.player.stat_agility - PC.AGILITY_START) / MC.AGILITY_PER_EXTRA_MOVE));
     // Berserk: an extra tile of reach for as long as it lasts.
-    if (this.player.berserk_turns_remaining > 0) bonus += MC.BERSERK_MOVE_BONUS;
+    if (this.player.berserk_turns_remaining > 0) bonus += this._berserk_move_bonus();
     if (this.player.potion_energy_turns > 0) bonus += MC.ENERGY_POTION_MOVE_BONUS;
     bonus += Math.trunc(this.player.talisman_bonus("move_range"));
     // Armour: Windrunner's Jerkin +1, Fortress Plate -1.
@@ -7837,15 +7837,17 @@ Object.assign(Sim.prototype, {
     const rating = 5 + Math.trunc((this.player.stat_agility - PC.AGILITY_START) / PC.AGILITY_BONUS_PER_LEVEL);
     let speed = rating + this.player.armor_speed_bonus();
     // Berserk: the Rage stat quickens the hero's turns while it lasts.
-    if (this.player.berserk_turns_remaining > 0) speed += this._berserk_speed_bonus();
+    if (this.player.berserk_turns_remaining > 0) speed *= this._berserk_speed_mult();
     return Math.max(MC.MIN_BATTLE_SPEED, speed);
   },
 
   // ---------------------------------------------------------------- Berserk (Main.gd _start_berserk / _berserk_*)
   _start_berserk(message) { this.player.berserk_turns_remaining = MC.BERSERK_TURNS; this.log(message, "good"); },
-  _berserk_damage_mult() { const p = this.player; return 1.0 + MC.BERSERK_DAMAGE_BONUS_PCT + p.stat_rage * MC.RAGE_DAMAGE_PCT_PER_POINT + p.meta_rage_bonus_pct; },
-  _berserk_taken_cut() { return Math.min(MC.BERSERK_TAKEN_CUT_CAP, MC.BERSERK_DAMAGE_TAKEN_CUT + this.player.stat_rage * MC.RAGE_TAKEN_CUT_PER_POINT); },
-  _berserk_speed_bonus() { return this.player.stat_rage * MC.RAGE_SPEED_PER_POINT; },
+  _rage_scale() { return 1.0 + this.player.stat_rage * MC.RAGE_SCALE_PER_POINT; },
+  _berserk_damage_mult() { return 1.0 + MC.BERSERK_DAMAGE_BONUS_PCT * this._rage_scale() + this.player.meta_rage_bonus_pct; },
+  _berserk_taken_cut() { return Math.min(MC.BERSERK_TAKEN_CUT_CAP, MC.BERSERK_DAMAGE_TAKEN_CUT * this._rage_scale()); },
+  _berserk_move_bonus() { return Math.floor(MC.BERSERK_MOVE_BONUS * this._rage_scale() + 0.0001); },
+  _berserk_speed_mult() { return 1.0 + (this._rage_scale() - 1.0) * MC.RAGE_SPEED_SHARE; },
   _unit_speed(kind, u) {
     if (kind === "hero") return this._hero_speed();
     const base = kind === "ally" ? (u.speed ?? MC.MERCENARY_SPEED) : (MC.ENEMY_SPEEDS[u.name] ?? MC.ENEMY_SPEED_DEFAULT);

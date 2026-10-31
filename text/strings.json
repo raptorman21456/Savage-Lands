@@ -122,7 +122,7 @@
 	"ui.levelup.agility": "+1 overworld speed per point, a faster attack cooldown, and +1 battle move tile every 20 points.",
 	"ui.levelup.dexterity": "0.75% crit chance per point (double damage, ignores cover), capped at 15%.",
 	"ui.levelup.fortitude": "+1 Fortitude per point, on top of your armour's, bent into less MAGICAL harm with diminishing returns (never past 80%).",
-	"ui.levelup.rage": "+1 Rage per point. While Berserk lasts, each point adds +1% damage dealt, 0.5% less damage taken and a quarter point of speed.",
+	"ui.levelup.rage": "+1 Rage per point. Every point makes everything Berserk gives you 5% bigger: its damage, its damage cut, its extra tile and your turn speed.",
 	"ui.levelup.intimidation": "-1% shop prices per point (capped at -75%).",
 	"ui.levelup.might": "Better weapons require higher Might to equip; boosts recruited party/wolf damage.",
 	"ui.levelup.reflexes": "0.75% dodge chance per point, capped at 15%.",

@@ -125,7 +125,7 @@ static func for_hero(h: Dictionary) -> Array:
 		var rage := entry("berserk", _turns(int(h.berserk)))
 		var info: Dictionary = h.get("berserk_info", {})
 		if not info.is_empty():
-			rage.desc = "+%d%% damage dealt, %d%% less damage taken and %d more tile of movement%s." % [int(info.damage), int(info.taken), int(info.move), (" (Rage %d adds to all three, and to your speed)" % int(info.rage)) if int(info.rage) > 0 else ""]
+			rage.desc = "+%d%% damage dealt, %d%% less damage taken and %d more tile of movement%s." % [int(info.damage), int(info.taken), int(info.move), (" (Rage %d makes all of it, and your turn speed, %d%% stronger)" % [int(info.rage), int(round(float(info.rage) * 5.0))]) if int(info.rage) > 0 else ""]
 		out.append(rage)
 	elif int(h.get("rage_kills", 0)) > 0:
 		var building := entry("rage_building", "%d / %d" % [int(h.rage_kills), int(h.get("rage_needed", 5))])

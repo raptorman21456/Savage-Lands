@@ -23,6 +23,9 @@ extends Control
 signal node_pressed(id: String)
 signal node_hover_changed(id: String)
 
+const PixelFxScript := preload("res://scripts/PixelFx.gd")
+# The Church's discs and rings are built from squares this many pixels across (PixelFx), not smooth circles; bigger ones use bigger squares.
+const PIXEL_CELL := 2.0
 const NODE_RADIUS := 28.0
 const HUB_RADIUS := 46.0
 const RING_START := 158.0
@@ -73,7 +76,7 @@ var _offset := Vector2.ZERO
 var _extent := 1000.0
 var _hover_id := ""
 var _pan_tween: Tween
-var _vignette := GradientTexture2D.new()
+var _vignette: Texture2D   # stepped pixel bands (PixelFx.vignette), built in _ready
 
 func _ready() -> void:
 	clip_contents = true
@@ -95,15 +98,7 @@ func _ready() -> void:
 			"phase": rng.randf() * TAU,
 			"speed": rng.randf_range(0.5, 2.0),
 		})
-	var vignette_gradient := Gradient.new()
-	vignette_gradient.offsets = PackedFloat32Array([0.0, 0.6, 1.0])
-	vignette_gradient.colors = PackedColorArray([Color(0, 0, 0, 0), Color(0, 0, 0, 0.1), Color(0, 0, 0, 0.75)])
-	_vignette.gradient = vignette_gradient
-	_vignette.fill = GradientTexture2D.FILL_RADIAL
-	_vignette.fill_from = Vector2(0.5, 0.5)
-	_vignette.fill_to = Vector2(1.0, 0.5)
-	_vignette.width = 256
-	_vignette.height = 256
+	_vignette = PixelFxScript.vignette(Color(0, 0, 0), 0.75, 64, 36, 5, 0.45, true)
 	_apply_offset()
 
 # --- Layout -----------------------------------------------------------------
@@ -301,7 +296,7 @@ func _make_node(d: Dictionary) -> void:
 	button.add_child(icon)
 
 	var badge := Label.new()
-	badge.add_theme_font_size_override("font_size", 13)
+	PixelKit.fit(badge, 13)
 	badge.add_theme_color_override("font_color", Color(1, 0.95, 0.7))
 	badge.add_theme_color_override("font_outline_color", Color(0.04, 0.02, 0.08))
 	badge.add_theme_constant_override("outline_size", 5)
@@ -493,8 +488,8 @@ func _draw() -> void:
 	]
 	for n in nebulae:
 		var c: Vector2 = Vector2(size.x * n[0].x, size.y * n[0].y) + _offset * 0.12
-		draw_circle(c, size.y * n[1], n[2])
-		draw_circle(c, size.y * n[1] * 0.6, Color(n[2].r, n[2].g, n[2].b, n[2].a * 0.9))
+		PixelFxScript.draw_disc(self, c, size.y * n[1], n[2], PIXEL_CELL)
+		PixelFxScript.draw_disc(self, c, size.y * n[1] * 0.6, Color(n[2].r, n[2].g, n[2].b, n[2].a * 0.9), PIXEL_CELL)
 	var tile := Vector2(1500.0, 1000.0)
 	for star in _stars:
 		var p := Vector2(
@@ -524,13 +519,13 @@ func _edge_color(parent_id: String, child_id: String) -> Color:
 
 func _draw_world() -> void:
 	for k in range(0, 10):
-		world.draw_arc(Vector2.ZERO, RING_START + float(k) * RING_STEP, 0.0, TAU, 128, Color(0.6, 0.65, 1.0, 0.035), 2.0)
+		world.draw_arc(Vector2.ZERO, RING_START + float(k) * RING_STEP, 0.0, TAU, 128, Color(0.6, 0.65, 1.0, 0.035), 2.0)   # a barely-there 3.5% guide ring: far too big to build from squares every frame
 	# The hub: a soft halo, a ring, and the Essence shard at its heart.
 	var breathe: float = 0.5 + 0.5 * sin(_time * 1.3)
-	world.draw_circle(Vector2.ZERO, HUB_RADIUS * (2.6 + 0.2 * breathe), Color(1.0, 0.8, 0.4, 0.04))
-	world.draw_circle(Vector2.ZERO, HUB_RADIUS * 1.7, Color(1.0, 0.8, 0.4, 0.07))
-	world.draw_circle(Vector2.ZERO, HUB_RADIUS, Color(0.07, 0.05, 0.12))
-	world.draw_arc(Vector2.ZERO, HUB_RADIUS, 0.0, TAU, 48, GOLD, 4.0)
+	PixelFxScript.draw_disc(world, Vector2.ZERO, HUB_RADIUS * (2.6 + 0.2 * breathe), Color(1.0, 0.8, 0.4, 0.04), PIXEL_CELL)
+	PixelFxScript.draw_disc(world, Vector2.ZERO, HUB_RADIUS * 1.7, Color(1.0, 0.8, 0.4, 0.07), PIXEL_CELL)
+	PixelFxScript.draw_disc(world, Vector2.ZERO, HUB_RADIUS, Color(0.07, 0.05, 0.12), PIXEL_CELL)
+	PixelFxScript.draw_ring(world, Vector2.ZERO, HUB_RADIUS, 4.0, GOLD, PIXEL_CELL)
 	if hub_texture != null:
 		world.draw_texture_rect(hub_texture, Rect2(-24.0, -24.0, 48.0, 48.0), false)
 
@@ -553,14 +548,14 @@ func _draw_world() -> void:
 	# Fully maxed nodes get a faint golden halo on top of their golden border.
 	for id in _states:
 		if _states[id] == "mastered" and _revealed.get(id, true):
-			world.draw_arc(_positions[id], _radius_of(_defs[id]) + 5.0, 0.0, TAU, 40, Color(GOLD.r, GOLD.g, GOLD.b, 0.45 * _reveal_alpha.get(id, 1.0)), 3.0)
+			PixelFxScript.draw_ring(world, _positions[id], _radius_of(_defs[id]) + 5.0, 3.0, Color(GOLD.r, GOLD.g, GOLD.b, 0.45 * _reveal_alpha.get(id, 1.0)), PIXEL_CELL)
 	_draw_wing_labels()
 	# A slow pulse around every node you can buy right now.
 	var pulse: float = fmod(_time * 0.9, 1.0)
 	for id in _states:
 		if _revealed.get(id, true) and (_states[id] == "available" or _states[id] == "upgradable"):
 			var c: Color = GOLD if _states[id] == "upgradable" else tint_of(id)
-			world.draw_arc(_positions[id], _radius_of(_defs[id]) + 5.0 + pulse * 9.0, 0.0, TAU, 40, Color(c.r, c.g, c.b, (1.0 - pulse) * 0.7), 3.0)
+			PixelFxScript.draw_ring(world, _positions[id], _radius_of(_defs[id]) + 5.0 + pulse * 9.0, 3.0, Color(c.r, c.g, c.b, (1.0 - pulse) * 0.7), PIXEL_CELL)
 
 # Each wing's name, centred on the path between the hub and the wing's root, in
 # the wing's colour with a dark outline so it reads over the line beneath it.
@@ -568,7 +563,7 @@ func _draw_wing_labels() -> void:
 	var font: Font = world.get_theme_default_font()
 	if font == null:
 		return
-	var font_size := 13
+	var font_size := PixelKit.snap(13)
 	for wing in _wing_labels:
 		if not _wing_roots.has(wing):
 			continue

@@ -49,7 +49,7 @@ func _build() -> void:
 	outer.add_child(title_row)
 	var title := Label.new()
 	title.text = "QUEST BOARD"
-	title.add_theme_font_size_override("font_size", 26)
+	PixelKit.fit(title, 26)
 	title.add_theme_color_override("font_color", Color(1, 0.9, 0.3))
 	title_row.add_child(title)
 	var spacer := Control.new()
@@ -62,7 +62,7 @@ func _build() -> void:
 
 	var flavor := Label.new()
 	flavor.text = "A handful of jobs pinned up for anyone willing."
-	flavor.add_theme_font_size_override("font_size", 14)
+	PixelKit.fit(flavor, 14)
 	flavor.add_theme_color_override("font_color", Color(0.8, 0.8, 0.75))
 	outer.add_child(flavor)
 
@@ -117,14 +117,14 @@ func _build_quest_card(main: Node, index: int) -> Control:
 
 	var title_label := Label.new()
 	title_label.text = slot.title
-	title_label.add_theme_font_size_override("font_size", 16)
+	PixelKit.fit(title_label, 16)
 	title_label.add_theme_color_override("font_color", Color(1, 0.9, 0.3))
 	text_col.add_child(title_label)
 
 	var flavor_label := Label.new()
 	flavor_label.text = slot.flavor
 	flavor_label.autowrap_mode = TextServer.AUTOWRAP_WORD
-	flavor_label.add_theme_font_size_override("font_size", 13)
+	PixelKit.fit(flavor_label, 13)
 	flavor_label.add_theme_color_override("font_color", Color(0.85, 0.85, 0.8))
 	text_col.add_child(flavor_label)
 
@@ -135,7 +135,7 @@ func _build_quest_card(main: Node, index: int) -> Control:
 		reward_bits.append("%d shards" % slot.reward_shards)
 	var reward_label := Label.new()
 	reward_label.text = "Reward: %s" % " + ".join(reward_bits)
-	reward_label.add_theme_font_size_override("font_size", 12)
+	PixelKit.fit(reward_label, 12)
 	reward_label.add_theme_color_override("font_color", Color(0.6, 0.85, 0.6))
 	text_col.add_child(reward_label)
 
@@ -143,7 +143,7 @@ func _build_quest_card(main: Node, index: int) -> Control:
 		var progress: int = main._quest_progress(slot)
 		var progress_label := Label.new()
 		progress_label.text = "Progress: %d / %d" % [mini(progress, slot.target_amount), slot.target_amount]
-		progress_label.add_theme_font_size_override("font_size", 13)
+		PixelKit.fit(progress_label, 13)
 		progress_label.add_theme_color_override("font_color", Color(0.7, 0.8, 0.95))
 		text_col.add_child(progress_label)
 

@@ -49,7 +49,7 @@ func _build() -> void:
 	outer.add_child(title_row)
 	var title := Label.new()
 	title.text = "THE RESTING INN"
-	title.add_theme_font_size_override("font_size", 26)
+	PixelKit.fit(title, 26)
 	title.add_theme_color_override("font_color", Color(1, 0.9, 0.3))
 	title_row.add_child(title)
 	var spacer := Control.new()
@@ -63,17 +63,17 @@ func _build() -> void:
 	var flavor := Label.new()
 	flavor.text = "The innkeeper gestures you toward a warm bed and a hot meal."
 	flavor.autowrap_mode = TextServer.AUTOWRAP_WORD
-	flavor.add_theme_font_size_override("font_size", 14)
+	PixelKit.fit(flavor, 14)
 	flavor.add_theme_color_override("font_color", Color(0.8, 0.8, 0.75))
 	outer.add_child(flavor)
 
 	hp_label = Label.new()
-	hp_label.add_theme_font_size_override("font_size", 16)
+	PixelKit.fit(hp_label, 16)
 	hp_label.add_theme_color_override("font_color", Color(0.85, 0.85, 0.8))
 	outer.add_child(hp_label)
 
 	stamina_label = Label.new()
-	stamina_label.add_theme_font_size_override("font_size", 16)
+	PixelKit.fit(stamina_label, 16)
 	stamina_label.add_theme_color_override("font_color", Color(0.85, 0.85, 0.8))
 	outer.add_child(stamina_label)
 

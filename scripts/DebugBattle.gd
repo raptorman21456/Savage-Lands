@@ -9,7 +9,22 @@ const DebugActionsScript := preload("res://scripts/DebugActions.gd")
 const DebugWorldScript := preload("res://scripts/DebugWorld.gd")
 const SandboxScript := preload("res://scripts/Sandbox.gd")
 const BattleStatusesScript := preload("res://scripts/BattleStatuses.gd")
+const AttackTimingsScript := preload("res://scripts/AttackTimings.gd")
 
+# The weapon attack styles the tester offers: [command id, label, what it is].
+const ATTACK_STYLES := [
+	["club", "Club", "slide: a marker crosses a bar, press in the middle zone"],
+	["spear", "Spear", "bullseye: a ring closes on it"],
+	["greatsword", "Greatsword", "arc: the Club's bar, curved"],
+	["hammer", "Hammer", "hold and release inside the zone"],
+	["battle_axe", "Battle Axe", "mash: keep a falling gauge in a random band"],
+	["dagger", "Dagger", "markers: random rhythm, every hit is a strike"],
+	["knuckle_gloves", "Gloves", "two circles: Z and X as the rings close"],
+	["hand_picks", "Picks", "round dial with a drifting zone"],
+	["bow", "Bow", "crosshair: press as it crosses the centre"],
+	["wand", "Wand", "trace a random shape with the mouse"],
+	["staff", "Staff", "press 4-7 arrow keys in order"],
+]
 static func ok(msg: String, extra: Dictionary = {}) -> Dictionary:
 	return DebugActionsScript.ok(msg, extra)
 
@@ -74,6 +89,28 @@ static func why_cannot_finish(main) -> String:
 	if bool(main.battle_awaiting_evasion) or bool(main.battle_awaiting_water_confirm):
 		return "Answer the question on screen first."
 	return ""
+
+# Plays one of the weapon attack popups (see ATTACK_STYLES) on its own, so you can feel it: the menu closes, the popup opens, and the
+# grade it earns comes up as a message. Nothing is attacked and nothing is spent.
+static func play_attack_style(main, command_id: String, spell_id: String = "staff_i_cast_fireball") -> Dictionary:
+	var dm = main._get_attack_minigame()
+	if dm._running:
+		return fail("A popup is already open.")
+	_play_attack_style(main, dm, command_id, spell_id)
+	return ok("Opening the %s popup." % command_id.replace("_", " "), {"close": true})
+
+static func _play_attack_style(main, dm, command_id: String, spell_id: String) -> void:
+	var command: Dictionary = AttackTimingsScript.command_for(command_id)
+	var opts := {}
+	if command_id == "wand" or command_id == "staff":
+		opts = {"verb": "CAST", "spell_id": spell_id}
+	var outcome: Dictionary = await dm.run(command, opts)
+	var text := "%s: %s" % [str(command.get("name", command_id)), str(outcome.get("result", "?")).to_upper()]
+	if outcome.has("hits"):
+		text += " (%d of %d markers)" % [int(outcome.hits), int(outcome.get("markers", 0))]
+	elif outcome.has("shape"):
+		text += " (%s, power x%.2f)" % [str(outcome.shape), float(outcome.get("power", 1.0))]
+	main.hud.show_message(text)
 
 # Every enemy falls (XP, drops and Essence as if you had struck them down) and the battle is won.
 static func win_now(main) -> Dictionary:

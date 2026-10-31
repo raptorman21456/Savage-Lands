@@ -534,7 +534,7 @@
 			"xp_reward": 715
 		}
 	],
-	"exported": "2026-10-30T19:47:28",
+	"exported": "2026-10-30T22:35:50",
 	"foods": [
 		{
 			"description": "Heals 5 HP and restores 15 stamina.",
@@ -651,6 +651,7 @@
 		"ARROW_FREEZE_FLAT_DMG": 5,
 		"ARROW_FREEZE_MAX_TURNS": 4,
 		"ARROW_FREEZE_MIN_TURNS": 2,
+		"ATTACK_MARKER_STRIKE_MULT": 0.45,
 		"ATTACK_POTION_DAMAGE_BONUS_PCT": 0.25,
 		"ATTACK_TIMING_HIT_MULT": 1.0,
 		"ATTACK_TIMING_MISS_MULT": 0.8,
@@ -1111,9 +1112,8 @@
 			"monster_slayer",
 			"treasure_hunter"
 		],
-		"RAGE_DAMAGE_PCT_PER_POINT": 0.01,
-		"RAGE_SPEED_PER_POINT": 0.25,
-		"RAGE_TAKEN_CUT_PER_POINT": 0.005,
+		"RAGE_SCALE_PER_POINT": 0.05,
+		"RAGE_SPEED_SHARE": 0.5,
 		"REGION_ENEMY_SCRIPTS": {
 			"archer": null,
 			"brute": null,

@@ -24,7 +24,7 @@ static func picker_window_size(viewport_size: Vector2) -> Vector2:
 # Close button to match.
 static func apply_bronze_frame(panel: TownPanel) -> void:
 	panel.window.add_theme_stylebox_override("panel", PixelUIScript.panel_style(true))
-	panel.title_label.add_theme_font_size_override("font_size", 28)
+	PixelKit.fit(panel.title_label, 28)
 	panel.title_label.add_theme_color_override("font_color", Color(1.0, 0.88, 0.4))
 	panel.title_label.add_theme_color_override("font_outline_color", PixelUIScript.OUTLINE)
 	panel.title_label.add_theme_constant_override("outline_size", 6)
@@ -47,7 +47,7 @@ static func add_top_row(outer: VBoxContainer) -> Dictionary:
 	coin_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	top.add_child(coin_icon)
 	var coins := Label.new()
-	coins.add_theme_font_size_override("font_size", 22)
+	PixelKit.fit(coins, 22)
 	coins.add_theme_color_override("font_color", GOLD)
 	coins.add_theme_color_override("font_outline_color", PixelUIScript.OUTLINE)
 	coins.add_theme_constant_override("outline_size", 5)
@@ -92,7 +92,7 @@ static func _label(text: String, size: int, color: Color) -> Label:
 	var label := Label.new()
 	label.text = text
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD
-	label.add_theme_font_size_override("font_size", size)
+	PixelKit.fit(label, size)
 	label.add_theme_color_override("font_color", color)
 	return label
 
@@ -148,7 +148,7 @@ static func make_entry(plate_box: Control, title: String, pips: Array, tag: Stri
 	var name_label := Label.new()
 	name_label.text = title
 	name_label.clip_text = true
-	name_label.add_theme_font_size_override("font_size", 15)
+	PixelKit.fit(name_label, 15)
 	name_label.add_theme_color_override("font_color", Color(0.94, 0.93, 0.88))
 	text_col.add_child(name_label)
 	var meta := HBoxContainer.new()
@@ -167,7 +167,7 @@ static func make_entry(plate_box: Control, title: String, pips: Array, tag: Stri
 	if tag != "":
 		var tag_label := Label.new()
 		tag_label.text = tag
-		tag_label.add_theme_font_size_override("font_size", 10)
+		PixelKit.fit(tag_label, 10)
 		tag_label.add_theme_color_override("font_color", tag_color)
 		meta.add_child(tag_label)
 	return entry
@@ -196,7 +196,7 @@ static func make_header(plate_box: Control, title: String, lines: Array) -> HBox
 	header.add_child(titles)
 	var name_label := Label.new()
 	name_label.text = title
-	name_label.add_theme_font_size_override("font_size", 26)
+	PixelKit.fit(name_label, 26)
 	name_label.add_theme_color_override("font_color", GOLD)
 	name_label.add_theme_color_override("font_outline_color", PixelUIScript.OUTLINE)
 	name_label.add_theme_constant_override("outline_size", 6)
@@ -219,7 +219,7 @@ static func make_action(price_text: String, affordable: bool, button_text: Strin
 		var price := Label.new()
 		price.text = price_text
 		price.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		price.add_theme_font_size_override("font_size", 14)
+		PixelKit.fit(price, 14)
 		price.add_theme_color_override("font_color", GOOD if affordable else BAD)
 		action.add_child(price)
 	var button := Button.new()

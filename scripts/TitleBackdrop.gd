@@ -8,6 +8,9 @@ extends Control
 # takes input; TitleScreen just drops it behind the menu.
 
 const BARBARIAN_TEXTURE := preload("res://assets/barbarian.png")
+const PixelFxScript := preload("res://scripts/PixelFx.gd")
+# The glows round the sun and the campfire are discs of squares this many pixels across, not smooth circles.
+const GLOW_CELL := 4.0
 const PINE_TEXTURE := preload("res://assets/deco_pine_tree.png")
 const DEAD_TREE_TEXTURE := preload("res://assets/deco_dead_tree.png")
 
@@ -31,7 +34,7 @@ var _layers: Array = []
 var _built_for := Vector2.ZERO
 var _sky := Gradient.new()
 var _sun_colors := Gradient.new()
-var _vignette := GradientTexture2D.new()
+var _vignette: Texture2D   # stepped pixel bands (PixelFx.vignette), built in _ready
 var _shooting_star: Dictionary = {}
 var _next_shooting_star := 4.0
 var _ember_budget := 0.0
@@ -51,15 +54,7 @@ func _ready() -> void:
 	_sun_colors.offsets = PackedFloat32Array([0.0, 0.5, 1.0])
 	_sun_colors.colors = PackedColorArray([Color(1.0, 0.86, 0.36), Color(1.0, 0.46, 0.2), Color(0.82, 0.1, 0.22)])
 
-	var vignette_gradient := Gradient.new()
-	vignette_gradient.offsets = PackedFloat32Array([0.0, 0.55, 1.0])
-	vignette_gradient.colors = PackedColorArray([Color(0, 0, 0, 0), Color(0, 0, 0, 0.05), Color(0, 0, 0, 0.7)])
-	_vignette.gradient = vignette_gradient
-	_vignette.fill = GradientTexture2D.FILL_RADIAL
-	_vignette.fill_from = Vector2(0.5, 0.5)
-	_vignette.fill_to = Vector2(1.0, 0.5)
-	_vignette.width = 256
-	_vignette.height = 256
+	_vignette = PixelFxScript.vignette(Color(0, 0, 0), 0.7, 64, 36, 5, 0.45, true)
 
 	for i in STAR_COUNT:
 		_stars.append({
@@ -225,9 +220,9 @@ func _draw_stars() -> void:
 func _draw_sun() -> void:
 	var radius: float = minf(size.x, size.y) * 0.19
 	var center := Vector2(size.x * 0.7, size.y * 0.5 + sin(_time * 0.25) * 4.0)
-	draw_circle(center, radius * 1.9, Color(1.0, 0.35, 0.18, 0.05))
-	draw_circle(center, radius * 1.5, Color(1.0, 0.4, 0.2, 0.07))
-	draw_circle(center, radius * 1.22, Color(1.0, 0.5, 0.22, 0.1))
+	PixelFxScript.draw_disc(self, center, radius * 1.9, Color(1.0, 0.35, 0.18, 0.05), GLOW_CELL)
+	PixelFxScript.draw_disc(self, center, radius * 1.5, Color(1.0, 0.4, 0.2, 0.07), GLOW_CELL)
+	PixelFxScript.draw_disc(self, center, radius * 1.22, Color(1.0, 0.5, 0.22, 0.1), GLOW_CELL)
 	var row_h: float = maxf(3.0, roundf(radius / 14.0))
 	var rows: int = int(ceil(radius * 2.0 / row_h))
 	for i in rows:
@@ -344,8 +339,8 @@ func _draw_cliff_scene() -> void:
 	# Campfire glow first, so it lights the hero from behind rather than over him.
 	var fire: Vector2 = _campfire_pos()
 	var flicker: float = 0.8 + 0.2 * sin(_time * 11.0) + 0.1 * sin(_time * 23.0)
-	draw_circle(fire + Vector2(0, -10), s * 11.0 * flicker, Color(1.0, 0.45, 0.15, 0.07))
-	draw_circle(fire + Vector2(0, -10), s * 6.5 * flicker, Color(1.0, 0.55, 0.18, 0.1))
+	PixelFxScript.draw_disc(self, fire + Vector2(0, -10), s * 11.0 * flicker, Color(1.0, 0.45, 0.15, 0.07), GLOW_CELL)
+	PixelFxScript.draw_disc(self, fire + Vector2(0, -10), s * 6.5 * flicker, Color(1.0, 0.55, 0.18, 0.1), GLOW_CELL)
 
 	var hero_x: float = _hero_x()
 	var breathe: float = 1.0 + 0.022 * sin(_time * 1.9)

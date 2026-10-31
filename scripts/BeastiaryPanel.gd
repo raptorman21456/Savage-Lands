@@ -62,7 +62,7 @@ func _build() -> void:
 	outer.add_child(title_row)
 	var title := Label.new()
 	title.text = "BEASTIARY"
-	title.add_theme_font_size_override("font_size", 26)
+	PixelKit.fit(title, 26)
 	title.add_theme_color_override("font_color", Color(1, 0.9, 0.3))
 	title_row.add_child(title)
 	var spacer := Control.new()
@@ -98,19 +98,19 @@ func _build() -> void:
 	detail_panel.add_child(detail_icon)
 
 	detail_name = Label.new()
-	detail_name.add_theme_font_size_override("font_size", 22)
+	PixelKit.fit(detail_name, 22)
 	detail_name.add_theme_color_override("font_color", Color(1, 0.9, 0.3))
 	detail_panel.add_child(detail_name)
 
 	detail_traits = Label.new()
 	detail_traits.autowrap_mode = TextServer.AUTOWRAP_WORD
-	detail_traits.add_theme_font_size_override("font_size", 14)
+	PixelKit.fit(detail_traits, 14)
 	detail_traits.add_theme_color_override("font_color", Color(0.7, 0.85, 1.0))
 	detail_panel.add_child(detail_traits)
 
 	detail_description = Label.new()
 	detail_description.autowrap_mode = TextServer.AUTOWRAP_WORD
-	detail_description.add_theme_font_size_override("font_size", 15)
+	PixelKit.fit(detail_description, 15)
 	detail_description.add_theme_color_override("font_color", Color(0.85, 0.85, 0.8))
 	detail_panel.add_child(detail_description)
 

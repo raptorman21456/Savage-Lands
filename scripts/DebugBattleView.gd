@@ -65,6 +65,12 @@ func _left_column() -> void:
 		var b: PixelButton = k.button(str(preset[0]), func(): act(DebugBattleScript.start_battle(main, spec, int(cfg.tier), bool(cfg.elite), float(cfg.power), int(cfg.get("level", 0)))))
 		k.set_enabled(b, not bool(main.in_battle))
 		presets.add_child(b)
+	k.section(col, "Try an attack style")
+	k.note(col, "Plays the popup each weapon uses, on its own (nothing is attacked): the menu closes and the popup opens at the bottom right.")
+	var styles := k.flow(col)
+	for style in DebugBattleScript.ATTACK_STYLES:
+		var style_id: String = str(style[0])
+		styles.add_child(k.button(str(style[1]), func(): act(DebugBattleScript.play_attack_style(main, style_id)), false, "", str(style[2])))
 	k.spacer(col, 12)
 
 # --- while it is on -----------------------------------------------------------------------------------------------------------------

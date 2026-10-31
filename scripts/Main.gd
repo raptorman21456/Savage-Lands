@@ -388,12 +388,12 @@ const BERSERK_KILLS_NEEDED := 5
 const BERSERK_DAMAGE_BONUS_PCT := 0.25
 const BERSERK_DAMAGE_TAKEN_CUT := 0.25
 const BERSERK_MOVE_BONUS := 1
-# The Rage stat ("berserk attack, defense, and speed increase"): per point, while Berserk lasts. The doc gives no per-point numbers,
-# so these are my drafts -- +1% damage dealt, 0.5% less damage taken (the whole cut stops at BERSERK_TAKEN_CUT_CAP) and a quarter of a
-# point of turn-speed rating (the same rating the Stats screen shows: 5 to start).
-const RAGE_DAMAGE_PCT_PER_POINT := 0.01
-const RAGE_TAKEN_CUT_PER_POINT := 0.005
-const RAGE_SPEED_PER_POINT := 0.25
+# The Rage stat ("berserk attack, defense, and speed increase") SCALES Berserk: it multiplies each of Berserk's own bonuses rather than
+# adding percentage points to them. Berserk's scale is 1 + Rage x RAGE_SCALE_PER_POINT (Rage 10 = 1.5x, Rage 20 = 2x); the doc's +25% damage
+# and 25% less damage taken are multiplied by it (the cut stops at BERSERK_TAKEN_CUT_CAP), the +1 tile is multiplied and rounded down (a
+# second tile at Rage 20), and the hero's turn speed rises by RAGE_SPEED_SHARE of the extra scale. The doc gives no numbers: these are drafts.
+const RAGE_SCALE_PER_POINT := 0.05
+const RAGE_SPEED_SHARE := 0.5
 const BERSERK_TAKEN_CUT_CAP := 0.6
 # Dodge / block timing minigames (DefenseMinigame.gd; each enemy's attacks live in
 # AttackPatterns.gd). An enemy attack that would hit the hero first rolls for a DODGE opening
@@ -412,12 +412,17 @@ const MINIGAME_PARRY_BONUS_CAP_MS := 30.0
 # Weapon attack timing minigame (AttackMinigame.gd; each weapon family's command lives in
 # AttackTimings.gd). How well the command is executed scales the damage of every attack that deals
 # damage (regular, Heavy, damaging specials -- a flurry scales each hit); a perfect also refunds a
-# little stamina. Skipped for non-damaging specials (dmg_mult 0), arrows, ally attacks and the
-# tutorial, or when the setting is off. DRAFT numbers -- the user said "about 0.8x / 1x / 1.25x".
+# little stamina. Skipped for non-damaging specials (dmg_mult 0), arrows and the tutorial, or when the
+# setting is off; party members only play it for a spell cast through a Staff (arrow keys) or a Wand
+# (a traced shape). DRAFT numbers -- the user said "about 0.8x / 1x / 1.25x".
 const ATTACK_TIMING_MISS_MULT := 0.8
 const ATTACK_TIMING_HIT_MULT := 1.0
 const ATTACK_TIMING_PERFECT_MULT := 1.25
 const ATTACK_TIMING_PERFECT_STAMINA := 5
+# The Dagger's markers: a plain attack lands one strike for every marker you hit, each worth this much of the swing (a swing with no hit
+# lands one strike at the miss share). A special keeps the usual miss / hit / perfect scaling. DRAFT: 2-4 markers, so a clean swing is
+# 0.9x to 1.8x in all.
+const ATTACK_MARKER_STRIKE_MULT := 0.45
 # Staff special Landfall: each enemy it hits has this chance to be stunned.
 const LANDFALL_STUN_CHANCE := 0.25
 # I CAST FIREBALL: damage lost for every tile between a victim and the blast's centre.
@@ -1849,7 +1854,7 @@ func _build_druid() -> void:
 	druid_npc.add_child(sprite)
 	var tag := Label.new()
 	tag.text = "Druid"
-	tag.add_theme_font_size_override("font_size", 14)
+	PixelKit.fit(tag, 14)
 	tag.modulate = Color(0.7, 1.0, 0.75)
 	tag.position = Vector2(-26, -64)
 	tag.z_index = 3
@@ -1975,7 +1980,7 @@ func _build_knight() -> void:
 	knight_npc.add_child(sprite)
 	var tag := Label.new()
 	tag.text = "Knight"
-	tag.add_theme_font_size_override("font_size", 14)
+	PixelKit.fit(tag, 14)
 	tag.modulate = Color(0.75, 0.85, 1.0)
 	tag.position = Vector2(-26, -64)
 	tag.z_index = 3
@@ -3040,7 +3045,7 @@ func spawn_damage_number_world(pos: Vector2, amount: int) -> void:
 		return
 	var label := Label.new()
 	label.text = str(amount)
-	label.add_theme_font_size_override("font_size", 16)
+	PixelKit.fit(label, 16)
 	label.add_theme_color_override("font_color", Color(1.0, 0.9, 0.3))
 	label.add_theme_color_override("font_outline_color", Color(0, 0, 0))
 	label.add_theme_constant_override("outline_size", 3)
@@ -3061,7 +3066,7 @@ func _spawn_battle_damage_number(tile: Vector2i, amount: int, size: int = 1) -> 
 		return
 	var label := Label.new()
 	label.text = str(amount)
-	label.add_theme_font_size_override("font_size", 16)
+	PixelKit.fit(label, 16)
 	label.add_theme_color_override("font_color", Color(1.0, 0.9, 0.3))
 	label.add_theme_color_override("font_outline_color", Color(0, 0, 0))
 	label.add_theme_constant_override("outline_size", 3)
@@ -4292,20 +4297,26 @@ func _start_berserk(message: String) -> void:
 
 # What Berserk is worth to the hero right now. Each is the doc's base number plus what the Rage stat adds (the Church's RAGE node
 # adds to the damage as well); callers only ask while player.berserk_turns_remaining > 0.
+func _rage_scale() -> float:
+	return 1.0 + player.stat_rage * RAGE_SCALE_PER_POINT
+
 func _berserk_damage_mult() -> float:
-	return 1.0 + BERSERK_DAMAGE_BONUS_PCT + player.stat_rage * RAGE_DAMAGE_PCT_PER_POINT + player.meta_rage_bonus_pct
+	return 1.0 + BERSERK_DAMAGE_BONUS_PCT * _rage_scale() + player.meta_rage_bonus_pct
 
 func _berserk_taken_cut() -> float:
-	return minf(BERSERK_TAKEN_CUT_CAP, BERSERK_DAMAGE_TAKEN_CUT + player.stat_rage * RAGE_TAKEN_CUT_PER_POINT)
+	return minf(BERSERK_TAKEN_CUT_CAP, BERSERK_DAMAGE_TAKEN_CUT * _rage_scale())
 
-func _berserk_speed_bonus() -> float:
-	return player.stat_rage * RAGE_SPEED_PER_POINT
+func _berserk_move_bonus() -> int:
+	return int(floor(float(BERSERK_MOVE_BONUS) * _rage_scale() + 0.0001))
+
+func _berserk_speed_mult() -> float:
+	return 1.0 + (_rage_scale() - 1.0) * RAGE_SPEED_SHARE
 
 func _battle_player_move_range() -> int:
 	var bonus: int = max(0, int(player.stat_agility - PlayerScript.AGILITY_START) / AGILITY_PER_EXTRA_MOVE)
 	# Berserk: an extra tile of reach for as long as it lasts.
 	if player.berserk_turns_remaining > 0:
-		bonus += BERSERK_MOVE_BONUS
+		bonus += _berserk_move_bonus()
 	# Energy Potion: a temporary extra tile of reach for a few of the
 	# player's own turns.
 	if player.potion_energy_turns > 0:
@@ -6249,6 +6260,8 @@ func _try_cleanse_one_player_status() -> void:
 # "who is acting" so the dispatcher never has to care: tile, weapon, resource pool, talismans...
 # ---------------------------------------------------------------------------
 var battle_actor: Dictionary = {}
+# What the minigame made of the spell being cast right now (1.0 = none): _potency() folds it in.
+var battle_cast_mult := 1.0
 
 # An "HP as mana" caster (the Necromancer) pays 1 HP for every 5 mana a spell is worth (the user's
 # ruling). It is a division, never a 0.2 multiplier: 35 * 0.2 is 7.000000000000001, which would round up.
@@ -6493,9 +6506,22 @@ func _battle_perform_attack(action: Dictionary) -> void:
 	var dmg_mult: float = action.get("dmg_mult", 1.0)
 	# Weapon attack timing minigame: how well the weapon's command is executed scales the damage.
 	var timing_result := ""
+	var marker_strikes := 0
+	battle_cast_mult = 1.0
 	if _attack_minigame_on(action):
-		timing_result = await _run_attack_minigame(weapon)
-		dmg_mult *= _attack_timing_mult(timing_result)
+		var timing_outcome: Dictionary = await _run_attack_minigame(weapon, action)
+		timing_result = str(timing_outcome.get("result", AttackTimingsScript.MISS))
+		if timing_outcome.has("hits") and not _actor_is_ally() and bool(action.get("is_regular_attack", false)):
+			# The Dagger's markers: every marker hit is a strike of its own.
+			marker_strikes = maxi(1, int(timing_outcome.hits))
+			dmg_mult *= ATTACK_MARKER_STRIKE_MULT * (1.0 if int(timing_outcome.hits) > 0 else ATTACK_TIMING_MISS_MULT)
+		else:
+			dmg_mult *= _attack_timing_mult(timing_result)
+		if _actor_is_ally():
+			# A spell cast through the minigame: its grade (and the Wand's shape) scales the spell's potency.
+			battle_cast_mult = _attack_timing_mult(timing_result)
+			if timing_result != AttackTimingsScript.MISS:
+				battle_cast_mult *= float(timing_outcome.get("power", 1.0))
 
 	# The Rogue's regular attack sometimes picks a pocket instead of dealing damage.
 	var stole := false
@@ -6691,6 +6717,10 @@ func _battle_perform_attack(action: Dictionary) -> void:
 			or weapon.get("passive_cleave_pct", 0.0) > 0.0 \
 			or whirlwind_melee
 		_hit(idx, dmg_mult, effect, weapon, -1, multihit_capable)
+		# The Dagger's markers: each marker hit past the first is another strike on the same target.
+		for extra_strike in maxi(0, marker_strikes - 1):
+			if still_primary_target.call():
+				_hit(idx, dmg_mult, effect, weapon, -1, multihit_capable)
 		# The Wolf's Feed: a kill heals it and gives most of the stamina back.
 		if effect == "feed" and not still_primary_target.call():
 			_actor_heal(PartyKitsScript.FEED_KILL_HEAL)
@@ -7450,7 +7480,11 @@ func _ally_special_pool(u: Dictionary) -> Array:
 # --- The Sorcery wing: talismans and Astral upgrades that act on spells (Talismans.gd key list, Player.meta_*) -------
 # What a caster's spells are worth: 1.0 plus every source of potency added together -- the Snail Shell, and the Church's Innate Power.
 func _potency(u: Dictionary) -> float:
-	return 1.0 + player.meta_spell_potency_pct + _unit_effect(u, "spell_potency_pct")
+	var potency: float = 1.0 + player.meta_spell_potency_pct + _unit_effect(u, "spell_potency_pct")
+	# The grade of the spell's minigame (and a Wand's shape) while its caster is mid-cast.
+	if is_same(u, battle_actor):
+		potency *= battle_cast_mult
+	return potency
 
 # A spell costs less for a unit that casts with mana (or HP, the Necromancer's mana): the Dreamcatcher takes 33% off. Costs are in
 # mana-worth throughout, so the same share comes off a mage's mana and the Necromancer's HP. Never below 1, and never on a fighter's stamina.
@@ -9211,9 +9245,13 @@ func _enemy_apply_damage(u: Dictionary, target_tile: Vector2i, raw_dmg: int, tra
 # Weapon attack timing minigame (see the ATTACK_TIMING_* constants).
 # ---------------------------------------------------------------------------
 func _attack_minigame_on(action: Dictionary) -> bool:
-	# The timing popup is the hero's own; party members swing without it.
-	if _actor_is_ally() or settings == null or not settings.attack_minigame_enabled or tutorial_active:
+	if settings == null or not settings.attack_minigame_enabled or tutorial_active:
 		return false
+	if _actor_is_ally():
+		# A party member plays it only for a spell cast through a Staff or a Wand (and not for an Echo's free recast).
+		if not SpellUpgradesScript.has(str(action.get("id", ""))) or bool(battle_actor.get("echo", false)):
+			return false
+		return ["staff", "wand"].has(AttackTimingsScript.base_id_for(str(_actor_weapon().get("id", ""))))
 	return float(action.get("dmg_mult", 1.0)) > 0.0
 
 func _get_attack_minigame() -> CanvasLayer:
@@ -9228,20 +9266,27 @@ func _attack_timing_mult(result: String) -> float:
 		AttackTimingsScript.HIT: return ATTACK_TIMING_HIT_MULT
 	return ATTACK_TIMING_MISS_MULT
 
-# Runs the popup for the wielded weapon's family and returns "miss" / "hit" / "perfect". The turn is
-# parked on "attack" meanwhile so the battle menus hide and no other input can sneak in.
-func _run_attack_minigame(weapon: Dictionary) -> String:
+# Runs the popup for the wielded weapon's family and returns its outcome ({"result": "miss" / "hit" / "perfect", plus what the style
+# adds -- the Dagger's "hits", the Wand's "shape" and "power"}). The turn is parked on "attack" meanwhile so the battle menus hide and no
+# other input can sneak in. A party member's spell passes its id (the Staff's arrow count depends on it).
+func _run_attack_minigame(weapon: Dictionary, action: Dictionary = {}) -> Dictionary:
 	var command: Dictionary = AttackTimingsScript.command_for_weapon(weapon)
+	var opts := {}
+	if _actor_is_ally():
+		opts = {"verb": "CAST", "spell_id": str(action.get("id", ""))}
 	battle_turn = "attack"
 	_refresh_battle_display()
-	var outcome: Dictionary = await _get_attack_minigame().run(command)
+	var outcome: Dictionary = await _get_attack_minigame().run(command, opts)
 	battle_turn = "player"
 	var result: String = str(outcome.get("result", AttackTimingsScript.MISS))
+	if outcome.has("hits") and not _actor_is_ally() and bool(action.get("is_regular_attack", false)):
+		hud.battle_log("%d of %d markers hit." % [int(outcome.hits), int(outcome.get("markers", 0))])
+		return outcome
 	match result:
 		AttackTimingsScript.PERFECT: hud.battle_log("Perfect timing! +%d%% damage." % int(round((ATTACK_TIMING_PERFECT_MULT - 1.0) * 100.0)))
 		AttackTimingsScript.HIT: pass
 		_: hud.battle_log("Mistimed -- the blow lands weakly (%d%% damage)." % int(round(ATTACK_TIMING_MISS_MULT * 100.0)))
-	return result
+	return outcome
 
 # Everything that happens when an enemy blow actually connects with the hero (damage has
 # already been through every reduction): HP loss, Momentum Chain, the lunge / number / flash /
@@ -10006,7 +10051,7 @@ func _hero_speed() -> float:
 	var speed: float = float(rating + player.armor_speed_bonus())
 	# Berserk: the Rage stat quickens the hero's turns while it lasts.
 	if player.berserk_turns_remaining > 0:
-		speed += _berserk_speed_bonus()
+		speed *= _berserk_speed_mult()
 	return maxf(MIN_BATTLE_SPEED, speed)
 
 func _unit_speed(kind: String, u: Dictionary) -> float:
@@ -10216,7 +10261,7 @@ func _hero_status_state() -> Dictionary:
 	return {
 		"defending": battle_player_defending, "taunting": battle_player_taunting,
 		"stealth": player.stealth_turns_remaining, "berserk": player.berserk_turns_remaining,
-		"berserk_info": {"damage": int(round((_berserk_damage_mult() - 1.0) * 100.0)), "taken": int(round(_berserk_taken_cut() * 100.0)), "move": BERSERK_MOVE_BONUS, "rage": player.stat_rage},
+		"berserk_info": {"damage": int(round((_berserk_damage_mult() - 1.0) * 100.0)), "taken": int(round(_berserk_taken_cut() * 100.0)), "move": _berserk_move_bonus(), "rage": player.stat_rage},
 		"rage_kills": player.berserk_kills, "rage_needed": BERSERK_KILLS_NEEDED,
 		"buff": battle_hero_buff_turns, "bloodrage": battle_bloodrage_stacks,
 		"bloodboost": player.bloodmoon_stacks, "bloodcrash": player.bloodmoon_debuffed,

@@ -117,7 +117,7 @@ func _build_content(outer: VBoxContainer) -> void:
 	shard.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	header.add_child(shard)
 	essence_label = Label.new()
-	essence_label.add_theme_font_size_override("font_size", 24)
+	PixelKit.fit(essence_label, 24)
 	essence_label.add_theme_color_override("font_color", Color(1.0, 0.86, 0.36))
 	essence_label.add_theme_color_override("font_outline_color", PixelUIScript.OUTLINE)
 	essence_label.add_theme_constant_override("outline_size", 5)

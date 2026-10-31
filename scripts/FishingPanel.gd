@@ -282,13 +282,13 @@ func _on_pond_draw() -> void:
 	var center: Vector2 = size / 2.0
 	match state:
 		"idle":
-			pond_view.draw_string(ThemeDB.fallback_font, center - Vector2(70, 0), "Cast a line to begin.", HORIZONTAL_ALIGNMENT_LEFT, 200, 14, Color(0.8, 0.9, 0.95))
+			pond_view.draw_string(PixelKit.font("body"), center - Vector2(70, 0), "Cast a line to begin.", HORIZONTAL_ALIGNMENT_LEFT, 200, 20, Color(0.8, 0.9, 0.95))
 		"waiting":
 			pond_view.draw_line(center, center + Vector2(0, 60), Color(0.9, 0.9, 0.85), 2.0)
 			pond_view.draw_circle(center + Vector2(0, 60), 5, Color(0.9, 0.3, 0.2))
 		"biting":
 			pond_view.draw_line(center, center + Vector2(0, 60), Color(0.9, 0.9, 0.85), 2.0)
 			pond_view.draw_circle(center + Vector2(0, 60), 5, Color(0.9, 0.3, 0.2))
-			pond_view.draw_string(ThemeDB.fallback_font, center + Vector2(-6, -20), "!", HORIZONTAL_ALIGNMENT_CENTER, 20, 32, Color(1.0, 0.9, 0.2))
+			pond_view.draw_string(PixelKit.font("body"), center + Vector2(-6, -20), "!", HORIZONTAL_ALIGNMENT_CENTER, 20, 30, Color(1.0, 0.9, 0.2))
 		"reeling":
-			pond_view.draw_string(ThemeDB.fallback_font, center - Vector2(80, 0), "It's fighting the line!", HORIZONTAL_ALIGNMENT_LEFT, 220, 16, Color(0.95, 0.85, 0.4))
+			pond_view.draw_string(PixelKit.font("body"), center - Vector2(80, 0), "It's fighting the line!", HORIZONTAL_ALIGNMENT_LEFT, 220, 20, Color(0.95, 0.85, 0.4))

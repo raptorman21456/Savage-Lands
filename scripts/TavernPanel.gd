@@ -67,7 +67,7 @@ func _build() -> void:
 	outer.add_child(title_row)
 	var title := Label.new()
 	title.text = "BOUNTY HUNTER'S TAVERN"
-	title.add_theme_font_size_override("font_size", 24)
+	PixelKit.fit(title, 24)
 	title.add_theme_color_override("font_color", Color(1, 0.9, 0.3))
 	title_row.add_child(title)
 	var spacer := Control.new()
@@ -151,7 +151,7 @@ func _refresh() -> void:
 func _add_heading(container: VBoxContainer, text: String) -> void:
 	var heading := Label.new()
 	heading.text = text
-	heading.add_theme_font_size_override("font_size", 16)
+	PixelKit.fit(heading, 16)
 	heading.add_theme_color_override("font_color", Color(1, 0.9, 0.3))
 	container.add_child(heading)
 
@@ -159,7 +159,7 @@ func _add_body_label(container: VBoxContainer, text: String, color: Color) -> La
 	var label := Label.new()
 	label.text = text
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD
-	label.add_theme_font_size_override("font_size", 13)
+	PixelKit.fit(label, 13)
 	label.add_theme_color_override("font_color", color)
 	container.add_child(label)
 	return label

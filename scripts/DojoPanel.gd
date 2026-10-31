@@ -189,7 +189,7 @@ func _make_move_card(base: Dictionary, index: int) -> PanelContainer:
 	step.custom_minimum_size = Vector2(38, 0)
 	step.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	step.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	step.add_theme_font_size_override("font_size", 24)
+	PixelKit.fit(step, 24)
 	step.add_theme_color_override("font_color", TownUIScript.GOLD if learned else Color(0.5, 0.46, 0.36))
 	step.add_theme_color_override("font_outline_color", PixelUIScript.OUTLINE)
 	step.add_theme_constant_override("outline_size", 5)
@@ -205,12 +205,12 @@ func _make_move_card(base: Dictionary, index: int) -> PanelContainer:
 	text_col.add_child(title_row)
 	var move_name := Label.new()
 	move_name.text = special.name
-	move_name.add_theme_font_size_override("font_size", 17)
+	PixelKit.fit(move_name, 17)
 	move_name.add_theme_color_override("font_color", TownUIScript.GOLD if highlight else Color(0.94, 0.93, 0.88))
 	title_row.add_child(move_name)
 	var sta := Label.new()
 	sta.text = "%d STA" % special.stamina_cost
-	sta.add_theme_font_size_override("font_size", 12)
+	PixelKit.fit(sta, 12)
 	sta.add_theme_color_override("font_color", TownUIScript.STAMINA_BLUE)
 	title_row.add_child(sta)
 	# The move data writes a literal percent sign as %% (it was once run through a

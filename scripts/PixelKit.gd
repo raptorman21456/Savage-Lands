@@ -79,6 +79,31 @@ static func font(kind: String = "body") -> Font:
 static func font_size(kind: String = "body") -> int:
 	return int(FONT_SIZES.get(kind, 20))
 
+# The older screens (the battle screen, the overworld readout, shops, town panels) size their text in arbitrary pixels -- 11, 13, 15, 17,
+# 22... A pixel font only looks right at whole multiples of its grid, so fit() puts a label, button or text box on the nearest rung of a
+# ladder of four: Jersey 10 at 10 px (one screen pixel per font pixel), Jersey 15 at 15 px, Jersey 10 at 20 px (two) and Jersey 15 at 30 px
+# (two). 10 and under take the first, 11 and 12 the second (small captions), 13 to 23 the third (the body size), 24 and over the last --
+# about the same size on screen as the smooth font they replace, and every pixel of the type a whole screen pixel or two.
+static func fit(control: Control, px: float) -> void:
+	var size := int(round(px))
+	var kind := "body"
+	var out := 10
+	if size > 23:
+		kind = "head"
+		out = 30
+	elif size > 12:
+		out = 20
+	elif size > 10:
+		kind = "head"
+		out = 15
+	control.add_theme_font_override("font", font(kind))
+	control.add_theme_font_size_override("font_size", out)
+
+# The same ladder for a size alone, where the font is the theme's default (Jersey 10): rich text boxes, which carry several sizes.
+static func snap(px: float) -> int:
+	var size := int(round(px))
+	return 10 if size <= 12 else (20 if size < 24 else 30)
+
 # A Label in the pixel type: the kind's font and size, a colour, and the hard 2px shadow every piece of text wears.
 static func label(text: String, kind: String = "body", color: Color = CREAM) -> Label:
 	var l := Label.new()

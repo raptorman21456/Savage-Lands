@@ -21,7 +21,7 @@ func _make_goblin(main, tile: Vector2i, hp: int = 999999) -> Dictionary:
 		"disarmed_tile": Vector2i(-1, -1),
 	}
 
-# Runs one popup with real input timing: starts it, injects the given [ms, pressed] events (their
+# Runs one popup with real input timing: starts it, injects the given [ms, pressed(, tag)] events (their
 # timestamps are honoured against the real clock), waits for it to finish, returns the result string.
 func _run_popup(dm, command: Dictionary, events: Array = []) -> String:
 	var finished := [false]
@@ -126,10 +126,14 @@ func _init() -> void:
 		match cmd.get("kind", ""):
 			"hold":
 				ok = ok and float(cmd.fill_ms) > 0.0 and cmd.zone[0] < cmd.zone[1] and cmd.perfect[0] >= cmd.zone[0] and cmd.perfect[1] <= cmd.zone[1] and cmd.zone[1] < 1.0
-			"beats":
-				ok = ok and cmd.beats.size() >= 2 and float(cmd.perfect_ms) < float(cmd.hit_ms)
-				for i in range(1, cmd.beats.size()):
-					ok = ok and float(cmd.beats[i]) - float(cmd.beats[i - 1]) > 2.0 * float(cmd.hit_ms) * 0.9
+			"mash":
+				ok = ok and float(cmd.need_ms) < float(cmd.limit_ms) and cmd.zone_range[0] < cmd.zone_range[1] and float(cmd.fall_per_s) > 0.0
+			"markers":
+				ok = ok and int(cmd.count[0]) >= 2 and int(cmd.count[1]) >= int(cmd.count[0]) and float(cmd.perfect_ms) < float(cmd.hit_ms)
+			"twin":
+				ok = ok and float(cmd.close_ms) > 0.0 and float(cmd.perfect_ms) < float(cmd.hit_ms)
+			"orbit":
+				ok = ok and float(cmd.perfect_deg) < float(cmd.hit_deg) and float(cmd.fill_ms) > 0.0
 			"cross":
 				ok = ok and cmd.crossings.size() >= 2 and float(cmd.perfect_ms) < float(cmd.hit_ms)
 			_:
@@ -137,7 +141,7 @@ func _init() -> void:
 		if not ok:
 			cmd_problems.append(base.id)
 	print("Every weapon family (%d) has a valid command: problems=%s (expected [])" % [bases.size(), cmd_problems])
-	print("The 6 command styles are all in use: %s (expected 6)" % [kinds_seen.size()])
+	print("The 9 command styles the weapons use are all in use (the Staff's arrows and the Wand's trace are tested apart): %s (expected 9)" % [kinds_seen.size()])
 	print("An unknown weapon id plays like the Club: %s (expected Swing)" % [AttackTimings.command_for("mystery_blade").name])
 	var id_cases := {"club": "club", "spear_fine_steel": "spear", "battle_axe_worn_wood": "battle_axe", "hammer_mythic": "hammer", "bow": "bow",
 		"knuckle_gloves_masterwork_gold": "knuckle_gloves", "hand_picks_fine_bone": "hand_picks", "greatsword": "greatsword", "dagger_legendary_silver": "dagger", "mystery_blade": "club"}
@@ -146,7 +150,7 @@ func _init() -> void:
 		if AttackTimings.base_id_for(id) != id_cases[id]:
 			id_bad.append(id)
 	print("A weapon id resolves to its family (variants, Mythics, base ids; unknown -> club): problems=%s (expected [])" % [id_bad])
-	print("command_for_weapon follows the wielded weapon: %s / %s / %s (expected Heave / Quick Taps / Steady Aim)" % [
+	print("command_for_weapon follows the wielded weapon: %s / %s / %s (expected Heave / Flurry / Steady Aim)" % [
 		AttackTimings.command_for_weapon({"id": "battle_axe_fine_steel"}).name, AttackTimings.command_for_weapon({"id": "dagger_mythic"}).name, AttackTimings.command_for_weapon({"id": "bow_worn_wood"}).name
 	])
 	var tampered: Dictionary = AttackTimings.command_for("club")
@@ -168,8 +172,8 @@ func _init() -> void:
 	print("Popup slide: a release alone is ignored: %s (expected miss)" % [await _run_popup(dm, slide, [[150.0, false]])])
 	var ring := {"kind": "ring", "name": "T", "target_ms": 150, "hit_ms": 60, "perfect_ms": 20, "end_ms": 300}
 	print("Popup ring: a press dead on is %s (expected perfect)" % [await _run_popup(dm, ring, [[150.0, true]])])
-	var sweep := {"kind": "sweep", "name": "T", "target_ms": 150, "hit_ms": 60, "perfect_ms": 20, "end_ms": 300}
-	print("Popup sweep: a press 40 ms late is %s (expected hit)" % [await _run_popup(dm, sweep, [[190.0, true]])])
+	var arc := {"kind": "arc", "name": "T", "target_ms": 150, "hit_ms": 60, "perfect_ms": 20, "end_ms": 300}
+	print("Popup arc: a press 40 ms late is %s (expected hit)" % [await _run_popup(dm, arc, [[190.0, true]])])
 	var cross_cmd := {"kind": "cross", "name": "T", "crossings": [100, 250, 400], "hit_ms": 60, "perfect_ms": 20, "end_ms": 500}
 	print("Popup cross: a press at the second crossing is %s (expected perfect)" % [await _run_popup(dm, cross_cmd, [[252.0, true]])])
 	var hold := {"kind": "hold", "name": "T", "fill_ms": 300, "zone": [0.7, 0.95], "perfect": [0.8, 0.9], "wait_ms": 500}
@@ -178,10 +182,10 @@ func _init() -> void:
 	print("Popup hold: an early release (33%%) is %s (expected miss)" % [await _run_popup(dm, hold, [[10.0, true], [110.0, false]])])
 	print("Popup hold: never releasing overcharges into a %s (expected miss)" % [await _run_popup(dm, hold, [[10.0, true]])])
 	print("Popup hold: never pressing times out as %s (expected miss)" % [await _run_popup(dm, hold, [])])
-	var beats_cmd := {"kind": "beats", "name": "T", "beats": [100, 250, 400], "hit_ms": 50, "perfect_ms": 20}
-	print("Popup beats: three clean taps are %s (expected perfect)" % [await _run_popup(dm, beats_cmd, [[100.0, true], [251.0, true], [398.0, true]])])
-	print("Popup beats: the last beat dropped is %s (expected hit)" % [await _run_popup(dm, beats_cmd, [[100.0, true], [250.0, true]])])
-	print("Popup beats: no taps is %s (expected miss)" % [await _run_popup(dm, beats_cmd, [])])
+	var beats_cmd := {"kind": "markers", "name": "T", "beats": [100, 250, 400], "travel_ms": 300, "hit_ms": 50, "perfect_ms": 20}
+	print("Popup markers: three clean taps are %s (expected perfect)" % [await _run_popup(dm, beats_cmd, [[100.0, true], [251.0, true], [398.0, true]])])
+	print("Popup markers: the last marker dropped is %s (expected hit)" % [await _run_popup(dm, beats_cmd, [[100.0, true], [250.0, true]])])
+	print("Popup markers: no taps is %s (expected miss)" % [await _run_popup(dm, beats_cmd, [])])
 	var widened := {"kind": "slide", "name": "T", "target_ms": 150, "hit_ms": 20, "perfect_ms": 10, "end_ms": 300}
 	var wide_result := [""]
 	dm.finished.connect(func(): wide_result[0] = dm._result, CONNECT_ONE_SHOT)
@@ -335,7 +339,7 @@ func _init() -> void:
 	main._on_battle_fight_action("attack")
 	main._on_battle_main_action("fight")
 	print("...and other battle input is refused: hp unchanged=%s turn still attack=%s (expected true, true)" % [g.hp == hp_during, main.battle_turn == "attack"])
-	main.attack_minigame._events.append([695.0, true])
+	main.attack_minigame._events.append([545.0, true])
 	var chain_started: int = Time.get_ticks_msec()
 	while g.hp == g.max_hp and Time.get_ticks_msec() - chain_started < 5000:
 		await process_frame

@@ -690,15 +690,17 @@ Object.assign(Sim.prototype, {
     const rating = 5 + Math.trunc((this.player.stat_agility - PC.AGILITY_START) / PC.AGILITY_BONUS_PER_LEVEL);
     let speed = rating + this.player.armor_speed_bonus();
     // Berserk: the Rage stat quickens the hero's turns while it lasts.
-    if (this.player.berserk_turns_remaining > 0) speed += this._berserk_speed_bonus();
+    if (this.player.berserk_turns_remaining > 0) speed *= this._berserk_speed_mult();
     return Math.max(MC.MIN_BATTLE_SPEED, speed);
   },
 
   // ---------------------------------------------------------------- Berserk (Main.gd _start_berserk / _berserk_*)
   _start_berserk(message) { this.player.berserk_turns_remaining = MC.BERSERK_TURNS; this.log(message, "good"); },
-  _berserk_damage_mult() { const p = this.player; return 1.0 + MC.BERSERK_DAMAGE_BONUS_PCT + p.stat_rage * MC.RAGE_DAMAGE_PCT_PER_POINT + p.meta_rage_bonus_pct; },
-  _berserk_taken_cut() { return Math.min(MC.BERSERK_TAKEN_CUT_CAP, MC.BERSERK_DAMAGE_TAKEN_CUT + this.player.stat_rage * MC.RAGE_TAKEN_CUT_PER_POINT); },
-  _berserk_speed_bonus() { return this.player.stat_rage * MC.RAGE_SPEED_PER_POINT; },
+  _rage_scale() { return 1.0 + this.player.stat_rage * MC.RAGE_SCALE_PER_POINT; },
+  _berserk_damage_mult() { return 1.0 + MC.BERSERK_DAMAGE_BONUS_PCT * this._rage_scale() + this.player.meta_rage_bonus_pct; },
+  _berserk_taken_cut() { return Math.min(MC.BERSERK_TAKEN_CUT_CAP, MC.BERSERK_DAMAGE_TAKEN_CUT * this._rage_scale()); },
+  _berserk_move_bonus() { return Math.floor(MC.BERSERK_MOVE_BONUS * this._rage_scale() + 0.0001); },
+  _berserk_speed_mult() { return 1.0 + (this._rage_scale() - 1.0) * MC.RAGE_SPEED_SHARE; },
   _unit_speed(kind, u) {
     if (kind === "hero") return this._hero_speed();
     const base = kind === "ally" ? (u.speed ?? MC.MERCENARY_SPEED) : (MC.ENEMY_SPEEDS[u.name] ?? MC.ENEMY_SPEED_DEFAULT);
