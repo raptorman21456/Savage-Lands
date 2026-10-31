@@ -48,7 +48,7 @@ const COMBAT_UPGRADES := ["strength", "agility", "vigor", "reflexes_unlock", "be
 	"stamina", "resilience_unlock", "herbalism", "vampiric_grit", "take_a_breather",
 	"block_master", "second_breath", "last_stand", "unbreakable_guard",
 	"battle_medic", "windfall",
-	"release_grudge", "deep_well", "innate_power"]
+	"release_grudge", "deep_well", "innate_power", "painful_memories"]
 
 const SQUAD_PRESETS := [
 	["Goblin pair", ["Goblin", "Goblin"]], ["Goblin trio", ["Goblin", "Goblin", "Goblin"]], ["Orc", ["Orc"]],
@@ -173,6 +173,8 @@ static func pickable_stats(player) -> Array:
 		out.append("dexterity")
 	if player.meta_fortitude_unlocked:
 		out.append("fortitude")
+	if player.meta_rage_unlocked:
+		out.append("rage")
 	return out
 
 # ---------------------------------------------------------------- applying a build
@@ -201,6 +203,7 @@ static func apply_build(main, cfg: Dictionary) -> void:
 	p.stat_reflexes = 0
 	p.stat_dexterity = 0
 	p.stat_fortitude = 0
+	p.stat_rage = 0
 	p.level = clampi(int(cfg.level), 1, PlayerScript.MAX_LEVEL)
 	p.xp = 0
 	p.xp_to_next = 0 if p.level >= PlayerScript.MAX_LEVEL else PlayerScript.XP_BASE + PlayerScript.XP_PER_LEVEL * p.level
@@ -219,6 +222,8 @@ static func apply_build(main, cfg: Dictionary) -> void:
 			p.stat_dexterity += 1
 		if p.meta_fortitude_unlocked:
 			p.stat_fortitude += 1 + p.meta_fortitude_passive_bonus
+		if p.meta_rage_unlocked:
+			p.stat_rage += 1
 	var allowed_picks: int = p.level - 1
 	for stat in cfg.picks:
 		for n in int(cfg.picks[stat]):
@@ -318,6 +323,7 @@ static func apply_build(main, cfg: Dictionary) -> void:
 
 	# fresh battle-scoped state
 	p.berserk_turns_remaining = 0
+	p.berserk_kills = 0
 	p.stealth_turns_remaining = 0
 	p.potion_attack_turns = 0
 	p.potion_resilience_turns = 0

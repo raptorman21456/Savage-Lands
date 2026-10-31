@@ -12,7 +12,7 @@ const DIR_ARROW = (d) => (d.x === 1 ? "→" : d.x === -1 ? "←" : d.y === 1 ? "
 const NOTHINGNESS_ORDER = ["Leviathan", "Lizen Warband", "Elder Oak", "White Dragon", "Red Wyrm", "Archmage"];
 // Astral upgrades that touch the tile battle (the rest are shop/economy/run-start perks). Update when the tree changes.
 const COMBAT_UPGRADES = new Set(["smart_savage", "continual_growth", "strength", "agility", "vigor", "reflexes_unlock", "berserker_edge", "adrenaline", "dexterity_unlock", "battle_hardened",
-  "pack_leader", "prodigy", "beastmaster", "pack_bond", "riposte", "momentum", "rage", "intimidation", "luck", "silver_muscles", "haggling", "light_metal",
+  "pack_leader", "prodigy", "beastmaster", "pack_bond", "riposte", "momentum", "rage", "intimidation", "luck", "silver_muscles", "haggling", "light_metal", "painful_memories",
   "stamina", "resilience_unlock", "herbalism", "vampiric_grit", "take_a_breather", "block_master", "second_breath", "last_stand", "unbreakable_guard",
   "worldwalker", "battle_medic", "windfall"]);
 const PASSIVE_LABELS = {
@@ -80,6 +80,7 @@ function pickableStats(p) {
   if (p.meta_reflexes_unlocked) base.push("reflexes");
   if (p.meta_dexterity_unlocked) base.push("dexterity");
   if (p.meta_fortitude_unlocked) base.push("fortitude");
+  if (p.meta_rage_unlocked) base.push("rage");
   return base;
 }
 

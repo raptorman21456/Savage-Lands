@@ -483,6 +483,7 @@ static var UI_TEXT := {
 	"levelup.might": "Better weapons require higher Might to equip; boosts recruited party/wolf damage.",
 	"levelup.resilience": "+1 Defense per point, pooled with your armour and bent into less BODILY harm with diminishing returns (never past 80%).",
 	"levelup.fortitude": "+1 Fortitude per point, on top of your armour's, bent into less MAGICAL harm with diminishing returns (never past 80%).",
+	"levelup.rage": "+1 Rage per point. While Berserk lasts, each point adds +1% damage dealt, 0.5% less damage taken and a quarter point of speed.",
 	"levelup.reflexes": "0.75% dodge chance per point, capped at 15%.",
 	"levelup.dexterity": "0.75% crit chance per point (double damage, ignores cover), capped at 15%.",
 }
@@ -850,13 +851,13 @@ func _ready() -> void:
 	levelup_label.add_theme_color_override("font_color", Color(1, 0.9, 0.3))
 	levelup_panel.add_child(levelup_label)
 
-	# Room for up to 8 rows now (the 4 original stats plus Might, always
-	# shown, plus Resilience/Reflexes/Dexterity once each is unlocked) --
-	# the description label moved down accordingly. See show_levelup_choice
+	# Room for up to 10 rows now (the 4 original stats plus Might, always
+	# shown, plus Resilience/Reflexes/Dexterity/Fortitude/Rage once each is
+	# unlocked) -- the description label moved down accordingly. See show_levelup_choice
 	# for the actual row-building (rebuilt fresh every time the panel opens,
 	# same clear-and-rebuild idiom show_shop uses for its offering rows).
 	levelup_description_label = Label.new()
-	levelup_description_label.position = Vector2(230, 560)
+	levelup_description_label.position = Vector2(230, 598)
 	levelup_description_label.size = Vector2(400, 60)
 	levelup_description_label.autowrap_mode = TextServer.AUTOWRAP_WORD
 	levelup_description_label.add_theme_font_size_override("font_size", 14)
@@ -864,8 +865,8 @@ func _ready() -> void:
 	levelup_panel.add_child(levelup_description_label)
 
 	levelup_box = VBoxContainer.new()
-	levelup_box.position = Vector2(230, 260)
-	levelup_box.add_theme_constant_override("separation", 6)
+	levelup_box.position = Vector2(230, 272)
+	levelup_box.add_theme_constant_override("separation", 3)
 	levelup_panel.add_child(levelup_box)
 
 	# Random events -- same full-screen-overlay + title + description +
@@ -3059,10 +3060,10 @@ func _populate_game_over_stats(essence_earned: int, total_essence: int, stats: D
 
 # Rebuilt fresh every open (clear-and-rebuild, same idiom show_shop uses for
 # its offering rows) -- the row list itself is dynamic: the 4 original stats
-# plus Might are always shown, Resilience/Reflexes/Dexterity only once each
+# plus Might are always shown, Resilience/Reflexes/Dexterity/Fortitude/Rage only once each
 # is unlocked via its own skill-tree node. Main.gd:_levelup_choice_order()
-# mirrors this exact same order for its number-key (1-8) shortcuts.
-func show_levelup_choice(new_level: int, intimidation: int, strength: int, vigor: int, agility: int, might: int, resilience: int, reflexes: int, dexterity: int, resilience_unlocked: bool, reflexes_unlocked: bool, dexterity_unlocked: bool, fortitude: int = 0, fortitude_unlocked: bool = false) -> void:
+# mirrors this exact same order for its number-key (1-9) shortcuts.
+func show_levelup_choice(new_level: int, intimidation: int, strength: int, vigor: int, agility: int, might: int, resilience: int, reflexes: int, dexterity: int, resilience_unlocked: bool, reflexes_unlocked: bool, dexterity_unlocked: bool, fortitude: int = 0, fortitude_unlocked: bool = false, rage: int = 0, rage_unlocked: bool = false) -> void:
 	levelup_label.text = "LEVEL UP! Now level %d\nAll stats +1. Choose ONE bonus +1:" % new_level
 	for c in levelup_box.get_children():
 		c.queue_free()
@@ -3086,6 +3087,8 @@ func show_levelup_choice(new_level: int, intimidation: int, strength: int, vigor
 		rows.append(["dexterity", "Dexterity (%d)" % dexterity, UI_TEXT["levelup.dexterity"]])
 	if fortitude_unlocked:
 		rows.append(["fortitude", "Fortitude (%d)" % fortitude, UI_TEXT["levelup.fortitude"]])
+	if rage_unlocked:
+		rows.append(["rage", "Rage (%d)" % rage, UI_TEXT["levelup.rage"]])
 
 	for i in rows.size():
 		var row: Array = rows[i]
@@ -3094,7 +3097,8 @@ func show_levelup_choice(new_level: int, intimidation: int, strength: int, vigor
 		button.text = "[%d] %s" % [i + 1, row[1]]
 		button.pressed.connect(func(): levelup_choice_pressed.emit(row[0]))
 		_setup_hover_button(button, row[2], levelup_description_label)
-		_style_standard_button(button)
+		# Slimmer than the usual button: with every stat unlocked there are ten rows to fit.
+		_style_standard_button(button, 3)
 		levelup_box.add_child(button)
 		levelup_buttons[row[0]] = button
 
@@ -3788,9 +3792,9 @@ func update_battle_grid(grid_w: int, grid_h: int, terrain: Dictionary, player_ti
 			battle_status_label2.text += "\n"
 		battle_status_label2.text += "Shield: %s (%d%% block)" % [shield_name, int(round(shield_block_pct * 100))]
 
-	# Rage/Berserk: the one status here with real drawbacks (no shield,
-	# gutted block/dodge) alongside the damage boost, so it's surfaced
-	# prominently rather than left to the battle log alone.
+	# Berserk: a strong, short-lived state (more damage, less damage taken,
+	# an extra tile), so it's surfaced prominently rather than left to the
+	# battle log alone.
 	if berserk_turns > 0:
 		if battle_status_label2.text != "":
 			battle_status_label2.text += "\n"

@@ -101,7 +101,6 @@ Object.assign(Sim.prototype, {
     let reduced = dmg;
     if (this.battle_player_defending) {
       let negate = p.meta_block_negate_chance;
-      if (p.berserk_turns_remaining > 0) negate *= MC.BERSERK_DEFENSE_MULT;
       if (negate > 0 && this.rng.randf() < negate) return 0;
       // Bastion Mail raises the threshold Defend negates a hit below.
       const threshold = MC.DEFEND_FULL_NEGATE_THRESHOLD + p.shield_defend_threshold_bonus() + Math.trunc(p.armor_trait_value("defend_threshold_bonus", 0));
@@ -117,6 +116,8 @@ Object.assign(Sim.prototype, {
     let total = 0;
     if (bodily_part > 0) total += this._reduce_bodily(bodily_part, traits);
     if (magical_part > 0) total += this._reduce_magical(magical_part);
+    // Berserk: the whole hit is cut, after every other reduction.
+    if (p.berserk_turns_remaining > 0 && total > 0) total = Math.max(1, round(total * (1.0 - this._berserk_taken_cut())));
     return total;
   },
 
@@ -305,7 +306,6 @@ Object.assign(Sim.prototype, {
     if (u.burning) raw_dmg = round(raw_dmg * (1.0 - MC.BURN_DAMAGE_DEALT_REDUCTION));
     if (veq(target_tile, this.battle_player_tile)) {
       let dodge = p.dodge_chance_total();
-      if (p.berserk_turns_remaining > 0) dodge *= MC.BERSERK_DEFENSE_MULT;
       if (dodge > 0 && rng.randf() < dodge) {
         this._on_hero_dodged();
         if (p.meta_riposte_chance > 0 && rng.randf() < p.meta_riposte_chance) {
@@ -688,8 +688,17 @@ Object.assign(Sim.prototype, {
   // the next one TURN_TIME_BASE / speed later. Ties go hero, then allies, then enemies (in field order).
   _hero_speed() {
     const rating = 5 + Math.trunc((this.player.stat_agility - PC.AGILITY_START) / PC.AGILITY_BONUS_PER_LEVEL);
-    return Math.max(MC.MIN_BATTLE_SPEED, rating + this.player.armor_speed_bonus());
+    let speed = rating + this.player.armor_speed_bonus();
+    // Berserk: the Rage stat quickens the hero's turns while it lasts.
+    if (this.player.berserk_turns_remaining > 0) speed += this._berserk_speed_bonus();
+    return Math.max(MC.MIN_BATTLE_SPEED, speed);
   },
+
+  // ---------------------------------------------------------------- Berserk (Main.gd _start_berserk / _berserk_*)
+  _start_berserk(message) { this.player.berserk_turns_remaining = MC.BERSERK_TURNS; this.log(message, "good"); },
+  _berserk_damage_mult() { const p = this.player; return 1.0 + MC.BERSERK_DAMAGE_BONUS_PCT + p.stat_rage * MC.RAGE_DAMAGE_PCT_PER_POINT + p.meta_rage_bonus_pct; },
+  _berserk_taken_cut() { return Math.min(MC.BERSERK_TAKEN_CUT_CAP, MC.BERSERK_DAMAGE_TAKEN_CUT + this.player.stat_rage * MC.RAGE_TAKEN_CUT_PER_POINT); },
+  _berserk_speed_bonus() { return this.player.stat_rage * MC.RAGE_SPEED_PER_POINT; },
   _unit_speed(kind, u) {
     if (kind === "hero") return this._hero_speed();
     const base = kind === "ally" ? (u.speed ?? MC.MERCENARY_SPEED) : (MC.ENEMY_SPEEDS[u.name] ?? MC.ENEMY_SPEED_DEFAULT);

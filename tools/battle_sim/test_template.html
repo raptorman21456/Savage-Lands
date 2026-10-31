@@ -83,7 +83,7 @@ async function runParity() {
       if (e.rock) sim.battle_terrain[vkey(V(etile.x, etile.y - 1))] = { type: "rock" };
       sim.battle_first_attack_used = st.first_used; sim.battle_bloodrage_stacks = st.bloodrage; sim.battle_shadow_crit = !!st.shadow_crit; sim.battle_momentum_stacks = st.momentum; sim.battle_momentum_chain_stacks = st.chain; sim.player_burning = st.burning; sim.player_blind_turns = 0;
       p.health = Math.max(1, round(p.max_health * st.health_frac));
-      p.potion_attack_turns = st.attack_potion ? 2 : 0; p.berserk_turns_remaining = st.berserk ? 2 : 0; p.pichaku_active = st.pichaku; p.stealth_turns_remaining = st.stealth ? 2 : 0;
+      p.potion_attack_turns = st.attack_potion ? 2 : 0; p.berserk_turns_remaining = st.berserk ? 2 : 0; p.stat_rage = st.rage || 0; p.pichaku_active = st.pichaku; p.stealth_turns_remaining = st.stealth ? 2 : 0;
       if (p.talisman_bonus("bloodmoon_fang") > 0) { p.bloodmoon_stacks = st.bloodmoon; p._recalc_stats(); }
       const tr = TRAITS[e.name] || {};
       const unit = { ref: 1, tile: etile, hp: e.hp, max_hp: e.max_hp, move_range: 2, damage: 1, name: e.name, winding_up: false, stunned: false, size: tr.size ?? 1, attack_range: 1, is_elite: false, concussed_turns: 0, frozen_turns: e.frozen ? 2 : 0, burning: false, vulnerable_turns: e.vulnerable ? 2 : 0, aware_of_player: false, armored: e.armored, disarmed_tile: V(-1, -1), xp_reward: 0 };
@@ -94,7 +94,7 @@ async function runParity() {
     } else if (c.kind === "incoming") {
       const p = sim.player, s = c.scenario;
       sim.battle_terrain = {}; sim.battle_player_tile = V(2, 2); if (s.rock) sim.battle_terrain[vkey(V(2, 1))] = { type: "rock" };
-      sim.battle_spellward_used = !!s.spellward_used; sim.battle_player_defending = s.defending; p.berserk_turns_remaining = s.berserk ? 2 : 0; p.potion_resilience_turns = s.resilience_potion ? 2 : 0;
+      sim.battle_spellward_used = !!s.spellward_used; sim.battle_player_defending = s.defending; p.berserk_turns_remaining = s.berserk ? 2 : 0; p.stat_rage = s.rage || 0; p.potion_resilience_turns = s.resilience_potion ? 2 : 0;
       p.health = Math.max(1, round(p.max_health * s.health_frac));
       got = { reduced: sim._apply_incoming_reductions(s.dmg, { ignore_cover: s.ignore_cover, harm: s.harm }) };
     } else if (c.kind === "enemy_turn") {

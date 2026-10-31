@@ -55,6 +55,7 @@ static func stat_rows(main) -> Array:
 			"reflexes": locked = not p.meta_reflexes_unlocked
 			"dexterity": locked = not p.meta_dexterity_unlocked
 			"fortitude": locked = not p.meta_fortitude_unlocked
+			"rage": locked = not p.meta_rage_unlocked
 		out.append({"id": str(id), "name": UIIconsScript.stat_name(str(id)), "abbr": UIIconsScript.stat_abbr(str(id)), "locked": locked})
 	return out
 
@@ -94,6 +95,7 @@ static func _reset_core_stats(p) -> void:
 	p.stat_reflexes = 0
 	p.stat_dexterity = 0
 	p.stat_fortitude = 0
+	p.stat_rage = 0
 
 # Runs `call` with the level-up screen switched off (the hero's leveled_up signal is what opens it), then restores it.
 static func _without_levelup_screen(main, call: Callable) -> void:

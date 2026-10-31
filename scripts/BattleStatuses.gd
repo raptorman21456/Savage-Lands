@@ -22,7 +22,8 @@ const TEXT := {
 	"rot": ["Rot", "Rots from within, losing a share of its max HP at the start of its turn. If it dies cursed, the kill belongs to the Necromancer.", false],
 	"buffed": ["Emboldened", "Hits harder than usual.", true],
 	"stealth": ["Stealth", "Enemies that haven't noticed it can't target it. Its next attack is a guaranteed crit and ends the stealth.", true],
-	"berserk": ["Berserk", "+50% damage dealt, but its dodge and shield blocking are crippled.", true],
+	"berserk": ["Berserk", "+25% damage dealt, 25% less damage taken and 1 more tile of movement.", true],
+	"rage_building": ["Rage building", "Every 5th enemy to fall sends you into Berserk. The count carries from battle to battle.", true],
 	"defending": ["Defending", "Takes half damage from the coming enemy turn, and recovers stamina.", true],
 	"taunting": ["Taunting", "Every enemy is forced onto it on the coming enemy turn.", true],
 	"empowered": ["Empowered", "Deals extra damage (a Druid's Empower).", true],
@@ -110,7 +111,8 @@ static func for_ally(u: Dictionary) -> Array:
 
 # The hero. `h` is assembled by Main (it keeps the hero's states in several places): any of the keys below, absent = off.
 # defending, taunting (bool); stealth, berserk, poison, bleed, blind, concussed, buff, potion_attack, potion_resilience,
-# potion_energy, bloodrage, bloodboost, skip (turns / stacks); burning, disarmed, bloodcrash (bool).
+# potion_energy, bloodrage, bloodboost, skip (turns / stacks); burning, disarmed, bloodcrash (bool); berserk_info ({damage, taken,
+# move, rage}: what Berserk is worth now, for its description); rage_kills, rage_needed (the count towards the next Berserk).
 static func for_hero(h: Dictionary) -> Array:
 	var out: Array = []
 	if h.get("defending", false):
@@ -120,7 +122,14 @@ static func for_hero(h: Dictionary) -> Array:
 	if int(h.get("stealth", 0)) > 0:
 		out.append(entry("stealth", _turns(int(h.stealth))))
 	if int(h.get("berserk", 0)) > 0:
-		out.append(entry("berserk", _turns(int(h.berserk))))
+		var rage := entry("berserk", _turns(int(h.berserk)))
+		var info: Dictionary = h.get("berserk_info", {})
+		if not info.is_empty():
+			rage.desc = "+%d%% damage dealt, %d%% less damage taken and %d more tile of movement%s." % [int(info.damage), int(info.taken), int(info.move), (" (Rage %d adds to all three, and to your speed)" % int(info.rage)) if int(info.rage) > 0 else ""]
+		out.append(rage)
+	elif int(h.get("rage_kills", 0)) > 0:
+		var building := entry("rage_building", "%d / %d" % [int(h.rage_kills), int(h.get("rage_needed", 5))])
+		out.append(building)
 	if int(h.get("buff", 0)) > 0:
 		out.append(entry("empowered", _turns(int(h.buff))))
 	if int(h.get("bloodrage", 0)) > 0:

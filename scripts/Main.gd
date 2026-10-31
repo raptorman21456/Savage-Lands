@@ -378,16 +378,23 @@ const BLINDNESS_MISS_CHANCE := 0.75
 # Exhausted lives entirely in Player.gd (EXHAUSTED_STAMINA_REGEN_MULT/
 # EXHAUSTED_CLEAR_STAMINA_PCT there) -- self-inflicted the instant stamina
 # hits 0, no enemy source or battle-state tracking needed here.
-# Rage/Berserk: triggered by a kill mid-battle (_on_enemy_died), the state
-# itself (berserk_turns_remaining) lives on Player.gd since it's checked
-# from several unrelated call sites, but the tuning numbers stay here with
-# every other status const. +50% damage dealt on top of Rage's own
-# meta_rage_bonus_pct; shields forced off entirely (Player.gd:
-# shield_block_chance); Block Master and Reflexes dodge both cut to a
-# quarter of their normal rate.
+# Berserk (design doc): started by the BERSERK_KILLS_NEEDED-th enemy to fall in a battle (_on_enemy_died; the kill count, Player.
+# berserk_kills, carries from battle to battle) or by a Club's Heavy Swing that kills, lasts BERSERK_TURNS of the hero's own turns
+# and is wiped when the battle ends. The state itself lives on Player.gd since it's checked from several unrelated call sites, but
+# the tuning numbers stay here with every other status const. While it lasts: +25% damage dealt, 25% less damage taken, +1 tile of
+# movement. The old drawbacks (no shield, dodge and Block Master cut to a quarter) are gone: the doc's description lists none.
 const BERSERK_TURNS := 2
-const BERSERK_DAMAGE_BONUS_PCT := 0.5
-const BERSERK_DEFENSE_MULT := 0.25
+const BERSERK_KILLS_NEEDED := 5
+const BERSERK_DAMAGE_BONUS_PCT := 0.25
+const BERSERK_DAMAGE_TAKEN_CUT := 0.25
+const BERSERK_MOVE_BONUS := 1
+# The Rage stat ("berserk attack, defense, and speed increase"): per point, while Berserk lasts. The doc gives no per-point numbers,
+# so these are my drafts -- +1% damage dealt, 0.5% less damage taken (the whole cut stops at BERSERK_TAKEN_CUT_CAP) and a quarter of a
+# point of turn-speed rating (the same rating the Stats screen shows: 5 to start).
+const RAGE_DAMAGE_PCT_PER_POINT := 0.01
+const RAGE_TAKEN_CUT_PER_POINT := 0.005
+const RAGE_SPEED_PER_POINT := 0.25
+const BERSERK_TAKEN_CUT_CAP := 0.6
 # Dodge / block timing minigames (DefenseMinigame.gd; each enemy's attacks live in
 # AttackPatterns.gd). An enemy attack that would hit the hero first rolls for a DODGE opening
 # (the easier timing check -- it also lets the hero roll one tile away); with no opening it is
@@ -941,7 +948,7 @@ var pending_event_weapon: Dictionary = {}
 var shrine_effect_waves_remaining := 0
 var event_extra_goblins := 0
 var event_force_elite := false
-var prev_num_key := {1: false, 2: false, 3: false, 4: false, 5: false, 6: false, 7: false, 8: false, 9: false}
+var prev_num_key := {1: false, 2: false, 3: false, 4: false, 5: false, 6: false, 7: false, 8: false, 9: false, 10: false}
 var prev_shop_num_key := {1: false, 2: false, 3: false, 4: false, 5: false, 6: false, 7: false, 8: false, 9: false}
 var prev_enter_key := false
 var prev_reroll_key := false
@@ -3249,15 +3256,13 @@ func _on_enemy_died(xp_reward: int, enemy_name: String = "") -> void:
 	# it can't silently accumulate across a run for players without it.
 	if player.meta_momentum_pct_per_kill > 0.0:
 		battle_momentum_stacks += 1
-	# Rage/Berserk: any kill mid-battle sets/refreshes the timer to the full
-	# duration, even if it's already active -- a fresh kill keeps the rage
-	# going rather than stacking on top of what's left.
+	# Berserk: every BERSERK_KILLS_NEEDED-th kill in a battle (whoever lands the blow) starts it, or refreshes it to the full duration
+	# if it is already going. The count carries between battles, so it is only spent here.
 	if in_battle:
-		player.berserk_turns_remaining = BERSERK_TURNS
-		if enemy_name != "":
-			hud.battle_log("Killing the %s sends you into a berserk rage!" % enemy_name)
-		else:
-			hud.battle_log("You fly into a berserk rage!")
+		player.berserk_kills += 1
+		if player.berserk_kills >= BERSERK_KILLS_NEEDED:
+			player.berserk_kills = 0
+			_start_berserk(("Killing the %s sends you into a berserk rage!" % enemy_name) if enemy_name != "" else "You fly into a berserk rage!")
 	# Windfall: a flat gold drop, independent of the enemy's own coin/loot
 	# (there isn't a per-kill coin drop elsewhere to stack onto).
 	if player.windfall_chance_total() > 0.0 and randf() < player.windfall_chance_total():
@@ -3805,7 +3810,7 @@ func _on_player_leveled_up(new_level: int) -> void:
 		hud.show_message("A new talisman slot opens!")
 	choosing_stat = true
 	get_tree().paused = true
-	hud.show_levelup_choice(new_level, player.stat_intimidation, player.stat_strength, player.stat_vigor, player.stat_agility, player.stat_might, player.stat_resilience, player.stat_reflexes, player.stat_dexterity, player.meta_resilience_unlocked, player.meta_reflexes_unlocked, player.meta_dexterity_unlocked, player.stat_fortitude, player.meta_fortitude_unlocked)
+	hud.show_levelup_choice(new_level, player.stat_intimidation, player.stat_strength, player.stat_vigor, player.stat_agility, player.stat_might, player.stat_resilience, player.stat_reflexes, player.stat_dexterity, player.meta_resilience_unlocked, player.meta_reflexes_unlocked, player.meta_dexterity_unlocked, player.stat_fortitude, player.meta_fortitude_unlocked, player.stat_rage, player.meta_rage_unlocked)
 
 var prev_debug_keys := {}
 
@@ -3957,7 +3962,7 @@ func _on_settings_back_pressed() -> void:
 # The always-available 5 (Intimidation/Strength/Vigor/Agility/Might) plus
 # Resilience/Reflexes/Dexterity in that fixed order, each only once its own
 # skill-tree unlock is owned -- mirrors HUD.gd:show_levelup_choice's own
-# button-building order exactly, so number keys 1-8 always match whatever's
+# button-building order exactly, so number keys 1-9 and 0 always match whatever's
 # actually on screen.
 func _levelup_choice_order() -> Array:
 	var order := ["intimidation", "strength", "vigor", "agility", "might"]
@@ -3969,10 +3974,12 @@ func _levelup_choice_order() -> Array:
 		order.append("dexterity")
 	if player.meta_fortitude_unlocked:
 		order.append("fortitude")
+	if player.meta_rage_unlocked:
+		order.append("rage")
 	return order
 
 func _handle_stat_choice_input() -> void:
-	var keys := {1: KEY_1, 2: KEY_2, 3: KEY_3, 4: KEY_4, 5: KEY_5, 6: KEY_6, 7: KEY_7, 8: KEY_8, 9: KEY_9}
+	var keys := {1: KEY_1, 2: KEY_2, 3: KEY_3, 4: KEY_4, 5: KEY_5, 6: KEY_6, 7: KEY_7, 8: KEY_8, 9: KEY_9, 10: KEY_0}
 	var order: Array = _levelup_choice_order()
 	for i in order.size():
 		var key_num := i + 1
@@ -4277,8 +4284,28 @@ func _gather_squad(initial_enemy) -> Array:
 			big_count += 1
 	return squad
 
+# Starts Berserk, or refreshes it to the full duration if it is already going -- a fresh trigger keeps the rage going rather than
+# stacking on top of what's left. `message` goes to the battle log.
+func _start_berserk(message: String) -> void:
+	player.berserk_turns_remaining = BERSERK_TURNS
+	hud.battle_log(message)
+
+# What Berserk is worth to the hero right now. Each is the doc's base number plus what the Rage stat adds (the Church's RAGE node
+# adds to the damage as well); callers only ask while player.berserk_turns_remaining > 0.
+func _berserk_damage_mult() -> float:
+	return 1.0 + BERSERK_DAMAGE_BONUS_PCT + player.stat_rage * RAGE_DAMAGE_PCT_PER_POINT + player.meta_rage_bonus_pct
+
+func _berserk_taken_cut() -> float:
+	return minf(BERSERK_TAKEN_CUT_CAP, BERSERK_DAMAGE_TAKEN_CUT + player.stat_rage * RAGE_TAKEN_CUT_PER_POINT)
+
+func _berserk_speed_bonus() -> float:
+	return player.stat_rage * RAGE_SPEED_PER_POINT
+
 func _battle_player_move_range() -> int:
 	var bonus: int = max(0, int(player.stat_agility - PlayerScript.AGILITY_START) / AGILITY_PER_EXTRA_MOVE)
+	# Berserk: an extra tile of reach for as long as it lasts.
+	if player.berserk_turns_remaining > 0:
+		bonus += BERSERK_MOVE_BONUS
 	# Energy Potion: a temporary extra tile of reach for a few of the
 	# player's own turns.
 	if player.potion_energy_turns > 0:
@@ -5794,7 +5821,7 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 	# player-only bonus here is, so an ally's own attack (funneling through
 	# this same function) never picks up the player's own berserk state.
 	if attacker_label == "You" and player.berserk_turns_remaining > 0:
-		dmg = int(round(dmg * (1.0 + BERSERK_DAMAGE_BONUS_PCT + player.meta_rage_bonus_pct)))
+		dmg = int(round(dmg * _berserk_damage_mult()))
 	# Brawler's Buckler (shield special "vengeance"): consumed by the
 	# player's very next regular/heavy attack after a shield block triggers
 	# -- gated on attacker_label so an ally's own attack (which funnels
@@ -6674,6 +6701,9 @@ func _battle_perform_attack(action: Dictionary) -> void:
 		if effect == "knife_throw" and not still_primary_target.call():
 			_actor_disarm()
 			hud.battle_log("The killing throw leaves you weaponless -- it lands on a random tile!")
+		# Club's Heavy Swing (design doc): a kill with it sends the hero straight into Berserk, no kill count needed.
+		if effect == "full_hp_bonus" and not _actor_is_ally() and not still_primary_target.call():
+			_start_berserk("The killing swing sends you into a berserk rage!")
 		if effect == "double_hit" and still_primary_target.call():
 			_hit(idx, dmg_mult, effect, weapon, -1, multihit_capable)
 		# Knuckle Gloves' innate double_strike (plain Attack only, not
@@ -8637,12 +8667,8 @@ func _apply_incoming_reductions(dmg: int, traits: Dictionary) -> int:
 	var reduced := dmg
 	if battle_player_defending:
 		# Block Master: a chance to no-sell the hit entirely, rolled before
-		# Defend's own flat reduction even applies. Rage/Berserk cuts this to
-		# a quarter of its normal rate rather than zeroing it outright, same
-		# as Reflexes' dodge below.
+		# Defend's own flat reduction even applies.
 		var block_negate_chance: float = player.meta_block_negate_chance
-		if player.berserk_turns_remaining > 0:
-			block_negate_chance *= BERSERK_DEFENSE_MULT
 		if block_negate_chance > 0.0 and randf() < block_negate_chance:
 			return 0
 		# Below the threshold, Defend alone stops it cold; at or above,
@@ -8669,6 +8695,9 @@ func _apply_incoming_reductions(dmg: int, traits: Dictionary) -> int:
 	var aura: float = _warden_aura_cut(battle_player_tile, null)
 	if aura > 0.0 and total > 0:
 		total = maxi(1, int(round(total * (1.0 - aura))))
+	# Berserk: the whole hit is cut, after every other reduction.
+	if player.berserk_turns_remaining > 0 and total > 0:
+		total = maxi(1, int(round(total * (1.0 - _berserk_taken_cut()))))
 	return total
 
 # The cuts that apply to either kind of harm: a Resilience Potion, and Last Stand (which scales
@@ -9041,10 +9070,7 @@ func _enemy_apply_damage(u: Dictionary, target_tile: Vector2i, raw_dmg: int, tra
 			return await _enemy_hit_player_minigame(u, raw_dmg, traits, attack_kind)
 		# Precision (Warrior wing): a flat chance to fully avoid the hit,
 		# mirroring an enemy's own dodge_chance trait but for the player.
-		# Rage/Berserk cuts this to a quarter of its normal rate.
 		var dodge_chance: float = player.dodge_chance_total()
-		if player.berserk_turns_remaining > 0:
-			dodge_chance *= BERSERK_DEFENSE_MULT
 		if dodge_chance > 0.0 and randf() < dodge_chance:
 			_on_hero_dodged()
 			# Riposte: a dodge has a further chance to immediately counter
@@ -9276,9 +9302,6 @@ func _get_defense_minigame() -> CanvasLayer:
 func _minigame_setup(force_mode: String = "") -> Dictionary:
 	var dodge_stat: float = player.dodge_chance_total()
 	var master: float = player.meta_block_negate_chance
-	if player.berserk_turns_remaining > 0:
-		dodge_stat *= BERSERK_DEFENSE_MULT
-		master *= BERSERK_DEFENSE_MULT
 	var opening: float = minf(MINIGAME_DODGE_OPENING_CAP, MINIGAME_DODGE_BASE_CHANCE + dodge_stat)
 	var mode: String = force_mode if force_mode != "" else ("dodge" if randf() < opening else "block")
 	var opts := {}
@@ -9980,7 +10003,11 @@ const MERCENARY_SPEED := 5.0
 # Speed is a rating in the same units the Stats screen shows for you (5 at the start, +1 a level).
 func _hero_speed() -> float:
 	var rating: int = 5 + int(player.stat_agility - PlayerScript.AGILITY_START) / PlayerScript.AGILITY_BONUS_PER_LEVEL
-	return maxf(MIN_BATTLE_SPEED, float(rating + player.armor_speed_bonus()))
+	var speed: float = float(rating + player.armor_speed_bonus())
+	# Berserk: the Rage stat quickens the hero's turns while it lasts.
+	if player.berserk_turns_remaining > 0:
+		speed += _berserk_speed_bonus()
+	return maxf(MIN_BATTLE_SPEED, speed)
 
 func _unit_speed(kind: String, u: Dictionary) -> float:
 	var speed: float
@@ -10189,6 +10216,8 @@ func _hero_status_state() -> Dictionary:
 	return {
 		"defending": battle_player_defending, "taunting": battle_player_taunting,
 		"stealth": player.stealth_turns_remaining, "berserk": player.berserk_turns_remaining,
+		"berserk_info": {"damage": int(round((_berserk_damage_mult() - 1.0) * 100.0)), "taken": int(round(_berserk_taken_cut() * 100.0)), "move": BERSERK_MOVE_BONUS, "rage": player.stat_rage},
+		"rage_kills": player.berserk_kills, "rage_needed": BERSERK_KILLS_NEEDED,
 		"buff": battle_hero_buff_turns, "bloodrage": battle_bloodrage_stacks,
 		"bloodboost": player.bloodmoon_stacks, "bloodcrash": player.bloodmoon_debuffed,
 		"potion_attack": player.potion_attack_turns, "potion_resilience": player.potion_resilience_turns, "potion_energy": player.potion_energy_turns,
@@ -10314,7 +10343,7 @@ func _estimate_hit(target: Dictionary, move_mult: float, ally = null) -> Vector2
 		dmg *= 1.0 + pct
 	if is_hero:
 		if player.berserk_turns_remaining > 0:
-			dmg *= 1.0 + BERSERK_DAMAGE_BONUS_PCT + player.meta_rage_bonus_pct
+			dmg *= _berserk_damage_mult()
 		if player.potion_attack_turns > 0:
 			dmg *= 1.0 + ATTACK_POTION_DAMAGE_BONUS_PCT
 		if battle_hero_buff_turns > 0:
@@ -10688,6 +10717,8 @@ func _battle_flee() -> void:
 
 func _end_battle() -> void:
 	in_battle = false
+	# Berserk stops when the battle does (its kill count stays).
+	player.berserk_turns_remaining = 0
 	player.shared_talisman_provider = Callable()
 	_settle_party_after_battle()
 	battle_units.clear()

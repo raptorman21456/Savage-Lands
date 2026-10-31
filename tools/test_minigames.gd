@@ -269,7 +269,7 @@ func _init() -> void:
 	player.berserk_turns_remaining = 2
 	player.meta_dodge_chance = 0.2
 	var s3: Dictionary = main._minigame_setup("dodge")
-	print("...Berserk quarters the dodge bonus: opening=%.2f (expected 0.35)" % [s3.opening_chance])
+	print("...Berserk no longer touches it: opening=%.2f (expected 0.50, the same as out of Berserk)" % [s3.opening_chance])
 	player.berserk_turns_remaining = 0
 	player.meta_dodge_chance = 0.0
 	var sb: Dictionary = main._minigame_setup("block")

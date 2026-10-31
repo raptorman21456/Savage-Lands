@@ -22,8 +22,8 @@ static func essence_for_kill(is_boss: bool) -> int:
 # FULLY BOUGHT (so min_level is its max_level unless the doc says "lvl 2"); an empty array is a root. `costs` is the price of each level in
 # turn, and its length is the node's max level.
 #
-# What is in the doc and not built: Painful Memories (+1 Rage per level-up) and Continual Learning (Intelligence, +1 every level) are in the tree
-# but Rage and Intelligence are not stats in the game yet, so they only record that they were bought. The third cross-branch capstone
+# What is in the doc and not built: Continual Learning (Intelligence, +1 every level) is in the tree but Intelligence is not a stat in the game
+# yet, so it only records that it was bought. (Painful Memories unlocks the Rage stat, which is built.) The third cross-branch capstone
 # ("something else") is the visualizer's Aegis & Transcendence.
 #
 # Note on strength/agility/vigor/might/intimidation: these do not add to your STARTING stat. Player.gd:_refresh_meta_passives stores them as
@@ -57,7 +57,7 @@ static var UPGRADES := {
 	"strength": {"name": "Physical Training", "stat_bonus": 1, "costs": [1], "max_level": 1, "description": "Putting a level-up into Strength grants +1 more.", "prereqs": [{"id": "legacy", "min_level": 1}]},
 	"agility": {"name": "Endurance Training", "stat_bonus": 10, "costs": [1], "max_level": 1, "description": "Putting a level-up into Agility grants +10 more.", "prereqs": [{"id": "legacy", "min_level": 1}]},
 	"continual_growth": {"name": "Continual Growth", "stat_bonus": 1, "costs": [2], "max_level": 1, "description": "Putting a level-up into Might grants +1 more.", "prereqs": [{"id": "legacy", "min_level": 1}]},
-	"painful_memories": {"name": "Painful Memories", "stat_bonus": 1, "costs": [2], "max_level": 1, "description": "Rage grows by +1 every level-up. (Rage is not a stat in the game yet, so this does nothing until it is.)", "prereqs": [{"id": "legacy", "min_level": 1}]},
+	"painful_memories": {"name": "Painful Memories", "stat_bonus": 1, "costs": [2], "max_level": 1, "description": "Unlocks the Rage stat: it grows by +1 every level-up and joins the level-up choices. Every point of Rage makes Berserk hit harder, shrug off more damage and act sooner.", "prereqs": [{"id": "legacy", "min_level": 1}]},
 	"reflexes_unlock": {"name": "Sharp Mind", "stat_bonus": 1, "costs": [2], "max_level": 1, "description": "Unlocks Reflexes as a level-up choice -- 0.5% chance per point owned to fully dodge an incoming hit, capped at 15%.", "prereqs": [{"id": "strength", "min_level": 1}, {"id": "agility", "min_level": 1}, {"id": "vigor", "min_level": 1}]},
 	"berserker_edge": {"name": "Pure Spite", "stat_bonus": 0.01, "costs": [2, 3, 4, 6, 10], "max_level": 5, "description": "+1% chance per level for ANY attack, with any weapon, to strike twice -- stacks with a weapon's own double-hit passive.", "prereqs": [{"id": "strength", "min_level": 1}]},
 	"adrenaline": {"name": "Adrenaline", "stat_bonus": 0.08, "costs": [4, 6, 9], "max_level": 3, "description": "+8% extra damage DEALT per level while below 30% HP.", "prereqs": [{"id": "reflexes_unlock", "min_level": 1}, {"id": "agility", "min_level": 1}]},
@@ -70,7 +70,7 @@ static var UPGRADES := {
 	"heroic_destiny": {"name": "Heroic Destiny", "stat_bonus": 1, "costs": [1], "max_level": 1, "description": "You start every run with a wooden club and a wooden shield.", "prereqs": [{"id": "battle_hardened", "min_level": 1}]},
 	"riposte": {"name": "Riposte", "stat_bonus": 0.02, "costs": [8, 12, 18, 27], "max_level": 4, "description": "+2% chance per level, when Reflexes fully dodges a hit, to immediately counter-attack whoever swung at you for 50% damage.", "prereqs": [{"id": "adrenaline", "min_level": 3}, {"id": "dexterity_unlock", "min_level": 1}]},
 	"momentum": {"name": "Momentum", "stat_bonus": 0.08, "costs": [4, 6, 9, 13, 20], "max_level": 5, "description": "+8% damage per level for the rest of the battle, per enemy you defeat this battle -- stacks, resets each fight.", "prereqs": [{"id": "berserker_edge", "min_level": 5}]},
-	"rage": {"name": "RAGE", "stat_bonus": 0.1, "costs": [8, 12, 18, 27, 40], "max_level": 5, "description": "+10% bonus damage per level while Berserk is active (triggered by killing an enemy mid-battle).", "prereqs": [{"id": "momentum", "min_level": 5}, {"id": "adrenaline", "min_level": 3}]},
+	"rage": {"name": "RAGE", "stat_bonus": 0.1, "costs": [8, 12, 18, 27, 40], "max_level": 5, "description": "+10% bonus damage per level while Berserk is active (every 5th enemy to fall sends you into Berserk).", "prereqs": [{"id": "momentum", "min_level": 5}, {"id": "adrenaline", "min_level": 3}]},
 
 	# ================= ECONOMY =================
 	"coins": {"name": "Inheritance", "stat_bonus": 15, "costs": [1, 2, 3, 5, 8], "max_level": 5, "description": "+15 starting coins per level.", "prereqs": [{"id": "legacy", "min_level": 1}]},

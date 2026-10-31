@@ -63,6 +63,8 @@ class Player {
     this.stat_agility = PC.AGILITY_START; this.stat_might = 0;
     this.stat_resilience = 0; this.stat_reflexes = 0; this.stat_dexterity = 0;
     this.stat_fortitude = 0;           // protection against MAGICAL harm (unlocked by Warded Mind)
+    this.stat_rage = 0;                // Berserk's strength (unlocked by Painful Memories, the hero only)
+    this.berserk_kills = 0;            // kills counted towards the next Berserk
     this.awaiting_bonus = 0;           // pending level-up stat picks (the game shows a menu)
     this.max_health = 20; this.health = 20; this.attack_damage = 1;
     this.coins = 0;
@@ -85,7 +87,7 @@ class Player {
     this.meta_dodge_chance = 0; this.meta_crit_chance = 0;
     this.meta_resilience_unlocked = false; this.meta_reflexes_unlocked = false; this.meta_dexterity_unlocked = false;
     this.meta_fortitude_unlocked = false; this.meta_fortitude_passive_bonus = 0; this.meta_fortitude_pick_doubled = false;
-    this.meta_rage_bonus_pct = 0; this.meta_low_hp_damage_bonus_pct = 0; this.meta_bonus_coin_pct = 0;
+    this.meta_rage_unlocked = false; this.meta_rage_bonus_pct = 0; this.meta_low_hp_damage_bonus_pct = 0; this.meta_bonus_coin_pct = 0;
     this.meta_healing_bonus_pct = 0; this.meta_bonus_levelup_stat = false;
     this.meta_levelup_bonus_strength = 0; this.meta_levelup_bonus_agility = 0;
     this.meta_levelup_bonus_vigor = 0; this.meta_levelup_bonus_intimidation = 0; this.meta_levelup_bonus_might = 0;
@@ -132,6 +134,7 @@ class Player {
       if (this.meta_reflexes_unlocked) this.stat_reflexes += 1;
       if (this.meta_dexterity_unlocked) this.stat_dexterity += 1;
       if (this.meta_fortitude_unlocked) this.stat_fortitude += 1 + this.meta_fortitude_passive_bonus;
+      if (this.meta_rage_unlocked) this.stat_rage += 1;
     }
     this.xp = 0;
     this.xp_to_next = this.level >= PC.MAX_LEVEL ? 0 : PC.XP_BASE + PC.XP_PER_LEVEL * this.level;
@@ -194,6 +197,7 @@ class Player {
         case "reflexes": this.stat_reflexes += 1; break;
         case "dexterity": this.stat_dexterity += 1; break;
         case "fortitude": this.stat_fortitude += this.meta_fortitude_pick_doubled ? 2 : 1; break;
+        case "rage": this.stat_rage += 1; break;
       }
     }
   }
@@ -212,6 +216,7 @@ class Player {
     this.meta_fortitude_unlocked = (b.smart_savage || 0) > 0;   // Smart Savage: unlocks Fortitude, +1 every level-up
     this.meta_fortitude_passive_bonus = 0; this.meta_fortitude_pick_doubled = false;
     this.meta_levelup_bonus_might = Math.trunc(b.continual_growth || 0);
+    this.meta_rage_unlocked = (b.painful_memories || 0) > 0;   // Painful Memories: unlocks the Rage stat, +1 every level-up
     this.meta_rage_bonus_pct = b.rage || 0;
     this.meta_double_hit_chance = b.berserker_edge || 0;
     this.meta_lifesteal_pct = b.vampiric_grit || 0;
@@ -333,7 +338,6 @@ class Player {
     return this.meta_shield_universal || shieldWeaponCompatible(wid);
   }
   shield_block_chance() {
-    if (this.berserk_turns_remaining > 0) return 0.0;
     if (isEmpty(this.equipped_shield) || !this._shield_weapon_ok()) return 0.0;
     return (this.equipped_shield.block_chance || 0) + this.meta_shield_block_bonus_pct;
   }
@@ -547,6 +551,7 @@ class Player {
     if (this.meta_reflexes_unlocked) this.stat_reflexes += 1;
     if (this.meta_dexterity_unlocked) this.stat_dexterity += 1;
     if (this.meta_fortitude_unlocked) this.stat_fortitude += 1 + this.meta_fortitude_passive_bonus;
+    if (this.meta_rage_unlocked) this.stat_rage += 1;
     if (this.level >= PC.MAX_LEVEL) { this.xp = 0; this.xp_to_next = 0; }
     else this.xp_to_next = PC.XP_BASE + PC.XP_PER_LEVEL * this.level;
     this._recalc_stats();

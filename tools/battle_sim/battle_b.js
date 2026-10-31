@@ -83,7 +83,11 @@ Object.assign(Sim.prototype, {
     p.gain_xp(u.xp_reward || 0);
     if (p.level > lvl_before) this.log(`Level up! You reach level ${p.level}.`, "good");
     if (p.meta_momentum_pct_per_kill > 0) this.battle_momentum_stacks += 1;
-    if (this.in_battle) { p.berserk_turns_remaining = MC.BERSERK_TURNS; this.log(`Killing the ${u.name} sends you into a berserk rage!`, "good"); }
+    // Berserk: every BERSERK_KILLS_NEEDED-th kill in a battle starts it (or refreshes it); the count is only spent here.
+    if (this.in_battle) {
+      p.berserk_kills += 1;
+      if (p.berserk_kills >= MC.BERSERK_KILLS_NEEDED) { p.berserk_kills = 0; this._start_berserk(`Killing the ${u.name} sends you into a berserk rage!`); }
+    }
     if (p.windfall_chance_total() > 0 && this.rng.randf() < p.windfall_chance_total()) {
       const amt = this.rng.randi_range(5, 15); p.add_coins(amt); this.log(`Windfall! +${amt} gold.`);
     }
@@ -139,7 +143,7 @@ Object.assign(Sim.prototype, {
     if (you && p.bloodmoon_stacks > 0) dmg = round(dmg * (1.0 + PC.BLOODMOON_DAMAGE_PCT_PER_STACK * p.bloodmoon_stacks));
     if (you && p.bloodmoon_debuffed) dmg = round(dmg * 0.5);
     if (you && p.talisman_bonus("chaos_shard") > 0) dmg = round(dmg * rng.randf_range(MC.CHAOS_SHARD_MIN_MULT, MC.CHAOS_SHARD_MAX_MULT));
-    if (you && p.berserk_turns_remaining > 0) dmg = round(dmg * (1.0 + MC.BERSERK_DAMAGE_BONUS_PCT + p.meta_rage_bonus_pct));
+    if (you && p.berserk_turns_remaining > 0) dmg = round(dmg * this._berserk_damage_mult());
     if (p.shield_vengeance_active && effect === "" && you) {
       dmg = round(dmg * (1.0 + p.shield_special_pct()));
       p.shield_vengeance_active = false;
@@ -429,6 +433,8 @@ Object.assign(Sim.prototype, {
         p.disarmed_tile = this._pick_disarm_tile();
         this.log("The killing throw leaves you weaponless -- it lands on a random tile!");
       }
+      // Club's Heavy Swing: a kill with it sends the hero straight into Berserk, no kill count needed.
+      if (effect === "full_hp_bonus" && !still()) this._start_berserk("The killing swing sends you into a berserk rage!");
       if (effect === "double_hit" && still()) this._apply_single_hit(idx, dmg_mult, effect, weapon, "You", null, -1, multihit_capable);
       if (action.is_regular_attack && still()) {
         if (weapon.double_strike || whirlwind_melee) this._apply_single_hit(idx, dmg_mult, effect, weapon, "You", null, -1, multihit_capable);

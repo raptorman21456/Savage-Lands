@@ -365,15 +365,16 @@ func _section_player() -> void:
 	DA.add_max_hp(main, 10)
 	print("max HP +10 through the Hardened bonus: %d -> %d (expected +10)" % [max_before, player.max_health])
 	DA.add_max_hp(main, -10)
-	for id in ["might", "strength", "vigor", "intimidation", "resilience", "reflexes", "dexterity", "fortitude"]:
+	for id in ["might", "strength", "vigor", "intimidation", "resilience", "reflexes", "dexterity", "fortitude", "rage"]:
 		DA.set_stat(main, id, 12)
 	DA.set_agility_rating(main, 12)
-	print("every stat can be set: might=%d str=%d vigor=%d agility rating=%d intimidation=%d resilience=%d reflexes=%d dexterity=%d fortitude=%d (expected 12 each)" % [
-		player.stat_might, player.stat_strength, player.stat_vigor, DA.agility_rating(main), player.stat_intimidation, player.stat_resilience, player.stat_reflexes, player.stat_dexterity, player.stat_fortitude])
+	print("every stat can be set: might=%d str=%d vigor=%d agility rating=%d intimidation=%d resilience=%d reflexes=%d dexterity=%d fortitude=%d rage=%d (expected 12 each)" % [
+		player.stat_might, player.stat_strength, player.stat_vigor, DA.agility_rating(main), player.stat_intimidation, player.stat_resilience, player.stat_reflexes, player.stat_dexterity, player.stat_fortitude, player.stat_rage])
 	print("...agility is a walking speed underneath: %d px/s (expected 215: 180 + 7 x 5)" % player.stat_agility)
 	print("...and the derived numbers followed: max HP=%d (expected 12), attack=%d (expected 12)" % [player.max_health, player.attack_damage])
 	var rows: Array = DA.stat_rows(main)
 	print("the stat list comes from the Player itself: %d stats incl. might=%s (expected >= 9, true)" % [rows.size(), rows.any(func(s): return s.id == "might")])
+	print("...Rage is in it, locked until Painful Memories: %s (expected true)" % [rows.any(func(s): return s.id == "rage" and s.locked)])
 	DA.reset_cheats(main)
 	DA.set_level(main, 1)
 	DA.set_coins(main, 500)

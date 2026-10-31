@@ -1,10 +1,9 @@
 extends SceneTree
 
-# New Stats & Status Conditions, Part 3: Rage/Berserk. Killing an enemy
-# mid-battle triggers/refreshes a 2-turn Berserk state (Player.gd:
-# berserk_turns_remaining) -- +50%+Rage's own meta_rage_bonus_pct damage
-# dealt, shields forced off entirely, Block Master/Reflexes dodge both cut
-# to a quarter of their normal rate.
+# Berserk and Rage, as the design doc has them. Berserk: every 5th enemy to fall in a battle starts it (the count carries from battle
+# to battle), or a Club's Heavy Swing that kills; it lasts 2 turns, stops when the battle does, and gives +25% damage dealt, 25% less
+# damage taken and +1 tile of movement -- no drawbacks. Rage is the hero's own stat (unlocked by the Church's Painful Memories, +1 per
+# level-up, also a level-up pick) and every point makes all three stronger, plus the hero's turn speed.
 
 func _make_unit(main, name: String, tile: Vector2i, hp: int = 999999) -> Dictionary:
 	var goblin_script = load("res://scripts/Enemy.gd")
@@ -33,6 +32,7 @@ func _init() -> void:
 	var player = main.player
 	var weapons_script = load("res://scripts/Weapons.gd")
 	var shields_script = load("res://scripts/Shields.gd")
+	var statuses_script = load("res://scripts/BattleStatuses.gd")
 
 	for e in main.get_tree().get_nodes_in_group("enemies"):
 		e.set_physics_process(false)
@@ -43,71 +43,130 @@ func _init() -> void:
 	main.battle_player_tile = Vector2i(3, 3)
 	player.current_weapon = weapons_script.CLUB
 	player.berserk_turns_remaining = 0
+	player.berserk_kills = 0
 	player.meta_rage_bonus_pct = 0.0
+	player.stat_rage = 0
 
-	# --- Trigger: any kill mid-battle sets it to the full duration. ---
+	# --- The numbers are the doc's ---
+	print("the doc's Berserk: %d turns, +%d%% damage, %d%% less damage taken, +%d tile, every %dth kill (expected 2, 25, 25, 1, 5)" % [
+		main.BERSERK_TURNS, int(main.BERSERK_DAMAGE_BONUS_PCT * 100), int(main.BERSERK_DAMAGE_TAKEN_CUT * 100), main.BERSERK_MOVE_BONUS, main.BERSERK_KILLS_NEEDED])
+
+	# --- Trigger: the 5th kill, and the count is spent when it fires ---
+	var counts: Array = []
+	var turns_after: Array = []
+	for i in 4:
+		main._on_enemy_died(0, "Goblin")
+		counts.append(player.berserk_kills)
+		turns_after.append(player.berserk_turns_remaining)
+	print("four kills do not start Berserk, the count climbs: counts=%s (expected [1, 2, 3, 4]) turns=%s (expected all 0)" % [counts, turns_after])
 	main._on_enemy_died(0, "Goblin")
-	print("A kill mid-battle triggers Berserk: berserk_turns_remaining=%d (expected %d)" % [player.berserk_turns_remaining, main.BERSERK_TURNS])
+	print("the 5th kill starts it and spends the count: turns=%d (expected %d), kills=%d (expected 0)" % [player.berserk_turns_remaining, main.BERSERK_TURNS, player.berserk_kills])
 
-	player.berserk_turns_remaining = 1
-	main._on_enemy_died(0, "Goblin")
-	print("...and refreshes back to full duration even if already active (doesn't stack): berserk_turns_remaining=%d (expected %d)" % [player.berserk_turns_remaining, main.BERSERK_TURNS])
-
-	main.in_battle = false
+	# The count carries from one battle to the next, and Berserk itself stops with the battle.
 	player.berserk_turns_remaining = 0
-	main._on_enemy_died(0, "Goblin")
-	print("...but only while actually in a battle: berserk_turns_remaining=%d (expected 0, an overworld kill doesn't trigger it)" % [player.berserk_turns_remaining])
+	player.berserk_kills = 3
+	main._end_battle()
 	main.in_battle = true
+	print("the battle ending keeps the count: kills=%d (expected 3)" % [player.berserk_kills])
+	var goblin_for_reset = load("res://scripts/Enemy.gd").new()
+	main.add_child(goblin_for_reset)
+	main._setup_battle_grid([goblin_for_reset])
+	print("...and a new battle does not wipe it either: kills=%d (expected 3)" % [player.berserk_kills])
+	main.in_battle = true
+	main._on_enemy_died(0, "Goblin")
+	main._on_enemy_died(0, "Goblin")
+	print("...so two more kills in the next battle make the 5th: turns=%d (expected %d), kills=%d (expected 0)" % [player.berserk_turns_remaining, main.BERSERK_TURNS, player.berserk_kills])
+	player.berserk_turns_remaining = 1
+	player.berserk_kills = 4
+	main._on_enemy_died(0, "Goblin")
+	print("a 5th kill while it is already on refreshes it to full instead of stacking: %d (expected %d)" % [player.berserk_turns_remaining, main.BERSERK_TURNS])
+	main._end_battle()
+	print("Berserk stops when the battle ends: turns=%d (expected 0)" % [player.berserk_turns_remaining])
+	main.in_battle = false
+	player.berserk_kills = 0
+	main._on_enemy_died(0, "Goblin")
+	print("a kill outside a battle does not count: kills=%d (expected 0)" % [player.berserk_kills])
+	main.in_battle = true
+	main.battle_allies = []
+	player.berserk_turns_remaining = 0
 
-	# --- Damage bonus: +50%+meta_rage_bonus_pct, gated on attacker_label so
-	# an ally's own hit through the same function is unaffected. ---
+	# --- Club's Heavy Swing: a kill with it starts Berserk at once ---
+	player.current_weapon = weapons_script.CLUB
+	player.stamina = player.MAX_STAMINA
+	player.stat_strength = 50
+	player.attack_damage = 50
+	main.battle_player_tile = Vector2i(2, 2)
+	# (A second enemy stays on the field: killing the last one ends the battle, and Berserk stops with it.)
+	var victim := _make_unit(main, "Goblin", Vector2i(3, 2), 5)
+	var bystander := _make_unit(main, "Goblin", Vector2i(7, 7), 99999)
+	main.battle_units = [victim, bystander]
+	main.battle_target_index = 0
+	player.berserk_kills = 0
+	main._battle_player_special(2)
+	print("Heavy Swing that kills starts Berserk without the count: turns=%d (expected %d: it started at 2 and the swing ending the turn ticked it once), the kill still counts: kills=%d (expected 1)" % [player.berserk_turns_remaining, main.BERSERK_TURNS - 1, player.berserk_kills])
+	player.berserk_turns_remaining = 0
+	player.stamina = player.MAX_STAMINA
+	var survivor := _make_unit(main, "Goblin", Vector2i(3, 2), 99999)
+	main.battle_units = [survivor, bystander]
+	main.battle_target_index = 0
+	main._battle_player_special(2)
+	print("...but a Heavy Swing that does not kill does not: turns=%d (expected 0)" % [player.berserk_turns_remaining])
+	player.berserk_turns_remaining = 0
+	player.berserk_kills = 0
+
+	# --- Damage dealt: +25%, + 1% per Rage, + the Church's RAGE node; an ally's own hit never gets it ---
 	player.attack_damage = 10
+	player.stat_strength = 10
 	var g_dmg := _make_unit(main, "Goblin", Vector2i(4, 3))
 	main.battle_units = [g_dmg]
 	main.battle_target_index = 0
-	player.berserk_turns_remaining = 0
 	main._apply_single_hit(0, 1.0, "", weapons_script.CLUB)
 	var normal_dmg: int = 999999 - g_dmg.hp
-
-	g_dmg.hp = 999999
 	player.berserk_turns_remaining = 2
+	g_dmg.hp = 999999
 	main._apply_single_hit(0, 1.0, "", weapons_script.CLUB)
 	var berserk_dmg: int = 999999 - g_dmg.hp
-	print("Berserk boosts damage dealt by +50%%: normal=%d berserk=%d (expected berserk == round(normal*1.5)=%d)" % [
-		normal_dmg, berserk_dmg, int(round(normal_dmg * 1.5))
-	])
-
+	print("Berserk boosts damage dealt by +25%%: normal=%d berserk=%d (expected round(normal*1.25)=%d)" % [normal_dmg, berserk_dmg, int(round(normal_dmg * 1.25))])
+	player.stat_rage = 10
 	g_dmg.hp = 999999
-	player.meta_rage_bonus_pct = 0.3
 	main._apply_single_hit(0, 1.0, "", weapons_script.CLUB)
-	var berserk_with_rage_dmg: int = 999999 - g_dmg.hp
-	print("...and Rage's own bonus stacks on top: berserk_with_rage=%d (expected round(normal*1.8)=%d, +50%% base +30%% Rage)" % [
-		berserk_with_rage_dmg, int(round(normal_dmg * 1.8))
-	])
-
+	print("...Rage 10 adds +10%%: %d (expected round(normal*1.35)=%d)" % [999999 - g_dmg.hp, int(round(normal_dmg * 1.35))])
+	player.meta_rage_bonus_pct = 0.3
+	g_dmg.hp = 999999
+	main._apply_single_hit(0, 1.0, "", weapons_script.CLUB)
+	print("...and the Church's RAGE node stacks on top of both: %d (expected round(normal*1.65)=%d)" % [999999 - g_dmg.hp, int(round(normal_dmg * 1.65))])
 	g_dmg.hp = 999999
 	main._apply_single_hit(0, 1.0, "", weapons_script.CLUB, "Knight")
-	var ally_dmg: int = 999999 - g_dmg.hp
-	print("...but never applies to an ally's own hit through the same function: ally_dmg=%d (expected == normal_dmg=%d, not boosted)" % [ally_dmg, normal_dmg])
+	print("...but an ally's own hit through the same function is not boosted: ally=%d (expected %d)" % [999999 - g_dmg.hp, normal_dmg])
 	player.meta_rage_bonus_pct = 0.0
+	player.stat_rage = 0
+	player.berserk_turns_remaining = 0
 
-	# --- Shields forced off entirely while berserk. ---
+	# --- Damage taken: 25% less after every other reduction, + 0.5% per Rage, capped ---
+	var taken_normal: int = main._apply_incoming_reductions(100, {})
+	player.berserk_turns_remaining = 2
+	var taken_berserk: int = main._apply_incoming_reductions(100, {})
+	print("Berserk takes 25%% off a hit: normal=%d berserk=%d (expected %d)" % [taken_normal, taken_berserk, int(round(taken_normal * 0.75))])
+	player.stat_rage = 20
+	print("...Rage 20 takes 10%% more off: %d (expected %d)" % [main._apply_incoming_reductions(100, {}), int(round(taken_normal * 0.65))])
+	player.stat_rage = 1000
+	print("...and it never takes more than 60%% off, however much Rage: %d (expected %d)" % [main._apply_incoming_reductions(100, {}), int(round(taken_normal * 0.4))])
+	print("a magical hit is cut too: %d (expected 40, the same 60%% off)" % [main._apply_incoming_reductions(100, {"harm": "magical"})])
+	player.stat_rage = 0
+	player.berserk_turns_remaining = 0
+
+	# --- No drawbacks: shields, Block Master and dodge all work as normal ---
 	var buckler: Dictionary = shields_script.SHIELDS.shield_buckler
 	player.equipped_shield = buckler
-	player.berserk_turns_remaining = 0
 	var block_before: float = player.shield_block_chance()
+	var usable_before: bool = player.shield_usable()
 	player.berserk_turns_remaining = 2
-	var block_during: float = player.shield_block_chance()
-	print("Berserk forces shield_block_chance to 0: before=%.2f (expected > 0) during=%.2f (expected 0.0)" % [block_before, block_during])
+	print("a shield works during Berserk: block %.2f -> %.2f (expected equal and > 0), usable %s -> %s (expected true, true)" % [block_before, player.shield_block_chance(), usable_before, player.shield_usable()])
 	player.equipped_shield = {}
+	player.berserk_turns_remaining = 0
 
-	# --- Block Master (Defend) cut to a quarter of its normal rate: 40% base
-	# -> 10% while berserk, proven via a large sample rather than a single
-	# roll (Godot's clean 0%/100% edge cases don't distinguish "scaled down"
-	# from "always/never triggers" the way an intermediate rate does).
 	player.meta_block_negate_chance = 0.4
 	main.battle_player_defending = true
-	player.berserk_turns_remaining = 0
 	var negates_normal := 0
 	for i in 500:
 		if main._apply_incoming_reductions(100, {}) == 0:
@@ -117,17 +176,12 @@ func _init() -> void:
 	for i in 500:
 		if main._apply_incoming_reductions(100, {}) == 0:
 			negates_berserk += 1
-	print("Block Master negate-rate over 500 rolls: normal=%d (expected ~200, 40%%) berserk=%d (expected ~50, 10%% -- a quarter of 40%%)" % [negates_normal, negates_berserk])
+	print("Block Master negates as often in Berserk as out of it: normal=%d berserk=%d over 500 rolls (expected both about 200, 40%%)" % [negates_normal, negates_berserk])
 	main.battle_player_defending = false
 	player.meta_block_negate_chance = 0.0
 	player.berserk_turns_remaining = 0
 
-	# --- Reflexes dodge cut to a quarter of its normal rate the same way.
-	# The 60% of rolls that DON'T dodge land a real hit via take_battle_damage
-	# -- health is topped up before/after so 500 real hits don't actually
-	# kill the player and end the battle out from under the rest of this test. ---
 	player.meta_dodge_chance = 0.4
-	player.berserk_turns_remaining = 0
 	var dodges_normal := 0
 	for i in 500:
 		player.health = player.max_health
@@ -141,43 +195,95 @@ func _init() -> void:
 		var r2: Dictionary = main._enemy_apply_damage(_make_unit(main, "Goblin", Vector2i(5, 3)), main.battle_player_tile, 10, {})
 		if r2.get("dodged", false):
 			dodges_berserk += 1
-	print("Reflexes dodge-rate over 500 rolls: normal=%d (expected ~200, 40%%) berserk=%d (expected ~50, 10%% -- a quarter of 40%%)" % [dodges_normal, dodges_berserk])
+	print("Reflexes dodge as often in Berserk: normal=%d berserk=%d over 500 rolls (expected both about 200, 40%%)" % [dodges_normal, dodges_berserk])
 	player.meta_dodge_chance = 0.0
 	player.berserk_turns_remaining = 0
 	player.health = player.max_health
-	# One of those 1000 real hits inevitably drops health to 0 on some
-	# iteration despite the top-of-loop reset (the reset happens BEFORE that
-	# iteration's hit, not after) -- take_battle_damage's death path sets
-	# game_over=true and in_battle=false right then, and nothing later in
-	# the loop undoes either, so both need restoring here too, not just health.
+	# (Some of those 1000 real hits can kill the hero: the death path sets game_over and ends the battle, so put both back.)
 	main.game_over = false
 	main.in_battle = true
 
-	# --- Ticks down once per player turn, same shape as Concussion/Blindness. ---
+	# --- +1 tile of movement, and Rage quickens the hero's turns ---
+	var move_normal: int = main._battle_player_move_range()
+	var speed_normal: float = main._hero_speed()
+	player.berserk_turns_remaining = 2
+	print("Berserk is one tile more movement: %d -> %d (expected +%d)" % [move_normal, main._battle_player_move_range(), main.BERSERK_MOVE_BONUS])
+	print("...and no faster a turn without Rage: speed %.2f -> %.2f (expected equal)" % [speed_normal, main._hero_speed()])
+	player.stat_rage = 8
+	print("...Rage 8 adds %.2f to the hero's speed: %.2f -> %.2f (expected +2.00)" % [main._berserk_speed_bonus(), speed_normal, main._hero_speed()])
+	player.berserk_turns_remaining = 0
+	print("...and none of it outside Berserk: move %d, speed %.2f (expected %d, %.2f)" % [main._battle_player_move_range(), main._hero_speed(), move_normal, speed_normal])
+	player.stat_rage = 0
+
+	# --- Ticks down once per player turn ---
 	player.berserk_turns_remaining = 2
 	main.battle_units = [_make_unit(main, "Goblin", Vector2i(6, 6))]
 	main._process_enemy_turn()
 	print("Berserk ticks down once per player turn: berserk_turns_remaining=%d (expected 1)" % [player.berserk_turns_remaining])
 
-	# --- Per-battle reset. ---
+	# --- Per-battle reset ---
 	player.berserk_turns_remaining = 2
-	var goblin_for_reset = load("res://scripts/Enemy.gd").new()
-	main.add_child(goblin_for_reset)
-	main._setup_battle_grid([goblin_for_reset])
-	print("Berserk (like every other battle-scoped player status) clears on the next battle setup: berserk_turns_remaining=%d (expected 0)" % [player.berserk_turns_remaining])
+	main._setup_battle_grid([load("res://scripts/Enemy.gd").new()])
+	print("a new battle starts with no Berserk running: berserk_turns_remaining=%d (expected 0)" % [player.berserk_turns_remaining])
 
-	# --- HUD status text (battle_status_label2 -- see HUD.gd:update_battle_grid,
-	# the HP/STA bars took over battle_status_label's old 2nd+ lines). ---
+	# --- What the screen says ---
 	main.in_battle = true
 	main.battle_terrain.clear()
 	main.battle_allies = []
 	main.battle_units = [_make_unit(main, "Goblin", Vector2i(6, 6))]
 	player.berserk_turns_remaining = 2
+	player.stat_rage = 4
 	main._refresh_battle_display()
-	print("HUD shows a BERSERK indicator while active: %s (expected true)" % [main.hud.battle_status_label2.text.contains("BERSERK")])
+	print("the HUD shows a BERSERK indicator while active: %s (expected true)" % [main.hud.battle_status_label2.text.contains("BERSERK")])
+	var entries: Array = statuses_script.for_hero(main._hero_status_state())
+	var berserk_entry: Dictionary = {}
+	for e in entries:
+		if e.id == "berserk":
+			berserk_entry = e
+	print("the status says what it is worth with Rage 4: '%s' (expected +29%% damage, 27%% less damage taken, 1 tile, Rage mentioned)" % [berserk_entry.get("desc", "")])
 	player.berserk_turns_remaining = 0
+	player.berserk_kills = 3
 	main._refresh_battle_display()
-	print("...and hides it once Berserk ends: %s (expected false)" % [main.hud.battle_status_label2.text.contains("BERSERK")])
+	entries = statuses_script.for_hero(main._hero_status_state())
+	var building: Dictionary = {}
+	for e in entries:
+		if e.id == "rage_building":
+			building = e
+	print("between Berserks the count shows as a status: '%s %s' (expected Rage building 3 / 5)" % [building.get("name", ""), building.get("detail", "")])
+	print("...and the BERSERK indicator is gone: %s (expected false)" % [main.hud.battle_status_label2.text.contains("BERSERK")])
+	player.berserk_kills = 0
+	player.stat_rage = 0
+
+	# --- Rage is a real stat: locked until Painful Memories, +1 per level-up, a level-up pick ---
+	player.meta_rage_unlocked = false
+	var rage_before: int = player.stat_rage
+	player._level_up()
+	print("Rage does not grow before Painful Memories: %d -> %d (expected 0 -> 0)" % [rage_before, player.stat_rage])
+	print("...and is not offered on the level-up screen: %s (expected false)" % [main._levelup_choice_order().has("rage")])
+	player.apply_bonus_stat("strength")
+	player.meta_rage_unlocked = true
+	player._level_up()
+	print("with Painful Memories every level-up gives +1 Rage: %d (expected 1)" % [player.stat_rage])
+	player._level_up()
+	print("...each time: %d (expected 2)" % [player.stat_rage])
+	var order: Array = main._levelup_choice_order()
+	print("Rage is the last choice on the level-up screen: %s (expected rage)" % [order[order.size() - 1]])
+	main.hud.show_levelup_choice(5, 1, 1, 1, 180, 1, 0, 0, 0, false, false, false, 0, false, 7, true)
+	print("the level-up screen lists it with its number: %s (expected true), Rage button text '%s'" % [main.hud.levelup_buttons.has("rage"), main.hud.levelup_buttons["rage"].text if main.hud.levelup_buttons.has("rage") else ""])
+	main.hud.hide_levelup_choice()
+	main.hud.show_levelup_choice(5, 1, 1, 1, 180, 1, 0, 0, 0, false, false, false, 0, false, 0, false)
+	print("...and does not list it while locked: %s (expected false)" % [main.hud.levelup_buttons.has("rage")])
+	main.hud.hide_levelup_choice()
+	var picked_before: int = player.stat_rage
+	player.apply_bonus_stat("rage")
+	print("picking Rage as the bonus gives +1: %d -> %d (expected +1)" % [picked_before, player.stat_rage])
+	player.meta_bonus_levelup_stat = true
+	picked_before = player.stat_rage
+	player.apply_bonus_stat("rage")
+	print("...and Prodigy doubles the pick: %d -> %d (expected +2)" % [picked_before, player.stat_rage])
+	player.meta_bonus_levelup_stat = false
+	player.stat_rage = 0
+	player.meta_rage_unlocked = false
 
 	# Reset the scratch save for whatever test runs next.
 	var save_data_script = load("res://scripts/SaveData.gd")

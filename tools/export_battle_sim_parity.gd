@@ -248,7 +248,7 @@ func _hit_case() -> Dictionary:
 		"pichaku": rng.randi() % 5 == 0, "stealth": rng.randi() % 5 == 0, "first_used": rng.randf() < 0.6,
 		"momentum": rng.randi() % 4, "chain": rng.randi() % 3, "burning": rng.randi() % 8 == 0, "bloodmoon": rng.randi() % 4,
 		"distance": 1 + rng.randi() % 4,
-		"bloodrage": rng.randi() % 4, "shadow_crit": rng.randf() < 0.2,
+		"bloodrage": rng.randi() % 4, "shadow_crit": rng.randf() < 0.2, "rage": rng.randi() % 25,
 	}
 	var out := _run_hit(b, action, enemy, state)
 	# a kill triggers XP/loot/level-up side effects in the real game that the harness does not model -- retry with a sturdier target
@@ -281,6 +281,7 @@ func _run_hit(b: Dictionary, action: Dictionary, enemy: Dictionary, st: Dictiona
 	p.health = maxi(1, int(round(p.max_health * float(st.health_frac))))
 	p.potion_attack_turns = 2 if st.attack_potion else 0
 	p.berserk_turns_remaining = 2 if st.berserk else 0
+	p.stat_rage = int(st.rage)
 	p.pichaku_active = st.pichaku
 	p.stealth_turns_remaining = 2 if st.stealth else 0
 	if p.talisman_bonus("bloodmoon_fang") > 0.0:
@@ -310,7 +311,7 @@ func _incoming_case() -> Dictionary:
 	var c := {
 		"dmg": 1 + rng.randi() % 80, "defending": rng.randf() < 0.5, "berserk": rng.randi() % 4 == 0, "resilience_potion": rng.randi() % 4 == 0,
 		"rock": rng.randf() < 0.4, "ignore_cover": rng.randi() % 4 == 0, "health_frac": _pick([1.0, 0.7, 0.4, 0.1]),
-		"harm": _pick(["bodily", "bodily", "magical", "both"]), "spellward_used": rng.randf() < 0.5,
+		"harm": _pick(["bodily", "bodily", "magical", "both"]), "spellward_used": rng.randf() < 0.5, "rage": rng.randi() % 25,
 	}
 	var p = player
 	main.battle_terrain.clear()
@@ -320,6 +321,7 @@ func _incoming_case() -> Dictionary:
 	main.battle_spellward_used = c.spellward_used
 	main.battle_player_defending = c.defending
 	p.berserk_turns_remaining = 2 if c.berserk else 0
+	p.stat_rage = int(c.rage)
 	p.potion_resilience_turns = 2 if c.resilience_potion else 0
 	p.health = maxi(1, int(round(p.max_health * float(c.health_frac))))
 	var reduced: int = main._apply_incoming_reductions(int(c.dmg), {"ignore_cover": c.ignore_cover, "harm": c.harm})

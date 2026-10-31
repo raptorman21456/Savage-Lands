@@ -43,7 +43,7 @@ const STAT_INFO := {
 	"strength": {"abbr": "STR", "name": "Strength", "does": "attack power"},
 	"vigor": {"abbr": "VGR", "name": "Vigor", "does": "HP"},
 	"agility": {"abbr": "AGI", "name": "Agility", "does": "speed"},
-	"rage": {"abbr": "RAGE", "name": "Rage", "does": "upgrades berserk"},
+	"rage": {"abbr": "RAGE", "name": "Rage", "does": "berserk power"},
 	"dexterity": {"abbr": "DXT", "name": "Dexterity", "does": "crit"},
 	"magic": {"abbr": "MAG", "name": "Magic", "does": "magic power"},
 	# ITL (the design doc's abbreviation; INM is Intimidation's). A Might-type requirement: needed to learn a weapon's

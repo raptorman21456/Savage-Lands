@@ -239,6 +239,16 @@ func _init() -> void:
 	texts = _texts(party_node)
 	print("Your sheet has Equipment, Specials, Stats, Defense and Run: %s (expected all true)" % [["Equipment", "Specials", "Stats", "Defense", "Run"].map(func(p): return _button_named(party_node, p) != null)])
 	print("Your stats go by their abbreviations, only the ones that exist: %s (expected MGT STR VGR AGI INM true; RAGE and MAG false as the game has no such stat yet)" % [["MGT", "STR", "VGR", "AGI", "INM"].map(func(s): return texts.has(s)) + [texts.has("RAGE"), texts.has("MAG")]])
+	player.meta_rage_unlocked = true
+	player.stat_rage = 4
+	panel._refresh()
+	await process_frame
+	texts = _texts(party_node)
+	print("Once Painful Memories is bought your sheet lists Rage with its value: RAGE shown=%s (expected true), a '4' beside it=%s (expected true)" % [texts.has("RAGE"), texts.has("4")])
+	player.meta_rage_unlocked = false
+	player.stat_rage = 0
+	panel._refresh()
+	await process_frame
 
 	# picks
 	druid.picks = 0

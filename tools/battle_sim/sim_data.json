@@ -534,7 +534,7 @@
 			"xp_reward": 715
 		}
 	],
-	"exported": "2026-10-27T21:26:52",
+	"exported": "2026-10-30T19:47:28",
 	"foods": [
 		{
 			"description": "Heals 5 HP and restores 15 stamina.",
@@ -658,8 +658,11 @@
 		"ATTACK_TIMING_PERFECT_STAMINA": 5,
 		"BATTLE_FLEE_COOLDOWN": 2.0,
 		"BATTLE_GATHER_RADIUS": 200.0,
-		"BERSERK_DAMAGE_BONUS_PCT": 0.5,
-		"BERSERK_DEFENSE_MULT": 0.25,
+		"BERSERK_DAMAGE_BONUS_PCT": 0.25,
+		"BERSERK_DAMAGE_TAKEN_CUT": 0.25,
+		"BERSERK_KILLS_NEEDED": 5,
+		"BERSERK_MOVE_BONUS": 1,
+		"BERSERK_TAKEN_CUT_CAP": 0.6,
 		"BERSERK_TURNS": 2,
 		"BLEED_BASE_TURNS": 2,
 		"BLEED_DAMAGE_PCT": 0.1,
@@ -1108,6 +1111,9 @@
 			"monster_slayer",
 			"treasure_hunter"
 		],
+		"RAGE_DAMAGE_PCT_PER_POINT": 0.01,
+		"RAGE_SPEED_PER_POINT": 0.25,
+		"RAGE_TAKEN_CUT_PER_POINT": 0.005,
 		"REGION_ENEMY_SCRIPTS": {
 			"archer": null,
 			"brute": null,
@@ -3780,7 +3786,7 @@
 				"costs": [
 					2
 				],
-				"description": "Rage grows by +1 every level-up. (Rage is not a stat in the game yet, so this does nothing until it is.)",
+				"description": "Unlocks the Rage stat: it grows by +1 every level-up and joins the level-up choices. Every point of Rage makes Berserk hit harder, shrug off more damage and act sooner.",
 				"max_level": 1,
 				"name": "Painful Memories",
 				"prereqs": [
@@ -3830,7 +3836,7 @@
 					27,
 					40
 				],
-				"description": "+10% bonus damage per level while Berserk is active (triggered by killing an enemy mid-battle).",
+				"description": "+10% bonus damage per level while Berserk is active (every 5th enemy to fall sends you into Berserk).",
 				"max_level": 5,
 				"name": "RAGE",
 				"prereqs": [

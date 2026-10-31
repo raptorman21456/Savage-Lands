@@ -757,7 +757,7 @@ const SIM_DATA = {
 			"xp_reward": 715
 		}
 	],
-	"exported": "2026-10-27T21:26:52",
+	"exported": "2026-10-30T19:47:28",
 	"foods": [
 		{
 			"description": "Heals 5 HP and restores 15 stamina.",
@@ -881,8 +881,11 @@ const SIM_DATA = {
 		"ATTACK_TIMING_PERFECT_STAMINA": 5,
 		"BATTLE_FLEE_COOLDOWN": 2.0,
 		"BATTLE_GATHER_RADIUS": 200.0,
-		"BERSERK_DAMAGE_BONUS_PCT": 0.5,
-		"BERSERK_DEFENSE_MULT": 0.25,
+		"BERSERK_DAMAGE_BONUS_PCT": 0.25,
+		"BERSERK_DAMAGE_TAKEN_CUT": 0.25,
+		"BERSERK_KILLS_NEEDED": 5,
+		"BERSERK_MOVE_BONUS": 1,
+		"BERSERK_TAKEN_CUT_CAP": 0.6,
 		"BERSERK_TURNS": 2,
 		"BLEED_BASE_TURNS": 2,
 		"BLEED_DAMAGE_PCT": 0.1,
@@ -1331,6 +1334,9 @@ const SIM_DATA = {
 			"monster_slayer",
 			"treasure_hunter"
 		],
+		"RAGE_DAMAGE_PCT_PER_POINT": 0.01,
+		"RAGE_SPEED_PER_POINT": 0.25,
+		"RAGE_TAKEN_CUT_PER_POINT": 0.005,
 		"REGION_ENEMY_SCRIPTS": {
 			"archer": null,
 			"brute": null,
@@ -4003,7 +4009,7 @@ const SIM_DATA = {
 				"costs": [
 					2
 				],
-				"description": "Rage grows by +1 every level-up. (Rage is not a stat in the game yet, so this does nothing until it is.)",
+				"description": "Unlocks the Rage stat: it grows by +1 every level-up and joins the level-up choices. Every point of Rage makes Berserk hit harder, shrug off more damage and act sooner.",
 				"max_level": 1,
 				"name": "Painful Memories",
 				"prereqs": [
@@ -4053,7 +4059,7 @@ const SIM_DATA = {
 					27,
 					40
 				],
-				"description": "+10% bonus damage per level while Berserk is active (triggered by killing an enemy mid-battle).",
+				"description": "+10% bonus damage per level while Berserk is active (every 5th enemy to fall sends you into Berserk).",
 				"max_level": 5,
 				"name": "RAGE",
 				"prereqs": [
@@ -5372,6 +5378,8 @@ class Player {
     this.stat_agility = PC.AGILITY_START; this.stat_might = 0;
     this.stat_resilience = 0; this.stat_reflexes = 0; this.stat_dexterity = 0;
     this.stat_fortitude = 0;           // protection against MAGICAL harm (unlocked by Warded Mind)
+    this.stat_rage = 0;                // Berserk's strength (unlocked by Painful Memories, the hero only)
+    this.berserk_kills = 0;            // kills counted towards the next Berserk
     this.awaiting_bonus = 0;           // pending level-up stat picks (the game shows a menu)
     this.max_health = 20; this.health = 20; this.attack_damage = 1;
     this.coins = 0;
@@ -5394,7 +5402,7 @@ class Player {
     this.meta_dodge_chance = 0; this.meta_crit_chance = 0;
     this.meta_resilience_unlocked = false; this.meta_reflexes_unlocked = false; this.meta_dexterity_unlocked = false;
     this.meta_fortitude_unlocked = false; this.meta_fortitude_passive_bonus = 0; this.meta_fortitude_pick_doubled = false;
-    this.meta_rage_bonus_pct = 0; this.meta_low_hp_damage_bonus_pct = 0; this.meta_bonus_coin_pct = 0;
+    this.meta_rage_unlocked = false; this.meta_rage_bonus_pct = 0; this.meta_low_hp_damage_bonus_pct = 0; this.meta_bonus_coin_pct = 0;
     this.meta_healing_bonus_pct = 0; this.meta_bonus_levelup_stat = false;
     this.meta_levelup_bonus_strength = 0; this.meta_levelup_bonus_agility = 0;
     this.meta_levelup_bonus_vigor = 0; this.meta_levelup_bonus_intimidation = 0; this.meta_levelup_bonus_might = 0;
@@ -5441,6 +5449,7 @@ class Player {
       if (this.meta_reflexes_unlocked) this.stat_reflexes += 1;
       if (this.meta_dexterity_unlocked) this.stat_dexterity += 1;
       if (this.meta_fortitude_unlocked) this.stat_fortitude += 1 + this.meta_fortitude_passive_bonus;
+      if (this.meta_rage_unlocked) this.stat_rage += 1;
     }
     this.xp = 0;
     this.xp_to_next = this.level >= PC.MAX_LEVEL ? 0 : PC.XP_BASE + PC.XP_PER_LEVEL * this.level;
@@ -5503,6 +5512,7 @@ class Player {
         case "reflexes": this.stat_reflexes += 1; break;
         case "dexterity": this.stat_dexterity += 1; break;
         case "fortitude": this.stat_fortitude += this.meta_fortitude_pick_doubled ? 2 : 1; break;
+        case "rage": this.stat_rage += 1; break;
       }
     }
   }
@@ -5521,6 +5531,7 @@ class Player {
     this.meta_fortitude_unlocked = (b.smart_savage || 0) > 0;   // Smart Savage: unlocks Fortitude, +1 every level-up
     this.meta_fortitude_passive_bonus = 0; this.meta_fortitude_pick_doubled = false;
     this.meta_levelup_bonus_might = Math.trunc(b.continual_growth || 0);
+    this.meta_rage_unlocked = (b.painful_memories || 0) > 0;   // Painful Memories: unlocks the Rage stat, +1 every level-up
     this.meta_rage_bonus_pct = b.rage || 0;
     this.meta_double_hit_chance = b.berserker_edge || 0;
     this.meta_lifesteal_pct = b.vampiric_grit || 0;
@@ -5642,7 +5653,6 @@ class Player {
     return this.meta_shield_universal || shieldWeaponCompatible(wid);
   }
   shield_block_chance() {
-    if (this.berserk_turns_remaining > 0) return 0.0;
     if (isEmpty(this.equipped_shield) || !this._shield_weapon_ok()) return 0.0;
     return (this.equipped_shield.block_chance || 0) + this.meta_shield_block_bonus_pct;
   }
@@ -5856,6 +5866,7 @@ class Player {
     if (this.meta_reflexes_unlocked) this.stat_reflexes += 1;
     if (this.meta_dexterity_unlocked) this.stat_dexterity += 1;
     if (this.meta_fortitude_unlocked) this.stat_fortitude += 1 + this.meta_fortitude_passive_bonus;
+    if (this.meta_rage_unlocked) this.stat_rage += 1;
     if (this.level >= PC.MAX_LEVEL) { this.xp = 0; this.xp_to_next = 0; }
     else this.xp_to_next = PC.XP_BASE + PC.XP_PER_LEVEL * this.level;
     this._recalc_stats();
@@ -5973,6 +5984,8 @@ class Sim {
   // ---------------------------------------------------------------- player setup helpers
   _battle_player_move_range() {
     let bonus = Math.max(0, Math.trunc((this.player.stat_agility - PC.AGILITY_START) / MC.AGILITY_PER_EXTRA_MOVE));
+    // Berserk: an extra tile of reach for as long as it lasts.
+    if (this.player.berserk_turns_remaining > 0) bonus += MC.BERSERK_MOVE_BONUS;
     if (this.player.potion_energy_turns > 0) bonus += MC.ENERGY_POTION_MOVE_BONUS;
     bonus += Math.trunc(this.player.talisman_bonus("move_range"));
     // Armour: Windrunner's Jerkin +1, Fortress Plate -1.
@@ -6437,7 +6450,11 @@ Object.assign(Sim.prototype, {
     p.gain_xp(u.xp_reward || 0);
     if (p.level > lvl_before) this.log(`Level up! You reach level ${p.level}.`, "good");
     if (p.meta_momentum_pct_per_kill > 0) this.battle_momentum_stacks += 1;
-    if (this.in_battle) { p.berserk_turns_remaining = MC.BERSERK_TURNS; this.log(`Killing the ${u.name} sends you into a berserk rage!`, "good"); }
+    // Berserk: every BERSERK_KILLS_NEEDED-th kill in a battle starts it (or refreshes it); the count is only spent here.
+    if (this.in_battle) {
+      p.berserk_kills += 1;
+      if (p.berserk_kills >= MC.BERSERK_KILLS_NEEDED) { p.berserk_kills = 0; this._start_berserk(`Killing the ${u.name} sends you into a berserk rage!`); }
+    }
     if (p.windfall_chance_total() > 0 && this.rng.randf() < p.windfall_chance_total()) {
       const amt = this.rng.randi_range(5, 15); p.add_coins(amt); this.log(`Windfall! +${amt} gold.`);
     }
@@ -6493,7 +6510,7 @@ Object.assign(Sim.prototype, {
     if (you && p.bloodmoon_stacks > 0) dmg = round(dmg * (1.0 + PC.BLOODMOON_DAMAGE_PCT_PER_STACK * p.bloodmoon_stacks));
     if (you && p.bloodmoon_debuffed) dmg = round(dmg * 0.5);
     if (you && p.talisman_bonus("chaos_shard") > 0) dmg = round(dmg * rng.randf_range(MC.CHAOS_SHARD_MIN_MULT, MC.CHAOS_SHARD_MAX_MULT));
-    if (you && p.berserk_turns_remaining > 0) dmg = round(dmg * (1.0 + MC.BERSERK_DAMAGE_BONUS_PCT + p.meta_rage_bonus_pct));
+    if (you && p.berserk_turns_remaining > 0) dmg = round(dmg * this._berserk_damage_mult());
     if (p.shield_vengeance_active && effect === "" && you) {
       dmg = round(dmg * (1.0 + p.shield_special_pct()));
       p.shield_vengeance_active = false;
@@ -6783,6 +6800,8 @@ Object.assign(Sim.prototype, {
         p.disarmed_tile = this._pick_disarm_tile();
         this.log("The killing throw leaves you weaponless -- it lands on a random tile!");
       }
+      // Club's Heavy Swing: a kill with it sends the hero straight into Berserk, no kill count needed.
+      if (effect === "full_hp_bonus" && !still()) this._start_berserk("The killing swing sends you into a berserk rage!");
       if (effect === "double_hit" && still()) this._apply_single_hit(idx, dmg_mult, effect, weapon, "You", null, -1, multihit_capable);
       if (action.is_regular_attack && still()) {
         if (weapon.double_strike || whirlwind_melee) this._apply_single_hit(idx, dmg_mult, effect, weapon, "You", null, -1, multihit_capable);
@@ -7229,7 +7248,6 @@ Object.assign(Sim.prototype, {
     let reduced = dmg;
     if (this.battle_player_defending) {
       let negate = p.meta_block_negate_chance;
-      if (p.berserk_turns_remaining > 0) negate *= MC.BERSERK_DEFENSE_MULT;
       if (negate > 0 && this.rng.randf() < negate) return 0;
       // Bastion Mail raises the threshold Defend negates a hit below.
       const threshold = MC.DEFEND_FULL_NEGATE_THRESHOLD + p.shield_defend_threshold_bonus() + Math.trunc(p.armor_trait_value("defend_threshold_bonus", 0));
@@ -7245,6 +7263,8 @@ Object.assign(Sim.prototype, {
     let total = 0;
     if (bodily_part > 0) total += this._reduce_bodily(bodily_part, traits);
     if (magical_part > 0) total += this._reduce_magical(magical_part);
+    // Berserk: the whole hit is cut, after every other reduction.
+    if (p.berserk_turns_remaining > 0 && total > 0) total = Math.max(1, round(total * (1.0 - this._berserk_taken_cut())));
     return total;
   },
 
@@ -7433,7 +7453,6 @@ Object.assign(Sim.prototype, {
     if (u.burning) raw_dmg = round(raw_dmg * (1.0 - MC.BURN_DAMAGE_DEALT_REDUCTION));
     if (veq(target_tile, this.battle_player_tile)) {
       let dodge = p.dodge_chance_total();
-      if (p.berserk_turns_remaining > 0) dodge *= MC.BERSERK_DEFENSE_MULT;
       if (dodge > 0 && rng.randf() < dodge) {
         this._on_hero_dodged();
         if (p.meta_riposte_chance > 0 && rng.randf() < p.meta_riposte_chance) {
@@ -7816,8 +7835,17 @@ Object.assign(Sim.prototype, {
   // the next one TURN_TIME_BASE / speed later. Ties go hero, then allies, then enemies (in field order).
   _hero_speed() {
     const rating = 5 + Math.trunc((this.player.stat_agility - PC.AGILITY_START) / PC.AGILITY_BONUS_PER_LEVEL);
-    return Math.max(MC.MIN_BATTLE_SPEED, rating + this.player.armor_speed_bonus());
+    let speed = rating + this.player.armor_speed_bonus();
+    // Berserk: the Rage stat quickens the hero's turns while it lasts.
+    if (this.player.berserk_turns_remaining > 0) speed += this._berserk_speed_bonus();
+    return Math.max(MC.MIN_BATTLE_SPEED, speed);
   },
+
+  // ---------------------------------------------------------------- Berserk (Main.gd _start_berserk / _berserk_*)
+  _start_berserk(message) { this.player.berserk_turns_remaining = MC.BERSERK_TURNS; this.log(message, "good"); },
+  _berserk_damage_mult() { const p = this.player; return 1.0 + MC.BERSERK_DAMAGE_BONUS_PCT + p.stat_rage * MC.RAGE_DAMAGE_PCT_PER_POINT + p.meta_rage_bonus_pct; },
+  _berserk_taken_cut() { return Math.min(MC.BERSERK_TAKEN_CUT_CAP, MC.BERSERK_DAMAGE_TAKEN_CUT + this.player.stat_rage * MC.RAGE_TAKEN_CUT_PER_POINT); },
+  _berserk_speed_bonus() { return this.player.stat_rage * MC.RAGE_SPEED_PER_POINT; },
   _unit_speed(kind, u) {
     if (kind === "hero") return this._hero_speed();
     const base = kind === "ally" ? (u.speed ?? MC.MERCENARY_SPEED) : (MC.ENEMY_SPEEDS[u.name] ?? MC.ENEMY_SPEED_DEFAULT);
@@ -8355,7 +8383,7 @@ const DIR_ARROW = (d) => (d.x === 1 ? "→" : d.x === -1 ? "←" : d.y === 1 ? "
 const NOTHINGNESS_ORDER = ["Leviathan", "Lizen Warband", "Elder Oak", "White Dragon", "Red Wyrm", "Archmage"];
 // Astral upgrades that touch the tile battle (the rest are shop/economy/run-start perks). Update when the tree changes.
 const COMBAT_UPGRADES = new Set(["smart_savage", "continual_growth", "strength", "agility", "vigor", "reflexes_unlock", "berserker_edge", "adrenaline", "dexterity_unlock", "battle_hardened",
-  "pack_leader", "prodigy", "beastmaster", "pack_bond", "riposte", "momentum", "rage", "intimidation", "luck", "silver_muscles", "haggling", "light_metal",
+  "pack_leader", "prodigy", "beastmaster", "pack_bond", "riposte", "momentum", "rage", "intimidation", "luck", "silver_muscles", "haggling", "light_metal", "painful_memories",
   "stamina", "resilience_unlock", "herbalism", "vampiric_grit", "take_a_breather", "block_master", "second_breath", "last_stand", "unbreakable_guard",
   "worldwalker", "battle_medic", "windfall"]);
 const PASSIVE_LABELS = {
@@ -8423,6 +8451,7 @@ function pickableStats(p) {
   if (p.meta_reflexes_unlocked) base.push("reflexes");
   if (p.meta_dexterity_unlocked) base.push("dexterity");
   if (p.meta_fortitude_unlocked) base.push("fortitude");
+  if (p.meta_rage_unlocked) base.push("rage");
   return base;
 }
 

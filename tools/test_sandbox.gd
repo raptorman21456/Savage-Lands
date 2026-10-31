@@ -81,6 +81,14 @@ func _init() -> void:
 	SandboxScript.apply_build(main, cfg)
 	print("level and stat points apply (Vitality level 2 makes each Vigor point worth +5): level=%d strength=%d (expected 20, 30) vigor=%d (expected 20+19+9*5=84)" % [player.level, player.stat_strength, player.stat_vigor])
 	print("max HP / attack follow: %d / %d (expected 84 / 30)" % [player.max_health, player.attack_damage])
+	var rage_cfg := SandboxScript.default_config()
+	rage_cfg.level = 6
+	rage_cfg.upgrades = {"painful_memories": 1}
+	rage_cfg.picks = {"rage": 2}
+	SandboxScript.apply_build(main, rage_cfg)
+	print("a build with Painful Memories grows Rage with the levels and takes picks into it: rage=%d (expected 7: +1 for each of 5 level-ups, +2 from the picks), offered as a pick=%s (expected true)" % [player.stat_rage, SandboxScript.pickable_stats(player).has("rage")])
+	SandboxScript.apply_build(main, cfg)
+	print("...and a build without it has none: rage=%d (expected 0)" % [player.stat_rage])
 	print("the weapon is the chosen variant with Blacksmith applied: id=%s upgrade=%d (expected spear_legendary_obsidian, 2)" % [player.current_weapon_base.id, player.get_weapon_upgrade_level(player.current_weapon_base.id)])
 	print("talismans respect the slot limit (4 at level 20): %s (expected 4 of 5, the first four)" % [player.equipped_talismans])
 	cfg.ignore_slots = true

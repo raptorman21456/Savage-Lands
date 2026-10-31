@@ -93,6 +93,10 @@ var stat_dexterity := 0
 # the Church's magical wing unlocks it (meta_fortitude_unlocked). Mental Mush adds extra points
 # every level-up; Smort Savage doubles the bonus pick put into it.
 var stat_fortitude := 0
+# Rage: the hero's own stat, and what makes Berserk stronger (every point adds damage dealt, damage cut and turn speed while it lasts --
+# the per-point numbers are Main.gd's RAGE_* constants). Locked at 0 until the Church's Painful Memories is bought
+# (meta_rage_unlocked); from then it grows by 1 every level-up and can be the level-up bonus pick, like Fortitude.
+var stat_rage := 0
 var awaiting_bonus := false
 
 var max_health := stat_vigor
@@ -229,7 +233,7 @@ var meta_spell_potency_pct := 0.0
 var meta_max_mana_flat := 0
 var meta_member_magic_per_level := 0.0
 var meta_intellect := false
-# Painful Memories: bought. (Rage is not a stat in the game yet.)
+# Painful Memories: bought -- unlocks the Rage stat (stat_rage grows +1 every level-up and joins the level-up choice).
 var meta_rage_unlocked := false
 # Whether the "resilience_unlock"/"reflexes_unlock"/"dexterity_unlock" skill
 # nodes are owned -- gates whether the matching stat auto-grows on level-up
@@ -241,8 +245,8 @@ var meta_dexterity_unlocked := false
 var meta_fortitude_unlocked := false
 var meta_fortitude_passive_bonus := 0
 var meta_fortitude_pick_doubled := false
-# Rage: bonus damage multiplier added on top of Berserk's own base bonus
-# while Berserk is active (see berserk_turns_remaining below).
+# The Church's RAGE node: bonus damage added on top of Berserk's own base bonus (and the Rage stat's) while Berserk is active
+# (see berserk_turns_remaining below).
 var meta_rage_bonus_pct := 0.0
 # Adrenaline: extra damage DEALT (not reduced) while below 30% HP -- read in
 # Main.gd:_apply_single_hit.
@@ -631,14 +635,14 @@ var owned_arrows := {"flame": 0, "freeze": 0, "bomb": 0}
 # Hand Picks' Pichaku: 80% damage + 20% double-hit chance on every regular/
 # heavy attack for the rest of the current battle.
 var pichaku_active := false
-# Rage/Berserk: set/refreshed to BERSERK_TURNS (Main.gd) by _on_enemy_died
-# whenever a kill lands mid-battle, decremented once per player turn
-# alongside the other player-side turn counters. While > 0: damage dealt
-# gets +50%+meta_rage_bonus_pct (Main.gd:_apply_single_hit), shields are
-# unusable (shield_block_chance below), and Block Master/Reflexes dodge are
-# both cut to a quarter of their normal rate (Main.gd:_apply_incoming_
-# reductions/_enemy_apply_damage).
+# Berserk (design doc): set to BERSERK_TURNS (Main.gd) when the BERSERK_KILLS_NEEDED-th enemy falls in a battle (or when a Club's Heavy
+# Swing kills), decremented once per player turn alongside the other player-side turn counters, and wiped when the battle ends. While
+# > 0: +25% damage dealt (Main.gd:_berserk_damage_mult), 25% less damage taken (_apply_incoming_reductions), +1 tile of movement and
+# a faster turn -- each of the three grows with the Rage stat.
 var berserk_turns_remaining := 0
+# Kills counted towards the next Berserk. Unlike the turns above it carries from battle to battle (it is only spent when Berserk
+# starts, and a new run starts it at 0).
+var berserk_kills := 0
 # Stealth: set to STEALTH_TURNS (Main.gd) by _battle_player_stealth,
 # decremented once per player turn alongside the other player-side turn
 # counters. While > 0, an enemy only targets the player if it currently sees
@@ -1769,17 +1773,14 @@ func _shield_weapon_ok() -> bool:
 # current weapon needs both hands -- see Shields.COMPATIBLE_WEAPONS. The
 # Shield Mastery skill node adds a flat bonus on top of the shield's own rate.
 func shield_block_chance() -> float:
-	if berserk_turns_remaining > 0:
-		return 0.0
 	if equipped_shield.is_empty() or not _shield_weapon_ok():
 		return 0.0
 	return equipped_shield.get("block_chance", 0.0) + meta_shield_block_bonus_pct
 
-# True when a carried shield is actually doing something right now: not forced off by
-# Berserk, and the weapon in hand leaves a hand free for it. The block minigame reads this
-# (a raised shield absorbs more than bare bracing does).
+# True when a carried shield is actually doing something right now: the weapon in hand leaves a hand free for it.
+# The block minigame reads this (a raised shield absorbs more than bare bracing does).
 func shield_usable() -> bool:
-	return berserk_turns_remaining <= 0 and not equipped_shield.is_empty() and _shield_weapon_ok()
+	return not equipped_shield.is_empty() and _shield_weapon_ok()
 
 # Heavy Shield's passive: immune to forced repositioning (water push) while
 # raised. Same weapon-compat gating as shield_block_chance().
@@ -2176,6 +2177,9 @@ func _level_up() -> void:
 		stat_dexterity += 1
 	if meta_fortitude_unlocked:
 		stat_fortitude += 1 + meta_fortitude_passive_bonus
+	# Painful Memories: Rage grows by 1 every level-up.
+	if meta_rage_unlocked:
+		stat_rage += 1
 	if level >= MAX_LEVEL:
 		xp = 0
 		xp_to_next = 0
@@ -2214,6 +2218,8 @@ func apply_bonus_stat(stat_name: String) -> void:
 				stat_dexterity += 1
 			"fortitude":
 				stat_fortitude += 2 if meta_fortitude_pick_doubled else 1
+			"rage":
+				stat_rage += 1
 	awaiting_bonus = false
 	_recalc_stats()
 

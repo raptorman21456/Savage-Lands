@@ -508,8 +508,8 @@ func _page_stats(member) -> void:
 	else:
 		_member_stats(member)
 
-# Your level-up stats: the always-there five, then Resilience / Reflexes / Dexterity / Fortitude once their unlocks are owned
-# (the same set the level-up screen offers). Rage, Magic and Intelligence have no stat in the game yet, so they are not listed.
+# Your level-up stats: the always-there five, then Resilience / Reflexes / Dexterity / Fortitude / Rage once their unlocks are owned
+# (the same set the level-up screen offers), then Rage once Painful Memories is bought. Magic and Intelligence have no hero stat in the game yet, so they are not listed.
 func _hero_stats() -> void:
 	var grid := GridContainer.new()
 	grid.columns = 2
@@ -532,6 +532,8 @@ func hero_stat_ids() -> Array:
 		ids.append("reflexes")
 	if player.meta_fortitude_unlocked:
 		ids.append("fortitude")
+	if player.meta_rage_unlocked:
+		ids.append("rage")
 	return ids
 
 func _stat_line(icon_name: String, abbr: String, does: String, value: String, tip: String) -> Control:

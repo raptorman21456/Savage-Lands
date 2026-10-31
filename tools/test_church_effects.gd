@@ -177,7 +177,10 @@ func _init() -> void:
 	var might_before: int = player.stat_might
 	player.apply_bonus_stat("might")
 	print("Continual Growth makes a level-up put into Might worth more: +%d (expected +3, 1 and 2 more)" % [player.stat_might - might_before])
-	print("Painful Memories is recorded (Rage is not a stat yet): %s (expected true)" % [player.meta_rage_unlocked])
+	print("Painful Memories unlocks the Rage stat: %s (expected true)" % [player.meta_rage_unlocked])
+	var rage_before: int = player.stat_rage
+	player._level_up()
+	print("...which then grows by 1 every level-up: %d -> %d (expected +1)" % [rage_before, player.stat_rage])
 
 	save_data_script.save_data({"essence": 0, "upgrades": {}, "best_wave": 0})
 	quit()
