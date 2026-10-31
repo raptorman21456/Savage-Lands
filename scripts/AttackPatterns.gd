@@ -57,7 +57,7 @@ const BOSS_NAMES := {
 	"Lava Construct": ["Magma Fist", "Ember Jabs", "Eruption"],
 	"Red Wyrm": ["Wyrm Bite", "Tail Lash", "Inferno Breath"],
 	"Voidwing": ["Void Rend", "Shadow Flicker", "Starless Gust"],
-	"Archmage": ["Hex Bolt", "Rapid Curses", "Doom Wave"],
+	"Archmage": ["Hex Bolt", "Rapid Curses", "Doom Surge"],
 }
 
 static var _cache := {}

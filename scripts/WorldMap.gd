@@ -17,8 +17,13 @@ class_name WorldMap
 #
 # EVERYTHING numeric here -- sizes, danger tiers, which enemies live where -- is a DRAFT for the user to tune.
 #
+# The landmarks' and regions' tweakable settings (name, position, size, tier, residents) can be overridden from res://data/landmarks.json
+# and regions.json -- see _apply_data and the Map Editor. The region OUTLINES are still drawn here.
+#
 # Regions are listed in PAINT ORDER (first = bottom layer); where two overlap, the later one wins, both on screen
 # and in region_at(). That is how the Voidlands swallow the mountains and the volcano's rings nest.
+
+const RoomDataScript := preload("res://scripts/RoomData.gd")
 
 # 7x the old 4800x3400 map in each direction.
 const SIZE := Vector2(33600, 23800)
@@ -80,6 +85,10 @@ static func ensure_built() -> void:
 	var woods_edge_poly: PackedVector2Array = _largest(Geometry2D.offset_polygon(woods_poly, 1800.0, Geometry2D.JOIN_ROUND))
 	woods_edge_poly = _clamp_to_map(woods_edge_poly)
 
+	# NOTE: the names, danger tiers, residents and minibosses below, and the landmarks' names, positions and sizes further down, are the
+	# FACTORY values. The game lays res://data/regions.json and landmarks.json over them (see _apply_data), and the Map Editor writes
+	# those files. Change a tier or an enemy list there; or change it here and run tools/convert_map_data.gd to rewrite the data files
+	# (tools/test_map_editor.gd warns when the two disagree).
 	var list: Array = []
 	list.append(_region("great_expanse", "The Great Expanse", _rect_n(0, 0, 1, 1), "grass", Color(1, 1, 1), 1, "plains", true, "plains",
 		[["goblin", 6], ["orc", 2], ["archer", 1], ["centaur_pack", 1]], false))
@@ -168,6 +177,7 @@ static func ensure_built() -> void:
 	_landmark_by_id.clear()
 	for l in landmarks:
 		_landmark_by_id[l.id] = l
+	_apply_data()
 
 	# The blocked ground (deep water): its outline with any later walkable region (the Pesca headland) cut out, so
 	# the dock town stands on solid ground in the middle of the sea.
@@ -190,6 +200,39 @@ static func ensure_built() -> void:
 			pieces = next_pieces
 		for piece in pieces:
 			_blocked_cache.append(piece)
+
+# The editable settings (res://data/landmarks.json and regions.json, see RoomData.gd) laid over the values written above: a landmark's
+# name, position and size, a region's name, danger tier, residents and miniboss. Whatever the files do not name keeps its value here.
+static func _apply_data() -> void:
+	for entry in RoomDataScript.landmarks():
+		var l: Dictionary = _landmark_by_id.get(str(entry.id), {})
+		if l.is_empty():
+			continue
+		if entry.has("name"):
+			l.name = str(entry.name)
+		if entry.has("pos"):
+			l.pos = Vector2(clampf(float(entry.pos[0]), 0.0, SIZE.x), clampf(float(entry.pos[1]), 0.0, SIZE.y))
+		if entry.has("radius"):
+			l.radius = float(entry.radius)
+	var tweaks: Dictionary = RoomDataScript.regions()
+	for id in tweaks:
+		var r: Dictionary = _by_id.get(str(id), {})
+		if r.is_empty():
+			continue
+		var t: Dictionary = tweaks[id]
+		if t.has("name"):
+			r.name = str(t.name)
+		if t.has("tier"):
+			r.tier = clampi(int(t.tier), 1, TIER_POWER.size() - 1)
+		if t.has("enemies"):
+			r.enemies = t.enemies
+		if t.has("miniboss"):
+			r.miniboss = str(t.miniboss)
+
+# Forgets the continent, so the next ensure_built() draws it again from the data files (the Map Editor calls it after changing a
+# landmark or a region).
+static func reset() -> void:
+	_built = false
 
 # --- queries -----------------------------------------------------------------------------------
 

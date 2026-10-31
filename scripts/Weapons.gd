@@ -207,7 +207,7 @@ static var HAND_PICKS := {
 # tiles of attack range and 6 magic, and every ranged attack (a target 2+ tiles away) has a 10%
 # chance to blind. Its three specials spend MANA (casters), or stamina for anyone without a
 # mana pool. Numbers: the user's design doc; costs are my drafts (Fireball 40, Landfall 60,
-# Channel 20). Keys: range_bonus = extra attack range, magic_bonus = flat magic while wielded,
+# I SUMMON THEE half the caster's pool). Keys: range_bonus = extra attack range, magic_bonus = flat magic while wielded,
 # uses_magic = damage uses the magic stat, ally_only = the player can't equip it.
 static var STAFF := {
 	"id": "staff", "name": "Staff", "price": 30,
@@ -221,7 +221,7 @@ static var STAFF := {
 	"specials": [
 		{"id": "staff_i_cast_fireball", "name": "I CAST FIREBALL", "stamina_cost": 40, "dmg_mult": 1.2, "effect": "fireball", "description": "Takes one turn to charge (no moving). The next turn, a fireball flies to any target on the field, sets it on fire, and explodes in a 3x3: magic x 1.2 damage at the centre, 5 less for every tile away from it."},
 		{"id": "staff_landfall", "name": "Landfall", "stamina_cost": 60, "dmg_mult": 1.0, "effect": "landfall", "description": "Damages every enemy on the field for (attack x 3) + (magic / 2), with a 25% chance to stun each."},
-		{"id": "staff_channel", "name": "Channel", "stamina_cost": 20, "dmg_mult": 0.0, "effect": "channel", "description": "Restores an ally's mana (stamina, for anyone without mana) by 20% of its maximum."},
+		{"id": "staff_i_summon_thee", "name": "I SUMMON THEE", "stamina_cost": 0, "cost_pct_max": 0.5, "dmg_mult": 0.0, "effect": "summon_spectre", "description": "Costs half your maximum mana (stamina for anyone without mana, HP for the Necromancer). Pick any empty tile: a spectre rises there and fights for you, walking through anything. Its STR and MAG are 80% of yours, its VGR 50%, its AGI 120% and its DXT 70%; it dodges half of all attacks and strikes the nearest enemy for its STR plus its MAG."},
 	],
 }
 

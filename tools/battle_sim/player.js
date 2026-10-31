@@ -80,7 +80,7 @@ class Player {
     this.luck_bonus = 0;
     this.resilience_reduction = 0; this.difficulty_mult = 1.0; this.difficulty_id = "normal"; this.temp_damage_bonus_pct = 0;
     // meta passives (Astral upgrades)
-    this.meta_double_hit_chance = 0; this.meta_lifesteal_pct = 0; this.meta_free_specials = false;
+    this.meta_double_hit_chance = 0; this.meta_lifesteal_pct = 0; this.meta_free_specials = false; this.meta_special_stamina_flat = 0; this.meta_battle_medic_damage = 0; this.meta_take_a_breather = false; this.meta_light_metal = false; this.meta_war_profiteer_pct_per_kill = 0;
     this.has_guardian_skill = false; this.has_merchant_prince = false;
     this.meta_dodge_chance = 0; this.meta_crit_chance = 0;
     this.meta_resilience_unlocked = false; this.meta_reflexes_unlocked = false; this.meta_dexterity_unlocked = false;
@@ -88,7 +88,7 @@ class Player {
     this.meta_rage_bonus_pct = 0; this.meta_low_hp_damage_bonus_pct = 0; this.meta_bonus_coin_pct = 0;
     this.meta_healing_bonus_pct = 0; this.meta_bonus_levelup_stat = false;
     this.meta_levelup_bonus_strength = 0; this.meta_levelup_bonus_agility = 0;
-    this.meta_levelup_bonus_vigor = 0; this.meta_levelup_bonus_intimidation = 0;
+    this.meta_levelup_bonus_vigor = 0; this.meta_levelup_bonus_intimidation = 0; this.meta_levelup_bonus_might = 0;
     this.meta_warband_bonus = 0; this.meta_battle_medic = false; this.meta_war_chest_reduction = 0;
     this.meta_war_profiteer_coins = 0; this.meta_block_negate_chance = 0; this.meta_block_heal_amount = 0;
     this.meta_last_stand_pct_per_10 = 0; this.meta_shield_block_bonus_pct = 0; this.meta_shield_universal = false;
@@ -189,7 +189,7 @@ class Player {
         case "strength": this.stat_strength += 1 + this.meta_levelup_bonus_strength; break;
         case "vigor": this.stat_vigor += 1 + this.meta_levelup_bonus_vigor; break;
         case "agility": this.stat_agility += PC.AGILITY_BONUS_PER_LEVEL + this.meta_levelup_bonus_agility; break;
-        case "might": this.stat_might += 1; break;
+        case "might": this.stat_might += 1 + this.meta_levelup_bonus_might; break;
         case "resilience": this.stat_resilience += 1; break;
         case "reflexes": this.stat_reflexes += 1; break;
         case "dexterity": this.stat_dexterity += 1; break;
@@ -209,18 +209,16 @@ class Player {
     this.meta_reflexes_unlocked = (b.reflexes_unlock || 0) > 0;
     this.meta_dexterity_unlocked = (b.dexterity_unlock || 0) > 0;
     // The magical wing: Warded Mind unlocks Fortitude, Mental Mush grows it every level-up, Smort Savage doubles the pick.
-    this.meta_fortitude_unlocked = (b.warded_mind || 0) > 0;
-    this.meta_fortitude_passive_bonus = Math.trunc(b.mental_mush || 0);
-    this.meta_fortitude_pick_doubled = (b.smort_savage || 0) > 0;
+    this.meta_fortitude_unlocked = (b.smart_savage || 0) > 0;   // Smart Savage: unlocks Fortitude, +1 every level-up
+    this.meta_fortitude_passive_bonus = 0; this.meta_fortitude_pick_doubled = false;
+    this.meta_levelup_bonus_might = Math.trunc(b.continual_growth || 0);
     this.meta_rage_bonus_pct = b.rage || 0;
     this.meta_double_hit_chance = b.berserker_edge || 0;
     this.meta_lifesteal_pct = b.vampiric_grit || 0;
-    this.meta_free_specials = (b.silver_tongue || 0) > 0;
+    this.meta_special_stamina_flat = Math.trunc(b.silver_muscles || 0);   // Silver Muscles: specials cost this much less
     this.has_merchant_prince = (b.golden_touch || 0) > 0;
-    this.has_guardian_skill = (b.undying || 0) > 0;
-    if ((b.warlord || 0) > 0) this.max_party_slots = 4;
-    else if ((b.pack_leader || 0) > 0) this.max_party_slots = 3;
-    else this.max_party_slots = D.party.consts.BASE_PARTY_SLOTS ?? 2;
+    this.has_guardian_skill = false;   // Guardian's Ultimatum is no longer in the tree
+    this.max_party_slots = (D.party.consts.BASE_PARTY_SLOTS ?? 2) + Math.trunc(b.pack_leader || 0);   // Leader's Instincts: +1 per level
     this.meta_low_hp_damage_bonus_pct = b.adrenaline || 0;
     this.meta_bonus_coin_pct = b.haggling || 0;
     this.meta_healing_bonus_pct = b.herbalism || 0;
@@ -228,8 +226,11 @@ class Player {
     this.meta_wolf_bonus_waves = Math.trunc(b.pack_bond || 0);
     this.meta_warband_bonus = b.warband || 0;
     this.meta_battle_medic = (b.battle_medic || 0) > 0;
+    this.meta_battle_medic_damage = Math.trunc(b.battle_medic || 0);
+    this.meta_take_a_breather = (b.take_a_breather || 0) > 0;
+    this.meta_light_metal = (b.light_metal || 0) > 0;
     this.meta_war_chest_reduction = b.war_chest || 0;
-    this.meta_war_profiteer_coins = Math.trunc(b.war_profiteer || 0);
+    this.meta_war_profiteer_pct_per_kill = b.war_profiteer || 0;   // a shop discount per kill now, not coins
     this.meta_block_negate_chance = b.block_master || 0;
     this.meta_block_heal_amount = Math.trunc(b.vigilant_defense || 0);
     this.meta_last_stand_pct_per_10 = b.last_stand || 0;
@@ -240,7 +241,7 @@ class Player {
     this.meta_hardened_hp_per_wave = Math.trunc(b.hardened || 0);
     this.meta_favour_chance = b.favour || 0;
     this.meta_stamina_regen_per_turn = Math.trunc(b.second_breath || 0);
-    this.meta_arrow_cap_bonus = 5 * Math.trunc((this.upgrade_levels || {}).fletcher || 0);
+    this.meta_arrow_cap_bonus = 3 * Math.trunc((this.upgrade_levels || {}).fletcher || 0);
     this.meta_windfall_chance = b.windfall || 0;
   }
 
@@ -282,7 +283,7 @@ class Player {
     return Math.trunc(flat) + Math.trunc(Math.floor(this.max_health / 20.0) * scale);
   }
   windfall_chance_total() { return this.meta_windfall_chance + this.talisman_bonus("windfall_chance"); }
-  coins_per_kill() { return Math.trunc(this.meta_war_profiteer_coins) + Math.trunc(this.talisman_bonus("coins_per_kill")); }
+  coins_per_kill() { return Math.trunc(this.talisman_bonus("coins_per_kill")); }
   low_hp_damage_bonus_total() { return this.meta_low_hp_damage_bonus_pct + this.talisman_bonus("low_hp_damage_pct"); }
   low_hp_threshold() { const t = this.talisman_bonus("low_hp_threshold"); return t > 0 ? t : 0.3; }
   fall_damage_factor() { return Math.max(0.0, 1.0 - this.talisman_bonus("fall_reduction")); }
@@ -400,7 +401,7 @@ class Player {
   }
   _apply_talisman_to_weapon(weapon) {
     const discount = this.talisman_bonus("special_stamina_discount");
-    const flat_reduction = Math.trunc(this.talisman_bonus("special_stamina_flat_reduction"));
+    const flat_reduction = Math.trunc(this.talisman_bonus("special_stamina_flat_reduction")) + this.meta_special_stamina_flat;   // + Silver Muscles
     const pct_increase = this.talisman_bonus("special_stamina_pct_increase");
     const break_cut = this.talisman_bonus("break_reduction");
     const whisperer_active = this.talisman_bonus("weapon_whisperer") > 0 && this.weapon_whisperer_specials.length > 0;
@@ -504,7 +505,6 @@ class Player {
       this.regen_stamina(stamina_restored);
       stamina_restored = this.stamina - before;
     }
-    if (this.meta_battle_medic) this.regen_stamina(20);
     return Object.assign({}, tier, { healed: heal_amount, stamina_restored });
   }
 

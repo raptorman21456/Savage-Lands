@@ -11,7 +11,10 @@ extends Control
 #
 # Node definition: {id, parents: Array of ids, wing: String, icon: Texture2D,
 #                   isolated (optional): true for a node with no prerequisites
-#                   that should sit apart from every wing (post-game unlocks)}
+#                   that should sit apart from every wing (post-game unlocks),
+#                   angle (optional, with isolated): which way it floats off,
+#                   hub (optional): true for THE node at the centre (Legacy) --
+#                   drawn big, on the hub, and never moved}
 # Nodes can also be hidden until the caller decides they are relevant
 # (set_revealed).
 # States: "locked", "unaffordable", "available", "owned", "upgradable" (owned and
@@ -30,16 +33,17 @@ const ISOLATED_RADIUS := 1150.0
 
 # Wing roots fan out around the hub (screen coordinates: y grows down).
 const WING_ANGLES := {
-	"warrior": 3.665191,   # 210 degrees: up and to the left
-	"merchant": 5.759587,  # 330 degrees: up and to the right
-	"survivor": 1.570796,  # 90 degrees: straight down
-	"magical": 4.712389,   # 270 degrees: straight up
+	"physical": 3.665191,   # 210 degrees: up and to the left
+	"economy": 5.759587,    # 330 degrees: up and to the right
+	"sustain": 1.570796,    # 90 degrees: straight down
+	"sorcery": 4.712389,    # 270 degrees: straight up
 }
 const WING_TINTS := {
-	"warrior": Color(1.0, 0.46, 0.27),
-	"merchant": Color(1.0, 0.82, 0.3),
-	"survivor": Color(0.36, 0.9, 0.62),
-	"magical": Color(0.62, 0.5, 1.0),
+	"physical": Color(1.0, 0.46, 0.27),
+	"economy": Color(1.0, 0.82, 0.3),
+	"sustain": Color(0.36, 0.9, 0.62),
+	"sorcery": Color(0.62, 0.5, 1.0),
+	"hub": Color(1.0, 0.86, 0.36),
 	"convergence": Color(0.74, 0.52, 1.0),
 	"isolated": Color(0.7, 0.95, 1.0),
 }
@@ -138,8 +142,11 @@ static func compute_layout(defs: Array) -> Dictionary:
 		var d: Dictionary = by_id[id]
 		var r: float = RING_START + float(depth[id]) * RING_STEP
 		var a: float = 0.0
-		if d.get("isolated", false):
-			a = 4.712389
+		if d.get("hub", false):
+			a = 0.0
+			r = 0.0
+		elif d.get("isolated", false):
+			a = float(d.get("angle", 4.712389))
 			r = ISOLATED_RADIUS
 		elif d.parents.is_empty():
 			a = WING_ANGLES.get(d.wing, 0.0)
@@ -171,9 +178,9 @@ static func compute_layout(defs: Array) -> Dictionary:
 				moved = true
 				var push: Vector2 = (pb - pa).normalized() if gap > 0.01 else Vector2.RIGHT.rotated(float(i))
 				var half: float = (MIN_GAP - gap) * 0.5
-				if not by_id[ids[i]].get("isolated", false):
+				if not by_id[ids[i]].get("isolated", false) and not by_id[ids[i]].get("hub", false):
 					pos[ids[i]] = pa - push * half
-				if not by_id[ids[j]].get("isolated", false):
+				if not by_id[ids[j]].get("isolated", false) and not by_id[ids[j]].get("hub", false):
 					pos[ids[j]] = pb + push * half
 		if not moved:
 			break
@@ -209,7 +216,7 @@ func build(defs: Array, hub_icon: Texture2D) -> void:
 	for d in defs:
 		_revealed[d.id] = true
 		_reveal_alpha[d.id] = 1.0
-		if d.parents.is_empty() and not d.get("isolated", false) and not _wing_roots.has(d.wing):
+		if d.parents.is_empty() and not d.get("isolated", false) and not d.get("hub", false) and not _wing_roots.has(d.wing):
 			_wing_roots[d.wing] = d.id
 	_recompute_extent()
 	for d in defs:
@@ -265,7 +272,7 @@ func _edge_alpha(parent_id: String, child_id: String) -> float:
 func _make_node(d: Dictionary) -> void:
 	var id: String = d.id
 	var button := Button.new()
-	var diameter: float = NODE_RADIUS * 2.0
+	var diameter: float = _radius_of(d) * 2.0
 	button.size = Vector2(diameter, diameter)
 	button.custom_minimum_size = button.size
 	button.position = _positions[id] - button.size * 0.5
@@ -288,7 +295,7 @@ func _make_node(d: Dictionary) -> void:
 	icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	icon.stretch_mode = TextureRect.STRETCH_SCALE
 	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	icon.size = Vector2(34, 34)
+	icon.size = Vector2(34, 34) if not d.get("hub", false) else Vector2(48, 48)
 	icon.position = (button.size - icon.size) * 0.5
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	button.add_child(icon)
@@ -327,18 +334,23 @@ func position_of(id: String) -> Vector2:
 func tint_of(id: String) -> Color:
 	return WING_TINTS.get(_defs[id].wing, WING_TINTS["convergence"])
 
-func _circle_style(fill: Color, border: Color, border_width: int = 4) -> StyleBoxFlat:
+# A node is NODE_RADIUS across; the hub (Legacy) is the big one in the middle.
+func _radius_of(d: Dictionary) -> float:
+	return HUB_RADIUS if d.get("hub", false) else NODE_RADIUS
+
+func _circle_style(fill: Color, border: Color, border_width: int = 4, radius: float = NODE_RADIUS) -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = fill
 	sb.border_color = border
 	sb.set_border_width_all(border_width)
-	sb.set_corner_radius_all(int(NODE_RADIUS))
+	sb.set_corner_radius_all(int(radius))
 	sb.anti_aliasing = false
 	return sb
 
 func _apply_state(id: String) -> void:
 	var button: Button = _buttons[id]
 	var tint: Color = tint_of(id)
+	var radius: float = _radius_of(_defs[id])
 	var state: String = _states.get(id, "locked")
 	var grey := Color(0.5, 0.5, 0.56)
 	var fill := Color(0.06, 0.06, 0.1)
@@ -371,11 +383,11 @@ func _apply_state(id: String) -> void:
 			ring = GOLD
 			icon_color = Color(1, 1, 1)
 			border = 6
-	button.add_theme_stylebox_override("normal", _circle_style(fill, ring, border))
-	button.add_theme_stylebox_override("hover", _circle_style(fill.lightened(0.18), ring.lightened(0.35), border))
-	button.add_theme_stylebox_override("pressed", _circle_style(fill.darkened(0.3), ring, border))
-	button.add_theme_stylebox_override("disabled", _circle_style(fill, ring, border))
-	var focus := _circle_style(Color(0, 0, 0, 0), Color(1, 1, 1, 0.95), 3)
+	button.add_theme_stylebox_override("normal", _circle_style(fill, ring, border, radius))
+	button.add_theme_stylebox_override("hover", _circle_style(fill.lightened(0.18), ring.lightened(0.35), border, radius))
+	button.add_theme_stylebox_override("pressed", _circle_style(fill.darkened(0.3), ring, border, radius))
+	button.add_theme_stylebox_override("disabled", _circle_style(fill, ring, border, radius))
+	var focus := _circle_style(Color(0, 0, 0, 0), Color(1, 1, 1, 0.95), 3, radius)
 	focus.expand_margin_left = 5
 	focus.expand_margin_right = 5
 	focus.expand_margin_top = 5
@@ -527,7 +539,9 @@ func _draw_world() -> void:
 			continue
 		var d: Dictionary = _defs[id]
 		var to: Vector2 = _positions[id]
-		var roots: bool = d.parents.is_empty() and not d.get("isolated", false)
+		if d.get("hub", false):
+			continue
+		var roots: bool = d.parents.is_empty() and not d.get("isolated", false) and not d.get("hub", false)
 		if roots:
 			var c: Color = tint_of(id)
 			world.draw_line(Vector2.ZERO, to, Color(c.r, c.g, c.b, 0.3 * _reveal_alpha.get(id, 1.0)), 3.0)
@@ -539,14 +553,14 @@ func _draw_world() -> void:
 	# Fully maxed nodes get a faint golden halo on top of their golden border.
 	for id in _states:
 		if _states[id] == "mastered" and _revealed.get(id, true):
-			world.draw_arc(_positions[id], NODE_RADIUS + 5.0, 0.0, TAU, 40, Color(GOLD.r, GOLD.g, GOLD.b, 0.45 * _reveal_alpha.get(id, 1.0)), 3.0)
+			world.draw_arc(_positions[id], _radius_of(_defs[id]) + 5.0, 0.0, TAU, 40, Color(GOLD.r, GOLD.g, GOLD.b, 0.45 * _reveal_alpha.get(id, 1.0)), 3.0)
 	_draw_wing_labels()
 	# A slow pulse around every node you can buy right now.
 	var pulse: float = fmod(_time * 0.9, 1.0)
 	for id in _states:
 		if _revealed.get(id, true) and (_states[id] == "available" or _states[id] == "upgradable"):
 			var c: Color = GOLD if _states[id] == "upgradable" else tint_of(id)
-			world.draw_arc(_positions[id], NODE_RADIUS + 5.0 + pulse * 9.0, 0.0, TAU, 40, Color(c.r, c.g, c.b, (1.0 - pulse) * 0.7), 3.0)
+			world.draw_arc(_positions[id], _radius_of(_defs[id]) + 5.0 + pulse * 9.0, 0.0, TAU, 40, Color(c.r, c.g, c.b, (1.0 - pulse) * 0.7), 3.0)
 
 # Each wing's name, centred on the path between the hub and the wing's root, in
 # the wing's colour with a dark outline so it reads over the line beneath it.

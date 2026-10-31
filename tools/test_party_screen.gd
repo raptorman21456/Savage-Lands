@@ -118,7 +118,7 @@ func _init() -> void:
 	druid.set_loadout_slot(0, dp[3], dp)
 	druid.set_loadout_slot(1, dp[4], dp)
 	druid.set_loadout_slot(2, dp[5], dp)
-	print("She can swap all three spells out for the Staff's: %s (expected [I CAST FIREBALL, Landfall, Channel, Stealth]) " % [_names(main._ally_specials(main.member_preview(druid)))])
+	print("She can swap all three spells out for the Staff's: %s (expected [I CAST FIREBALL, Landfall, I SUMMON THEE, Stealth]) " % [_names(main._ally_specials(main.member_preview(druid)))])
 	print("A wolf has only its three kit specials and fills all three slots: %d (expected 3)" % [wolf.resolved_loadout(_pool_ids(main, wolf)).size()])
 	print("The Guardian's four kit specials don't all fit: default slots %s (expected Taunt, Body Slam, Haymaker, then Stealth -- Earbursting Bellow waits in the pool)" % [_names(main._ally_specials(main.member_preview(guardian)))])
 	print("Units without a loadout (mercenaries, skeletons) keep the whole pool: %s (expected true)" % [not main._make_skeleton(Vector2i(0, 0)).has("special_ids")])
@@ -238,7 +238,7 @@ func _init() -> void:
 	await process_frame
 	texts = _texts(party_node)
 	print("Your sheet has Equipment, Specials, Stats, Defense and Run: %s (expected all true)" % [["Equipment", "Specials", "Stats", "Defense", "Run"].map(func(p): return _button_named(party_node, p) != null)])
-	print("Your stats go by their abbreviations, only the ones that exist: %s (expected MGT STR VGR AGI INT true; RAGE and MAG false as the game has no such stat yet)" % [["MGT", "STR", "VGR", "AGI", "INT"].map(func(s): return texts.has(s)) + [texts.has("RAGE"), texts.has("MAG")]])
+	print("Your stats go by their abbreviations, only the ones that exist: %s (expected MGT STR VGR AGI INM true; RAGE and MAG false as the game has no such stat yet)" % [["MGT", "STR", "VGR", "AGI", "INM"].map(func(s): return texts.has(s)) + [texts.has("RAGE"), texts.has("MAG")]])
 
 	# picks
 	druid.picks = 0

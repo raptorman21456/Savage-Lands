@@ -315,7 +315,7 @@ static func _cell_to_px(p: Array) -> Vector2:
 func _build_roads(state: Dictionary) -> void:
 	var rect: Rect2 = state.room.rect
 	var rect_poly := PackedVector2Array([rect.position, Vector2(rect.end.x, rect.position.y), rect.end, Vector2(rect.position.x, rect.end.y)])
-	for road in RoomDataScript.ROADS:
+	for road in RoomDataScript.roads():
 		var pts := PackedVector2Array()
 		for p in road.points:
 			pts.append(_cell_to_px(p))

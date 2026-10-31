@@ -3,8 +3,8 @@ class_name SpellUpgrades
 
 # Spell upgrades, bought from the Wizard's Tower (its "Spells" tab). EVERY spell can be upgraded twice -- to "+" and then to
 # "EX" ("Restore" -> "Restore+" -> "Restore EX"). They are paid for in ESSENCE, the banked Essence the Church spends: the
-# upgrade lasts only the run (an upgrade belongs to the SPELL, not to a member: whoever casts it, in any battle of the run,
-# casts the upgraded one), but the Essence is gone for good. That is the risk and the reward -- die and you have paid
+# upgrade lasts only the run (an upgrade belongs to the CASTER -- the party member it was bought for -- and goes with them from battle to battle of the run, whatever
+# they hold), but the Essence is gone for good. That is the risk and the reward -- die and you have paid
 # permanent currency for something you no longer have -- and it gives Essence a use once every Church upgrade is owned.
 # Level 0 is the plain spell; its numbers are the ones the design doc gives (PartyKits.gd / Main.gd).
 #
@@ -18,8 +18,9 @@ class_name SpellUpgrades
 const MAX_LEVEL := 2
 const SUFFIX := ["", "+", " EX"]
 
-# What it costs, in banked Essence, to REACH level 1 and level 2 (index = the level reached). (A Church capstone is 250-600.)
-const PRICES := [{}, {"essence": 60}, {"essence": 160}]
+# What it costs, in banked Essence, to REACH level 1 and level 2 (index = the level reached): the design doc (2026-10-27) says + costs 10 and EX
+# 40 more (50 in all).
+const PRICES := [{}, {"essence": 10}, {"essence": 40}]
 
 const SPELLS := [
 	# --- the Druid ---
@@ -59,9 +60,14 @@ const SPELLS := [
 	{"id": "staff_landfall", "owner": "Staff", "name": "Landfall",
 		"numbers": [{"attack_mult": 3.0, "magic_mult": 0.5, "stun": 0.25}, {"attack_mult": 3.5, "magic_mult": 0.65, "stun": 0.35}, {"attack_mult": 4.0, "magic_mult": 0.8, "stun": 0.5}],
 		"text": ["", "(Attack x 3.5) + (magic x 0.65), 35% to stun.", "(Attack x 4) + (magic x 0.8), 50% to stun."]},
-	{"id": "staff_channel", "owner": "Staff", "name": "Channel",
-		"numbers": [{"pct": 0.20}, {"pct": 0.30}, {"pct": 0.40}],
-		"text": ["", "Restores 30% of an ally's maximum.", "Restores 40% of an ally's maximum."]},
+	# I SUMMON THEE (it replaced Channel): one spectre ally whose stats are shares of the caster's. `cost_pct` is the share of the caster's
+	# maximum mana (stamina, or HP for the Necromancer) the cast takes; `dodge` is the spectre's flat chance to dodge an attack (RFL).
+	{"id": "staff_i_summon_thee", "owner": "Staff", "name": "I SUMMON THEE",
+		"numbers": [{"str": 0.8, "mag": 0.8, "vgr": 0.5, "agi": 1.2, "dxt": 0.7, "dodge": 0.5, "cost_pct": 0.5},
+			{"str": 1.0, "mag": 1.0, "vgr": 0.65, "agi": 1.3, "dxt": 0.85, "dodge": 0.5, "cost_pct": 0.5},
+			{"str": 1.2, "mag": 1.2, "vgr": 0.8, "agi": 1.4, "dxt": 1.0, "dodge": 0.6, "cost_pct": 0.4}],
+		"text": ["", "The spectre is stronger: STR and MAG 100% of yours, VGR 65%, AGI 130%, DXT 85%.",
+			"STR and MAG 120%, VGR 80%, AGI 140%, DXT 100%, it dodges 60% of attacks, and the cast costs only 40% of your maximum."]},
 ]
 
 static func has(spell_id: String) -> bool:

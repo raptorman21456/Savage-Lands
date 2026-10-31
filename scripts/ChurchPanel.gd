@@ -2,11 +2,11 @@ extends TownPanel
 
 # The Church: where banked Essence is spent on the permanent skill tree. It used
 # to live on the title screen; it now sits in town as a starfield constellation
-# (see AscensionView.gd) -- a hub at the centre, three wings fanning out from it
-# (Warrior / Merchant / Survivor), a few cross-wing nodes between them, and the
-# post-game Worldwalker floating far off on its own. A skill only appears once you
-# own one of its prerequisites (see is_revealed), so a new save shows three roots
-# and the tree grows as you spend.
+# (see AscensionView.gd) -- a hub at the centre, four wings fanning out from it
+# (Physical / Economy / Sustain / Sorcery), a couple of cross-branch nodes between
+# them, and the post-game Worldwalker and Otherworldly Power floating far off on
+# their own. EVERY upgrade is always on show, owned or not, so you can see the whole
+# tree and what each thing asks of you (see is_revealed).
 #
 # The panel owns the game rules (what a node is called, what state it's in, what
 # a purchase does); AscensionView only draws and reports clicks. Essence and
@@ -23,53 +23,48 @@ const TownUIScript := preload("res://scripts/TownUI.gd")
 # fan out from). Every id in SaveData.UPGRADE_IDS must appear exactly once --
 # test_church.gd checks.
 const WING_MEMBERS := {
-	"warrior": [
-		"strength", "agility", "dexterity_unlock", "vigor", "reflexes_unlock", "berserker_edge",
-		"adrenaline", "battle_hardened", "pack_leader", "prodigy", "warlord", "beastmaster",
-		"hardened", "pack_bond", "riposte", "momentum", "rage",
+	"hub": ["legacy"],
+	"physical": [
+		"strength", "agility", "continual_growth", "painful_memories", "reflexes_unlock", "berserker_edge", "adrenaline", "dexterity_unlock",
+		"pack_leader", "prodigy", "beastmaster", "pack_bond", "heroic_destiny",
+		"riposte", "momentum", "rage",
 	],
-	"merchant": [
-		"coins", "intimidation", "luck", "haggling", "silver_tongue", "appraisal", "golden_touch",
-		"investor", "fletcher", "field_surgeon", "windfall", "black_market",
+	"economy": [
+		"coins", "intimidation", "luck", "haggling", "silver_muscles", "golden_touch", "battle_hardened", "fletcher",
+		"field_surgeon", "windfall", "light_metal", "black_market",
 	],
-	"survivor": [
-		"stamina", "resilience_unlock", "potions", "herbalism", "vampiric_grit", "vigilant_defense",
-		"undying", "second_wind", "second_breath", "block_master", "last_stand", "shield_mastery",
-		"unbreakable_guard", "favour",
+	"sustain": [
+		"stamina", "vigor", "resilience_unlock", "potions", "herbalism", "vampiric_grit", "take_a_breather",
+		"block_master", "second_breath", "last_stand", "unbreakable_guard",
 	],
-	# Fortitude (protection against magical harm) has a wing of its own, straight up.
-	"magical": ["warded_mind", "mental_mush", "smort_savage"],
-	"convergence": ["warband", "war_chest", "battle_medic", "war_profiteer"],
-	"isolated": ["worldwalker"],
+	# Sorcery is a normal fourth wing; Smart Savage (Fortitude, protection against magical harm) and Continual Learning (Intelligence) sit in it too.
+	"sorcery": ["release_grudge", "deep_well", "innate_power", "smart_savage", "continual_learning"],
+	"convergence": ["war_profiteer", "battle_medic", "aegis_transcendence"],
+	"isolated": ["worldwalker", "otherworldly_power"],
 }
 
 # assets/ filename stems, borrowed from the game's existing art so the tree
-# needs no new sprites.
+# needs no new sprites (the newer nodes are placeholders until they get their own).
 const NODE_ICONS := {
-	"strength": "weapon_battle_axe", "agility": "cloth_feet", "dexterity_unlock": "weapon_dagger",
-	"vigor": "food_meat", "reflexes_unlock": "shield_buckler", "berserker_edge": "weapon_hand_picks",
-	"adrenaline": "potion", "battle_hardened": "blade_ally", "pack_leader": "barbarian",
-	"prodigy": "talisman_uncommon", "warlord": "weapon_greatsword", "beastmaster": "enemy_wolf",
-	"hardened": "armor_iron", "pack_bond": "meat", "riposte": "weapon_knuckle_gloves",
-	"momentum": "weapon_spear", "rage": "enemy_orc",
-	"coins": "coin", "intimidation": "cloth_head", "luck": "talisman_common", "haggling": "market_stall",
-	"silver_tongue": "talisman_rare", "appraisal": "building_shop", "golden_touch": "talisman_epic",
-	"investor": "quest_board", "fletcher": "quiver", "field_surgeon": "building_healer",
-	"windfall": "runic_shard", "black_market": "building_enchanter",
-	"stamina": "food_bread", "resilience_unlock": "armor_leather", "potions": "potion",
-	"herbalism": "flower_bed", "vampiric_grit": "enemy_shade", "vigilant_defense": "shield_round",
-	"undying": "building_church", "second_wind": "food_fish", "second_breath": "cloth_body",
-	"block_master": "shield_bulwark", "last_stand": "armor_rags", "shield_mastery": "shield_brawler",
-	"unbreakable_guard": "shield_phantom", "favour": "talisman_epic",
-	"warband": "enemy_brute", "war_chest": "armor_steel", "battle_medic": "meat", "war_profiteer": "coin",
-	"worldwalker": "enemy_voidwing",
-	"warded_mind": "talisman_rare", "mental_mush": "talisman_uncommon", "smort_savage": "talisman_epic",
+	"legacy": "runic_shard", "aegis_transcendence": "icon_shield", "strength": "weapon_battle_axe", "agility": "cloth_feet", "continual_growth": "weapon_hammer", "painful_memories": "enemy_orc", "vigor": "food_meat", "reflexes_unlock": "shield_buckler",
+	"berserker_edge": "weapon_hand_picks", "adrenaline": "potion", "dexterity_unlock": "weapon_dagger",
+	"battle_hardened": "blade_ally", "pack_leader": "barbarian", "prodigy": "talisman_uncommon", "beastmaster": "enemy_wolf",
+	"pack_bond": "meat", "heroic_destiny": "weapon_club", "riposte": "weapon_knuckle_gloves", "momentum": "weapon_spear", "rage": "enemy_orc",
+	"coins": "coin", "intimidation": "cloth_head", "luck": "talisman_common", "haggling": "market_stall", "silver_muscles": "talisman_rare",
+	"golden_touch": "talisman_epic", "fletcher": "quiver", "field_surgeon": "building_healer", "windfall": "runic_shard",
+	"light_metal": "armor_iron", "black_market": "building_enchanter",
+	"stamina": "food_bread", "resilience_unlock": "armor_leather", "potions": "potion", "herbalism": "flower_bed",
+	"vampiric_grit": "enemy_shade", "take_a_breather": "food_fish", "block_master": "shield_bulwark", "second_breath": "cloth_body",
+	"last_stand": "armor_rags", "unbreakable_guard": "shield_phantom", "worldwalker": "enemy_voidwing",
+	"release_grudge": "enemy_druid", "deep_well": "wishing_well", "innate_power": "runic_shard", "smart_savage": "talisman_epic",
+	"continual_learning": "enemy_apprentice_mage",
+	"war_profiteer": "coin", "battle_medic": "meat", "otherworldly_power": "enemy_supreme_warlock",
 }
 
 const TOOLTIP_WIDTH := 330.0
 # Shift+click on a node buys up to this many levels at once.
 const SHIFT_BUY_LEVELS := 5
-const WING_NAMES := {"warrior": "WARRIOR", "merchant": "MERCHANT", "survivor": "SURVIVOR", "magical": "MAGICAL"}
+const WING_NAMES := {"physical": "PHYSICAL", "economy": "ECONOMY", "sustain": "SUSTAIN", "sorcery": "SORCERY"}
 # Shared with the Dojo/Blacksmith (TownUI.gd) so all three town panels read from the
 # same palette: COLOR_GOOD/BAD/DIM are kept as aliases since test_church.gd and the
 # rest of this file were written against those names.
@@ -168,7 +163,9 @@ func _node_defs() -> Array:
 	for id in SaveDataScript.UPGRADE_IDS:
 		var parents := []
 		for prereq in SaveDataScript.UPGRADES[id].get("prereqs", []):
-			parents.append(prereq.id)
+			# Legacy is the hub every wing grows from: its children are drawn as the wing roots, not as its branches.
+			if prereq.id != "legacy":
+				parents.append(prereq.id)
 		var icon_path := "res://assets/%s.png" % NODE_ICONS.get(id, "runic_shard")
 		var def := {
 			"id": id,
@@ -176,8 +173,13 @@ func _node_defs() -> Array:
 			"wing": _wing_of(id),
 			"icon": load(icon_path) if ResourceLoader.exists(icon_path) else null,
 		}
+		if SaveDataScript.UPGRADES[id].get("hub", false):
+			def["hub"] = true
 		if _wing_of(id) == "isolated":
 			def["isolated"] = true
+			# Otherworldly Power floats out the other way from Worldwalker (straight down, past the Sustain wing).
+			if id == "otherworldly_power":
+				def["angle"] = 1.570796
 		defs.append(def)
 	return defs
 
@@ -208,24 +210,10 @@ func state_for(id: String) -> String:
 		return "available" if can_afford(id) else "unaffordable"
 	return "upgradable" if can_afford(id) else "owned"
 
-# Whether the node is on show. Owned skills always are; otherwise a skill stays
-# hidden until you own at least one of its prerequisites (the roots, having
-# none, are there from the start). Worldwalker has no prerequisite but is gated
-# on beating the game, so it stays hidden until then rather than teasing.
-func is_revealed(id: String) -> bool:
-	if level_of(id) > 0:
-		return true
-	var def: Dictionary = SaveDataScript.UPGRADES[id]
-	var flag: String = def.get("requires_lifetime_flag", "")
-	if flag != "" and not SaveDataScript.load_lifetime_data().get(flag, false):
-		return false
-	var prereqs: Array = def.get("prereqs", [])
-	if prereqs.is_empty():
-		return true
-	for prereq in prereqs:
-		if level_of(prereq.id) > 0:
-			return true
-	return false
+# Whether the node is on show: every upgrade always is -- owned or not, reachable or not (a locked one says what it wants in its
+# tooltip). The reveal machinery in AscensionView is still there for a tree that wants to hide things.
+func is_revealed(_id: String) -> bool:
+	return true
 
 # How many different skills you own at least one level of.
 func learned_count() -> int:
@@ -257,7 +245,7 @@ func _on_opened() -> void:
 	view.reset_view()
 	# Keyboard/gamepad players need something focused to start from -- the first
 	# node they can buy, else the tree's first root.
-	var first := "strength"
+	var first := "legacy"
 	for id in SaveDataScript.UPGRADE_IDS:
 		var state := state_for(id)
 		if state == "available" or state == "upgradable":
@@ -393,6 +381,8 @@ func _level_text(id: String) -> String:
 # Every unmet prerequisite, or the lifetime gate for Worldwalker.
 func _requirement_text(id: String) -> String:
 	var def: Dictionary = SaveDataScript.UPGRADES[id]
+	if def.get("requires_all", false):
+		return "Requires: every other upgrade, fully bought"
 	var lines: Array = []
 	var flag: String = def.get("requires_lifetime_flag", "")
 	if flag != "" and not SaveDataScript.load_lifetime_data().get(flag, false):

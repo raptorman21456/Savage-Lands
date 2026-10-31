@@ -29,6 +29,8 @@ const TEXT := {
 	"charm": ["Charmed talismans", "Its talismans reach allies who stand close (a Shaman's How Charming).", true],
 	"charging": ["Charging", "Gathering a fireball and can't move. Release it next turn.", true],
 	"bloodrage": ["Bloodrage", "Every hit it takes stacks extra damage dealt, for a couple of turns.", true],
+	"bloodboost": ["Bloodboost", "Every hit landed stacks +5% damage and +7.5% move speed. Three turns with no hit landed by anyone crash it.", true],
+	"bloodcrash": ["Bloodcrash", "The Bloodboost crashed: every combat stat is halved for the rest of the battle.", false],
 	"potion_attack": ["Attack Potion", "Deals 25% more damage.", true],
 	"potion_resilience": ["Resilience Potion", "Takes 20% less damage.", true],
 	"potion_energy": ["Energy Potion", "Moves one tile farther.", true],
@@ -39,6 +41,15 @@ const TEXT := {
 static func entry(id: String, detail: String = "") -> Dictionary:
 	var t: Array = TEXT.get(id, [id.capitalize(), "", false])
 	return {"id": id, "name": t[0], "detail": detail, "desc": t[1], "good": t[2]}
+
+# The ids of the statuses in `entries` that have a picture (UIIcons.status_icon), each once, in order: what an icon tray shows.
+static func ids_with_icons(entries: Array) -> Array:
+	var out: Array = []
+	for e in entries:
+		var id: String = str(e.get("id", ""))
+		if UIIcons.status_icon(id) != "" and not out.has(id):
+			out.append(id)
+	return out
 
 static func _turns(n: int) -> String:
 	return "%d turn%s" % [n, "" if n == 1 else "s"]
@@ -99,7 +110,7 @@ static func for_ally(u: Dictionary) -> Array:
 
 # The hero. `h` is assembled by Main (it keeps the hero's states in several places): any of the keys below, absent = off.
 # defending, taunting (bool); stealth, berserk, poison, bleed, blind, concussed, buff, potion_attack, potion_resilience,
-# potion_energy, bloodrage, skip (turns / stacks); burning, disarmed (bool).
+# potion_energy, bloodrage, bloodboost, skip (turns / stacks); burning, disarmed, bloodcrash (bool).
 static func for_hero(h: Dictionary) -> Array:
 	var out: Array = []
 	if h.get("defending", false):
@@ -114,6 +125,10 @@ static func for_hero(h: Dictionary) -> Array:
 		out.append(entry("empowered", _turns(int(h.buff))))
 	if int(h.get("bloodrage", 0)) > 0:
 		out.append(entry("bloodrage", "x%d" % int(h.bloodrage)))
+	if int(h.get("bloodboost", 0)) > 0:
+		out.append(entry("bloodboost", "x%d" % int(h.bloodboost)))
+	if h.get("bloodcrash", false):
+		out.append(entry("bloodcrash"))
 	for key in ["potion_attack", "potion_resilience", "potion_energy"]:
 		if int(h.get(key, 0)) > 0:
 			out.append(entry(key, _turns(int(h[key]))))

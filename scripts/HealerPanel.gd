@@ -61,7 +61,7 @@ func _build() -> void:
 	title_row.add_child(close_button)
 
 	var flavor := Label.new()
-	flavor.text = "The innkeeper waves you toward a warm bed and a hot meal."
+	flavor.text = "The innkeeper gestures you toward a warm bed and a hot meal."
 	flavor.autowrap_mode = TextServer.AUTOWRAP_WORD
 	flavor.add_theme_font_size_override("font_size", 14)
 	flavor.add_theme_color_override("font_color", Color(0.8, 0.8, 0.75))

@@ -106,13 +106,13 @@ func _apply_outcome(id: String) -> String:
 			_player.temp_damage_bonus_pct = pct
 			main.shrine_effect_waves_remaining = WishingWellScript.EFFECT_WAVES
 			_play_sfx("buff")
-			return "Warmth floods your arms. +%d%% damage for %d waves." % [int(round(pct * 100)), WishingWellScript.EFFECT_WAVES]
+			return "Warmth floods your arms. +%d%% damage until the danger rises %d times." % [int(round(pct * 100)), WishingWellScript.EFFECT_WAVES]
 		"curse":
 			var pct: float = WishingWellScript.curse_pct()
 			_player.temp_damage_bonus_pct = -pct
 			main.shrine_effect_waves_remaining = WishingWellScript.EFFECT_WAVES
 			_play_sfx("error")
-			return "A cold hand closes over yours. -%d%% damage for %d waves." % [int(round(pct * 100)), WishingWellScript.EFFECT_WAVES]
+			return "A cold hand closes over yours. -%d%% damage until the danger rises %d times." % [int(round(pct * 100)), WishingWellScript.EFFECT_WAVES]
 		"refund":
 			var amount: int = WishingWellScript.refund_amount(wager)
 			_player.add_coins_flat(amount)

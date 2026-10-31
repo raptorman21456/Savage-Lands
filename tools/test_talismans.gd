@@ -23,6 +23,9 @@ const KNOWN_KEYS := [
 	"whirlwind_double_melee", "weapon_whisperer", "special_stamina_pct_increase",
 	"chaos_shard", "lock_hp_to_one", "oneshot_regular_enemies", "bloodmoon_fang",
 	"ironclad_ward", "wildfire_core",
+	# --- Sorcery ---
+	"mana_regen_pct", "spell_cost_pct", "spell_potency_pct", "spell_echo_chance", "fireball_instant",
+	"summon_double", "spell_clapback_chance", "spell_clapback_mage_pct", "res_ftd_per_3_mag",
 ]
 # Talismans.gd's doc comment also lists "special_stamina_discount",
 # "break_reduction", "max_hp", "max_stamina", "dodge_chance", "block_heal",
@@ -1014,7 +1017,7 @@ func _init() -> void:
 	print("pressing it wears it: %s (expected [wolf_fang, stone_amulet])" % [player.equipped_talismans])
 	print("with the slots full the button says so: label=%s enabled=%s (expected No free slot, false)" % [InvData.talisman_action(player, null, InvData.talisman_entries(player).filter(func(e): return str(e.id) == "ember_charm")[0]).label, InvData.talisman_action(player, null, InvData.talisman_entries(player).filter(func(e): return str(e.id) == "ember_charm")[0]).enabled])
 	var unfound: Array = InvData.talisman_entries(player).filter(func(e): return not e.owned)
-	print("talismans you haven't found are listed as not owned (shown as black shapes): %d of %d (expected 35 of 38 with three owned)" % [unfound.size(), InvData.talisman_entries(player).size()])
+	print("talismans you haven't found are listed as not owned (shown as black shapes): %d of %d (expected 43 of 46 with three owned)" % [unfound.size(), InvData.talisman_entries(player).size()])
 	panel.close()
 
 	quit()

@@ -75,7 +75,7 @@ func _init() -> void:
 	var found_kills_header := false
 	var found_goblin_kill := false
 	for t in row_texts:
-		if t.contains("Waves cleared: 22"):
+		if t.contains("Danger reached: 22"):
 			found_waves = true
 		if t == "Kills:":
 			found_kills_header = true

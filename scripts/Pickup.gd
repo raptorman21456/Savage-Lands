@@ -30,7 +30,8 @@ func _ready() -> void:
 
 	sprite = Sprite2D.new()
 	sprite.texture = _texture_for_kind()
-	sprite.scale = Vector2(1.5, 1.5)
+	# The coin is 8x8 art, shown at exactly twice its size so every pixel stays a clean 2x2; the other pickups are 12x12, shown at 1.5x.
+	sprite.scale = Vector2(2.0, 2.0) if kind == "coin" else Vector2(1.5, 1.5)
 	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	add_child(sprite)
 
@@ -39,7 +40,7 @@ func _ready() -> void:
 func _texture_for_kind() -> Texture2D:
 	match kind:
 		"coin":
-			return preload("res://assets/coin.png")
+			return preload("res://assets/drop_coin.png")
 		"shard":
 			return preload("res://assets/runic_shard.png")
 		_:

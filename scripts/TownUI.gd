@@ -6,6 +6,7 @@ class_name TownUI
 # right. Kept in one place so the two panels stay matched.
 
 const PixelUIScript := preload("res://scripts/PixelUI.gd")
+const UIIconsScript := preload("res://scripts/UIIcons.gd")
 
 const GOLD := Color(1.0, 0.86, 0.36)
 const DIM := Color(0.68, 0.68, 0.72)
@@ -39,9 +40,9 @@ static func add_top_row(outer: VBoxContainer) -> Dictionary:
 	speech.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top.add_child(speech)
 	var coin_icon := TextureRect.new()
-	coin_icon.texture = load("res://assets/coin.png")
+	coin_icon.texture = UIIconsScript.texture("stat_coin")
 	coin_icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	coin_icon.custom_minimum_size = Vector2(26, 26)
+	coin_icon.custom_minimum_size = Vector2(32, 32)
 	coin_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	coin_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	top.add_child(coin_icon)

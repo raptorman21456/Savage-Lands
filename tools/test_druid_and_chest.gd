@@ -18,6 +18,7 @@ func _fresh_main() -> Node:
 	for e in m.get_tree().get_nodes_in_group("enemies"):
 		e.free()
 	m.enemies_alive = 0
+	m.player.meta_release_grudge = true     # the Sorcery wing's root: without it no magical member will join (test_church_effects)
 	return m
 
 func _kinds(main) -> Array:

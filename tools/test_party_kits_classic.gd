@@ -202,7 +202,7 @@ func _init() -> void:
 	await _cast(main, d1, "Restore", "hero")
 	print("...on the hero: 25%% of 500 + 4 = 129: %d (expected 229)" % [player.health])
 	d1.upgraded_flag_probe = true
-	player.spell_levels["druid_heal"] = 1                      # Restore+ (the Wizard's Tower: SpellUpgrades.gd)
+	player.set_spell_level_of(druid, "druid_heal", 1)                      # Restore+ (the Wizard's Tower: SpellUpgrades.gd)
 	var d1b: Dictionary = main._make_member_battle_unit(druid, Vector2i(1, 4), 1.0)
 	d1b.magic = 12.0
 	t1.hp = 5

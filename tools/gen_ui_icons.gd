@@ -13,6 +13,8 @@ extends SceneTree
 # scripts/UIIcons.gd loads them by name. A hand-made 16x16 PNG with the same name dropped into assets/ui/ simply
 # replaces the generated one.
 
+const UIIconsScript := preload("res://scripts/UIIcons.gd")
+
 const S := 16          # final icon size
 const D := 14          # drawing canvas (the outline takes the 1px border)
 const OUT_DIR := "res://assets/ui"
@@ -49,12 +51,17 @@ func _init() -> void:
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUT_DIR))
 	var icons := _icons()
 	var written := 0
+	var kept: Array = []
 	for icon_name in icons:
+		# The artists drew these by hand since; the generated version must not overwrite them.
+		if icon_name in UIIconsScript.HAND_MADE:
+			kept.append(icon_name)
+			continue
 		_name = icon_name
 		_run(icons[icon_name])
 		_render().save_png("%s/%s.png" % [OUT_DIR, icon_name])
 		written += 1
-	print("wrote %d icons to %s" % [written, OUT_DIR])
+	print("wrote %d icons to %s (left the %d hand-made ones alone: %s)" % [written, OUT_DIR, kept.size(), ", ".join(kept)])
 	var args := OS.get_cmdline_user_args()
 	_contact_sheet(icons, args[0] if args.size() > 0 else "user://ui_icon_sheet.png")
 	quit()

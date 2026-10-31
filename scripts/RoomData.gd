@@ -6,6 +6,13 @@ class_name RoomData
 # which only fills in the rooms nobody has written yet. Everything is plain data: change a number and the room
 # changes.
 #
+# WHERE THE DATA LIVES NOW: the game reads res://data/rooms.json, edges.json, roads.json (and landmarks.json, regions.json) -- the
+# same values as the constants below, in the same format, written by the in-game MAP EDITOR (title screen > Map Editor) or by hand.
+# The constants below are the FACTORY copy: they are used only for a part whose file is missing or cannot be read (a clear warning
+# is printed and the Map Editor shows it); the editor's "Revert to shipped" button (Room tab) puts one room back to them, and
+# tools/convert_map_data.gd rewrites every data file from them. Read the data through rooms() / edges() / roads() -- never the
+# constants -- so the files win.
+#
 # A room is found by the cell at its top-left corner, "col,row" (the map is 11 x 11 cells; a plain cell is 3,055 x
 # 2,164 px). All positions are px from the ROOM'S TOP-LEFT CORNER (x to the right, y down).
 #
@@ -1007,3 +1014,98 @@ const ROADS := [
 	{"width": 200.0, "style": "boards", "points": [[2.23, 9.5], [1.52, 9.5]]},   # the Long Pier: Pesca's west shore out over the sea to Gull Rock
 	{"width": 140.0, "style": "boards", "points": [[2.0, 6.5], [3.0, 6.5]]},                                          # the boardwalk across the bog
 ]
+
+# ------------------------------------------------------------------------------------------------------------------------------
+# THE LIVE DATA. The constants above are the factory copy; what the game uses is read from the data files (MapData.gd) once, the
+# first time anything asks, and whatever cannot be used falls back to the factory values with a printed warning.
+
+const MapDataScript := preload("res://scripts/MapData.gd")
+
+static var _live := {}
+static var _loaded := false
+static var data_dir := MapDataScript.DIR
+static var sources := {}         # kind -> "file" or "built-in": where each part of the map came from
+static var report: Array = []    # sentences about everything that was wrong with the files (the Map Editor shows them)
+
+static func _ensure() -> void:
+	if not _loaded:
+		read_files()
+
+# Reads the data files again (from `dir`, default res://data). A missing or broken file is replaced by the factory values for that
+# part; an entry that does not make sense is left out (that room is then drawn by the generator).
+static func read_files(dir: String = "") -> void:
+	if dir != "":
+		data_dir = dir
+	_loaded = true
+	_live = {}
+	sources = {}
+	report = []
+	for kind in MapDataScript.KINDS:
+		var res: Dictionary = MapDataScript.read(kind, data_dir)
+		for w in res.warnings:
+			report.append(str(w))
+		if res.status == "ok":
+			_live[kind] = res.data
+			sources[kind] = "file"
+		else:
+			_live[kind] = factory(kind)
+			sources[kind] = "built-in"
+			if kind in ["rooms", "edges", "roads"]:
+				report.append("the built-in %s are used instead" % kind)
+	for line in report:
+		push_warning("Map data: " + line)
+
+# Hands the game data from somewhere else (the Map Editor's working copy, a test's scratch folder) without touching any file.
+static func use(data: Dictionary) -> void:
+	_loaded = true
+	for kind in MapDataScript.KINDS:
+		if data.has(kind):
+			_live[kind] = data[kind]
+		elif not _live.has(kind):
+			_live[kind] = factory(kind)
+		if not sources.has(kind):
+			sources[kind] = "built-in"
+
+# The factory values of one part (a deep copy: change it freely). Landmarks and regions have none here -- WorldMap.gd's own code is
+# their factory copy -- so they are empty, meaning "change nothing".
+static func factory(kind: String):
+	match kind:
+		"rooms":
+			return ROOMS.duplicate(true)
+		"edges":
+			return EDGES.duplicate(true)
+		"roads":
+			return ROADS.duplicate(true)
+		"landmarks":
+			return []
+	return {}
+
+static func rooms() -> Dictionary:
+	_ensure()
+	return _live.rooms
+
+static func edges() -> Dictionary:
+	_ensure()
+	return _live.edges
+
+static func roads() -> Array:
+	_ensure()
+	return _live.roads
+
+# The named places' settings from the data file ([] when there is none): WorldMap applies them over its own.
+static func landmarks() -> Array:
+	_ensure()
+	return _live.landmarks
+
+# Per-region tweaks from the data file ({} when there are none): WorldMap applies them over its own.
+static func regions() -> Dictionary:
+	_ensure()
+	return _live.regions
+
+# A deep copy of everything live, as one document (what the Map Editor edits).
+static func document() -> Dictionary:
+	_ensure()
+	var doc := {}
+	for kind in MapDataScript.KINDS:
+		doc[kind] = MapDataScript.copy(_live[kind])
+	return doc

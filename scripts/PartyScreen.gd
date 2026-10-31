@@ -671,6 +671,6 @@ func _page_run() -> void:
 	col.add_child(InvWidgets.caption("This run"))
 	InvWidgets.icon_row(col, "stat_intimidation", "Foes defeated", str(kills))
 	InvWidgets.icon_row(col, "stat_level", "Bosses beaten", str(int(main.run_bosses_defeated)))
-	InvWidgets.icon_row(col, "stat_damage", "Waves cleared", str(maxi(0, int(main.wave) - 1)))
+	InvWidgets.icon_row(col, "stat_damage", Wording.DANGER + " reached", str(maxi(0, int(main.wave) - 1)))
 	InvWidgets.icon_row(col, "stat_coin", "Coins", str(int(player.coins)))
 	InvWidgets.icon_row(col, "stat_shard", "Runic shards", str(int(player.runic_shards)))

@@ -1,10 +1,9 @@
 extends SceneTree
 
-# Every node touched by the "make the tree EXPANSIVE" redesign: the 4
-# level-up-bonus stats (Might/Swiftness/Vitality/Presence), the 4 repurposed
-# nodes (Adrenaline/Beastmaster/Investor/Resilience -- Adrenaline's own
-# damage-boost half is covered in test_skill_tree.gd, not repeated here),
-# and all 13 brand-new nodes.
+# The Church's stat-scaling nodes and battle mechanics (Magpie, Field Surgeon, Scholar, Leader's Instincts, Man's Best Friend, Pack Bond,
+# Black Market, Fletcher, Herbalist, Parry Master, Last Stand, Riposte, Momentum, Full Breath, Keen Eye, War Profiteer, and the per-level-up
+# stat bonuses). The newer nodes (Silver Muscles, Light Metal, Take a Breather, Battle Medic, Heroic Destiny, Essence Tithe, Release Grudge
+# and the Sorcery wing) are in test_church_effects.gd.
 
 func _make_goblin(main, tile: Vector2i, hp: int = 999) -> Dictionary:
 	var goblin_script = load("res://scripts/Enemy.gd")
@@ -29,17 +28,15 @@ func _init() -> void:
 
 	# --- _apply_meta_upgrades wires every node's owned level into the right
 	# Player field (or, for the plain stat-scaling nodes, the right stat),
-	# all via a single save. ---
+	# all via a single save (prerequisites are not checked when a save is read). ---
 	save_data_script.save_data({
 		"essence": 0,
 		"upgrades": {
-			"haggling": 3, "herbalism": 2,
-			"prodigy": 1, "warlord": 1, "beastmaster": 1, "pack_bond": 2,
-			"appraisal": 2, "investor": 1,
-			"warband": 1, "battle_medic": 1, "war_chest": 1, "war_profiteer": 2,
-			"block_master": 1, "second_breath": 2, "favour": 1, "last_stand": 3,
-			"riposte": 2, "momentum": 1, "hardened": 1,
-			"fletcher": 2, "field_surgeon": 1, "windfall": 1, "black_market": 1,
+			"haggling": 3, "herbalism": 2, "prodigy": 1, "pack_leader": 2, "beastmaster": 1, "pack_bond": 2,
+			"coins": 1, "battle_medic": 1, "war_profiteer": 1,
+			"block_master": 1, "second_breath": 2, "last_stand": 3,
+			"riposte": 2, "momentum": 1,
+			"fletcher": 2, "field_surgeon": 3, "windfall": 2, "black_market": 1,
 		},
 		"best_wave": 0,
 	})
@@ -51,38 +48,26 @@ func _init() -> void:
 	await physics_frame
 	var player = main.player
 
-	print("Haggling: meta_bonus_coin_pct=%.2f (expected 0.30, 3 levels * 0.10)" % [player.meta_bonus_coin_pct])
-	print("Herbalism: meta_healing_bonus_pct=%.2f (expected 0.30, 2 levels * 0.15)" % [player.meta_healing_bonus_pct])
-	print("Prodigy: meta_bonus_levelup_stat=%s (expected true)" % [player.meta_bonus_levelup_stat])
-	print("Warlord: max_party_slots=%d (expected 4 -- applies unconditionally once owned, independent of whether Pack Leader is also in this save)" % [player.max_party_slots])
-	print("Warband/Battle Medic/War Chest flags are live: warband=%.2f battle_medic=%s war_chest=%.2f (expected 0.15, true, 0.05)" % [
-		player.meta_warband_bonus, player.meta_battle_medic, player.meta_war_chest_reduction
+	print("Magpie: meta_bonus_coin_pct=%.2f (expected 0.15, 3 levels * 0.05)" % [player.meta_bonus_coin_pct])
+	print("Field Surgeon: meta_healing_bonus_pct=%.2f (expected 0.10, 2 levels * 0.05)" % [player.meta_healing_bonus_pct])
+	print("Scholar: meta_bonus_levelup_stat=%s (expected true)" % [player.meta_bonus_levelup_stat])
+	print("Leader's Instincts (2 levels): max_party_slots=%d (expected 4)" % [player.max_party_slots])
+	print("Battle Medic is live: flag=%s damage=%d (expected true, 5)" % [player.meta_battle_medic, player.meta_battle_medic_damage])
+
+	# --- Man's Best Friend: guarantees a Traitor Wolf from the start of the run, no recruit roll needed -- and its loyalty timer is
+	# already ticking, for 25 battles. Pack Bond (2 levels) extends how long ANY wolf lasts. ---
+	print("Man's Best Friend guarantees a starting Fickle Wolf: %s (expected true, one wolf)" % [player.party_wolves().size() == 1])
+	print("...and Pack Bond's bonus battles are stored for it: meta_wolf_bonus_waves=%d (expected 8, 2 levels * 4)" % [player.meta_wolf_bonus_waves])
+	print("...the wolf's loyalty is already ticking (25 + Pack Bond): battles_left=%d (expected %d)" % [
+		player.party_wolves()[0].battles_left, 25 + player.meta_wolf_bonus_waves
 	])
 
-	# --- Beastmaster (repurposed): guarantees a Traitor Wolf from the start
-	# of the run, no recruit roll needed -- and its loyalty timer is already
-	# ticking. Pack Bond (2 levels) extends how long it lasts. ---
-	print("Beastmaster guarantees a starting Fickle Wolf: %s (expected true, one wolf)" % [player.party_wolves().size() == 1])
-	print("...and Pack Bond's bonus battles are stored for it: meta_wolf_bonus_waves=%d (expected 6, 2 levels * 3)" % [player.meta_wolf_bonus_waves])
-	print("...the wolf's loyalty is already ticking (10 base + Pack Bond): battles_left=%d (expected %d)" % [
-		player.party_wolves()[0].battles_left, 10 + player.meta_wolf_bonus_waves
-	])
+	# --- Inheritance: starting coins. ---
+	print("Inheritance gives its starting coins: coins=%d (expected >= 15)" % [player.coins])
 
-	# --- Appraisal is a plain stacking stat node (extra starting coins). ---
-	print("Appraisal stacks with Nest Egg's starting coins: coins=%d (expected >= %d from Appraisal alone, 2 * 20)" % [
-		player.coins, 2 * 20
-	])
-
-	# --- Investor (repurposed): extra weapon slots in every shop offering,
-	# not a stat bonus anymore. ---
-	print("Investor stores its shop-slot bonus: meta_investor_bonus_slots=%d (expected 3)" % [player.meta_investor_bonus_slots])
 	main._open_shop()
-	# The shop is a flat lootpool now (see Main.gd:_roll_shop_offering) --
-	# Investor's bonus slots roll from the same shared pool as everything
-	# else, not guaranteed weapons specifically, so this checks the total
-	# offering size rather than assuming every bonus slot is a weapon.
-	print("Investor rolls 3 more slots into the shop: %d total offers (expected %d, Club + %d rolled)" % [
-		main.current_shop_offering.size(), 1 + main.SHOP_TOTAL_SLOTS + 3, main.SHOP_TOTAL_SLOTS + 3
+	print("The shop offers its usual count (no Investor any more): %d total offers (expected %d, Club + %d rolled)" % [
+		main.current_shop_offering.size(), 1 + main.SHOP_TOTAL_SLOTS, main.SHOP_TOTAL_SLOTS
 	])
 	main.shop_open = false
 	main.get_tree().paused = false
@@ -100,10 +85,10 @@ func _init() -> void:
 	player.stat_intimidation = 0
 	var base_flame_price: int = weapons_script.ARROW_TYPES.flame.price
 	var expected_flame_price: int = int(round(base_flame_price * (1.0 - player.meta_arrow_discount_pct)))
-	print("Fletcher discounts arrow prices by 30%% (2 levels * 15%%): %d (expected %d, base %d)" % [
+	print("Fletcher discounts arrow prices by 10%% (2 levels * 5%%): %d (expected %d, base %d)" % [
 		player.get_arrow_price("flame"), expected_flame_price, base_flame_price
 	])
-	print("...and raises the held-arrow cap by 10 (2 levels * 5): meta_arrow_cap_bonus=%d (expected 10)" % [player.meta_arrow_cap_bonus])
+	print("...and raises the held-arrow cap by 6 (2 levels * 3): meta_arrow_cap_bonus=%d (expected 6)" % [player.meta_arrow_cap_bonus])
 	player.coins = 100000
 	var raised_cap: int = weapons_script.ARROW_MAX_HELD + player.meta_arrow_cap_bonus
 	for i in raised_cap:
@@ -114,12 +99,12 @@ func _init() -> void:
 		bought_past_cap, player.owned_arrows.flame == raised_cap
 	])
 
-	# --- Field Surgeon: cheaper shop potions. ---
+	# --- Herbalist: cheaper shop potions. ---
 	var potions_script = load("res://scripts/Potions.gd")
 	var potion_tier: Dictionary = potions_script.TIERS[0]
 	player.stat_intimidation = 0
 	var expected_potion_price: int = int(round(potion_tier.price * (1.0 - player.meta_field_surgeon_discount_pct)))
-	print("Field Surgeon discounts shop potions by 15%%: %d (expected %d, base %d)" % [
+	print("Herbalist discounts shop potions by 3%% (3 levels * 1%%): %d (expected %d, base %d)" % [
 		player.get_potion_price(potion_tier), expected_potion_price, potion_tier.price
 	])
 
@@ -295,29 +280,27 @@ func _init() -> void:
 	print("Vigilant Defense heals a flat amount on Defend: health=%d (expected 17, 10 + 7)" % [player.health])
 	player.meta_block_heal_amount = 0
 
-	# --- Windfall: a chance for a defeated enemy to drop bonus gold. ---
-	# Haggling (3 levels, +30%) and War Profiteer (2 levels, +2/kill) are
-	# both still active from earlier in this save and legitimately stack
-	# onto/alongside Windfall's gold too -- add_coins() boosts every coin
-	# gain "from every source" per its own description, and War Profiteer
-	# fires unconditionally on any kill, not just the ones this file happens
-	# to test in isolation. Both zeroed here so this check isolates
-	# Windfall's own range instead of also re-deriving their contributions.
+	# --- Keen Eye (the Church's Windfall): a chance for a defeated enemy to drop 1-3 bonus gold. ---
+	# Magpie (3 levels, +15%) is still active from earlier in this save and legitimately boosts every coin gain, Keen Eye's included --
+	# zeroed here so this check isolates Keen Eye's own range.
 	player.meta_bonus_coin_pct = 0.0
-	player.meta_war_profiteer_coins = 0
 	player.meta_windfall_chance = 1.0
 	player.coins = 0
 	main._on_enemy_died(0)
-	print("Windfall grants bonus gold on a kill at 100%% chance: coins=%d (expected between 5 and 15)" % [player.coins])
-	print("...within the promised range: %s" % [player.coins >= 5 and player.coins <= 15])
+	print("Keen Eye grants bonus gold on a kill at 100%% chance: coins=%d (expected between 1 and 3)" % [player.coins])
+	print("...within the promised range: %s" % [player.coins >= 1 and player.coins <= 3])
 	player.meta_windfall_chance = 0.0
 
-	# --- War Profiteer: flat coins per kill, on top of Windfall. ---
-	player.meta_war_profiteer_coins = 2
-	var coins_before_profiteer: int = player.coins
+	# --- War Profiteer: every enemy defeated THIS run shaves 0.2% off the shops, instead of paying coins. ---
+	player.run_kills = 0
+	var weapon_price_before: int = player.get_weapon_price(weapons_script.SPEAR)
 	main._on_enemy_died(0)
-	print("War Profiteer grants flat coins per kill: coins=%d (expected %d, +2)" % [player.coins, coins_before_profiteer + 2])
-	player.meta_war_profiteer_coins = 0
+	main._on_enemy_died(0)
+	print("each kill counts toward War Profiteer: run_kills=%d (expected 2)" % [player.run_kills])
+	player.run_kills = 100
+	print("100 kills make the shops %.1f%% cheaper (expected 20.0%%): a Spear costs %d instead of %d" % [player.war_profiteer_discount() * 100.0, player.get_weapon_price(weapons_script.SPEAR), weapon_price_before])
+	player.run_kills = 0
+	print("War Profiteer no longer pays coins per kill: coins_per_kill=%d (expected 0)" % [player.coins_per_kill()])
 
 	# --- Hardened: permanent max-HP growth per wave cleared this run. ---
 	player.meta_hardened_hp_per_wave = 4

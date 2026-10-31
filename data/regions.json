@@ -1,0 +1,126 @@
+{
+	"_about": "Per-region tweaks keyed by region id: name, tier (danger 1-8), enemies = [[enemy, weight], ...], miniboss. The outlines of the regions are still drawn in scripts/WorldMap.gd.",
+	"format": 1,
+	"regions": {
+		"great_expanse": {
+			"name": "The Great Expanse",
+			"tier": 1,
+			"enemies": [["goblin", 6], ["orc", 2], ["archer", 1], ["centaur_pack", 1]],
+			"miniboss": ""
+		},
+		"woods_edge": {
+			"name": "Central Lexia",
+			"tier": 1,
+			"enemies": [["goblin", 5], ["wolf", 2], ["gnome_pack", 1], ["orc", 1]],
+			"miniboss": ""
+		},
+		"woods": {
+			"name": "Central Lexia",
+			"tier": 2,
+			"enemies": [["wolf", 4], ["goblin", 3], ["fae_hut", 1], ["gnome_pack", 2], ["archer", 1]],
+			"miniboss": ""
+		},
+		"heartwood_grove": {
+			"name": "The HeartWood",
+			"tier": 3,
+			"enemies": [["wolf", 4], ["fae_hut", 2], ["gnome_pack", 2], ["brute", 1]],
+			"miniboss": "treant"
+		},
+		"ruins": {
+			"name": "The Ruined Settlement",
+			"tier": 2,
+			"enemies": [["shade", 3], ["orc", 2], ["goblin", 2]],
+			"miniboss": ""
+		},
+		"volcano_hills": {
+			"name": "Death Mountain",
+			"tier": 5,
+			"enemies": [["brute", 3], ["orc", 3], ["centaur_pack", 1], ["shade", 1]],
+			"miniboss": ""
+		},
+		"volcano_slopes": {
+			"name": "Death Mountain",
+			"tier": 6,
+			"enemies": [["brute", 3], ["shade", 3], ["archer", 1]],
+			"miniboss": "lava_construct"
+		},
+		"crater": {
+			"name": "The Crater",
+			"tier": 7,
+			"enemies": [["shade", 3], ["brute", 2]],
+			"miniboss": ""
+		},
+		"desert": {
+			"name": "Arahas Desert",
+			"tier": 4,
+			"enemies": [["centaur_pack", 2], ["orc", 3], ["brute", 2], ["archer", 1]],
+			"miniboss": "iron_construct"
+		},
+		"mountains": {
+			"name": "Lexian Peaks",
+			"tier": 5,
+			"enemies": [["brute", 3], ["orc", 3], ["centaur_pack", 1], ["archer", 1]],
+			"miniboss": "iron_construct"
+		},
+		"lizen": {
+			"name": "The Lizen Encampment",
+			"tier": 3,
+			"enemies": [["orc", 4], ["brute", 2], ["archer", 2], ["goblin", 2]],
+			"miniboss": ""
+		},
+		"swamp": {
+			"name": "The Toxic Mire",
+			"tier": 3,
+			"enemies": [["fae_hut", 2], ["shade", 3], ["gnome_pack", 2], ["wolf", 2]],
+			"miniboss": "black_dragonlet"
+		},
+		"beach": {
+			"name": "Sandy Shores",
+			"tier": 2,
+			"enemies": [["goblin", 4], ["orc", 2], ["archer", 2], ["gnome_pack", 1]],
+			"miniboss": ""
+		},
+		"ocean": {
+			"name": "The Ocean",
+			"tier": 3,
+			"enemies": [],
+			"miniboss": ""
+		},
+		"pesca": {
+			"name": "Pesca",
+			"tier": 1,
+			"enemies": [],
+			"miniboss": ""
+		},
+		"long_pier": {
+			"name": "The Long Pier",
+			"tier": 1,
+			"enemies": [],
+			"miniboss": ""
+		},
+		"gull_rock": {
+			"name": "Gull Rock",
+			"tier": 1,
+			"enemies": [],
+			"miniboss": ""
+		},
+		"frozen_wastes": {
+			"name": "The Frozen Wastes",
+			"tier": 5,
+			"enemies": [["wolf", 4], ["brute", 3], ["shade", 2], ["archer", 1]],
+			"miniboss": "black_dragonlet"
+		},
+		"voidlands": {
+			"name": "The Voidlands",
+			"tier": 8,
+			"enemies": [["shade", 4], ["archer", 2], ["brute", 2], ["centaur_pack", 1]],
+			"miniboss": "voidwing"
+		},
+		"ranch": {
+			"name": "The Ranch",
+			"tier": 1,
+			"enemies": [],
+			"miniboss": ""
+		}
+	}
+}

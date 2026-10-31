@@ -20,7 +20,7 @@ const EVENT_IDS := [
 static var EVENTS := {
 	"goblin_swarm": {
 		"name": "Goblin Swarm", "auto": true,
-		"description": "A goblin warband has caught your scent! More of them are coming this wave -- but there's coin in it for you if you can weather it.",
+		"description": "A goblin warband has caught your scent! More of them are coming this time -- but there's coin in it for you if you can weather it.",
 	},
 	"elite_bounty": {
 		"name": "Elite Bounty", "auto": true,

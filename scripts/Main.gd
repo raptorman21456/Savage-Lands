@@ -54,6 +54,7 @@ const FishmongerPanelScript := preload("res://scripts/FishmongerPanel.gd")
 const TalismansScript := preload("res://scripts/Talismans.gd")
 const SandboxScript := preload("res://scripts/Sandbox.gd")
 const SandboxPanelScript := preload("res://scripts/SandboxPanel.gd")
+const DebugMenuScript := preload("res://scripts/DebugMenu.gd")
 const AttackPatternsScript := preload("res://scripts/AttackPatterns.gd")
 const DefenseMinigameScript := preload("res://scripts/DefenseMinigame.gd")
 const AttackTimingsScript := preload("res://scripts/AttackTimings.gd")
@@ -588,7 +589,7 @@ const ENEMY_TRAITS := {
 	# _can_battle_attack) -- a caster's arcing bolt instead of a bowstring's
 	# dead-straight shot. Doesn't kite/strafe -- that identity moved to the
 	# Centaur Archer variant below, so the two ranged enemies feel distinct.
-	"Apprentice Mage": {"harm": "magical", "attack_range": ARCHER_ATTACK_RANGE, "ignore_line": true, "inflicts_blind": true, "inflicts_fear": true},
+	"Apprentice Mage": {"harm": "magical", "mage": true, "attack_range": ARCHER_ATTACK_RANGE, "ignore_line": true, "inflicts_blind": true, "inflicts_fear": true},
 	# A full 2x2 footprint (see the "size" field in _setup_battle_grid) that
 	# ignores every terrain rule entirely -- rocks, water, ledges, cliffs all
 	# do nothing to it -- on top of shrugging off rock cover and resisting
@@ -653,7 +654,7 @@ const ENEMY_TRAITS := {
 	# scripts/Archmage.gd's power_tier). A wide multi-target spell
 	# that ignores obstacles entirely, unarmored (a glass-cannon caster,
 	# not a brute).
-	"Archmage": {"harm": "magical", "windup": true, "sweeps": true, "ignore_line": true, "attack_range": 2, "knockback_resist": 0.4, "move_range": 1, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true},
+	"Archmage": {"harm": "magical", "mage": true, "windup": true, "sweeps": true, "ignore_line": true, "attack_range": 2, "knockback_resist": 0.4, "move_range": 1, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true},
 }
 
 # How fast each enemy acts, in the same rating you see for yourself on the Stats screen (you start at 5
@@ -959,6 +960,8 @@ var in_battle := false
 # "fled" / "defeat" for the sandbox battle in progress.
 var sandbox_panel: CanvasLayer = null
 var sandbox_result := ""
+# The Debug menu (F1; DebugMenu.gd). Always built, but it only answers F1 when Settings > Gameplay turns it on (or in the Sandbox).
+var debug_menu: CanvasLayer = null
 # First-ever-battle interactive tutorial. Gated device-wide via
 # SaveData.gd:is_tutorial_completed_ever (not per-save-slot). tutorial_step:
 # 0=Move, 1=Fight, 2=Defend. Set once in trigger_battle, left untouched by
@@ -1204,6 +1207,10 @@ func _ready() -> void:
 	_roll_seer_stock()
 	if SaveDataScript.sandbox_active:
 		_enter_sandbox()
+	# Last, so it sees keys before every other panel does.
+	debug_menu = DebugMenuScript.new()
+	add_child(debug_menu)
+	debug_menu.setup(self)
 
 # ---------------------------------------------------------------------------
 # Sandbox (debug) mode: entered from the title screen's Sandbox button, never
@@ -1888,6 +1895,10 @@ func _on_druid_touched() -> void:
 func _try_recruit_druid() -> bool:
 	if druid_recruited:
 		return false
+	# Release Grudge (Church, Sorcery): until it is bought no magical party member will join you (the sandbox lets anyone).
+	if not player.meta_release_grudge and not SaveDataScript.sandbox_active:
+		hud.show_message("The Druid will not look at you. Some old grudge keeps her from your side -- the Church might know how to release it.")
+		return false
 	if not player.can_recruit("druid"):
 		hud.show_message("Your party is full. Make room, then come back for the Druid.")
 		return false
@@ -2087,7 +2098,7 @@ func _open_chest(chest_id: String, interior_kind: String = "") -> void:
 			var weapon: Dictionary = WeaponsScript.make_legendary()
 			player.grant_weapon(weapon.id)
 			reward = str(weapon.id)
-			var needs := int(weapon.get("required_might", 0))
+			var needs: int = player.might_needed(weapon)
 			text = "In the chest: the %s!%s" % [weapon.name, "" if player.stat_might >= needs else " (it takes %d Might to wield)" % needs]
 		"talisman":
 			var talisman_id: String = content.id
@@ -3221,6 +3232,8 @@ func _on_enemy_died(xp_reward: int, enemy_name: String = "") -> void:
 			was_boss = true
 	# Every enemy that falls (whoever landed the blow) is worth Essence.
 	run_essence += SaveDataScript.essence_for_kill(was_boss)
+	# War Profiteer counts every enemy defeated this run (Player.war_profiteer_discount).
+	player.run_kills += 1
 	# Crafting materials (Materials.gd): whatever this kind of enemy leaves behind.
 	if enemy_name != "":
 		var drops: Dictionary = MaterialsScript.roll_drops(enemy_name)
@@ -3248,7 +3261,7 @@ func _on_enemy_died(xp_reward: int, enemy_name: String = "") -> void:
 	# Windfall: a flat gold drop, independent of the enemy's own coin/loot
 	# (there isn't a per-kill coin drop elsewhere to stack onto).
 	if player.windfall_chance_total() > 0.0 and randf() < player.windfall_chance_total():
-		var windfall_amount := randi_range(5, 15)
+		var windfall_amount := randi_range(1, 3)
 		player.add_coins(windfall_amount)
 		hud.battle_log("Windfall! +%d gold." % windfall_amount)
 	# War Profiteer (Warrior + Merchant convergence): flat coins per kill.
@@ -3267,12 +3280,12 @@ func _on_enemy_died(xp_reward: int, enemy_name: String = "") -> void:
 	# advances the instant its one enemy is dead, same as every wave used to.
 	if current_world_index == WORLDS.size() - 1 and not nothingness_rush_complete:
 		if enemies_alive <= 0:
-			hud.show_message("Wave %d cleared!" % wave)
+			hud.show_message("%s rises!" % Wording.DANGER)
 			_queue_wave_advance()
 		return
 	total_kills += 1
 	if total_kills % KILLS_PER_TIER == 0:
-		hud.show_message("Wave %d cleared!" % wave)
+		hud.show_message("%s rises!" % Wording.DANGER)
 		_queue_wave_advance()
 
 # Advancing the wave/tier (and everything that hangs off it -- biome, boss
@@ -3464,7 +3477,7 @@ func _build_quest(template: String) -> Dictionary:
 				"template": "treasure_hunter", "target_name": "", "target_amount": amount,
 				"baseline": 0, "accepted": false, "title": "Treasure Hunter",
 				"flavor": "Hold %d coins at once." % amount,
-				"reward_coins": 0, "reward_shards": 2,
+				"reward_coins": 50, "reward_shards": 0,
 			}
 		_:
 			var amount := randi_range(15, 25)
@@ -3472,7 +3485,7 @@ func _build_quest(template: String) -> Dictionary:
 				"template": "monster_slayer", "target_name": "", "target_amount": amount,
 				"baseline": 0, "accepted": false, "title": "Monster Slayer",
 				"flavor": "Kill %d enemies of any kind." % amount,
-				"reward_coins": amount * 5, "reward_shards": 1,
+				"reward_coins": amount * 5 + 25, "reward_shards": 0,
 			}
 
 # treasure_hunter is a live threshold (no baseline needed -- just check the
@@ -3577,13 +3590,13 @@ func _roll_shop_offering() -> void:
 	current_shop_offering.append_array(locked_weapons)
 
 	# Merchant Prince (Merchant capstone): one extra GUARANTEED weapon offer
-	# every shop visit, Masterwork tier or better -- stays outside the random
+	# every shop visit, Fine tier or better (the doc's Merchant's Favour) -- stays outside the random
 	# pool above so the capstone's promise ("always at least one good weapon
 	# offer") can't get crowded out by armor/shield/potion rolls.
 	if player.has_merchant_prince:
 		var pool: Array = WeaponsScript.UPGRADABLE_TYPES.duplicate()
 		var extra_base: Dictionary = pool[randi() % pool.size()]
-		current_shop_offering.append(_tagged(WeaponsScript.make_variant(extra_base, 3, player.total_luck()), "weapon"))
+		current_shop_offering.append(_tagged(WeaponsScript.make_variant(extra_base, 2, player.total_luck()), "weapon"))
 	# A Staff turns up while a caster is in your party -- it is bought FOR them (the player can
 	# never wield one), see _on_shop_buy_pressed.
 	if player.party.any(func(m): return m.is_caster()):
@@ -3661,7 +3674,7 @@ func _refresh_shop_display() -> void:
 	var shopkeeper_lines := []
 	for item in current_shop_offering:
 		shopkeeper_lines.append(_shop_row_keeper_line(item))
-	hud.show_shop(player.coins, player.runic_shards, current_shop_offering, prices, player.current_weapon.name, player.owned_weapons, player.equipped_armor.name, player.healing_items, _get_shop_reroll_cost(), _player_has_bow(), player.owned_arrows, arrow_prices, WeaponsScript.ARROW_MAX_HELD + player.arrow_cap_bonus(), player.equipped_shield.get("name", "None"), player.owned_shields, player.stat_might, shopkeeper_lines, player.has_unlimited_arrows(), player.stat_intimidation)
+	hud.show_shop(player.coins, player.runic_shards, current_shop_offering, prices, player.current_weapon.name, player.owned_weapons, player.equipped_armor.name, player.healing_items, _get_shop_reroll_cost(), _player_has_bow(), player.owned_arrows, arrow_prices, WeaponsScript.ARROW_MAX_HELD + player.arrow_cap_bonus(), player.equipped_shield.get("name", "None"), player.owned_shields, player.stat_might, shopkeeper_lines, player.has_unlimited_arrows(), player.stat_intimidation, player.meta_light_metal)
 	_refresh_enchant_display()
 
 # Weapons get Shopkeeper.gd's per-type/tier/familiarity reaction (falling
@@ -3688,27 +3701,38 @@ func _refresh_enchant_display() -> void:
 	hud.show_enchant_tab(player.coins, player.runic_shards, player.current_weapon_base.name, weapon_id, applied_rune_id, EnchantmentsScript.RUNES)
 	_refresh_spells_display()
 
-# The Wizard's Tower's Spells tab: every spell with its level, what the next level does and what it costs.
+# The Wizard's Tower's Spells tab: every spell of every caster in your party (an upgrade belongs to the caster), with its level, what the
+# next level does and what it costs. A row's id is "<member id>|<spell id>".
 func spell_upgrade_rows() -> Array:
 	var rows: Array = []
-	for s in SpellUpgradesScript.SPELLS:
-		var level: int = player.spell_level(s.id)
-		var maxed: bool = level >= SpellUpgradesScript.MAX_LEVEL
-		var price: Dictionary = SpellUpgradesScript.price(level + 1)
-		rows.append({
-			"id": s.id, "owner": s.owner, "level": level, "maxed": maxed,
-			"title": SpellUpgradesScript.display_name(s.id, level) if maxed else "%s  ->  %s" % [SpellUpgradesScript.display_name(s.id, level), SpellUpgradesScript.display_name(s.id, level + 1)],
-			"effect": "Fully upgraded." if maxed else SpellUpgradesScript.level_text(s.id, level + 1),
-			"price_text": "" if maxed else "%d Essence" % int(price.essence),
-			"can_buy": not maxed and SaveDataScript.banked_essence() >= int(price.get("essence", 0)),
-		})
+	for member in player.party:
+		for entry in member_special_pool(member):
+			var spell_id: String = str(entry.special.get("id", ""))
+			if not SpellUpgradesScript.has(spell_id):
+				continue
+			var level: int = player.spell_level_of(member, spell_id)
+			var maxed: bool = level >= SpellUpgradesScript.MAX_LEVEL
+			rows.append({
+				"id": Player.spell_key(member, spell_id), "owner": str(member.name), "level": level, "maxed": maxed,
+				"title": SpellUpgradesScript.display_name(spell_id, level) if maxed else "%s  ->  %s" % [SpellUpgradesScript.display_name(spell_id, level), SpellUpgradesScript.display_name(spell_id, level + 1)],
+				"effect": "Fully upgraded." if maxed else SpellUpgradesScript.level_text(spell_id, level + 1),
+				"price_text": "" if maxed else "%d Essence" % player.spell_upgrade_price(level + 1),
+				"can_buy": not maxed and SaveDataScript.banked_essence() >= player.spell_upgrade_price(level + 1),
+			})
 	return rows
 
 func _refresh_spells_display() -> void:
-	hud.show_spells_tab("Every spell can be upgraded twice, to + and then EX, for banked Essence. An upgrade is for the spell, not the caster, and lasts only this run -- but the Essence is gone for good, so don't die. (%d Essence banked)" % SaveDataScript.banked_essence(), spell_upgrade_rows())
+	hud.show_spells_tab("Every spell can be upgraded twice, to + and then EX, for banked Essence. An upgrade belongs to the caster it is bought for, and lasts only this run -- but the Essence is gone for good, so don't die. (%d Essence banked)" % SaveDataScript.banked_essence(), spell_upgrade_rows())
 
-func _on_spell_upgrade_pressed(spell_id: String) -> void:
-	if player.try_upgrade_spell(spell_id):
+func _on_spell_upgrade_pressed(row_id: String) -> void:
+	var parts: PackedStringArray = row_id.split("|")
+	var member = null
+	if parts.size() == 2:
+		for m in player.party:
+			if m.id == int(parts[0]):
+				member = m
+				break
+	if member != null and player.try_upgrade_spell(member, parts[parts.size() - 1]):
 		play_sfx("purchase")
 	_refresh_shop_display()
 
@@ -3785,22 +3809,24 @@ func _on_player_leveled_up(new_level: int) -> void:
 
 var prev_debug_keys := {}
 
-# Dev-only cheat keys for exercising content that'd otherwise take a real
-# run to reach -- F1/F2 jump the world forward/backward (also fast-forwards
+# Dev-only quick keys for exercising content that'd otherwise take a real
+# run to reach -- F2 jumps the world backward (also fast-forwards
 # wave to match, respawning a fresh squad for wherever you land, so the
 # enemies/terrain match instead of leftover stragglers from the old world),
 # F3 grants and equips a random weapon at a random quality tier, F4 hands
 # out a stack of coins, F5 tops off HP/stamina. Checked at the very top of
 # _process, ahead of every other state's early-return, so they work no
 # matter what's on screen (battle, shop, overworld, paused).
+# F1 belongs to the Debug menu (DebugMenu.gd), which can do all of this and a great deal more; these keys are
+# part of it now, so like the menu they only work while it is on (Settings > Gameplay, or the Sandbox).
 func _handle_debug_input() -> void:
-	var keys := {"F1": KEY_F1, "F2": KEY_F2, "F3": KEY_F3, "F4": KEY_F4, "F5": KEY_F5}
+	if not DebugMenuScript.is_enabled():
+		return
+	var keys := {"F2": KEY_F2, "F3": KEY_F3, "F4": KEY_F4, "F5": KEY_F5}
 	for name in keys:
 		var pressed: bool = Input.is_key_pressed(keys[name])
 		if pressed and not prev_debug_keys.get(name, false):
 			match name:
-				"F1":
-					_debug_jump_world(1)
 				"F2":
 					_debug_jump_world(-1)
 				"F3":
@@ -3831,7 +3857,7 @@ func _debug_jump_world(delta_index: int) -> void:
 		e.queue_free()
 	enemies_alive = 0
 	_spawn_wave()
-	hud.show_message("[DEBUG] %s, wave %d" % [WORLDS[current_world_index].name, wave])
+	hud.show_message("[DEBUG] %s, danger %d" % [WORLDS[current_world_index].name, wave])
 
 # Any UPGRADABLE_TYPES base at any quality tier (min_rank 0), bypassing the
 # usual coin cost/Might gate entirely -- for trying out weapon variety/tiers
@@ -3848,6 +3874,9 @@ func _debug_grant_random_weapon() -> void:
 func _process(delta: float) -> void:
 	_update_shake(delta)
 	_handle_debug_input()
+	# The Debug menu is up (it paused the game): nothing underneath reads keys or moves on.
+	if debug_menu != null and debug_menu.visible:
+		return
 	_update_party_followers()
 	if not in_interior:
 		_update_town_label()
@@ -4122,7 +4151,7 @@ func _apply_automatic_event(id: String) -> void:
 			hud.show_message("A goblin swarm approaches! (+%d coins for the trouble)" % 20)
 		"elite_bounty":
 			event_force_elite = true
-			hud.show_message("An elite has been spotted this wave...")
+			hud.show_message("An elite has been spotted nearby...")
 
 # Mirrors _on_levelup_choice_pressed's re-pause guard (Main.gd) -- the event
 # choice is the only thing that was paused, so unless something else (the
@@ -4159,10 +4188,10 @@ func _resolve_event_choice(id: String, accepted: bool) -> void:
 		"ancient_shrine":
 			if randf() < 0.5:
 				player.temp_damage_bonus_pct = 0.20
-				hud.show_message("The shrine blesses you! +20%% damage for %d waves." % SHRINE_EFFECT_WAVES)
+				hud.show_message("The shrine blesses you! +20%% damage until the danger rises %d times." % SHRINE_EFFECT_WAVES)
 			else:
 				player.temp_damage_bonus_pct = -0.15
-				hud.show_message("The shrine's energy sours! -15%% damage for %d waves." % SHRINE_EFFECT_WAVES)
+				hud.show_message("The shrine's energy sours! -15%% damage until the danger rises %d times." % SHRINE_EFFECT_WAVES)
 			shrine_effect_waves_remaining = SHRINE_EFFECT_WAVES
 		"wounded_traveler":
 			if player.healing_items > 0:
@@ -4534,10 +4563,18 @@ func _make_member_battle_unit(member, tile: Vector2i, might_mult: float) -> Dict
 	# Magic: the member's own (a Moonstick doubles what levelling GAINED), plus what the weapon
 	# adds, times the kind's favour for it (the Druid's staff).
 	var magic_gain_mult: float = float(weapon.get("passive_magic_gain_mult", 1.0))
-	var magic_value: float = float(rules.get("base", {}).get("magic", 0.0)) + float(member.bonus.get("magic", 0.0)) * magic_gain_mult
+	# Arcane Training (the Astral Sorcery wing) adds magic every level a member has gained, a Moonstick doubles it with the rest.
+	var arcane_gain: float = float(maxi(0, member.level - 1)) * player.meta_member_magic_per_level if member.levels() else 0.0
+	var magic_value: float = float(rules.get("base", {}).get("magic", 0.0)) + (float(member.bonus.get("magic", 0.0)) + arcane_gain) * magic_gain_mult
 	magic_value = (magic_value + float(weapon.get("magic_bonus", 0.0))) * float(favour.get("magic_mult", 1.0))
 	var mana_pool: int = int(round(magic_value * PartyRulesScript.MANA_PER_MAGIC)) if member.is_caster() else 0
+	# Deep Well (+flat mana from the Church) -- a Necromancer's mana is her HP, handled just below.
+	if mana_pool > 0:
+		mana_pool += player.meta_max_mana_flat
 	var hp_value: int = member.max_hp() + int(mods.get("max_hp", 0.0))
+	# For a unit whose spells cost HP the mana bonuses are HP bonuses: Deep Well's flat mana at 5 mana to the HP.
+	if bool(rules.get("hp_as_mana", false)):
+		hp_value += int(player.meta_max_mana_flat) / MANA_PER_HP
 	hp_value = int(round(hp_value * (1.0 + float(mods.get("max_hp_pct", 0.0)))))
 	if float(mods.get("lock_hp_to_one", 0.0)) > 0.0:
 		hp_value = 1
@@ -4558,6 +4595,12 @@ func _make_member_battle_unit(member, tile: Vector2i, might_mult: float) -> Dict
 		defense_points += player.armor_defense_fraction(armor) * 100.0 if not armor.is_empty() else 0.0
 		defense_points += float(shield.get("damage_reduction_pct", 0.0)) * 100.0
 	var fortitude_points: float = member.fortitude() + float(armor.get("fortitude", 0)) + float(shield.get("fortitude", 0))
+	# Heavy Cloak: +1 Resilience and Fortitude for every 3 Magic (a Marksman's Defense stays what it is).
+	var cloak: float = floorf(magic_value / 3.0 * float(mods.get("res_ftd_per_3_mag", 0.0)))
+	if cloak > 0.0:
+		if not rules.has("defense_fixed"):
+			defense_points += cloak
+		fortitude_points += cloak
 	if stamina_pool > 0:
 		stamina_pool = maxi(1, stamina_pool + int(armor_params.get("max_stamina_bonus", 0)))
 	var move_tiles: int = member.move_tiles() + int(mods.get("move_range", 0.0))
@@ -4818,6 +4861,10 @@ func _effective_rock_target() -> Vector2i:
 # here regardless of what's actually on it -- only a currently-targetable
 # rock during the player's own turn does anything with the click.
 func _on_rock_target_selected(tile: Vector2i) -> void:
+	# While the Staff's I SUMMON THEE waits for a tile, a click on the grid is where the spectre rises.
+	if battle_menu_state == "ally_pick" and str(battle_ally_pending_action.get("effect", "")) == "summon_spectre":
+		_spectre_click(tile)
+		return
 	if battle_turn != "player" or not tile in _targetable_rock_tiles():
 		return
 	battle_rock_target = tile
@@ -6235,7 +6282,8 @@ func _hero_shared_effect(key: String) -> float:
 	return _shared_effect_at(battle_player_tile, key, null)
 
 # The combat effects a Shaman can share: only ones that are read live during a fight.
-const SHARED_TALISMAN_KEYS := ["damage_pct", "crit_chance", "crit_damage_mult_bonus", "low_hp_damage_pct", "burn_chance", "burn_chance_multihit", "first_attack_damage_pct", "lifesteal_pct", "heal_on_kill", "hp_regen_turn", "hp_regen_per_20_max_hp", "stamina_regen", "double_secondary_chance"]
+const SHARED_TALISMAN_KEYS := ["damage_pct", "crit_chance", "crit_damage_mult_bonus", "low_hp_damage_pct", "burn_chance", "burn_chance_multihit", "first_attack_damage_pct", "lifesteal_pct", "heal_on_kill", "hp_regen_turn", "hp_regen_per_20_max_hp", "stamina_regen", "double_secondary_chance",
+	"spell_potency_pct", "spell_echo_chance", "spell_clapback_chance", "spell_clapback_mage_pct", "mana_regen_pct", "spell_cost_pct"]
 
 func _shared_effect_at(tile: Vector2i, key: String, exclude) -> float:
 	if battle_allies.is_empty() or not SHARED_TALISMAN_KEYS.has(key):
@@ -6457,8 +6505,8 @@ func _battle_perform_attack(action: Dictionary) -> void:
 		_resolve_fireball(action, weapon)
 	elif effect == "landfall":
 		_resolve_landfall(weapon)
-	elif effect == "channel":
-		_resolve_channel()
+	elif effect == "summon_spectre":
+		_resolve_summon_spectre()
 	elif effect == "revive":
 		_resolve_revive()
 	# The party kits (PartyKits.gd). Sucker Punch and Drain Punch are plain hits with a rider in
@@ -6686,11 +6734,17 @@ func _battle_perform_attack(action: Dictionary) -> void:
 	if timing_result == AttackTimingsScript.PERFECT:
 		_actor_gain_stamina(ATTACK_TIMING_PERFECT_STAMINA)
 
+	# Clapback and Lingering Echo ride on a member's spell (not on the turn a Fireball only charges).
+	var echo_armed := false
+	if _actor_is_ally() and not battle_units.is_empty() and int(battle_actor.get("hp", 0)) > 0 and battle_actor.get("charging", {}).is_empty() \
+			and SpellUpgradesScript.has(str(action.get("id", ""))):
+		echo_armed = _after_spell(action, weapon)
+
 	# Some actions leave a member's command open: a free action (Taunt, the Druid's movement spell,
 	# Drive-By), or -- for the Rogue -- the first attack of the turn, after which it can run.
 	if _actor_is_ally() and not battle_units.is_empty():
 		var unit = battle_actor
-		if action.get("keeps_turn", false):
+		if action.get("keeps_turn", false) or echo_armed:
 			battle_actor = {}
 			return
 		if unit.get("moves_after_attack", false) and not unit.get("attacked", false) and float(action.get("dmg_mult", 1.0)) > 0.0:
@@ -7004,6 +7058,16 @@ func _battle_player_item() -> void:
 		"restore_stamina":
 			player.reset_stamina()
 			hud.battle_log("Stamina rushes back into you!")
+	# Battle Medic (Church): using a healing item shocks every enemy for a little damage.
+	if player.meta_battle_medic_damage > 0:
+		hud.battle_log("Battle Medic! The healing item lashes every enemy for %d damage." % player.meta_battle_medic_damage)
+		for foe in battle_units.duplicate():
+			var foe_idx: int = battle_units.find(foe)
+			if foe_idx >= 0:
+				_hit(foe_idx, 1.0, "battle_medic", player.current_weapon, player.meta_battle_medic_damage, true)
+		if battle_units.is_empty():
+			_battle_victory()
+			return
 	_end_player_turn()
 
 # Cleansing Potion: strips every negative status currently afflicting the
@@ -7024,6 +7088,9 @@ func _battle_player_defend() -> void:
 	# Resilience (repurposed): heal a flat amount every time you Defend.
 	if player.block_heal_amount() > 0:
 		player.heal(player.block_heal_amount())
+	# Take a Breather (Church): the hero has no Skip, so waiting is Defend -- it heals 1/16 of your max HP.
+	if player.meta_take_a_breather:
+		player.heal(maxi(1, player.max_health / 16))
 	if tutorial_active and tutorial_step == 2:
 		_complete_tutorial()
 	_end_player_turn()
@@ -7303,8 +7370,6 @@ func _on_battle_ally_action(action: String) -> void:
 const ALLY_GUARD_MANA := 15
 # Summon the Dead's "how many" picker offers one button per number up to this many (the HUD keeps that many pick buttons).
 const SUMMON_PICK_LIMIT := 24
-# Channel restores this share of the target's maximum mana (stamina for anyone without mana).
-const CHANNEL_RESTORE_PCT := 0.2
 
 # The regular attack as an action dictionary -- free for everything but a Bow, which costs stamina
 # exactly as it does for the hero. Members have no Heavy Attack.
@@ -7320,6 +7385,10 @@ func _ally_specials(u: Dictionary) -> Array:
 			"dmg_mult": float(charging.get("dmg_mult", 1.0)), "effect": str(charging.get("effect", "")), "release": true,
 			"description": "Let it fly at your selected target -- it can be anyone on the field.",
 		}]
+	# Echo: the spell just cast comes round again, free -- the only thing left in the menu (the target is picked afresh).
+	var echo: Dictionary = u.get("echo", {})
+	if not echo.is_empty():
+		return [echo]
 	var pool: Array = _ally_special_pool(u)
 	# A member brings only the specials chosen on the Party screen (PartyRules.SPECIAL_SLOTS of them), in
 	# slot order; anyone without a loadout (a mercenary, a skeleton) simply has the whole pool. Every roster member
@@ -7345,26 +7414,73 @@ func _ally_special_pool(u: Dictionary) -> Array:
 	for kit in PartyKitsScript.specials_for(str(u.get("kind", ""))):
 		out.append(_kit_special_for(u, kit))
 	for special in u.get("weapon", {}).get("specials", []):
-		out.append(_with_spell_level(special))
+		out.append(_spell_cost_adjust(u, _priced_special(u, _with_spell_level(special, u))))
+	return out
+
+# --- The Sorcery wing: talismans and Astral upgrades that act on spells (Talismans.gd key list, Player.meta_*) -------
+# What a caster's spells are worth: 1.0 plus every source of potency added together -- the Snail Shell, and the Church's Innate Power.
+func _potency(u: Dictionary) -> float:
+	return 1.0 + player.meta_spell_potency_pct + _unit_effect(u, "spell_potency_pct")
+
+# A spell costs less for a unit that casts with mana (or HP, the Necromancer's mana): the Dreamcatcher takes 33% off. Costs are in
+# mana-worth throughout, so the same share comes off a mage's mana and the Necromancer's HP. Never below 1, and never on a fighter's stamina.
+func _spell_cost_adjust(u: Dictionary, s: Dictionary) -> Dictionary:
+	var cost: int = int(s.get("stamina_cost", 0))
+	if cost <= 0 or not SpellUpgradesScript.has(str(s.get("id", ""))) or _unit_pool_name(u) == "stamina":
+		return s
+	var cut: float = clampf(_unit_effect(u, "spell_cost_pct"), 0.0, 0.95)
+	if cut <= 0.0:
+		return s
+	var out: Dictionary = s.duplicate(true)
+	out["stamina_cost"] = maxi(1, int(round(float(cost) * (1.0 - cut))))
+	return out
+
+# Loud Whistle: every summon is doubled.
+func _summon_mult(u: Dictionary) -> int:
+	return 2 if _unit_effect(u, "summon_double") > 0.0 else 1
+
+# A weapon special whose price is a share of the caster's whole pool (I SUMMON THEE: half of it), worked out in the caster's own
+# currency -- mana, stamina, or the Necromancer's HP (in mana-worth, like every other HP cost). Anything else comes back as is.
+func _priced_special(u: Dictionary, s: Dictionary) -> Dictionary:
+	if float(s.get("cost_pct_max", 0.0)) <= 0.0:
+		return s
+	var pct: float = _sn(str(s.get("id", "")), "cost_pct", float(s.cost_pct_max), u)
+	var out: Dictionary = s.duplicate(true)
+	var cost: int
+	if bool(u.get("hp_as_mana", false)):
+		cost = int(round(float(u.get("max_hp", 0)) * pct)) * MANA_PER_HP
+	elif int(u.get("max_mana", 0)) > 0:
+		cost = int(round(float(u.max_mana) * pct))
+	else:
+		cost = int(round(float(u.get("max_stamina", 0)) * pct))
+	out["stamina_cost"] = maxi(1, cost)
 	return out
 
 # --- Spell upgrades (SpellUpgrades.gd) -------------------------------------------------------------------
 # An upgrade belongs to the spell, whoever casts it: one number of one spell, at its current level.
-func _sn(spell_id: String, key: String, fallback: float = 0.0) -> float:
-	return SpellUpgradesScript.number(spell_id, player.spell_level(spell_id), key, fallback)
+# The unit whose spell is being read: the one acting, else the one being commanded (a spell upgrade belongs to its caster).
+func _spell_caster() -> Dictionary:
+	if not battle_actor.is_empty():
+		return battle_actor
+	return battle_commanding_ally if battle_commanding_ally != null else {}
+
+# One number of one spell at the CASTER's level of it (`u` names the caster; by default it is whoever is acting or being commanded).
+func _sn(spell_id: String, key: String, fallback: float = 0.0, u: Dictionary = {}) -> float:
+	var caster: Dictionary = u if not u.is_empty() else _spell_caster()
+	return SpellUpgradesScript.number(spell_id, player.spell_level_of(caster.get("member", null), spell_id), key, fallback)
 
 # The special as the player sees and casts it at its upgraded level: renamed (Restore+, Restore EX), a line added saying what
 # the upgrade does, and the fireball's damage multiplier raised. A plain spell, or anything that is not a spell, comes back as is.
-func _with_spell_level(s: Dictionary) -> Dictionary:
+func _with_spell_level(s: Dictionary, u: Dictionary = {}) -> Dictionary:
 	var id: String = str(s.get("id", ""))
-	var level: int = player.spell_level(id) if SpellUpgradesScript.has(id) else 0
+	var level: int = player.spell_level_of(u.get("member", null), id) if SpellUpgradesScript.has(id) else 0
 	if level <= 0:
 		return s
 	var out: Dictionary = s.duplicate(true)
 	out["name"] = SpellUpgradesScript.display_name(id, level)
 	out["description"] = "%s  [%s] %s" % [str(s.get("description", "")), SpellUpgradesScript.SUFFIX[level].strip_edges(), SpellUpgradesScript.level_text(id, level)]
 	if id == "staff_i_cast_fireball":
-		out["dmg_mult"] = _sn(id, "mult", 1.2)
+		out["dmg_mult"] = _sn(id, "mult", 1.2, u)
 	return out
 
 # --- What the Party screen shows -----------------------------------------------------------
@@ -7394,7 +7510,7 @@ func _kit_special_for(u: Dictionary, kit: Dictionary) -> Dictionary:
 	if s.get("cost_all", false):
 		# Every HP but one (the upgrades leave her more: SpellUpgrades keep_pct), in mana-worth; with nothing to spare the
 		# cost cannot be paid at all.
-		var keep: int = maxi(1, int(round(float(u.max_hp) * _sn(str(s.get("id", "")), "keep_pct"))))
+		var keep: int = maxi(1, int(round(float(u.max_hp) * _sn(str(s.get("id", "")), "keep_pct", 0.0, u))))
 		cost = (int(u.hp) - keep if int(u.hp) > keep else int(u.hp)) * MANA_PER_HP
 	elif s.has("hp_cost_flat"):
 		# A flat HP cost plus a share of max HP (Curse of Rot: 10 HP + 15% of max HP).
@@ -7402,7 +7518,7 @@ func _kit_special_for(u: Dictionary, kit: Dictionary) -> Dictionary:
 	elif s.get("per_skeleton", false):
 		var member = u.get("member", null)
 		var kills: int = int(member.kills_last_battle) if member != null else 0
-		var skeleton_cost: int = int(_sn("necromancer_summon_the_dead", "hp_cost", PartyKitsScript.SKELETON_HP_COST))
+		var skeleton_cost: int = int(_sn("necromancer_summon_the_dead", "hp_cost", PartyKitsScript.SKELETON_HP_COST, u))
 		var count: int = mini(kills, maxi(0, (int(u.hp) - 1) / skeleton_cost))
 		# It can only be cast with enough HP in hand (5 HP + 40% of max HP), on top of paying per skeleton.
 		var needed: int = int(s.get("require_hp_flat", 0)) + int(round(float(u.max_hp) * float(s.get("require_hp_pct", 0.0))))
@@ -7433,12 +7549,12 @@ func _kit_special_for(u: Dictionary, kit: Dictionary) -> Dictionary:
 		if int(player.owned_arrows.get(arrow_kind, 0)) <= 0:
 			s["disabled_reason"] = "out of %s arrows" % arrow_kind
 	s["stamina_cost"] = cost
-	return _with_spell_level(s)
+	return _spell_cost_adjust(u, _with_spell_level(s, u))
 
 # Which side an effect needs the player to pick from before it resolves ("" = no pick needed).
 func _special_target_kind(effect: String) -> String:
 	match effect:
-		"channel": return "ally"
+		"summon_spectre": return "tile"
 		"revive": return "downed"
 		"charge", "dodge_and_weave": return "direction"
 		"cleansing_chant": return "chant"
@@ -7477,11 +7593,13 @@ func _ally_choose_special(i: int) -> void:
 		return
 	var picks: Array = _ally_pick_candidates(u, kind, action)
 	if picks.is_empty():
-		hud.battle_log("There is no one to use %s on." % action.name)
+		hud.battle_log("There is no one to use %s on." % action.name if kind != "tile" else "There is nowhere to put it.")
 		return
 	battle_ally_pending_action = action
 	battle_ally_pick_candidates = picks
 	battle_menu_state = "ally_pick"
+	if kind == "tile":
+		hud.battle_log("Click any empty tile on the field to raise it there, or pick a spot from the list.")
 	_refresh_battle_display()
 	hud.focus_ally_submenu()
 
@@ -7501,6 +7619,23 @@ func _ally_pick_candidates(u: Dictionary, kind: String, action: Dictionary = {})
 			counts.append(most)
 		for n in counts:
 			out.append({"label": "Raise %d  (%d HP)%s" % [n, n * each, "  - most" if n == most else ""], "target": n})
+		return out
+	if kind == "tile":
+		# I SUMMON THEE: any empty tile (clicked on the grid -- see _on_rock_target_selected); the list offers the two sensible spots.
+		var beside_caster: Vector2i = _open_tile_near(u.tile)
+		if beside_caster != Vector2i(-1, -1):
+			out.append({"label": "Beside %s" % str(u.name), "target": beside_caster})
+		var nearest_foe := -1
+		var nearest_gap := 9999
+		for i in battle_units.size():
+			var gap: int = _footprint_dist(_footprint(battle_units[i].tile, battle_units[i].get("size", 1)), u.tile)
+			if gap < nearest_gap:
+				nearest_gap = gap
+				nearest_foe = i
+		if nearest_foe >= 0:
+			var beside_foe: Vector2i = _open_tile_near(battle_units[nearest_foe].tile)
+			if beside_foe != Vector2i(-1, -1) and beside_foe != beside_caster:
+				out.append({"label": "Beside the nearest enemy", "target": beside_foe})
 		return out
 	if kind == "chant":
 		# Cleansing Chant: the whole circle at once (one status each), or one ally freed of everything.
@@ -7546,7 +7681,10 @@ func _ally_pick_target(j: int) -> void:
 		# The pick is a number of skeletons, not a target: the action is repriced to raise (and pay for) exactly that many.
 		var n: int = clampi(int(picked), 1, maxi(1, int(action.get("summon_max", 1))))
 		action["summon_count"] = n
-		action["stamina_cost"] = n * int(_sn("necromancer_summon_the_dead", "hp_cost", PartyKitsScript.SKELETON_HP_COST)) * MANA_PER_HP
+		# (an Echo recast is free)
+		if not bool(action.get("echo", false)):
+			action["stamina_cost"] = n * int(_sn("necromancer_summon_the_dead", "hp_cost", PartyKitsScript.SKELETON_HP_COST)) * MANA_PER_HP
+			action = _spell_cost_adjust(battle_commanding_ally, action)
 		battle_ally_target = null
 	else:
 		battle_ally_target = picked
@@ -7582,7 +7720,7 @@ func _ally_menu_info() -> Dictionary:
 	var disarmed: bool = u.get("disarmed_tile", Vector2i(-1, -1)) != Vector2i(-1, -1)
 	var regular: Dictionary = _ally_regular_action(u)
 	info.attack_label = "Attack" + _ally_cost_text(u, int(regular.stamina_cost))
-	info.attack_disabled = charging or disarmed or bool(u.get("attacked", false)) or not _unit_can_pay(u, int(regular.stamina_cost))
+	info.attack_disabled = charging or not u.get("echo", {}).is_empty() or disarmed or bool(u.get("attacked", false)) or not _unit_can_pay(u, int(regular.stamina_cost))
 	info.move_disabled = battle_ally_moves_left <= 0 or charging
 	var specials: Array = _ally_specials(u)
 	# After Drive-By only a plain attack is left; after the Rogue's strike only moving is.
@@ -7593,7 +7731,7 @@ func _ally_menu_info() -> Dictionary:
 		var reason: String = str(special.get("disabled_reason", ""))
 		# Summon the Dead's price is per skeleton (the picker asks how many); the rest show their whole cost.
 		var cost_text: String = _ally_cost_text(u, cost)
-		if special.get("per_skeleton", false):
+		if special.get("per_skeleton", false) and not special.get("echo", false):
 			cost_text = " (%d HP each)" % int(_sn("necromancer_summon_the_dead", "hp_cost", PartyKitsScript.SKELETON_HP_COST))
 		info.specials.append({
 			"label": str(special.name) + cost_text,
@@ -7684,6 +7822,52 @@ func _mark_ally_spotted(u: Dictionary, a: Dictionary) -> void:
 	spotted[str(a.get("name", ""))] = true
 	u["spotted_allies"] = spotted
 
+# --- Riders on a cast spell: Clapback and Lingering Echo ----------------------------------------------------------
+
+# The index of the enemy nearest `from` (-1 on an empty field).
+func _nearest_enemy_index(from: Vector2i) -> int:
+	var best := -1
+	var best_gap := 9999
+	for i in battle_units.size():
+		var gap: int = _footprint_dist(_footprint(battle_units[i].tile, battle_units[i].get("size", 1)), from)
+		if gap < best_gap:
+			best_gap = gap
+			best = i
+	return best
+
+# Called once a member's spell has resolved (and the field is not empty). True = Lingering Echo was rolled: the spell is armed to be cast again,
+# free, with its target picked afresh, and the member's command stays open for it.
+func _after_spell(action: Dictionary, weapon: Dictionary) -> bool:
+	var u: Dictionary = battle_actor
+	if bool(action.get("echo", false)):
+		u["echo"] = {}
+	# Clapback: STR plus half MAG on the nearest enemy, more if it is a mage.
+	var clap: float = _proc(_actor_tb("spell_clapback_chance"))
+	if clap > 0.0 and randf() < clap and not battle_units.is_empty():
+		var c_idx: int = _nearest_enemy_index(u.tile)
+		if c_idx >= 0:
+			var is_mage: bool = bool(ENEMY_TRAITS.get(battle_units[c_idx].name, {}).get("mage", false))
+			var mage_bonus: float = _actor_tb("spell_clapback_mage_pct") if is_mage else 0.0
+			var flat: int = maxi(1, int(round((float(u.get("attack", 0.0)) + float(u.get("magic", 0.0)) / 2.0) * (1.0 + mage_bonus) * float(u.get("dmg_mult", 1.0)))))
+			hud.battle_log("%s follows up with a clapback!" % _actor_label())
+			_hit(c_idx, 1.0, "clapback", weapon, flat, false)
+	# Echo: the spell comes round again for nothing -- worth arming only if it has somewhere to land.
+	if bool(action.get("echo", false)) or bool(action.get("keeps_turn", false)) or battle_units.is_empty():
+		return false
+	var echo: float = _proc(_actor_tb("spell_echo_chance"))
+	if echo <= 0.0 or randf() >= echo:
+		return false
+	var again: Dictionary = action.duplicate(true)
+	again["stamina_cost"] = 0
+	again["echo"] = true
+	again["name"] = "Echo: %s" % str(action.get("name", "")).trim_prefix("Release: ")
+	var kind: String = _special_target_kind(str(again.get("effect", "")))
+	if kind != "" and _ally_pick_candidates(u, kind, again).is_empty():
+		return false
+	u["echo"] = again
+	hud.battle_log("%s's spell echoes -- it can be cast again, free!" % _actor_label())
+	return true
+
 # --- The Staff's effects (and Revival, ready for the Necromancer) -----------------------------
 
 # I CAST FIREBALL: the first use charges (the member can't move; the charge is lost if it is
@@ -7692,7 +7876,8 @@ func _mark_ally_spotted(u: Dictionary, a: Dictionary) -> void:
 # 5 per tile from the centre. Damage reaches enemies only.
 func _resolve_fireball(action: Dictionary, weapon: Dictionary) -> void:
 	var u = battle_actor
-	if not action.get("release", false):
+	# (the Ember Lens skips the charging turn: the fireball is thrown at once)
+	if not action.get("release", false) and _actor_tb("fireball_instant") <= 0.0:
 		u["charging"] = {"id": str(action.get("id", "")), "name": str(action.get("name", "Fireball")), "dmg_mult": float(action.get("dmg_mult", 1.2)), "effect": "fireball"}
 		hud.battle_log("%s gathers a fireball... (can't move while charging)" % _actor_label())
 		return
@@ -7705,7 +7890,7 @@ func _resolve_fireball(action: Dictionary, weapon: Dictionary) -> void:
 	# 1) it flies, 2) it lights the target, 3) it explodes -- in that order.
 	center["burning"] = true
 	hud.battle_log("The %s catches fire!" % center.name)
-	var base: float = _actor_attack_stat() * float(weapon.get("damage_mult", 1.0)) * float(action.get("dmg_mult", 1.2))
+	var base: float = _actor_attack_stat() * float(weapon.get("damage_mult", 1.0)) * float(action.get("dmg_mult", 1.2)) * _potency(u)
 	var victims: Array = []
 	for e in battle_units:
 		# The blast covers the 3x3 around the centre (a diagonal neighbour is in it); a big unit
@@ -7729,31 +7914,80 @@ func _resolve_fireball(action: Dictionary, weapon: Dictionary) -> void:
 # Landfall: every enemy on the field takes (attack x 3) + (magic / 2), each with a 25% stun chance.
 func _resolve_landfall(weapon: Dictionary) -> void:
 	var u = battle_actor
-	var flat: int = maxi(1, int(round((float(u.get("attack", 0.0)) * _sn("staff_landfall", "attack_mult", 3.0) + float(u.get("magic", 0.0)) * _sn("staff_landfall", "magic_mult", 0.5)) * float(u.get("dmg_mult", 1.0)))))
+	var flat: int = maxi(1, int(round((float(u.get("attack", 0.0)) * _sn("staff_landfall", "attack_mult", 3.0) + float(u.get("magic", 0.0)) * _sn("staff_landfall", "magic_mult", 0.5)) * float(u.get("dmg_mult", 1.0)) * _potency(u))))
 	hud.battle_log("%s calls the sky down!" % _actor_label())
 	for e in battle_units.duplicate():
 		var idx: int = battle_units.find(e)
 		if idx >= 0:
 			_hit(idx, 1.0, "landfall", weapon, flat, true)
 
-# Channel: restores a share of an ally's maximum mana (stamina, for someone without a mana pool).
-func _resolve_channel() -> void:
-	var target = battle_ally_target
-	if target == null:
+# --- I SUMMON THEE (the Staff's third special; it replaced Channel) -----------------------------------------------
+# One spectre ally, raised on any empty tile the caster picks -- it ignores terrain, so rock and water are fine to stand it on.
+# Its stats are shares of the CASTER's (the SpellUpgrades table: STR and MAG 80%, VGR 50%, AGI 120%, DXT 70%; MGT, ITL, INM,
+# RES and FTD are 0), it dodges a flat share of attacks (RFL), and like a skeleton it needs no orders: it walks at the nearest enemy
+# and strikes it with a plain attack whose damage is its STR plus its MAG.
+const SPECTRE_ID := "staff_i_summon_thee"
+
+func _spectre_tile_ok(t: Vector2i) -> bool:
+	return _in_battle_bounds(t) and not _battle_tile_occupied(t)
+
+# The tile the player clicked while choosing where to raise it (the pending special is waiting in "ally_pick").
+func _spectre_click(tile: Vector2i) -> void:
+	if not _spectre_tile_ok(tile):
+		hud.battle_log("Pick an empty tile.")
 		return
-	if typeof(target) == TYPE_STRING:
-		var gain: int = int(round(player.max_stamina * _sn("staff_channel", "pct", CHANNEL_RESTORE_PCT)))
-		player.regen_stamina(gain)
-		hud.battle_log("%s channels %d stamina into you." % [_actor_label(), gain])
+	var action: Dictionary = battle_ally_pending_action
+	battle_ally_pending_action = {}
+	battle_ally_pick_candidates = []
+	battle_ally_target = tile
+	_ally_perform(action)
+
+func _resolve_summon_spectre() -> void:
+	var caster: Dictionary = battle_actor
+	var tile = battle_ally_target
+	if typeof(tile) != TYPE_VECTOR2I or not _spectre_tile_ok(tile):
+		tile = _open_tile_near(caster.tile)
+	if typeof(tile) != TYPE_VECTOR2I or tile == Vector2i(-1, -1):
+		hud.battle_log("There is nowhere for the spectre to rise.")
 		return
-	if int(target.get("max_mana", 0)) > 0:
-		var gain_mana: int = int(round(int(target.max_mana) * _sn("staff_channel", "pct", CHANNEL_RESTORE_PCT)))
-		target.mana = mini(int(target.max_mana), int(target.mana) + gain_mana)
-		hud.battle_log("%s channels %d mana into %s." % [_actor_label(), gain_mana, target.name])
-	else:
-		var gain_sta: int = int(round(int(target.get("max_stamina", 0)) * _sn("staff_channel", "pct", CHANNEL_RESTORE_PCT)))
-		target["stamina"] = mini(int(target.get("max_stamina", 0)), int(target.get("stamina", 0)) + gain_sta)
-		hud.battle_log("%s channels %d stamina into %s." % [_actor_label(), gain_sta, target.name])
+	battle_allies.append(_make_spectre(tile, caster))
+	# A Loud Whistle raises a second spectre beside the first.
+	for extra in _summon_mult(caster) - 1:
+		var beside: Vector2i = _open_tile_near(tile)
+		if beside != Vector2i(-1, -1):
+			battle_allies.append(_make_spectre(beside, caster))
+	hud.battle_log("%s calls: I SUMMON THEE! A spectre rises." % _actor_label() if _summon_mult(caster) == 1 else "%s calls: I SUMMON THEE! Spectres rise." % _actor_label())
+
+func _make_spectre(tile: Vector2i, caster: Dictionary) -> Dictionary:
+	var u: Dictionary = _make_skeleton(tile)
+	var potency: float = _potency(caster)
+	var strength: float = float(caster.get("attack", 0.0)) * _sn(SPECTRE_ID, "str", 0.8, caster) * potency
+	var magic: float = float(caster.get("magic", 0.0)) * _sn(SPECTRE_ID, "mag", 0.8, caster) * potency
+	var hp: int = maxi(1, int(round(float(caster.get("max_hp", 1)) * _sn(SPECTRE_ID, "vgr", 0.5, caster) * potency)))
+	var agility: float = _sn(SPECTRE_ID, "agi", 1.2, caster)
+	u["name"] = "Spectre"
+	u["kind"] = "spectre"
+	u["hp"] = hp
+	u["max_hp"] = hp
+	u["strength"] = strength
+	u["attack"] = strength + magic
+	u["magic"] = magic
+	u["dmg_mult"] = float(caster.get("dmg_mult", 1.0))
+	u["speed"] = float(caster.get("speed", MERCENARY_SPEED)) * agility
+	u["move_range"] = maxi(1, int(ceil(float(caster.get("move_range", 1)) * agility)))
+	u["dodge_chance"] = _sn(SPECTRE_ID, "dodge", 0.5, caster)
+	u["mods"] = {"crit_chance": _unit_effect(caster, "crit_chance") * _sn(SPECTRE_ID, "dxt", 0.7, caster)}
+	u["defense_pct"] = 0.0
+	u["fortitude"] = 0.0
+	u["ignores_terrain"] = true
+	return u
+
+# One step for a unit that ignores terrain: any in-bounds, unoccupied tile, whatever is on it (no rock to block, no cliff to fall off).
+func _spectre_step(from: Vector2i, dir: Vector2i) -> Dictionary:
+	var target: Vector2i = from + dir
+	if not _in_battle_bounds(target) or _battle_tile_occupied(target, null, from):
+		return {"tile": from, "moved": false, "fell": false}
+	return {"tile": target, "moved": true, "fell": false}
 
 # Revival (the Necromancer's Revival Blessing): stands a downed ally back up at full HP.
 func _resolve_revive() -> void:
@@ -7877,7 +8111,7 @@ func _resolve_curse_of_rot() -> void:
 		return
 	var e: Dictionary = battle_units[idx]
 	e["rot_turns"] = PartyKitsScript.ROT_TURNS
-	e["rot_pct"] = _sn("necromancer_curse_of_rot", "pct", PartyKitsScript.ROT_DAMAGE_PCT)
+	e["rot_pct"] = _sn("necromancer_curse_of_rot", "pct", PartyKitsScript.ROT_DAMAGE_PCT) * _potency(battle_actor)
 	e["rot_kills"] = maxi(1, int(_sn("necromancer_curse_of_rot", "kills", 1.0)))   # how many kills its death counts as
 	e["rot_by"] = battle_actor
 	hud.battle_log("%s curses the %s -- it begins to rot!" % [_actor_label(), e.name])
@@ -7913,18 +8147,22 @@ func _note_enemy_death(enemy: Dictionary, killer) -> void:
 func _resolve_summon_dead(action: Dictionary) -> void:
 	var u = battle_actor
 	var raised := 0
-	for i in int(action.get("summon_count", 0)):
+	# (a Loud Whistle doubles the number raised for the same price)
+	for i in int(action.get("summon_count", 0)) * _summon_mult(u):
 		var tile: Vector2i = _open_tile_near(u.tile)
 		if tile == Vector2i(-1, -1):
 			break
-		battle_allies.append(_make_skeleton(tile))
+		battle_allies.append(_make_skeleton(tile, u))
 		raised += 1
 	hud.battle_log("%s raises %d skeleton%s from the dead!" % [_actor_label(), raised, "" if raised == 1 else "s"])
 
-func _make_skeleton(tile: Vector2i) -> Dictionary:
+# (the summoner's spell potency -- the Snail Shell, Innate Power -- toughens and strengthens what it raises)
+func _make_skeleton(tile: Vector2i, caster: Dictionary = {}) -> Dictionary:
+	var potency: float = _potency(caster) if not caster.is_empty() else 1.0
+	var bones: int = maxi(1, int(round(_sn("necromancer_summon_the_dead", "hp", PartyKitsScript.SKELETON_HP, caster) * potency)))
 	return {
-		"tile": tile, "hp": int(_sn("necromancer_summon_the_dead", "hp", PartyKitsScript.SKELETON_HP)), "max_hp": int(_sn("necromancer_summon_the_dead", "hp", PartyKitsScript.SKELETON_HP)),
-		"name": "Skeleton", "kind": "skeleton", "attack": _sn("necromancer_summon_the_dead", "damage", PartyKitsScript.SKELETON_DAMAGE), "magic": 0.0,
+		"tile": tile, "hp": bones, "max_hp": bones,
+		"name": "Skeleton", "kind": "skeleton", "attack": _sn("necromancer_summon_the_dead", "damage", PartyKitsScript.SKELETON_DAMAGE, caster) * potency, "magic": 0.0,
 		"dmg_mult": 1.0, "defense_pct": 0.0, "move_range": PartyKitsScript.SKELETON_MOVE, "attack_range": 1,
 		"stamina": 0, "max_stamina": 0, "mana": 0, "max_mana": 0, "hp_as_mana": false,
 		"weapon": {"damage_mult": 1.0}, "mods": {}, "fainted": false, "skip_turns": 0, "charging": {},
@@ -7961,7 +8199,7 @@ func _auto_ally_act(a: Dictionary) -> void:
 				step_dir = dir
 		if step_dir == Vector2i.ZERO:
 			break
-		var result := _resolve_battle_step(a.tile, step_dir, a.tile)
+		var result := _spectre_step(a.tile, step_dir) if a.get("ignores_terrain", false) else _resolve_battle_step(a.tile, step_dir, a.tile)
 		if not result.moved:
 			break
 		a.tile = result.tile
@@ -7970,8 +8208,9 @@ func _auto_ally_act(a: Dictionary) -> void:
 	if not reachable.is_empty():
 		_hit(nearest if nearest in reachable else reachable[0], 1.0, "", a.weapon)
 	battle_actor = {}
-	a.tile = _apply_water_push(a.tile, a)
-	_apply_terrain_tick(a.tile, a)
+	if not a.get("ignores_terrain", false):
+		a.tile = _apply_water_push(a.tile, a)
+		_apply_terrain_tick(a.tile, a)
 
 # How Charming: the Shaman's talisman sharing reaches 4 tiles for 2 turns.
 func _resolve_how_charming() -> void:
@@ -7994,7 +8233,7 @@ func _friends_within(center: Vector2i, radius: int) -> Array:
 # Soothing Rain: heals everyone within 2 tiles (the Shaman too) for 20% of their max HP.
 func _resolve_soothing_rain() -> void:
 	hud.battle_log("%s calls down a soothing rain." % _actor_label())
-	var rain_pct: float = _sn("shaman_soothing_rain", "pct", PartyKitsScript.SOOTHING_RAIN_PCT)
+	var rain_pct: float = _sn("shaman_soothing_rain", "pct", PartyKitsScript.SOOTHING_RAIN_PCT) * _potency(battle_actor)
 	for f in _friends_within(_actor_tile(), int(_sn("shaman_soothing_rain", "radius", PartyKitsScript.AURA_RADIUS))):
 		if typeof(f) == TYPE_STRING:
 			var healed: int = int(round(player.max_health * rain_pct))
@@ -8162,8 +8401,9 @@ func _resolve_druid_heal() -> void:
 	var target = battle_ally_target
 	if target == null:
 		return
-	var heal_pct: float = _sn("druid_heal", "pct", PartyKitsScript.DRUID_HEAL_PCT)
-	var magic_part: float = float(u.get("magic", 0.0)) / _sn("druid_heal", "div", PartyKitsScript.DRUID_HEAL_MAGIC_DIV)
+	var potency: float = _potency(u)
+	var heal_pct: float = _sn("druid_heal", "pct", PartyKitsScript.DRUID_HEAL_PCT) * potency
+	var magic_part: float = float(u.get("magic", 0.0)) / _sn("druid_heal", "div", PartyKitsScript.DRUID_HEAL_MAGIC_DIV) * potency
 	if typeof(target) == TYPE_STRING:
 		var healed: int = int(round(player.max_health * heal_pct + magic_part))
 		player.heal(healed)
@@ -8176,7 +8416,8 @@ func _resolve_druid_heal() -> void:
 # The Druid's buff: the target deals 1.5x damage for 3 rounds.
 func _resolve_druid_buff() -> void:
 	var target = battle_actor if battle_ally_target == null else battle_ally_target
-	var mult: float = _sn("druid_buff", "mult", PartyKitsScript.DRUID_BUFF_MULT)
+	# Potency raises the BONUS the buff gives (x1.5 is +0.5), not the 1x everyone already deals.
+	var mult: float = 1.0 + (_sn("druid_buff", "mult", PartyKitsScript.DRUID_BUFF_MULT) - 1.0) * _potency(battle_actor)
 	var turns: int = int(_sn("druid_buff", "turns", PartyKitsScript.DRUID_BUFF_TURNS))
 	if typeof(target) == TYPE_STRING:
 		battle_hero_buff_turns = turns
@@ -8231,14 +8472,27 @@ func _resolve_ally_arrow(kind: String, weapon: Dictionary) -> void:
 			_hit(idx, 1.0, "arrow_freeze", weapon, ARROW_FREEZE_FLAT_DMG, false)
 	player.owned_arrows[kind] = int(player.owned_arrows[kind]) - 1
 
+# The Spell Bank: a share of the caster's pool back at the end of each of its own turns (a Necromancer heals that share of her max HP).
+func _ally_end_of_turn_regen(u: Dictionary) -> void:
+	var pct: float = _unit_effect(u, "mana_regen_pct")
+	if pct <= 0.0:
+		return
+	if bool(u.get("hp_as_mana", false)):
+		u.hp = mini(int(u.max_hp), int(u.hp) + maxi(1, int(round(float(u.max_hp) * pct))))
+	elif int(u.get("max_mana", 0)) > 0:
+		u.mana = mini(int(u.max_mana), int(u.mana) + maxi(1, int(round(float(u.max_mana) * pct))))
+
 func _end_ally_command() -> void:
 	# Same end-of-turn terrain handling _end_player_turn gives the hero (water
 	# current, embers/spring/etc.) -- no Turtle Shell prompt, that's the
 	# hero's own talisman.
 	var u = battle_commanding_ally
+	if u != null:
+		u["echo"] = {}      # an Echo not taken up is lost
 	if u != null and u.hp > 0:
 		u.tile = _apply_water_push(u.tile, u)
 		_apply_terrain_tick(u.tile, u)
+		_ally_end_of_turn_regen(u)
 	battle_menu_state = "main"
 	battle_move_trail = []
 	_ally_command_over()
@@ -8312,7 +8566,7 @@ func _remove_fallen_allies() -> void:
 		var fallen: Dictionary = battle_allies[ally_i]
 		if fallen.hp <= 0 and fallen.get("summoned", false):
 			# A skeleton just crumbles: no body to revive, nothing to count.
-			hud.battle_log("Your %s crumbles to dust." % fallen.name)
+			hud.battle_log(("Your %s fades away." if str(fallen.get("kind", "")) == "spectre" else "Your %s crumbles to dust.") % fallen.name)
 			_spawn_battle_death_burst(fallen.tile)
 			battle_allies.remove_at(ally_i)
 		elif fallen.hp <= 0:
@@ -9936,6 +10190,7 @@ func _hero_status_state() -> Dictionary:
 		"defending": battle_player_defending, "taunting": battle_player_taunting,
 		"stealth": player.stealth_turns_remaining, "berserk": player.berserk_turns_remaining,
 		"buff": battle_hero_buff_turns, "bloodrage": battle_bloodrage_stacks,
+		"bloodboost": player.bloodmoon_stacks, "bloodcrash": player.bloodmoon_debuffed,
 		"potion_attack": player.potion_attack_turns, "potion_resilience": player.potion_resilience_turns, "potion_energy": player.potion_energy_turns,
 		"poison": player_poison_turns, "burning": player_burning, "bleed": player_bleed_turns, "blind": player_blind_turns,
 		"concussed": player_concussed_turns, "disarmed": player.disarmed_tile != Vector2i(-1, -1), "skip": battle_player_turns_to_skip,

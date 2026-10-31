@@ -1,0 +1,102 @@
+{
+	"_about": "The named places of the world: id (do not change), name, pos = [x, y] in world px, radius in px. Only these fields are read; the game's code still decides what stands there.",
+	"format": 1,
+	"landmarks": [
+		{
+			"id": "spawn",
+			"name": "Where you woke",
+			"kind": "spawn",
+			"pos": [12919.2, 7573.159668],
+			"radius": 220,
+			"boss": ""
+		},
+		{
+			"id": "town",
+			"name": "The Castle Town",
+			"kind": "town",
+			"pos": [16800, 11900],
+			"radius": 900,
+			"boss": ""
+		},
+		{
+			"id": "ranch",
+			"name": "The Ranch",
+			"kind": "ranch",
+			"pos": [19854.5, 14063.5],
+			"radius": 900,
+			"boss": ""
+		},
+		{
+			"id": "heartwood",
+			"name": "The HeartWood",
+			"kind": "boss",
+			"pos": [6109.5, 4327.5],
+			"radius": 700,
+			"boss": "elder_oak"
+		},
+		{
+			"id": "ruins",
+			"name": "The Ruined Settlement",
+			"kind": "ruins",
+			"pos": [15272.5, 1082],
+			"radius": 700,
+			"boss": ""
+		},
+		{
+			"id": "lizen_encampment",
+			"name": "The Lizen Encampment",
+			"kind": "boss",
+			"pos": [1527.5, 11900],
+			"radius": 700,
+			"boss": "lizen_warband"
+		},
+		{
+			"id": "pesca",
+			"name": "Pesca",
+			"kind": "town",
+			"pos": [7459.2, 20468],
+			"radius": 600,
+			"boss": ""
+		},
+		{
+			"id": "leviathan_shore",
+			"name": "Leviathan's Shore",
+			"kind": "boss",
+			"pos": [13950, 22250],
+			"radius": 700,
+			"boss": "leviathan"
+		},
+		{
+			"id": "frozen_spire",
+			"name": "The White Spire",
+			"kind": "boss",
+			"pos": [16800, 22718],
+			"radius": 700,
+			"boss": "white_dragon"
+		},
+		{
+			"id": "crater",
+			"name": "The Crater",
+			"kind": "boss",
+			"pos": [22909, 4327.5],
+			"radius": 700,
+			"boss": "red_wyrm"
+		},
+		{
+			"id": "void_throne",
+			"name": "The Void Throne",
+			"kind": "boss",
+			"pos": [29018, 20554.5],
+			"radius": 700,
+			"boss": "archmage"
+		},
+		{
+			"id": "caves",
+			"name": "The Caves",
+			"kind": "cave",
+			"pos": [32072.5, 14063.5],
+			"radius": 500,
+			"boss": ""
+		}
+	]
+}

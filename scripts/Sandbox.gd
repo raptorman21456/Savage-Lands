@@ -43,11 +43,12 @@ const NOTHINGNESS_ORDER := ["Leviathan", "Lizen Warband", "Elder Oak", "White Dr
 # Upgrades that actually change how a tile battle plays (the rest are shop /
 # economy / run-start perks) -- the panel's "combat only" filter and "max combat".
 const COMBAT_UPGRADES := ["strength", "agility", "vigor", "reflexes_unlock", "berserker_edge", "adrenaline", "dexterity_unlock",
-	"battle_hardened", "pack_leader", "prodigy", "warlord", "beastmaster", "pack_bond", "riposte", "momentum", "rage", "hardened",
-	"intimidation", "luck", "silver_tongue", "haggling", "warded_mind", "mental_mush", "smort_savage",
-	"stamina", "resilience_unlock", "herbalism", "vampiric_grit",
-	"vigilant_defense", "undying", "block_master", "second_breath", "favour", "last_stand", "shield_mastery", "unbreakable_guard",
-	"warband", "battle_medic", "war_chest", "war_profiteer", "windfall"]
+	"battle_hardened", "pack_leader", "prodigy", "beastmaster", "pack_bond", "riposte", "momentum", "rage",
+	"intimidation", "luck", "silver_muscles", "haggling", "light_metal", "continual_growth", "smart_savage",
+	"stamina", "resilience_unlock", "herbalism", "vampiric_grit", "take_a_breather",
+	"block_master", "second_breath", "last_stand", "unbreakable_guard",
+	"battle_medic", "windfall",
+	"release_grudge", "deep_well", "innate_power"]
 
 const SQUAD_PRESETS := [
 	["Goblin pair", ["Goblin", "Goblin"]], ["Goblin trio", ["Goblin", "Goblin", "Goblin"]], ["Orc", ["Orc"]],

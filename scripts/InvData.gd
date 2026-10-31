@@ -130,12 +130,12 @@ static func _tier_rank(variant: Dictionary) -> int:
 # What a weapon asks of you that you do not have: [{"stat": "MGT", "need": 15, "have": 6}, ...] (empty = nothing lacking).
 static func lacking(player, variant: Dictionary) -> Array:
 	var out: Array = []
-	var need_might := int(variant.get("required_might", 0))
+	var need_might: int = player.might_needed(variant)
 	if need_might > player.stat_might:
 		out.append({"stat": "MGT", "need": need_might, "have": int(player.stat_might)})
 	var need_intimidation := int(variant.get("required_intimidation", 0))
 	if need_intimidation > player.stat_intimidation:
-		out.append({"stat": "INT", "need": need_intimidation, "have": int(player.stat_intimidation)})
+		out.append({"stat": "INM", "need": need_intimidation, "have": int(player.stat_intimidation)})
 	return out
 
 static func armor_entries(player, member = null) -> Array:
@@ -248,7 +248,7 @@ static func arrow_entries(player) -> Array:
 		var info: Dictionary = WeaponsScript.ARROW_TYPES[kind]
 		n += 1
 		out.append({
-			"kind": "arrow", "id": kind, "name": str(info.name), "sub": "", "quality": "", "art": PixelKit.texture_at("res://assets/quiver.png"),
+			"kind": "arrow", "id": kind, "name": str(info.name), "sub": "", "quality": "", "art": PixelKit.texture_at("res://assets/arrow_%s.png" % kind),
 			"number": "x%d" % held, "lore": "", "desc": str(info.get("description", "")), "mythic": false, "holders": [], "lack": [],
 			"specials": [], "data": info, "tint": ARROW_TINTS[kind], "qty": held, "key": kind, "level": 0, "sort_quality": 0.0,
 			"sort_number": float(held), "sort_new": n, "tooltip": "", "rune": "",
@@ -286,13 +286,13 @@ static func rows(player, member, entry: Dictionary) -> Array:
 			var lack_notes: Array = []
 			var need_parts: Array = []
 			var icons: Array = []
-			var might := int(variant.get("required_might", 0))
+			var might: int = player.might_needed(variant)
 			if might > 0:
 				need_parts.append("MGT %d" % might)
 				icons.append("stat_might")
 			var intim := int(variant.get("required_intimidation", 0))
 			if intim > 0:
-				need_parts.append("INT %d" % intim)
+				need_parts.append("INM %d" % intim)
 				icons.append("stat_intimidation")
 			if member == null:
 				for l in entry.lack:

@@ -5,7 +5,8 @@ class_name UIIcons
 # "which icon is Fortitude", "what do we call it on screen" and "what does it do", so the inventory, the character sheet,
 # the level-up screen and the tooltips all say the same thing.
 #
-# Files are named by group: stat_<id>.png, tab_<id>.png (the inventory's tabs) and sub_<id>.png (the pages inside a tab).
+# Files are named by group: stat_<id>.png, tab_<id>.png (the inventory's tabs), sub_<id>.png (the pages inside a tab) and
+# status_<name>.png (what a unit on the battle grid is afflicted with).
 # A hand-made 16x16 PNG with the same name dropped into the folder simply replaces the generated one.
 #
 # Show them at a whole-number scale (16 -> 32) with nearest-neighbour filtering; rect() does that.
@@ -45,10 +46,10 @@ const STAT_INFO := {
 	"rage": {"abbr": "RAGE", "name": "Rage", "does": "upgrades berserk"},
 	"dexterity": {"abbr": "DXT", "name": "Dexterity", "does": "crit"},
 	"magic": {"abbr": "MAG", "name": "Magic", "does": "magic power"},
-	# PROVISIONAL abbreviation: INT already belongs to Intimidation. A Might-type requirement: needed to learn a weapon's
+	# ITL (the design doc's abbreviation; INM is Intimidation's). A Might-type requirement: needed to learn a weapon's
 	# specials in the first place, and what staffs ask for in place of Might.
-	"intelligence": {"abbr": "INTL", "name": "Intelligence", "does": "learning specials; staffs"},
-	"intimidation": {"abbr": "INT", "name": "Intimidation", "does": "shop prices"},
+	"intelligence": {"abbr": "ITL", "name": "Intelligence", "does": "learning specials; staffs"},
+	"intimidation": {"abbr": "INM", "name": "Intimidation", "does": "shop prices"},
 	"resilience": {"abbr": "RES", "name": "Resilience", "does": "defense"},
 	"reflexes": {"abbr": "RFL", "name": "Reflexes", "does": "dodge chance"},
 	"fortitude": {"abbr": "FTD", "name": "Fortitude", "does": "magical defense"},
@@ -75,25 +76,42 @@ static func stat_tooltip(stat_id: String) -> String:
 static func stat_icon(stat_id: String) -> String:
 	return "stat_" + stat_id
 
-# Hand-drawn pictures that stand in for a generated one, wherever they were saved. These two are 32x32 (drawn on a finer grid than the
-# 16x16 set), so at the usual 32 screen pixels they show one-to-one. Delete the file and the generated icon comes back.
-const OVERRIDES := {
-	"sub_armour": "res://assets/icon_armour.png",
-	"sub_shields": "res://assets/icon_shield.png",
+# The icons the artists drew by hand (they replaced generated ones of the same name, or are new): tools/gen_ui_icons.gd leaves these
+# files alone, and the pixel-grid checks in tools/test_ui_icons.gd skip them (they are not drawn on the generator's 14x14 canvas).
+const HAND_MADE := [
+	"stat_coin", "stat_might", "stat_strength", "pin_boss", "pin_chest", "sub_armour", "sub_arrows", "sub_shields",
+	"status_poison", "status_burned", "status_bleeding", "status_frozen", "status_concussed", "status_blinded", "status_vulnerable",
+	"status_disarmed", "status_rotting", "status_taunted", "status_defending", "status_charmed", "status_bloodboost", "status_bloodcrash",
+]
+
+# Battle status icons (status_<name>.png, 16x16), by the id BattleStatuses uses. A status with no picture here (Stealth, Berserk, Stunned,
+# Charging... the design doc draws those as effects on the character, not as icons) is shown by its name alone.
+const STATUS_ICONS := {
+	"poison": "status_poison", "burn": "status_burned", "bleed": "status_bleeding", "frozen": "status_frozen",
+	"concussed": "status_concussed", "blind": "status_blinded", "vulnerable": "status_vulnerable", "disarmed": "status_disarmed",
+	"rot": "status_rotting", "taunting": "status_taunted", "defending": "status_defending", "charm": "status_charmed",
+	"bloodboost": "status_bloodboost", "bloodcrash": "status_bloodcrash",
 }
+# Icons that are a row of frames in one PNG (the shaking eyes): how many frames. IconStrip plays them.
+const ANIMATED := {"status_bloodboost": 4, "status_bloodcrash": 5}
+
+# The icon name for a BattleStatuses id, or "" when that status has no picture.
+static func status_icon(status_id: String) -> String:
+	return STATUS_ICONS.get(status_id, "")
+
+# How many frames the icon's PNG holds side by side (1 for an ordinary still).
+static func frame_count(icon: String) -> int:
+	return int(ANIMATED.get(icon, 1))
 
 # The file for an icon name ("stat_health", "tab_gear", "sub_potions"), or "" when there is none.
 static func path_for(icon: String) -> String:
-	if OVERRIDES.has(icon):
-		var made: String = OVERRIDES[icon]
-		if ResourceLoader.exists(made) or FileAccess.file_exists(made):
-			return made
 	var path := "%s/%s.png" % [dir, icon]
 	if ResourceLoader.exists(path) or FileAccess.file_exists(path):
 		return path
 	return ""
 
-static func texture(icon: String) -> Texture2D:
+# The whole PNG, which for an animated icon is every frame side by side.
+static func strip(icon: String) -> Texture2D:
 	var path := path_for(icon)
 	if path == "":
 		return null
@@ -103,6 +121,17 @@ static func texture(icon: String) -> Texture2D:
 		return load(path)
 	var img := Image.load_from_file(path)
 	return ImageTexture.create_from_image(img) if img != null else null
+
+# One 16x16 picture: the icon itself, or the first frame of an animated one.
+static func texture(icon: String) -> Texture2D:
+	var whole := strip(icon)
+	var frames := frame_count(icon)
+	if whole == null or frames == 1:
+		return whole
+	var first := AtlasTexture.new()
+	first.atlas = whole
+	first.region = Rect2(0, 0, int(whole.get_width() / float(frames)), whole.get_height())
+	return first
 
 # A menu frame by name ("panel", "button_on", "card_worn"...), or null when there is none.
 static func kit(frame_name: String) -> Texture2D:
@@ -114,13 +143,26 @@ static func kit(frame_name: String) -> Texture2D:
 		return ImageTexture.create_from_image(img) if img != null else null
 	return null
 
-# The icon as a control, `px` pixels square (pass a multiple of 16 to keep the pixels crisp).
+# The icon as a control, `px` pixels square (pass a multiple of 16 to keep the pixels crisp). An animated icon comes back as an
+# IconStrip, which plays itself.
 static func rect(icon: String, px: int = 32) -> TextureRect:
-	var r := TextureRect.new()
-	r.texture = texture(icon)
+	var r: TextureRect
+	if frame_count(icon) > 1:
+		r = load("res://scripts/IconStrip.gd").new()
+		r.show_strip(strip(icon), frame_count(icon))
+	else:
+		r = TextureRect.new()
+		r.texture = texture(icon)
+		r.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		r.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		r.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		r.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	r.custom_minimum_size = Vector2(px, px)
-	r.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	r.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	r.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	r.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return r
+
+# Points a status slot (an IconStrip) at the picture for a BattleStatuses id; the slot hides itself when the status has none.
+# Returns whether it is showing one.
+static func show_status(slot: TextureRect, status_id: String) -> bool:
+	var icon := status_icon(status_id)
+	slot.show_strip(strip(icon) if icon != "" else null, frame_count(icon))
+	return icon != ""

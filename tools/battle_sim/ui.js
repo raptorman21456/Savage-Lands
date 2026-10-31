@@ -11,10 +11,10 @@ const DIR_ARROW = (d) => (d.x === 1 ? "→" : d.x === -1 ? "←" : d.y === 1 ? "
 
 const NOTHINGNESS_ORDER = ["Leviathan", "Lizen Warband", "Elder Oak", "White Dragon", "Red Wyrm", "Archmage"];
 // Astral upgrades that touch the tile battle (the rest are shop/economy/run-start perks). Update when the tree changes.
-const COMBAT_UPGRADES = new Set(["warded_mind", "mental_mush", "smort_savage", "strength", "agility", "vigor", "reflexes_unlock", "berserker_edge", "adrenaline", "dexterity_unlock", "battle_hardened",
-  "pack_leader", "prodigy", "warlord", "beastmaster", "riposte", "momentum", "rage", "hardened", "intimidation", "luck", "silver_tongue", "haggling",
-  "stamina", "resilience_unlock", "herbalism", "vampiric_grit", "vigilant_defense", "undying", "block_master", "second_breath", "favour", "last_stand",
-  "shield_mastery", "unbreakable_guard", "worldwalker", "warband", "battle_medic", "war_chest", "war_profiteer", "windfall", "pack_bond"]);
+const COMBAT_UPGRADES = new Set(["smart_savage", "continual_growth", "strength", "agility", "vigor", "reflexes_unlock", "berserker_edge", "adrenaline", "dexterity_unlock", "battle_hardened",
+  "pack_leader", "prodigy", "beastmaster", "pack_bond", "riposte", "momentum", "rage", "intimidation", "luck", "silver_muscles", "haggling", "light_metal",
+  "stamina", "resilience_unlock", "herbalism", "vampiric_grit", "take_a_breather", "block_master", "second_breath", "last_stand", "unbreakable_guard",
+  "worldwalker", "battle_medic", "windfall"]);
 const PASSIVE_LABELS = {
   passive_double_hit_chance: (v) => `${pct(v)} chance to strike twice`, passive_lifesteal_pct: (v) => `Heals ${pct(v)} of damage dealt`,
   passive_free_specials: () => "Specials cost no stamina", passive_heal_chance: (v) => `${pct(v)} chance to heal on hit`, passive_stun_chance: (v) => `${pct(v)} chance to stun`,

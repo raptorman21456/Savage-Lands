@@ -183,6 +183,12 @@ static var _cell_room: Array = []     # COLS * ROWS -> room id
 static var _layouts: Dictionary = {}   # room id -> RoomLayout, built on demand
 static var _built := false
 
+# Forgets every room and shape, so the next ensure_built() reads the hand-made data (RoomData) afresh -- the Map Editor calls it after
+# every change.
+static func reset() -> void:
+	_built = false
+	_layouts = {}
+
 static func ensure_built() -> void:
 	if _built:
 		return
@@ -252,13 +258,14 @@ static func _free_block(cell: Vector2i, span: Vector2i, locked: Dictionary, info
 # The hand-made rooms (RoomData.gd) claim their cells first. A cell already taken by one of the landmark rooms above
 # (the HeartWood...) keeps that room and its id.
 static func _register_authored_rooms() -> void:
-	for key in RoomDataScript.ROOMS:
+	var authored: Dictionary = RoomDataScript.rooms()
+	for key in authored:
 		var parts: PackedStringArray = str(key).split(",")
 		var col := int(parts[0])
 		var row := int(parts[1])
 		if _cell_room[row * COLS + col] != null:
 			continue
-		var span_data: Array = RoomDataScript.ROOMS[key].get("span", [1, 1])
+		var span_data: Array = authored[key].get("span", [1, 1])
 		var span := Vector2i(int(span_data[0]), int(span_data[1]))
 		var id := "r%d_%d" % [col, row] if span == Vector2i(1, 1) else "m%d_%d" % [col, row]
 		_register(_make_room(id, Vector2i(col, row), span))
@@ -266,7 +273,7 @@ static func _register_authored_rooms() -> void:
 # What a hand-made room overrides on the generated one: its name, shape, solid ground, set pieces, decoration and who
 # lives there.
 static func _apply_authored(r: Dictionary) -> void:
-	var data: Dictionary = RoomDataScript.ROOMS.get("%d,%d" % [r.cell.x, r.cell.y], {})
+	var data: Dictionary = RoomDataScript.rooms().get("%d,%d" % [r.cell.x, r.cell.y], {})
 	if data.is_empty():
 		return
 	r.authored = true
@@ -579,8 +586,9 @@ const CORNER_POST := 160.0             # solid ground kept at every room corner
 # The ways through a shared side, decided from the edge alone so both rooms agree: wide open, a wide opening, or one
 # or two narrow gaps. Edges at the sea, at safe rooms and at the room you wake in are always wide open.
 static func _openings(a: Dictionary, b: Dictionary, key: String, length: float, edge_name: String = "") -> Array:
-	if RoomDataScript.EDGES.has(edge_name):
-		return _authored_openings(RoomDataScript.EDGES[edge_name], length)
+	var authored_edges: Dictionary = RoomDataScript.edges()
+	if authored_edges.has(edge_name):
+		return _authored_openings(authored_edges[edge_name], length)
 	for r in [a, b]:
 		if r.kind in ["sea", "safe"] or "spawn" in r.landmarks or float(r.land) < 0.85:
 			return [[0.0, 1.0]]

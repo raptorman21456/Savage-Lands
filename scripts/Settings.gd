@@ -49,6 +49,9 @@ var combat_minigames_enabled := true
 # The weapon attack timing popup (AttackMinigame.gd): off = attacks deal their normal damage
 # instantly. Separate from the dodge/block toggle since it comes up every turn. Off in scripted runs too.
 var attack_minigame_enabled := true
+# The Debug menu (DebugMenu.gd, F1): off for everyone until they turn it on in Settings > Gameplay. The Sandbox
+# opens it regardless (see DebugMenu.is_enabled).
+var debug_menu_enabled := false
 
 func _ready() -> void:
 	_ensure_audio_buses()
@@ -108,6 +111,10 @@ func set_attack_minigame_enabled(v: bool) -> void:
 	attack_minigame_enabled = v
 	_save()
 
+func set_debug_menu_enabled(v: bool) -> void:
+	debug_menu_enabled = v
+	_save()
+
 func _apply_bus_volume(bus_name: String, linear: float) -> void:
 	var idx := AudioServer.get_bus_index(bus_name)
 	if idx < 0:
@@ -138,6 +145,7 @@ func _load() -> void:
 	damage_numbers_enabled = saved.get("damage_numbers_enabled", true)
 	combat_minigames_enabled = saved.get("combat_minigames_enabled", true) and not OS.get_cmdline_args().has("--script")
 	attack_minigame_enabled = saved.get("attack_minigame_enabled", true) and not OS.get_cmdline_args().has("--script")
+	debug_menu_enabled = bool(saved.get("debug_menu_enabled", false))
 	_apply_bus_volume("Master", master_volume)
 	_apply_bus_volume("SFX", sfx_volume)
 	_apply_bus_volume("Music", music_volume)
@@ -156,4 +164,5 @@ func _save() -> void:
 		"damage_numbers_enabled": damage_numbers_enabled,
 		"combat_minigames_enabled": combat_minigames_enabled,
 		"attack_minigame_enabled": attack_minigame_enabled,
+		"debug_menu_enabled": debug_menu_enabled,
 	})

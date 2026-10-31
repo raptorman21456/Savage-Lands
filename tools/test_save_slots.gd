@@ -95,6 +95,7 @@ func _init() -> void:
 	save_data_script.active_slot = 1
 	var data1: Dictionary = save_data_script.load_data()
 	data1.essence = 999
+	save_data_script.try_buy_upgrade(data1, "legacy")
 	save_data_script.try_buy_upgrade(data1, "strength")
 	save_data_script.save_data(data1)
 

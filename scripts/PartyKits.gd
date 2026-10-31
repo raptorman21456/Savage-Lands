@@ -166,7 +166,7 @@ const KITS := {
 
 # Effects that are not aimed at an enemy in reach: _battle_perform_attack does not refuse them for
 # "no enemy in range".
-const NO_ENEMY_NEEDED := ["rallying_cry", "charge", "stalwart", "summon_dead", "how_charming", "soothing_rain", "cleansing_chant", "channel", "revive", "taunt", "sprint", "druid_heal", "druid_buff", "ally_stealth"]
+const NO_ENEMY_NEEDED := ["rallying_cry", "charge", "stalwart", "summon_dead", "how_charming", "soothing_rain", "cleansing_chant", "summon_spectre", "revive", "taunt", "sprint", "druid_heal", "druid_buff", "ally_stealth"]
 
 static func specials_for(kind: String) -> Array:
 	return KITS.get(kind, [])

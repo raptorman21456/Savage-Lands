@@ -155,6 +155,16 @@ class_name Talismans
 #   wildfire_core           1 = a burning enemy's death explodes for 3x its
 #                           fire damage per turn, damaging and igniting
 #                           everything nearby (_trigger_wildfire_explosion)
+#
+# The Sorcery keys (read only for a unit that casts; every member can wear them, the hero casts nothing):
+#   mana_regen_pct          +x of max mana back at the end of each of the unit's turns (HP for the Necromancer) -- Main._end_ally_command
+#   spell_cost_pct          spells cost this share less mana (mana-worth: a Necromancer pays that share less HP) -- Main._spell_cost_adjust
+#   res_ftd_per_3_mag       +x Resilience and Fortitude for every 3 Magic the unit has (Heavy Cloak) -- Main._make_member_battle_unit
+#   spell_potency_pct       +x spell potency, added together with every other source -- Main._potency
+#   spell_echo_chance       chance a spell casts a second time, free, with the target chosen again -- Main._after_spell
+#   fireball_instant        1 = I CAST FIREBALL needs no charging turn -- Main._resolve_fireball
+#   summon_double           1 = every summon (skeletons, spectres) is doubled -- Main._summon_mult
+#   spell_clapback_chance   chance a cast spell is followed by a STR + MAG/2 strike on the nearest enemy, spell_clapback_mage_pct more vs a mage
 
 # The player levels at which the 2nd, 3rd and 4th slots open (the 1st is
 # always available).
@@ -210,6 +220,31 @@ static var ITEMS := [
 	{"id": "cliffwalkers_bead", "name": "Cliffwalker's Bead", "rarity": "common", "price": 50,
 		"effects": {"fall_reduction": 1.0, "ignore_ledge_attack": 1},
 		"description": "Cliff falls deal no damage, and you can attack up a ledge or cliff drop with any weapon."},
+	# --- Sorcery (every member can wear them; they only do anything for whoever casts). The design doc's list, 2026-10-27; its prices are "xx", so these are my drafts ---
+	{"id": "clapback", "name": "Clapback", "rarity": "rare", "price": 85,
+		"effects": {"spell_clapback_chance": 0.20, "spell_clapback_mage_pct": 0.30},
+		"description": "Whenever you cast a spell, a 20% chance you also strike the nearest enemy for your STR + half your MAG, with +30% damage if it is a mage."},
+	{"id": "heavy_cloak", "name": "Heavy Cloak", "rarity": "common", "price": 55,
+		"effects": {"res_ftd_per_3_mag": 1},
+		"description": "+1 Resilience and Fortitude for every 3 Magic you have."},
+	{"id": "spell_bank", "name": "Spell Bank", "rarity": "uncommon", "price": 70,
+		"effects": {"mana_regen_pct": 0.05},
+		"description": "Regain 5% of your max mana at the end of each of your turns (the Necromancer heals 5% of her max HP)."},
+	{"id": "dreamcatcher", "name": "Dreamcatcher", "rarity": "uncommon", "price": 75,
+		"effects": {"spell_cost_pct": 0.33},
+		"description": "Spells cost 33% less mana (a Necromancer pays 33% less HP)."},
+	{"id": "snail_shell", "name": "Snail Shell", "rarity": "rare", "price": 95,
+		"effects": {"spell_potency_pct": 0.25},
+		"description": "Spells have +25% potency."},
+	{"id": "lingering_echo", "name": "Lingering Echo", "rarity": "common", "price": 60,
+		"effects": {"spell_echo_chance": 0.10},
+		"description": "10% chance for a spell to cast twice: the second cast is free, and you choose its target again."},
+	{"id": "blazing_battery", "name": "Blazing Battery", "rarity": "rare", "price": 90,
+		"effects": {"fireball_instant": 1},
+		"description": "I CAST FIREBALL skips its charging turn."},
+	{"id": "loud_whistle", "name": "Loud Whistle", "rarity": "rare", "price": 100,
+		"effects": {"summon_double": 1},
+		"description": "Every summon is doubled: twice the skeletons, twice the spectres."},
 	# --- Sustain ---
 	{"id": "moss_charm", "name": "Moss Charm", "rarity": "uncommon", "price": 55,
 		"effects": {"hp_regen_turn": 1, "hp_regen_per_20_max_hp": 1},

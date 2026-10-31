@@ -190,6 +190,11 @@ var difficulty_id := "normal"
 # remaining). Read generically in _apply_single_hit, so it affects the
 # player's own hits and the Knight's alike.
 var temp_damage_bonus_pct := 0.0
+# Debug menu cheats (DebugMenu.gd, F1): all off in a normal game. God mode ignores every hit (overworld and
+# battle), infinite stamina makes every cost free, the speed multiplier scales overworld walking.
+var debug_god_mode := false
+var debug_infinite_stamina := false
+var debug_speed_mult := 1.0
 
 # Skill tree tier-4 passives -- stamped onto whatever weapon gets equipped
 # (see _apply_meta_passives_to_weapon), not tied to any one weapon the way a
@@ -205,18 +210,27 @@ var has_merchant_prince := false
 # Deeper skill tree nodes (see SaveData.gd's Reflexes/Adrenaline/Haggling/
 # Herbalism/Prodigy/Beastmaster) -- read at their one call site each, same
 # pattern as the meta-passives above.
-# Reflexes (core stat, unlocked via "reflexes_unlock"): 0.75% dodge chance
+# Reflexes (core stat, unlocked via "reflexes_unlock"): 0.5% dodge chance
 # per point, capped at 15%. Derived fresh in _recalc_stats from
 # stat_reflexes, same pattern as resilience_reduction above.
-const REFLEXES_PCT_PER_POINT := 0.0075
+const REFLEXES_PCT_PER_POINT := 0.005
 const REFLEXES_DODGE_CAP := 0.15
 var meta_dodge_chance := 0.0
-# Dexterity (core stat, unlocked via "dexterity_unlock"): 0.75% crit chance
+# Dexterity (core stat, unlocked via "dexterity_unlock"): 0.5% crit chance
 # per point (double damage, ignores the rock-cover reduction), capped at
-# 15%. Same derivation pattern.
-const DEXTERITY_PCT_PER_POINT := 0.0075
-const DEXTERITY_CRIT_CAP := 0.15
+# 10%. Same derivation pattern.
+const DEXTERITY_PCT_PER_POINT := 0.005
+const DEXTERITY_CRIT_CAP := 0.10
 var meta_crit_chance := 0.0
+# The Sorcery wing's passives (they affect every party member EXCEPT the hero, who casts nothing). Zero until the Church's upgrades set them
+# in _refresh_meta_passives; Main reads them when it builds a member's battle unit and when a spell is cast.
+var meta_release_grudge := false
+var meta_spell_potency_pct := 0.0
+var meta_max_mana_flat := 0
+var meta_member_magic_per_level := 0.0
+var meta_intellect := false
+# Painful Memories: bought. (Rage is not a stat in the game yet.)
+var meta_rage_unlocked := false
 # Whether the "resilience_unlock"/"reflexes_unlock"/"dexterity_unlock" skill
 # nodes are owned -- gates whether the matching stat auto-grows on level-up
 # and can be chosen as the bonus (see _level_up/apply_bonus_stat), same
@@ -243,6 +257,22 @@ var meta_warband_bonus := 0.0
 var meta_battle_medic := false
 var meta_war_chest_reduction := 0.0
 var meta_war_profiteer_coins := 0
+# The doc's version of War Profiteer: each enemy defeated THIS run makes shops this much cheaper (see war_profiteer_discount).
+var meta_war_profiteer_pct_per_kill := 0.0
+var run_kills := 0
+# Battle Medic: a healing item used in battle deals this much damage to every enemy (0 = not owned).
+var meta_battle_medic_damage := 0
+# Silver Muscles: weapon specials cost this much less stamina (the hero's weapons; see _apply_talisman_to_weapon).
+var meta_special_stamina_flat := 0
+# Light Metal: weapons ask for half the Might.
+var meta_light_metal := false
+# Take a Breather: skipping a battle turn heals max HP / 16.
+var meta_take_a_breather := false
+# Otherworldly Power: bought. (The true ending it unlocks is not in the game yet.)
+var meta_otherworldly_power := false
+# Aegis & Transcendence: shops are this much cheaper for every full STAMINA_BAR stamina you carry in (0 = not owned).
+var meta_aegis_discount_per_bar := 0.0
+const STAMINA_BAR := 100
 
 # Brawn/Swiftness/Vitality/Presence: instead of a flat starting-stat add,
 # these boost the amount gained when you level up and choose that stat --
@@ -252,6 +282,8 @@ var meta_levelup_bonus_strength := 0
 var meta_levelup_bonus_agility := 0
 var meta_levelup_bonus_vigor := 0
 var meta_levelup_bonus_intimidation := 0
+# Continual Growth: a level-up put into Might grants this much more.
+var meta_levelup_bonus_might := 0
 
 # Block Master: chance to fully negate incoming damage while Defending.
 var meta_block_negate_chance := 0.0
@@ -316,7 +348,8 @@ var meta_battle_hardened := false
 
 # Fishing (FishingHole.gd): bait is spent a cast at a time, and you fish with the best rod you own. Both reset every run.
 var bait := 0
-# Spell upgrades bought at the Wizard's Tower (SpellUpgrades.gd): spell id -> 0 (plain), 1 (+) or 2 (EX). Per run, like runes.
+# Spell upgrades bought at the Wizard's Tower (SpellUpgrades.gd), which belong to the CASTER (the design doc, 2026-10-27): "<member id>|<spell id>"
+# -> 0 (plain), 1 (+) or 2 (EX). Per run, like runes.
 var spell_levels := {}
 var owned_rods := {"rod_driftwood": true}
 
@@ -326,7 +359,7 @@ var owned_rods := {"rod_driftwood": true}
 #    recruited Warrior (random event), each just {"name", "dmg_mult"}.
 #  - party: the full PartyMember roster (PartyMember.gd) -- Fickle Wolves, Druid,
 #    Guardian, Marksman, Rogue -- with their own levels, stats, gear and loyalty.
-# max_party_slots is upgraded by the Pack Leader / Warlord skill tree nodes; every
+# max_party_slots is upgraded by the Leader's Instincts skill tree node; every
 # member counts toward it, wolves included, and the Wolf Fang talisman adds one
 # more slot that only a wolf can fill (see can_recruit).
 var party_members: Array = []
@@ -717,31 +750,22 @@ func _apply_meta_upgrades() -> void:
 		potion_queue.append("potion_health")
 	healing_items = potion_queue.size()
 
-	# Skill tree capstones -- one-time unlocks for fully investing in a wing
-	# (see SaveData.gd:UPGRADES). Each is now a whole new mechanic rather than a
-	# flat stat, so the ally-granting ones just seed the party here.
+	# Skill tree capstones -- one-time unlocks (see SaveData.gd:UPGRADES). Each is a whole new mechanic rather than a flat stat, so the
+	# ally-granting ones just seed the party here.
 	meta_battle_hardened = bonuses.get("battle_hardened", 0) > 0
-	# Beastmaster (repurposed): guarantees a Fickle Wolf from the start of
-	# the run instead of a bonus recruit-chance.
+	# Man's Best Friend: a Traitor Wolf from the start of the run, loyal for MAN_BEST_FRIEND_WOLF_BATTLES battles.
 	if bonuses.get("beastmaster", 0) > 0:
-		recruit("wolf")
-	# Appraisal is a plain stacking stat node (extra starting coins), applied
-	# the same way its tier-1 counterpart is.
-	coins += int(bonuses.get("appraisal", 0))
-	# Second Wind is a plain stacking stat node too (extra healing items),
-	# applied after the base amount above so it adds on top rather than
-	# being overwritten by it.
-	for i in int(bonuses.get("second_wind", 0)):
-		potion_queue.append("potion_health")
-	healing_items = potion_queue.size()
+		_grant_starting_wolf()
+	# Heroic Destiny: the wooden club (already your starting weapon) and a wooden shield.
+	if bonuses.get("heroic_destiny", 0) > 0:
+		_grant_starting_shield()
 
 # Every continuously-read effect of the owned upgrades, as plain assignments --
 # idempotent, so calling it again after a purchase just brings the player up to
 # date. bonuses is SaveData.get_applied_bonuses() (stat_bonus * level per id).
 func _refresh_meta_passives(bonuses: Dictionary) -> void:
-	# Might/Swiftness/Vitality/Presence no longer touch starting stats at
-	# all -- they're stored here and applied per level-up instead, in
-	# apply_bonus_stat().
+	# Physical Training / Endurance Training / Dense Muscles / Presence no longer touch starting stats at all -- they're stored here and
+	# applied per level-up instead, in apply_bonus_stat().
 	meta_levelup_bonus_strength = int(bonuses.get("strength", 0))
 	meta_levelup_bonus_agility = int(bonuses.get("agility", 0))
 	meta_levelup_bonus_vigor = int(bonuses.get("vigor", 0))
@@ -754,60 +778,51 @@ func _refresh_meta_passives(bonuses: Dictionary) -> void:
 	meta_resilience_unlocked = bonuses.get("resilience_unlock", 0) > 0
 	meta_reflexes_unlocked = bonuses.get("reflexes_unlock", 0) > 0
 	meta_dexterity_unlocked = bonuses.get("dexterity_unlock", 0) > 0
-	# The magical wing: Warded Mind unlocks Fortitude, Mental Mush grows it every level-up, Smort
-	# Savage doubles the bonus pick put into it.
-	meta_fortitude_unlocked = bonuses.get("warded_mind", 0) > 0
-	meta_fortitude_passive_bonus = int(bonuses.get("mental_mush", 0))
-	meta_fortitude_pick_doubled = bonuses.get("smort_savage", 0) > 0
+	# Smart Savage (the Sorcery wing) unlocks Fortitude, which then grows by +1 every level-up (_level_up).
+	meta_fortitude_unlocked = bonuses.get("smart_savage", 0) > 0
+	meta_levelup_bonus_might = int(bonuses.get("continual_growth", 0))
+	meta_rage_unlocked = bonuses.get("painful_memories", 0) > 0
 	meta_rage_bonus_pct = bonuses.get("rage", 0.0)
 	meta_double_hit_chance = bonuses.get("berserker_edge", 0.0)
 	meta_lifesteal_pct = bonuses.get("vampiric_grit", 0.0)
-	meta_free_specials = bonuses.get("silver_tongue", 0) > 0
+	meta_special_stamina_flat = int(bonuses.get("silver_muscles", 0))
 	has_merchant_prince = bonuses.get("golden_touch", 0) > 0
-	has_guardian_skill = bonuses.get("undying", 0) > 0
-	# Pack Leader -- a further Warrior-wing unlock past Knight itself, so
-	# a fully-invested run can field 2 recruited allies, not just 1. Warlord
-	# (deeper still) pushes it one further, to 4.
-	if bonuses.get("warlord", 0) > 0:
-		max_party_slots = 4
-	elif bonuses.get("pack_leader", 0) > 0:
-		max_party_slots = 3
-	else:
-		max_party_slots = BASE_PARTY_SLOTS
-	# Adrenaline (repurposed): extra damage DEALT below 30% HP, read in
-	# Main.gd:_apply_single_hit -- no longer a damage-reduction node.
+	# Leader's Instincts: +1 max party slot per level.
+	max_party_slots = BASE_PARTY_SLOTS + int(bonuses.get("pack_leader", 0))
+	# Adrenaline: extra damage DEALT below 30% HP, read in Main.gd:_apply_single_hit.
 	meta_low_hp_damage_bonus_pct = bonuses.get("adrenaline", 0.0)
 	meta_bonus_coin_pct = bonuses.get("haggling", 0.0)
 	meta_healing_bonus_pct = bonuses.get("herbalism", 0.0)
 	meta_bonus_levelup_stat = bonuses.get("prodigy", 0) > 0
 	meta_wolf_bonus_waves = int(bonuses.get("pack_bond", 0))
-	meta_warband_bonus = bonuses.get("warband", 0.0)
 	meta_battle_medic = bonuses.get("battle_medic", 0) > 0
-	meta_war_chest_reduction = bonuses.get("war_chest", 0.0)
-	meta_war_profiteer_coins = int(bonuses.get("war_profiteer", 0))
-	# Investor (repurposed): extra weapon slots rolled into every shop
-	# offering, read in Main.gd:_roll_shop_offering.
-	meta_investor_bonus_slots = int(bonuses.get("investor", 0))
-	# Block Master / Vigilant Defense (renamed) / Last Stand -- all read
-	# directly by Main.gd's damage-reduction/Defend pipeline.
+	meta_battle_medic_damage = int(bonuses.get("battle_medic", 0))
+	meta_war_profiteer_pct_per_kill = bonuses.get("war_profiteer", 0.0)
+	meta_light_metal = bonuses.get("light_metal", 0) > 0
+	meta_take_a_breather = bonuses.get("take_a_breather", 0) > 0
+	meta_otherworldly_power = bonuses.get("otherworldly_power", 0) > 0
+	meta_aegis_discount_per_bar = bonuses.get("aegis_transcendence", 0.0)
+	# Parry Master / Last Stand / Unbreakable Guard -- read directly by Main.gd's damage-reduction/Defend pipeline.
 	meta_block_negate_chance = bonuses.get("block_master", 0.0)
-	meta_block_heal_amount = int(bonuses.get("vigilant_defense", 0))
 	meta_last_stand_pct_per_10 = bonuses.get("last_stand", 0.0)
-	meta_shield_block_bonus_pct = bonuses.get("shield_mastery", 0.0)
 	meta_shield_universal = bonuses.get("unbreakable_guard", 0) > 0
 	meta_riposte_chance = bonuses.get("riposte", 0.0)
 	meta_momentum_pct_per_kill = bonuses.get("momentum", 0.0)
-	meta_hardened_hp_per_wave = int(bonuses.get("hardened", 0))
-	meta_favour_chance = bonuses.get("favour", 0.0)
 	meta_stamina_regen_per_turn = int(bonuses.get("second_breath", 0))
 	meta_arrow_discount_pct = bonuses.get("fletcher", 0.0)
-	# +5 held-arrow cap per level -- read straight off the owned level
-	# rather than back-deriving it from the float percentage above (which
-	# risks floating-point drift at higher levels).
-	meta_arrow_cap_bonus = 5 * int(SaveDataScript.load_data().get("upgrades", {}).get("fletcher", 0))
+	# +3 held-arrow cap per level -- read straight off the owned level rather than back-deriving it from the float percentage above
+	# (which risks floating-point drift at higher levels).
+	meta_arrow_cap_bonus = 3 * int(SaveDataScript.load_data().get("upgrades", {}).get("fletcher", 0))
 	meta_field_surgeon_discount_pct = bonuses.get("field_surgeon", 0.0)
 	meta_windfall_chance = bonuses.get("windfall", 0.0)
 	meta_reroll_discount_pct = bonuses.get("black_market", 0.0)
+	# --- Sorcery: affects every party member except the hero, who casts nothing (Main.gd reads these when it builds a member's
+	# battle unit and when a spell is cast) ---
+	meta_release_grudge = bonuses.get("release_grudge", 0) > 0
+	meta_member_magic_per_level = 1.0 if meta_release_grudge else 0.0     # Release Grudge: +1 Magic every level-up, for everyone but you
+	meta_max_mana_flat = int(bonuses.get("deep_well", 0))
+	meta_intellect = bonuses.get("continual_learning", 0) > 0
+	meta_spell_potency_pct = bonuses.get("innate_power", 0.0)
 
 # One newly bought skill level (the Church, Main.gd:apply_meta_purchase),
 # applied to the run already in progress. The slot file must already hold the
@@ -815,12 +830,27 @@ func _refresh_meta_passives(bonuses: Dictionary) -> void:
 # refresh, then hands out only what THIS level grants of the one-shot kind --
 # never _apply_meta_upgrades again, which would re-add coins/potions/allies and
 # reset health.
+# Man's Best Friend's wolf: loyal for this many battles (Pack Bond and Wolf Fang add to it, as to any wolf).
+const MAN_BEST_FRIEND_WOLF_BATTLES := 25
+
+# The Traitor Wolf Man's Best Friend starts a run with.
+func _grant_starting_wolf() -> void:
+	var wolf: RefCounted = recruit("wolf")
+	if wolf != null:
+		wolf.battles_left = MAN_BEST_FRIEND_WOLF_BATTLES + int(talisman_bonus("wolf_stay_bonus")) + meta_wolf_bonus_waves
+
+# Heroic Destiny's wooden shield (the wooden club is what every run starts with anyway).
+func _grant_starting_shield() -> void:
+	owned_shields["shield_buckler"] = true
+	if equipped_shield.is_empty():
+		equip_shield(ShieldsScript.SHIELDS["shield_buckler"])
+
 func apply_meta_purchase(id: String) -> void:
 	var bonuses: Dictionary = SaveDataScript.get_applied_bonuses()
 	_refresh_meta_passives(bonuses)
 	var per_level: float = float(SaveDataScript.UPGRADES.get(id, {}).get("stat_bonus", 0))
 	match id:
-		"coins", "appraisal":
+		"coins":
 			coins += int(per_level)
 			coins_changed.emit(coins)
 		"stamina":
@@ -829,13 +859,15 @@ func apply_meta_purchase(id: String) -> void:
 			max_stamina = _base_max_stamina + int(talisman_bonus("max_stamina")) + armor_max_stamina_bonus()
 			stamina = clampi(stamina + (max_stamina - old_max_stamina), 0, max_stamina)
 			stamina_changed.emit(stamina, max_stamina)
-		"potions", "second_wind":
+		"potions":
 			add_potion("potion_health")
 		"battle_hardened":
 			meta_battle_hardened = true
 		"beastmaster":
 			if party_wolves().is_empty():
-				recruit("wolf")
+				_grant_starting_wolf()
+		"heroic_destiny":
+			_grant_starting_shield()
 	# Worldwalker's +HP/+damage and the unlock-derived stats live in
 	# _recalc_stats; the weapon's baked passives (double-hit, lifesteal, free
 	# specials) only refresh on a re-equip.
@@ -867,7 +899,7 @@ func _physics_process(delta: float) -> void:
 		if facing.x != 0.0:
 			sprite.flip_h = facing.x < 0.0
 
-	velocity = move_dir * move_speed
+	velocity = move_dir * move_speed * debug_speed_mult
 	move_and_slide()
 
 	# Isaac-style: WASD aims and swings independently of movement (arrows).
@@ -1078,6 +1110,9 @@ func _apply_talisman_to_weapon(weapon: Dictionary, bonuses = null) -> Dictionary
 		return float(bonuses.get(key, 0.0)) if bonuses != null else talisman_bonus(key)
 	var discount: float = tb.call("special_stamina_discount")
 	var flat_reduction: int = int(tb.call("special_stamina_flat_reduction"))
+	# Silver Muscles (Church) cheapens the HERO's weapons only.
+	if bonuses == null:
+		flat_reduction += meta_special_stamina_flat
 	var pct_increase: float = tb.call("special_stamina_pct_increase")
 	var break_cut: float = tb.call("break_reduction")
 	var whisperer_active: bool = bonuses == null and talisman_bonus("weapon_whisperer") > 0.0 and not weapon_whisperer_specials.is_empty()
@@ -1331,7 +1366,7 @@ func windfall_chance_total() -> float:
 	return meta_windfall_chance + talisman_bonus("windfall_chance")
 
 func coins_per_kill() -> int:
-	return int(meta_war_profiteer_coins) + int(talisman_bonus("coins_per_kill"))
+	return int(talisman_bonus("coins_per_kill"))
 
 func low_hp_damage_bonus_total() -> float:
 	return meta_low_hp_damage_bonus_pct + talisman_bonus("low_hp_damage_pct")
@@ -1401,8 +1436,16 @@ func _apply_meta_passives_to_weapon(weapon: Dictionary) -> Dictionary:
 		w.passive_free_specials = true
 	return w
 
+# War Profiteer: every enemy defeated this run shaves a little off every price in the shops.
+func war_profiteer_discount() -> float:
+	return float(run_kills) * meta_war_profiteer_pct_per_kill
+
+# Aegis & Transcendence: 10% off for every full bar (100) of stamina you hold.
+func aegis_discount() -> float:
+	return float(int(stamina) / STAMINA_BAR) * meta_aegis_discount_per_bar
+
 func _shop_discount() -> float:
-	return min(0.75, stat_intimidation * 0.01 + talisman_bonus("shop_discount"))
+	return min(0.75, stat_intimidation * 0.01 + talisman_bonus("shop_discount") + war_profiteer_discount() + aegis_discount())
 
 func get_weapon_price(weapon: Dictionary) -> int:
 	# A Marksman in the party makes every weapon but a bow dearer.
@@ -1458,6 +1501,11 @@ func try_apply_enchantment(rune_id: String) -> bool:
 	_equip_weapon(current_weapon_base)
 	return true
 
+# The Might a weapon asks of you: half of it, rounded up, with Light Metal.
+func might_needed(variant: Dictionary) -> int:
+	var need: int = int(variant.get("required_might", 0))
+	return int(ceil(float(need) / 2.0)) if meta_light_metal else need
+
 func try_buy_weapon(weapon: Dictionary) -> bool:
 	# The Staff is for party members only -- use try_buy_weapon_for_party.
 	if WeaponsScript.is_ally_only(weapon):
@@ -1467,7 +1515,7 @@ func try_buy_weapon(weapon: Dictionary) -> bool:
 	# threshold -- same hard block whether this is a fresh purchase or
 	# switching back to something already owned. Mythic alone also gates on
 	# a second stat, required_intimidation.
-	if int(weapon.get("required_might", 0)) > stat_might:
+	if might_needed(weapon) > stat_might:
 		return false
 	if int(weapon.get("required_intimidation", 0)) > stat_intimidation:
 		return false
@@ -1843,21 +1891,34 @@ func add_coins(amount: int) -> void:
 # Coins added exactly as given -- no coin-bonus percentage. For gambling
 # winnings (the Wishing Well, the horse races): a skill-tree or talisman coin
 # bonus would otherwise quietly inflate the payouts past the odds the game shows.
-func spell_level(spell_id: String) -> int:
-	return int(spell_levels.get(spell_id, 0))
+# The key a caster's spell level is kept under (a unit with no roster member -- a mercenary, a skeleton -- has none, and casts plain).
+static func spell_key(member, spell_id: String) -> String:
+	return "%d|%s" % [int(member.id), spell_id]
 
-# Buys the next level of a spell at the Wizard's Tower, with banked Essence (it lasts this run; the Essence is gone for
+# How far this member's copy of the spell is upgraded: 0 plain, 1 (+), 2 (EX).
+func spell_level_of(member, spell_id: String) -> int:
+	if member == null:
+		return 0
+	return int(spell_levels.get(spell_key(member, spell_id), 0))
+
+func set_spell_level_of(member, spell_id: String, level: int) -> void:
+	spell_levels[spell_key(member, spell_id)] = clampi(level, 0, SpellUpgradesScript.MAX_LEVEL)
+
+# What reaching a spell level costs at the Wizard's Tower, in banked Essence (the design doc: + is 10, EX 40 more).
+func spell_upgrade_price(level: int) -> int:
+	return int(SpellUpgradesScript.price(level).get("essence", 0))
+
+# Buys the next level of one member's spell at the Wizard's Tower, with banked Essence (it lasts this run; the Essence is gone for
 # good). False if it is already EX, is not a spell, or you cannot afford it.
-func try_upgrade_spell(spell_id: String) -> bool:
-	if not SpellUpgradesScript.has(spell_id):
+func try_upgrade_spell(member, spell_id: String) -> bool:
+	if member == null or not SpellUpgradesScript.has(spell_id):
 		return false
-	var next: int = spell_level(spell_id) + 1
+	var next: int = spell_level_of(member, spell_id) + 1
 	if next > SpellUpgradesScript.MAX_LEVEL:
 		return false
-	var price: Dictionary = SpellUpgradesScript.price(next)
-	if not SaveDataScript.try_spend_essence(int(price.essence)):
+	if not SaveDataScript.try_spend_essence(spell_upgrade_price(next)):
 		return false
-	spell_levels[spell_id] = next
+	set_spell_level_of(member, spell_id, next)
 	return true
 
 # The best rod you own (the Fishing panel and the Fishmonger both read it).
@@ -1939,6 +2000,8 @@ func reset_stamina_for_battle() -> void:
 	stamina_changed.emit(stamina, max_stamina)
 
 func spend_stamina(amount: int) -> bool:
+	if debug_infinite_stamina:
+		return true
 	if stamina < amount:
 		return false
 	stamina -= amount
@@ -2013,17 +2076,13 @@ func _consume_potion(potion_id: String) -> Dictionary:
 		var before: int = stamina
 		regen_stamina(stamina_restored)
 		stamina_restored = stamina - before
-	# Battle Medic (Survivor + Warrior convergence): every healing item also
-	# restores a flat chunk of stamina.
-	if meta_battle_medic:
-		regen_stamina(20)
 	var result: Dictionary = tier.duplicate()
 	result.healed = heal_amount
 	result.stamina_restored = stamina_restored
 	return result
 
 func take_damage(amount: int) -> void:
-	if invincible_timer > 0.0:
+	if invincible_timer > 0.0 or debug_god_mode:
 		return
 	health -= amount
 	invincible_timer = INVINCIBILITY_TIME
@@ -2059,6 +2118,8 @@ func _try_phoenix() -> bool:
 # overworld's real-time invincibility frames -- each turn is a discrete
 # decision, not a rapid repeated collision, so i-frames don't apply here.
 func take_battle_damage(amount: int) -> void:
+	if debug_god_mode:
+		return
 	health -= amount
 	if health <= 0:
 		# Favour (renamed from Second Chance): a %-chance, the first time a
@@ -2144,7 +2205,7 @@ func apply_bonus_stat(stat_name: String) -> void:
 			"agility":
 				stat_agility += AGILITY_BONUS_PER_LEVEL + meta_levelup_bonus_agility
 			"might":
-				stat_might += 1
+				stat_might += 1 + meta_levelup_bonus_might
 			"resilience":
 				stat_resilience += 1
 			"reflexes":

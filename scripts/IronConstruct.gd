@@ -18,6 +18,8 @@ const HURTBOX_RADIUS := 115.0
 const WINDUP_TIME := 0.8
 const ATTACK_COOLDOWN := 1.3
 const BODY_RADIUS := 34.0
+# Walking into it starts the fight at once (the player's body is 16 across), the same as every plain enemy -- not only its telegraphed strike.
+const TOUCH_RANGE := BODY_RADIUS + 18.0
 const XP_REWARD := 710
 const COIN_MIN := 110
 const COIN_MAX := 160
@@ -59,6 +61,10 @@ func _physics_process(delta: float) -> void:
 
 	if player == null or not is_instance_valid(player):
 		player = get_tree().get_first_node_in_group("player")
+
+	if player != null and attack_cooldown <= 0.0 and global_position.distance_to(player.global_position) < TOUCH_RANGE:
+		_touched_by_player()
+		return
 
 	if is_winding_up:
 		var track_dir := Vector2.ZERO
@@ -174,3 +180,12 @@ func _drop_loot() -> void:
 		shard.amount = 1
 		shard.position = global_position + Vector2(randf_range(-10, 10), randf_range(-10, 10))
 		get_parent().add_child(shard)
+
+# The player walked into it: the fight starts now (and it has to wait out its cooldown before it can start another).
+func _touched_by_player() -> void:
+	is_winding_up = false
+	attack_cooldown = ATTACK_COOLDOWN + randf_range(0.0, 0.3)
+	_play_attack_lunge(player.global_position)
+	var main := get_parent()
+	if main != null and main.has_method("trigger_battle"):
+		main.trigger_battle(self)

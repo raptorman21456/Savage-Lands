@@ -27,7 +27,7 @@ func _init() -> void:
 	var special_names := []
 	for s in staff.specials:
 		special_names.append(s.name)
-	print("Its three specials: %s (expected I CAST FIREBALL, Landfall, Channel)" % [special_names])
+	print("Its three specials: %s (expected I CAST FIREBALL, Landfall, I SUMMON THEE)" % [special_names])
 	var mythic: Dictionary = weapons.get_owned_variant("staff_mythic")
 	print("The Mythic Staff is Moonstick and doubles magic gain: %s / %.1f (expected Moonstick, 2.0)" % [mythic.get("name", "?"), float(mythic.get("passive_magic_gain_mult", 0.0))])
 
@@ -110,11 +110,11 @@ func _init() -> void:
 	var costs := []
 	for s in stamped.specials:
 		costs.append(s.stamina_cost)
-	print("A member's own talismans cheapen ITS specials (-5 flat): %s (expected [35, 55, 15])" % [costs])
+	print("A member's own talismans cheapen ITS specials (-5 flat; I SUMMON THEE is priced as a share of her pool when she casts it, so its base cost here is 0 and stays 0): %s (expected [35, 55, 0])" % [costs])
 	var untouched := []
 	for s in plain_staff.specials:
 		untouched.append(s.stamina_cost)
-	print("...without touching the shared weapon data: %s (expected [40, 60, 20])" % [untouched])
+	print("...without touching the shared weapon data: %s (expected [40, 60, 0])" % [untouched])
 	player.meta_double_hit_chance = 0.1
 	player.meta_lifesteal_pct = 0.05
 	player.owned_weapons["club"] = true

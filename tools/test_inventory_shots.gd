@@ -64,6 +64,7 @@ func _init() -> void:
 		player.add_potion(id)
 	player.owned_arrows["flame"] = 6
 	player.owned_arrows["freeze"] = 3
+	player.owned_arrows["bomb"] = 4
 	for id in ["ember_charm", "moss_charm", "guardian_knot", "vampires_pact", "gilded_scarab", "wildfire_core", "merchants_coin", "healers_knot", "swift_feather", "berserkers_knot", "iron_will_band", "bloodstone"]:
 		player.owned_talismans[id] = true
 	player.equip_talisman("moss_charm")

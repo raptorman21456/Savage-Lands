@@ -23,7 +23,7 @@ func _init() -> void:
 	# WeaponsScript.CLUB const. ---
 	save_data_script.save_data({
 		"essence": 0,
-		"upgrades": {"berserker_edge": 3, "vampiric_grit": 2, "silver_tongue": 1},
+		"upgrades": {"berserker_edge": 3, "vampiric_grit": 1, "silver_muscles": 1},
 		"best_wave": 0,
 	})
 	var main_scene = load("res://Main.tscn")
@@ -34,31 +34,32 @@ func _init() -> void:
 	await physics_frame
 	var player = main.player
 
-	print("Berserker's Edge (3 levels) is live on the starting Club: passive_double_hit_chance=%.2f (expected 0.24)" % [
+	print("Pure Spite (3 levels) is live on the starting Club: passive_double_hit_chance=%.2f (expected 0.03)" % [
 		player.current_weapon.get("passive_double_hit_chance", 0.0)
 	])
-	print("Vampiric Grit (2 levels) is live on the starting Club: passive_lifesteal_pct=%.2f (expected 0.10)" % [
+	print("Bloodlust is live on the starting Club: passive_lifesteal_pct=%.2f (expected 0.05)" % [
 		player.current_weapon.get("passive_lifesteal_pct", 0.0)
 	])
-	print("Silver Tongue is live on the starting Club: passive_free_specials=%s (expected true)" % [
-		player.current_weapon.get("passive_free_specials", false)
-	])
-	print("WeaponsScript.CLUB itself is untouched (the shared const, not a copy): %s (expected 0.0, false, false)" % [
-		[weapons_script.CLUB.get("passive_double_hit_chance", 0.0), weapons_script.CLUB.get("passive_lifesteal_pct", 0.0), weapons_script.CLUB.get("passive_free_specials", false)]
+	var plain_club_costs: Array = weapons_script.CLUB.specials.map(func(s): return int(s.stamina_cost))
+	var club_costs: Array = player.current_weapon.specials.map(func(s): return int(s.stamina_cost))
+	print("Silver Muscles cheapens every Club special by 5 stamina (never below 1): %s -> %s (expected %s)" % [plain_club_costs, club_costs, plain_club_costs.map(func(c): return maxi(1, c - 5) if c > 0 else 0)])
+	print("WeaponsScript.CLUB itself is untouched (the shared const, not a copy): %s (expected 0.0, 0.0, same costs as the plain Club)" % [
+		[weapons_script.CLUB.get("passive_double_hit_chance", 0.0), weapons_script.CLUB.get("passive_lifesteal_pct", 0.0), weapons_script.CLUB.specials.map(func(s): return int(s.stamina_cost)) == plain_club_costs]
 	])
 
 	player.coins = 10000
 	player.try_buy_weapon(weapons_script.SPEAR)
-	print("switching weapons re-stamps the same meta-passives onto the new weapon: double_hit=%.2f lifesteal=%.2f free_specials=%s (expected 0.24, 0.10, true)" % [
-		player.current_weapon.get("passive_double_hit_chance", 0.0), player.current_weapon.get("passive_lifesteal_pct", 0.0), player.current_weapon.get("passive_free_specials", false)
+	var plain_spear_costs: Array = weapons_script.SPEAR.specials.map(func(s): return int(s.stamina_cost))
+	print("switching weapons re-stamps the same meta-passives onto the new weapon: double_hit=%.2f lifesteal=%.2f spear costs=%s (expected 0.03, 0.05, each 5 less than %s)" % [
+		player.current_weapon.get("passive_double_hit_chance", 0.0), player.current_weapon.get("passive_lifesteal_pct", 0.0), player.current_weapon.specials.map(func(s): return int(s.stamina_cost)), plain_spear_costs
 	])
 
 	# The Implement (Mythic Dagger) carries its own passive_lifesteal_pct
-	# (0.20) -- Vampiric Grit's meta_lifesteal_pct (2 levels = 0.10) should
+	# (0.20) -- Bloodlust's meta_lifesteal_pct (0.05) should
 	# stack additively on top of it, not replace it.
 	var mythic_dagger: Dictionary = weapons_script.make_variant(weapons_script.DAGGER, 5)
 	player._equip_weapon(mythic_dagger)
-	print("meta lifesteal stacks additively with a Mythic weapon's own passive: %.2f (expected 0.20+0.10=0.30)" % [
+	print("meta lifesteal stacks additively with a Mythic weapon's own passive: %.2f (expected 0.20+0.05=0.25)" % [
 		player.current_weapon.get("passive_lifesteal_pct", 0.0)
 	])
 
@@ -184,8 +185,8 @@ func _init() -> void:
 	main._battle_player_defend()
 	print("the cooldown ticks down once per player turn regardless of the action taken: cooldown=%d (expected 2, one tick from casting it and one from this Defend)" % [main.battle_skill_cooldown])
 
-	# --- Merchant Prince: one extra shop weapon, guaranteed Masterwork tier
-	# or better. ---
+	# --- Merchant Prince: one extra shop weapon, guaranteed Fine tier
+	# or better (the doc's Merchant's Favour). ---
 	player.has_merchant_prince = false
 	main._roll_shop_offering()
 	var weapons_without: int = main.current_shop_offering.filter(func(it): return it.category == "weapon").size()
@@ -200,7 +201,7 @@ func _init() -> void:
 		if t.tier_name == bonus_weapon.tier_name:
 			bonus_rank = t.rank
 	print("Merchant Prince adds one extra weapon offer: %d (expected 6, Club + 4 rolled + 1 bonus)" % [weapon_offers.size()])
-	print("the bonus weapon is at least Masterwork tier: tier=%s rank=%d (expected rank >= 3)" % [bonus_weapon.tier_name, bonus_rank])
+	print("the bonus weapon is at least Fine tier: tier=%s rank=%d (expected rank >= 2)" % [bonus_weapon.tier_name, bonus_rank])
 
 	# Reset the scratch save for whatever test runs next.
 	save_data_script.save_data({"essence": 0, "upgrades": {}, "best_wave": 0})

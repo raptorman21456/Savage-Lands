@@ -48,6 +48,7 @@ var play_button: TitleEntry
 var quit_button: TitleEntry
 var stats_button: TitleEntry
 var sandbox_button: TitleEntry
+var map_editor_button: TitleEntry
 var switch_save_button: TitleEntry
 var beastiary_button: TitleEntry
 var description_label: Label     # the words under the screen being looked at (the main menu's and the difficulty screen's each have one)
@@ -339,6 +340,7 @@ func _build_menu(parent: Control) -> void:
 	stats_button = _menu_entry(col, "Stats", _on_stats_pressed, "View your lifetime stats across every file.")
 	beastiary_button = _menu_entry(col, "Beastiary", func(): beastiary_panel.open(), "Browse every creature you've encountered or defeated, across every file.")
 	sandbox_button = _menu_entry(col, "Sandbox", _on_sandbox_pressed, "Debug sandbox: build any character, pick the enemies, and fight a real battle. Nothing in it is saved.")
+	map_editor_button = _menu_entry(col, "Map Editor", _on_map_editor_pressed, "Edit the world map: rooms, doorways, roads and places. Your save files are never touched.")
 	switch_save_button = _menu_entry(col, "Switch File", _on_switch_save_pressed, "Return to the file select to play a different file.")
 	quit_button = _menu_entry(col, "Quit", _on_quit_pressed, "Exit the game.")
 	var gap2 := Control.new()
@@ -729,6 +731,12 @@ func _on_sandbox_pressed() -> void:
 	SaveDataScript.sandbox_active = true
 	SaveDataScript.sandbox_data = {}
 	get_tree().change_scene_to_file("res://Main.tscn")
+
+# The Map Editor shows the real overworld with nothing running in it; the same switch as the sandbox keeps any save read/write in memory.
+func _on_map_editor_pressed() -> void:
+	SaveDataScript.sandbox_active = true
+	SaveDataScript.sandbox_data = {}
+	get_tree().change_scene_to_file("res://MapEditor.tscn")
 
 func _on_quit_pressed() -> void:
 	get_tree().quit()

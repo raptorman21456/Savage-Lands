@@ -2,9 +2,9 @@ extends SceneTree
 
 # The Church (ChurchPanel.gd + AscensionView.gd): the skill tree, moved off the
 # title screen into a town building. Covers the data feeding the constellation
-# (every skill in exactly one wing, an icon each, a collision-free layout), the
+# (every skill in exactly one wing, an icon each, a collision-free layout, Legacy as the hub), the
 # per-node states, buying (persisted to the slot AND applied to the run in
-# progress), the tooltip, and the Worldwalker lifetime gate.
+# progress), the tooltip, and the Worldwalker lifetime gate. EVERY upgrade is on show at all times.
 
 func _init() -> void:
 	# Fixed seed: every random roll below repeats run to run, so a changed result
@@ -62,90 +62,96 @@ func _init() -> void:
 			min_gap = minf(min_gap, pos[ids[i]].distance_to(pos[ids[j]]))
 	print("layout positions every skill: %s (expected true)" % [all_placed])
 	print("no two nodes crowd each other (nearest pair >= 2 node radii + gap): %.1f (expected >= %.1f)" % [min_gap, view_script.NODE_RADIUS * 2.0 + 8.0])
-	print("Worldwalker sits far out on its own: dist=%.0f (expected >= 1000)" % [pos["worldwalker"].length()])
-	print("wing roots start apart around the hub: strength=%s coins=%s stamina=%s" % [pos["strength"].round(), pos["coins"].round(), pos["stamina"].round()])
+	print("Legacy is the hub, dead centre: %s (expected (0, 0))" % [pos["legacy"]])
+	print("Worldwalker and Otherworldly Power sit far out on their own: dist=%.0f and %.0f (expected >= 1000 each)" % [pos["worldwalker"].length(), pos["otherworldly_power"].length()])
+	print("wing roots start apart around the hub: strength=%s coins=%s stamina=%s release_grudge=%s" % [pos["strength"].round(), pos["coins"].round(), pos["stamina"].round(), pos["release_grudge"].round()])
 
 	# --- Opening ---
 	main._try_open_panel("church")
 	await process_frame
 	await process_frame
 	print("the church door opens its panel and pauses the game: visible=%s paused=%s (expected true, true)" % [panel.visible, main.get_tree().paused])
-	print("opening focuses a starting node for the keyboard without popping its tooltip: focused=%s tooltip=%s (expected true, false)" % [
-		panel.view.button_for("strength").has_focus(), panel.tooltip.visible
+	print("opening focuses the hub for the keyboard without popping its tooltip: focused=%s tooltip=%s (expected true, false)" % [
+		panel.view.button_for("legacy").has_focus(), panel.tooltip.visible
 	])
 	print("a broke player sees 0 Essence: '%s' (expected '0 Essence')" % [panel.essence_label.text])
-	print("root skill with no Essence is unaffordable, deeper ones locked: strength=%s agility=%s worldwalker=%s (expected unaffordable, locked, locked)" % [
-		panel.state_for("strength"), panel.state_for("agility"), panel.state_for("worldwalker")
+	print("Legacy with no Essence is unaffordable, everything behind it locked: legacy=%s strength=%s worldwalker=%s (expected unaffordable, locked, locked)" % [
+		panel.state_for("legacy"), panel.state_for("strength"), panel.state_for("worldwalker")
 	])
-	# --- Reveal: a fresh save shows only the three roots ---
+	# --- Reveal: EVERY upgrade is on show, owned or not ---
 	var shown: Array = panel.view.node_ids().filter(func(id): return panel.view.is_revealed(id))
-	shown.sort()
-	print("a fresh save shows only the four wing roots: %s (expected [coins, stamina, strength, warded_mind])" % [shown])
-	print("...the rest are really hidden, not just dimmed: agility_visible=%s worldwalker_visible=%s strength_visible=%s (expected false, false, true)" % [
-		panel.view.button_for("agility").visible, panel.view.button_for("worldwalker").visible, panel.view.button_for("strength").visible
+	print("a fresh save shows the whole tree: %d of %d upgrades on show (expected all)" % [shown.size(), save_data_script.UPGRADE_IDS.size()])
+	print("...locked ones included, really on screen: agility_visible=%s worldwalker_visible=%s otherworldly_visible=%s (expected true, true, true)" % [
+		panel.view.button_for("agility").visible, panel.view.button_for("worldwalker").visible, panel.view.button_for("otherworldly_power").visible
 	])
 
 	# --- Buying: persisted, and felt by the run in progress ---
+	var cost_legacy: int = save_data_script.get_upgrade_cost("legacy", 0)
 	var cost_strength: int = save_data_script.get_upgrade_cost("strength", 0)
 	save_data_script.save_data({"essence": 100, "upgrades": {}, "best_wave": 0})
 	panel._refresh()
-	print("with Essence the root skill becomes available: %s (expected available)" % [panel.state_for("strength")])
-	panel._on_node_pressed("agility")
-	print("a locked skill can't be bought: agility level=%d (expected 0), essence=%d (expected 100)" % [
-		panel.level_of("agility"), save_data_script.load_data().essence
+	print("with Essence the hub becomes available: %s (expected available)" % [panel.state_for("legacy")])
+	panel._on_node_pressed("strength")
+	print("a locked skill can't be bought (Physical Training wants Legacy): strength level=%d (expected 0), essence=%d (expected 100)" % [
+		panel.level_of("strength"), save_data_script.load_data().essence
 	])
+	panel._on_node_pressed("legacy")
+	print("buying Legacy spends %d Essence and persists to the slot: essence=%d (expected %d), legacy=%d (expected 1)" % [
+		cost_legacy, save_data_script.load_data().essence, 100 - cost_legacy, save_data_script.load_data().upgrades.get("legacy", 0)
+	])
+	print("...the label follows: '%s' (expected '%d Essence')" % [panel.essence_label.text, 100 - cost_legacy])
 	panel._on_node_pressed("strength")
 	var reloaded: Dictionary = save_data_script.load_data()
-	print("buying spends Essence and persists to the slot: essence=%d (expected %d), strength=%d (expected 1)" % [
-		reloaded.essence, 100 - cost_strength, reloaded.upgrades.get("strength", 0)
-	])
-	print("...the label follows: '%s' (expected '%d Essence')" % [panel.essence_label.text, 100 - cost_strength])
+	print("then the wings open: strength=%d (expected 1), essence=%d (expected %d)" % [reloaded.upgrades.get("strength", 0), reloaded.essence, 100 - cost_legacy - cost_strength])
 	print("...and it is applied to the run already in progress: meta_levelup_bonus_strength=%d (expected 1)" % [player.meta_levelup_bonus_strength])
-	print("an owned skill you can afford again reads upgradable, its child is available: strength=%s agility=%s (expected upgradable, available)" % [
+	print("a single-purchase skill you own reads mastered; what asked only for Legacy is open: strength=%s agility=%s (expected mastered, available)" % [
 		panel.state_for("strength"), panel.state_for("agility")
 	])
-	print("multi-level skills badge their level: '%s' (expected '1')" % [panel._badge_for("strength")])
-	print("owning a skill reveals the next one, but not the one after: agility=%s vigor=%s (expected true, false)" % [
-		panel.view.is_revealed("agility"), panel.view.is_revealed("vigor")
-	])
-	print("...and the newly revealed node is really on screen: %s (expected true)" % [panel.view.button_for("agility").visible])
-	save_data_script.save_data({"essence": 5, "upgrades": {"strength": 1}, "best_wave": 0})
+	print("single-level skills show no level badge: '%s' (expected '')" % [panel._badge_for("strength")])
+	save_data_script.save_data({"essence": 100, "upgrades": {"legacy": 1, "stamina": 1}, "best_wave": 0})
 	panel._refresh()
-	print("owned but the next level is out of reach reads owned: %s (expected owned)" % [panel.state_for("strength")])
+	print("a multi-level skill badges its level: '%s' (expected '1'), and reads upgradable while the next level is in reach: %s (expected upgradable)" % [panel._badge_for("stamina"), panel.state_for("stamina")])
+	save_data_script.save_data({"essence": 0, "upgrades": {"legacy": 1, "stamina": 1}, "best_wave": 0})
+	panel._refresh()
+	print("owned but the next level is out of reach reads owned: %s (expected owned)" % [panel.state_for("stamina")])
 
 	# --- One-shot grants land exactly once, immediately ---
-	save_data_script.save_data({"essence": 5000, "upgrades": {}, "best_wave": 0})
+	save_data_script.save_data({"essence": 5000, "upgrades": {"legacy": 1}, "best_wave": 0})
 	panel._refresh()
 	var coins_before: int = player.coins
 	panel._on_node_pressed("coins")
-	print("Nest Egg hands over its coins right away: +%d (expected +%d)" % [player.coins - coins_before, save_data_script.UPGRADES.coins.stat_bonus])
+	print("Inheritance hands over its coins right away: +%d (expected +%d)" % [player.coins - coins_before, save_data_script.UPGRADES.coins.stat_bonus])
 	var stamina_before: int = player.max_stamina
 	panel._on_node_pressed("stamina")
-	print("Endurance raises max stamina right away: +%d (expected +%d)" % [player.max_stamina - stamina_before, save_data_script.UPGRADES.stamina.stat_bonus])
+	print("Deep Lungs raises max stamina right away: +%d (expected +%d)" % [player.max_stamina - stamina_before, save_data_script.UPGRADES.stamina.stat_bonus])
+	panel._on_node_pressed("stamina")
+	panel._on_node_pressed("stamina")
 	panel._on_node_pressed("resilience_unlock")
 	var potions_before: int = player.potion_queue.size()
 	panel._on_node_pressed("potions")
-	print("Provisions adds a healing item right away: +%d (expected +1)" % [player.potion_queue.size() - potions_before])
-	print("Resilience unlocks its level-up stat right away: %s (expected true)" % [player.meta_resilience_unlocked])
+	print("Preparations adds a healing item right away: +%d (expected +1)" % [player.potion_queue.size() - potions_before])
+	print("Leather Skin unlocks Resilience as a level-up stat right away: %s (expected true)" % [player.meta_resilience_unlocked])
 	print("a single-purchase skill reads mastered and shows no badge: %s '%s' (expected mastered, '')" % [panel.state_for("resilience_unlock"), panel._badge_for("resilience_unlock")])
 	var essence_before: int = save_data_script.load_data().essence
 	panel._on_node_pressed("resilience_unlock")
 	print("...and can't be bought twice: essence_unchanged=%s (expected true)" % [save_data_script.load_data().essence == essence_before])
 
-	# --- Allies from the capstones ---
-	save_data_script.save_data({"essence": 5000, "upgrades": {"strength": 1, "agility": 1, "vigor": 1, "berserker_edge": 3, "reflexes_unlock": 1, "adrenaline": 2}, "best_wave": 0})
+	# --- Allies from the capstones (every requirement is the node FULLY bought) ---
+	save_data_script.save_data({"essence": 5000, "upgrades": {"legacy": 1, "strength": 1, "agility": 1, "vigor": 1, "berserker_edge": 5, "reflexes_unlock": 1, "adrenaline": 3}, "best_wave": 0})
 	panel._refresh()
 	var flag_before: bool = player.meta_battle_hardened
 	panel._on_node_pressed("battle_hardened")
 	var placeholders: int = player.party_members.filter(func(m): return m.get("name", "") == "Knight").size()
 	print("Friends in High Places puts the Knight within reach (he is found in the ruins, nothing joins at once): flag %s -> %s (expected false -> true), placeholder knights=%d (expected 0)" % [flag_before, player.meta_battle_hardened, placeholders])
 	panel._on_node_pressed("pack_leader")
-	print("Pack Leader opens a party slot right away: max_party_slots=%d (expected 3)" % [player.max_party_slots])
+	print("Leader's Instincts opens a party slot right away: max_party_slots=%d (expected 3)" % [player.max_party_slots])
+	panel._on_node_pressed("pack_leader")
+	print("...and a second level opens another: max_party_slots=%d (expected 4)" % [player.max_party_slots])
 	player.party = []
 	panel._on_node_pressed("beastmaster")
 	var church_wolves: Array = player.party_wolves()
-	print("Beastmaster puts a wolf in the pack with its loyalty timer running: wolves=%d battles_left=%d (expected 1, %d)" % [
-		church_wolves.size(), church_wolves[0].battles_left if not church_wolves.is_empty() else -1, load("res://scripts/PartyRules.gd").wolf_stay_battles(0, player.meta_wolf_bonus_waves)
+	print("Man's Best Friend puts a wolf in the pack, loyal for 25 battles: wolves=%d battles_left=%d (expected 1, %d)" % [
+		church_wolves.size(), church_wolves[0].battles_left if not church_wolves.is_empty() else -1, player.MAN_BEST_FRIEND_WOLF_BATTLES
 	])
 
 	# --- Worldwalker: gated by the lifetime flag ---
@@ -153,12 +159,12 @@ func _init() -> void:
 	panel._refresh()
 	panel._on_node_pressed("worldwalker")
 	print("Worldwalker is locked until the game has been beaten: state=%s level=%d (expected locked, 0)" % [panel.state_for("worldwalker"), panel.level_of("worldwalker")])
-	print("...and stays hidden rather than teasing: revealed=%s visible=%s (expected false, false)" % [
+	print("...and is shown (everything is) but locked: revealed=%s visible=%s (expected true, true)" % [
 		panel.view.is_revealed("worldwalker"), panel.view.button_for("worldwalker").visible
 	])
 	save_data_script.mark_game_completed()
 	panel._refresh()
-	print("...it appears and opens up once it has: revealed=%s state=%s (expected true, available)" % [
+	print("...it opens up once it has: revealed=%s state=%s (expected true, available)" % [
 		panel.view.is_revealed("worldwalker"), panel.state_for("worldwalker")
 	])
 	panel._on_node_pressed("worldwalker")
@@ -171,18 +177,23 @@ func _init() -> void:
 	print("hovering a node shows its name, level and description: shown=%s name='%s' (expected true, '%s')" % [
 		panel.tooltip.visible, panel.tooltip_name_label.text, save_data_script.UPGRADES.strength.name
 	])
-	print("...with the cost in red when you can't afford it: '%s'" % [panel.tooltip_cost_label.text])
-	# A convergence node shows as soon as ONE of its parents is owned, and its
-	# tooltip names the parent still missing.
+	print("...a locked node names what it wants first: '%s' (expected 'Requires: Legacy')" % [panel.tooltip_cost_label.text])
+	# A locked node is on show too, and its tooltip names the parents still missing.
 	save_data_script.save_data({"essence": 0, "upgrades": {"battle_hardened": 1}, "best_wave": 0})
 	panel._refresh()
-	print("a node with two parents appears once one is owned: warband=%s (expected true); one whose parents are both unowned stays hidden: field_surgeon=%s (expected false)" % [
-		panel.view.is_revealed("warband"), panel.view.is_revealed("field_surgeon")
+	print("a node with two parents shows even with neither owned: war_profiteer=%s, golden_touch=%s (expected true, true)" % [
+		panel.view.is_revealed("war_profiteer"), panel.view.is_revealed("golden_touch")
 	])
-	panel._on_node_hover_changed("warband")
-	print("a revealed-but-locked node lists its missing prerequisite: '%s' (expected 'Requires: %s')" % [
+	panel._on_node_hover_changed("war_profiteer")
+	print("a locked node lists its missing prerequisite: '%s' (expected 'Requires: %s')" % [
 		panel.tooltip_cost_label.text, save_data_script.UPGRADES.golden_touch.name
 	])
+	save_data_script.save_data({"essence": 0, "upgrades": {"legacy": 1, "strength": 1, "berserker_edge": 2, "adrenaline": 1}, "best_wave": 0})
+	panel._refresh()
+	panel._on_node_hover_changed("battle_hardened")
+	print("a requirement is the node FULLY bought, and the tooltip says how far it needs to go: '%s' (expected 'Requires: Pure Spite (Lv 5), Adrenaline (Lv 3)')" % [panel.tooltip_cost_label.text])
+	panel._on_node_hover_changed("otherworldly_power")
+	print("Otherworldly Power says it wants everything: '%s' (expected 'Requires: every other upgrade, fully bought')" % [panel.tooltip_cost_label.text])
 	panel._on_node_hover_changed("strength")
 	# The tooltip settles its size over a frame or two, like it does in play.
 	await process_frame
@@ -194,51 +205,56 @@ func _init() -> void:
 	print("moving off a node hides the tooltip: %s (expected false)" % [panel.tooltip.visible])
 
 	# --- Polish: node styling, multi-buy, progress, wing labels, door marker ---
-	save_data_script.save_data({"essence": 400, "upgrades": {"strength": 2, "agility": 1, "reflexes_unlock": 1}, "best_wave": 0})
+	save_data_script.save_data({"essence": 400, "upgrades": {"legacy": 1, "stamina": 1, "strength": 1, "agility": 1, "vigor": 1, "reflexes_unlock": 1}, "best_wave": 0})
 	panel._refresh()
 	var mastered_box: StyleBoxFlat = panel.view.button_for("reflexes_unlock").get_theme_stylebox("normal")
-	var upgradable_box: StyleBoxFlat = panel.view.button_for("strength").get_theme_stylebox("normal")
+	var upgradable_box: StyleBoxFlat = panel.view.button_for("stamina").get_theme_stylebox("normal")
 	print("a maxed-out node gets a thick golden border: state=%s width=%d gold=%s (expected mastered, 6, true)" % [
 		panel.state_for("reflexes_unlock"), mastered_box.border_width_left, mastered_box.border_color == view_script.GOLD
 	])
 	print("...an owned node that isn't maxed does not: width=%d gold=%s (expected 4, false)" % [
 		upgradable_box.border_width_left, upgradable_box.border_color == view_script.GOLD
 	])
-	print("progress line counts the skills you own: '%s' (expected '3 / %d skills')" % [panel.progress_label.text, save_data_script.UPGRADE_IDS.size()])
-	print("wing names are set on the three roots: %s (expected warrior=strength, merchant=coins, survivor=stamina)" % [
-		"warrior=%s, merchant=%s, survivor=%s" % [panel.view._wing_roots.get("warrior"), panel.view._wing_roots.get("merchant"), panel.view._wing_roots.get("survivor")]
+	var hub_box: StyleBoxFlat = panel.view.button_for("legacy").get_theme_stylebox("normal")
+	print("the hub button is bigger than a node: size=%s corner=%d (expected 92 wide, round to the hub's radius %d)" % [panel.view.button_for("legacy").size, hub_box.corner_radius_top_left, int(view_script.HUB_RADIUS)])
+	print("progress line counts the skills you own: '%s' (expected '6 / %d skills')" % [panel.progress_label.text, save_data_script.UPGRADE_IDS.size()])
+	print("wing names are set on the four roots: %s (expected physical=strength, economy=coins, sustain=stamina, sorcery=release_grudge)" % [
+		"physical=%s, economy=%s, sustain=%s, sorcery=%s" % [panel.view._wing_roots.get("physical"), panel.view._wing_roots.get("economy"), panel.view._wing_roots.get("sustain"), panel.view._wing_roots.get("sorcery")]
 	])
-	panel._on_node_hover_changed("strength")
-	print("a stackable buyable node advertises Shift+click: shown=%s text='%s' (expected true, 'Shift+click: buy up to 5 levels')" % [
+	panel._on_node_hover_changed("stamina")
+	print("a stackable buyable node advertises Shift+click: shown=%s text='%s' (expected true, 'Shift+click: buy up to 2 levels')" % [
 		panel.tooltip_hint_label.visible, panel.tooltip_hint_label.text
 	])
 	panel._on_node_hover_changed("reflexes_unlock")
 	print("...a maxed one does not: shown=%s (expected false)" % [panel.tooltip_hint_label.visible])
 	panel._on_node_hover_changed("")
 
-	save_data_script.save_data({"essence": 5, "upgrades": {"strength": 1}, "best_wave": 0})
+	save_data_script.save_data({"essence": 0, "upgrades": {"legacy": 1, "stamina": 1}, "best_wave": 0})
 	panel._refresh()
-	var owned_box: StyleBoxFlat = panel.view.button_for("strength").get_theme_stylebox("normal")
-	var greyed_owned: float = panel.view.button_for("strength").get_child(0).modulate.r
+	var owned_box: StyleBoxFlat = panel.view.button_for("stamina").get_theme_stylebox("normal")
+	var greyed_owned: float = panel.view.button_for("stamina").get_child(0).modulate.r
 	var greyed_unaffordable: float = panel.view.button_for("coins").get_child(0).modulate.r
 	print("a node you can't buy is a little greyed out: owned=%s icon=%.2f, unaffordable=%s icon=%.2f (expected owned/unaffordable, both < 1.0)" % [
-		panel.state_for("strength"), greyed_owned, panel.state_for("coins"), greyed_unaffordable
+		panel.state_for("stamina"), greyed_owned, panel.state_for("coins"), greyed_unaffordable
 	])
 	print("...but an owned one keeps its wing colour, not gold: gold=%s (expected false)" % [owned_box.border_color == view_script.GOLD])
 
-	save_data_script.save_data({"essence": 1000, "upgrades": {}, "best_wave": 0})
+	save_data_script.save_data({"essence": 1000, "upgrades": {"legacy": 1}, "best_wave": 0})
 	panel._refresh()
-	var coins_before_stack: int = player.coins
-	var got: int = panel.buy_levels("coins", 3)
-	var expected_spend: int = save_data_script.get_upgrade_cost("coins", 0) + save_data_script.get_upgrade_cost("coins", 1) + save_data_script.get_upgrade_cost("coins", 2)
+	# (the player still carries the Deep Lungs bought earlier in this test; line it up with the emptied save first)
+	player._base_max_stamina = player.MAX_STAMINA
+	player.max_stamina = player.MAX_STAMINA
+	var stamina_before_stack: int = player.max_stamina
+	var got: int = panel.buy_levels("stamina", 3)
+	var expected_spend: int = save_data_script.get_upgrade_cost("stamina", 0) + save_data_script.get_upgrade_cost("stamina", 1) + save_data_script.get_upgrade_cost("stamina", 2)
 	print("Shift+click style buying takes several levels: bought=%d level=%d essence_left=%d (expected 3, 3, %d)" % [
-		got, panel.level_of("coins"), save_data_script.load_data().essence, 1000 - expected_spend
+		got, panel.level_of("stamina"), save_data_script.load_data().essence, 1000 - expected_spend
 	])
-	print("...each level is applied to the run: +%d coins (expected +%d)" % [player.coins - coins_before_stack, 3 * int(save_data_script.UPGRADES.coins.stat_bonus)])
-	save_data_script.save_data({"essence": 30, "upgrades": {"coins": 3}, "best_wave": 0})
+	print("...each level is applied to the run: +%d max stamina (expected +%d)" % [player.max_stamina - stamina_before_stack, 3 * int(save_data_script.UPGRADES.stamina.stat_bonus)])
+	save_data_script.save_data({"essence": 1, "upgrades": {"legacy": 1}, "best_wave": 0})
 	panel._refresh()
-	print("...it stops when you run out of Essence: bought=%d (expected 1: 28 fits, the next level doesn't)" % [panel.buy_levels("coins", 5)])
-	save_data_script.save_data({"essence": 1000, "upgrades": {"agility": 1, "strength": 1}, "best_wave": 0})
+	print("...it stops when you run out of Essence: bought=%d (expected 1: Deep Lungs level 1 costs 1, level 2 costs 1 more but only 1 is in hand)" % [panel.buy_levels("stamina", 5)])
+	save_data_script.save_data({"essence": 1000, "upgrades": {"legacy": 1, "agility": 1, "strength": 1, "vigor": 1}, "best_wave": 0})
 	panel._refresh()
 	print("...and at a skill's max level: bought=%d (expected 1 for a single-purchase skill asked for 5)" % [panel.buy_levels("reflexes_unlock", 5)])
 
@@ -248,9 +264,13 @@ func _init() -> void:
 	save_data_script.save_data({"essence": 100, "upgrades": {}, "best_wave": 0})
 	main.refresh_church_marker()
 	print("the Church door shows a marker only when something is buyable: broke=%s afford=%s (expected false, true)" % [marker_broke, main.church_marker.visible])
-	print("can_buy_any_upgrade: 9 essence=%s, 10 essence=%s (expected false, true: Nest Egg is the cheapest root at 10)" % [
-		save_data_script.can_buy_any_upgrade({"essence": 9, "upgrades": {}}), save_data_script.can_buy_any_upgrade({"essence": 10, "upgrades": {}})
+	print("can_buy_any_upgrade: 0 essence=%s, 1 essence=%s (expected false, true: Legacy costs 1)" % [
+		save_data_script.can_buy_any_upgrade({"essence": 0, "upgrades": {}}), save_data_script.can_buy_any_upgrade({"essence": 1, "upgrades": {}})
 	])
+
+	# --- The tree as a whole ---
+	print("the whole tree costs %d Essence (expected 1588: the visualizer's prices where a node had one, drafts for the new ones; the doc's old total was 1,536)" % [save_data_script.total_tree_cost()])
+	print("...every node keeps the visualizer's per-level prices: Pure Spite %s (expected [2, 3, 4, 6, 10]), Pack Bond %s (expected [40, 60, 90]), Otherworldly Power %s (expected [184])" % [save_data_script.UPGRADES.berserker_edge.costs, save_data_script.UPGRADES.pack_bond.costs, save_data_script.UPGRADES.otherworldly_power.costs])
 
 	# --- Closing ---
 	panel.close()

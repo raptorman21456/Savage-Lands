@@ -98,7 +98,8 @@ func _audio() -> void:
 
 func _gameplay() -> void:
 	for spec in [["Screen shake", "screen_shake_enabled", "set_screen_shake_enabled"], ["Damage numbers", "damage_numbers_enabled", "set_damage_numbers_enabled"],
-			["Dodge and block popups", "combat_minigames_enabled", "set_combat_minigames_enabled"], ["Attack timing popup", "attack_minigame_enabled", "set_attack_minigame_enabled"]]:
+			["Dodge and block popups", "combat_minigames_enabled", "set_combat_minigames_enabled"], ["Attack timing popup", "attack_minigame_enabled", "set_attack_minigame_enabled"],
+			["Debug menu (F1)", "debug_menu_enabled", "set_debug_menu_enabled"]]:
 		var row := _row(str(spec[0]))
 		var spacer := Control.new()
 		spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -114,6 +115,7 @@ func _gameplay() -> void:
 			toggle.on = now
 		)
 		row.add_child(toggle)
+	_body.add_child(InvWidgets.paragraph("The Debug menu is for testing: with it On, F1 opens a window that can change almost anything in a run. Leave it Off to play normally."))
 
 func _controls() -> void:
 	for action in settings.ACTION_ORDER:

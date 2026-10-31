@@ -13,38 +13,38 @@ func _init() -> void:
 	var data: Dictionary = save_data_script.load_data()
 	print("fresh save starts empty: essence=%d (expected 0), upgrades=%s (expected {})" % [data.essence, data.upgrades])
 
-	# "strength" (a branch-root node with no prereq) stands in for the old
-	# blanket "any upgrade" test target -- "vigor" now sits behind strength
-	# -> agility in the Warrior branch (see SaveData.gd:SKILL_TREE_BRANCHES),
-	# so buying it directly here would be silently rejected by the new
-	# prereq check in try_buy_upgrade.
-	var cost_lvl0: int = save_data_script.get_upgrade_cost("strength", 0)
-	var cost_lvl1: int = save_data_script.get_upgrade_cost("strength", 1)
-	print("upgrade cost rises with level owned: lvl0=%d lvl1=%d (expected %d, %d)" % [
-		cost_lvl0, cost_lvl1, save_data_script.UPGRADES.strength.base_cost, save_data_script.UPGRADES.strength.base_cost + save_data_script.UPGRADES.strength.cost_step
+	# Legacy (the hub every wing grows from) costs 1; Deep Lungs (stamina) is the cheapest multi-level node behind it, 1, 1, 2 Essence for
+	# its three levels.
+	var legacy_cost: int = save_data_script.get_upgrade_cost("legacy", 0)
+	var cost_lvl0: int = save_data_script.get_upgrade_cost("stamina", 0)
+	var cost_lvl2: int = save_data_script.get_upgrade_cost("stamina", 2)
+	print("each level has its own price: lvl0=%d lvl2=%d (expected %d, %d from the node's price list)" % [
+		cost_lvl0, cost_lvl2, save_data_script.UPGRADES.stamina.costs[0], save_data_script.UPGRADES.stamina.costs[2]
 	])
 
-	data.essence = 10
-	var bought_too_poor: bool = save_data_script.try_buy_upgrade(data, "strength")
+	data.essence = 0
+	var bought_too_poor: bool = save_data_script.try_buy_upgrade(data, "legacy")
 	print("can't buy an upgrade without enough essence: bought=%s essence_unchanged=%s (expected false, true)" % [
-		bought_too_poor, data.essence == 10
+		bought_too_poor, data.essence == 0
 	])
-
 	data.essence = 100
-	var bought: bool = save_data_script.try_buy_upgrade(data, "strength")
+	var bought_locked: bool = save_data_script.try_buy_upgrade(data, "stamina")
+	print("...nor one whose requirement is missing (Deep Lungs needs Legacy): bought=%s (expected false)" % [bought_locked])
+	save_data_script.try_buy_upgrade(data, "legacy")
+	var bought: bool = save_data_script.try_buy_upgrade(data, "stamina")
 	print("buying an upgrade spends essence and levels it up: bought=%s essence_left=%d (expected %d) level=%d (expected 1)" % [
-		bought, data.essence, 100 - cost_lvl0, data.upgrades.strength
+		bought, data.essence, 100 - legacy_cost - cost_lvl0, data.upgrades.stamina
 	])
 
 	save_data_script.save_data(data)
 	var reloaded: Dictionary = save_data_script.load_data()
-	print("save/load round-trips correctly: essence=%d (expected %d) strength_level=%d (expected 1)" % [
-		reloaded.essence, 100 - cost_lvl0, reloaded.upgrades.get("strength", 0)
+	print("save/load round-trips correctly: essence=%d (expected %d) stamina_level=%d (expected 1)" % [
+		reloaded.essence, 100 - legacy_cost - cost_lvl0, reloaded.upgrades.get("stamina", 0)
 	])
 
 	var bonuses: Dictionary = save_data_script.get_applied_bonuses()
-	print("applied bonuses reflect owned upgrade levels: strength_bonus=%d (expected %d), coins_bonus=%d (expected 0)" % [
-		bonuses.strength, save_data_script.UPGRADES.strength.stat_bonus, bonuses.coins
+	print("applied bonuses reflect owned upgrade levels: stamina_bonus=%d (expected %d), coins_bonus=%d (expected 0)" % [
+		bonuses.stamina, save_data_script.UPGRADES.stamina.stat_bonus, bonuses.coins
 	])
 
 	# --- A fresh run's Player picks up the permanent bonus. ---
@@ -54,8 +54,8 @@ func _init() -> void:
 	await physics_frame
 	await physics_frame
 	var player = main.player
-	print("a new run's player starts with the permanent strength bonus applied: stat_strength=%d (expected 1+%d=%d), attack_damage=%d (expected same)" % [
-		player.stat_strength, bonuses.strength, 1 + bonuses.strength, player.attack_damage
+	print("a new run's player starts with the permanent stamina bonus applied: max_stamina=%d (expected %d)" % [
+		player.max_stamina, player.MAX_STAMINA + bonuses.stamina
 	])
 
 	# --- Death: computes essence for the kills made, banks it into the slot
@@ -87,9 +87,9 @@ func _init() -> void:
 	# serialized, so they're gone regardless).
 	var after_death: Dictionary = save_data_script.load_data()
 	print("dying keeps the slot and banks the essence: slot_exists=%s (expected true), essence=%d (expected %d)" % [
-		save_data_script.slot_exists(save_data_script.active_slot), after_death.essence, (100 - cost_lvl0) + expected_earned
+		save_data_script.slot_exists(save_data_script.active_slot), after_death.essence, (100 - legacy_cost - cost_lvl0) + expected_earned
 	])
-	print("...and the upgrades bought with it survive: strength_level=%d (expected 1)" % [after_death.upgrades.get("strength", 0)])
+	print("...and the upgrades bought with it survive: stamina_level=%d (expected 1)" % [after_death.upgrades.get("stamina", 0)])
 
 	# Reset the scratch save so later tests in a full-suite run always see a
 	# clean slate, regardless of run order.

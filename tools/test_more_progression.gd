@@ -23,11 +23,11 @@ func _init() -> void:
 	# owning it just needs to read as > 0, not a specific percentage.
 	var data: Dictionary = save_data_script.load_data()
 	data.essence = 1000
-	for id in ["stamina", "luck", "resilience_unlock", "potions"]:
+	for id in ["legacy", "stamina", "stamina", "stamina", "coins", "coins", "coins", "coins", "coins", "luck", "resilience_unlock", "potions"]:
 		save_data_script.try_buy_upgrade(data, id)
 	save_data_script.save_data(data)
 	var bonuses: Dictionary = save_data_script.get_applied_bonuses()
-	print("applied bonuses after buying one level of each: stamina=%d (expected 15), luck=%.2f (expected 0.15), resilience_unlock=%s (expected true), potions=%d (expected 1)" % [
+	print("applied bonuses after buying one level of each: stamina=%d (expected 60), luck=%.2f (expected 0.15), resilience_unlock=%s (expected true), potions=%d (expected 1)" % [
 		bonuses.stamina, bonuses.luck, bonuses.resilience_unlock > 0, bonuses.potions
 	])
 
@@ -40,7 +40,7 @@ func _init() -> void:
 	await physics_frame
 	var player = main.player
 	print("player picks up stamina/luck/potions on a new run: max_stamina=%d (expected %d), stamina=%d (expected same), luck_bonus=%.2f (expected 0.15), healing_items=%d (expected >=1)" % [
-		player.max_stamina, player.MAX_STAMINA + 15, player.stamina, player.luck_bonus, player.healing_items
+		player.max_stamina, player.MAX_STAMINA + 60, player.stamina, player.luck_bonus, player.healing_items
 	])
 	print("...and Resilience is unlocked as a level-up choice, though its stat starts at 0 until leveled: meta_resilience_unlocked=%s (expected true), stat_resilience=%d (expected 0), resilience_reduction=%.2f (expected 0.0)" % [
 		player.meta_resilience_unlocked, player.stat_resilience, player.resilience_reduction

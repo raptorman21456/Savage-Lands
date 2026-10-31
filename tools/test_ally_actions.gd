@@ -108,7 +108,7 @@ func _init() -> void:
 	var labels := []
 	for s in info.specials:
 		labels.append(s.label)
-	print("Her special list shows each cost in her own currency -- her three spells, then the Staff's: %s (expected [Restore (40 MP), Empower (30 MP), Vitalize (40 MP), I CAST FIREBALL (40 MP), Landfall (60 MP), Channel (20 MP), Stealth (20 MP) -- every member has Stealth])" % [labels])
+	print("Her special list shows each cost in her own currency -- her three spells, then the Staff's: %s (expected [Restore (40 MP), Empower (30 MP), Vitalize (40 MP), I CAST FIREBALL (40 MP), Landfall (60 MP), I SUMMON THEE (46 MP), Stealth (20 MP) -- every member has Stealth])" % [labels])
 	print("The Special button is available, Attack reads plain: has_specials=%s attack_label=%s (expected true, Attack)" % [info.has_specials, info.attack_label])
 	main._on_battle_ally_action("special")
 	print("Special opens the list: state=%s (expected ally_special)" % [main.battle_menu_state])
@@ -183,57 +183,93 @@ func _init() -> void:
 	print("A caster knocked out mid-charge loses it: charging=%s (expected {})" % [u4.charging])
 
 	# =========================================================
-	# Channel and the friendly-target picker
+	# I SUMMON THEE (it replaced Channel) and the tile picker
 	# =========================================================
 	_reset(main, player)
 	var caster: Dictionary = main._make_member_battle_unit(druid, Vector2i(1, 4), 1.0)
-	var friend: Dictionary = main._make_member_battle_unit(guardian, Vector2i(1, 3), 1.0)
-	var druid2 = player.recruit("druid")
-	var other_caster: Dictionary = main._make_member_battle_unit(druid2, Vector2i(1, 2), 1.0)
 	main.battle_units = [_make_goblin(main, Vector2i(6, 6))]
-	main.battle_allies = [caster, friend, other_caster]
+	main.battle_allies = [caster, _filler()]
 	main._start_ally_turn()
+	var summon_label: String = ""
+	for s in main._ally_menu_info().specials:
+		if s.label.begins_with("I SUMMON THEE"):
+			summon_label = s.label
+	print("Her Staff has I SUMMON THEE, costing HALF her mana: '%s' (expected I SUMMON THEE (%d MP), half of %d)" % [summon_label, int(round(caster.max_mana * 0.5)), caster.max_mana])
 	main._on_battle_ally_action("special")
 	main._on_battle_ally_action("special_5")
 	var pick_labels := []
 	for p in main._ally_menu_info().picks:
-		pick_labels.append(p.label.split("  ")[0])
-	print("Channel opens the target picker: state=%s, candidates=%s (expected ally_pick, [You, Guardian, Druid])" % [main.battle_menu_state, pick_labels])
-	player.stamina = 10
+		pick_labels.append(p.label)
+	print("It opens a tile picker offering two spots: state=%s, candidates=%s (expected ally_pick, [Beside <her name>, Beside the nearest enemy])" % [main.battle_menu_state, pick_labels])
+	var mana_before: int = caster.mana
 	main._on_battle_ally_action("pick_0")
-	print("Channelling into YOU gives 20%% of your max stamina: %d (expected 30), and costs her 20 mana: %d (expected 72)" % [player.stamina, caster.mana])
+	var spectre: Dictionary = {}
+	for a in main.battle_allies:
+		if str(a.get("kind", "")) == "spectre":
+			spectre = a
+	print("Choosing a spot raises a spectre ally: %s (expected true), its mana cost %d (expected %d)" % [not spectre.is_empty(), mana_before - caster.mana, int(round(caster.max_mana * 0.5))])
 	print("...the picker is closed and her command ended: pending=%s commanding_changed=%s (expected {}, true)" % [main.battle_ally_pending_action, main.battle_commanding_ally != caster])
-	# a stamina ally, then a caster ally
+	print("Its stats are shares of hers: attack=%.2f (expected %.2f = 80%% of her attack + 80%% of her magic), max_hp=%d (expected %d, half of hers), speed=%.2f (expected %.2f, 120%%)" % [
+		spectre.attack, 0.8 * float(caster.attack) + 0.8 * float(caster.magic), spectre.max_hp, int(round(caster.max_hp * 0.5)), spectre.speed, float(caster.speed) * 1.2
+	])
+	print("...it dodges half of all attacks, ignores terrain, has no armour and acts on its own: dodge=%.2f (expected 0.50), ignores_terrain=%s auto=%s summoned=%s (expected true x3), defense=%.1f fortitude=%.1f (expected 0, 0)" % [
+		spectre.dodge_chance, spectre.ignores_terrain, spectre.auto, spectre.summoned, spectre.defense_pct, spectre.fortitude
+	])
+
+	# Clicking ANY empty tile on the grid places it there -- even one with rock on it -- and an occupied tile is refused.
 	_reset(main, player)
-	caster.mana = 92
-	friend.stamina = 0
-	other_caster.mana = 20
 	main.battle_units = [_make_goblin(main, Vector2i(6, 6))]
-	main.battle_allies = [caster, friend, other_caster]
+	main.battle_allies = [caster, _filler()]
+	caster.mana = caster.max_mana
 	main._start_ally_turn()
+	main.battle_terrain[Vector2i(4, 2)] = {"type": "rock"}
 	main._on_battle_ally_action("special")
 	main._on_battle_ally_action("special_5")
-	main._on_battle_ally_action("pick_1")
-	print("Channel into a stamina ally: +20%% of 100 = %d (expected 20)" % [friend.stamina])
-	main.battle_allies = [caster, friend, other_caster]
-	main.battle_turn = "player"
-	main.battle_commanding_ally = null
-	main.battle_ally_queue = []
-	caster.mana = 92
-	main._start_ally_turn()
-	main._on_battle_ally_action("special")
-	main._on_battle_ally_action("special_5")
-	main._on_battle_ally_action("pick_2")
-	print("Channel into a caster ally: +20%% of %d mana = %d now (expected 20 + 10 = 30)" % [other_caster.max_mana, other_caster.mana])
-	main.battle_turn = "player"
-	main.battle_commanding_ally = null
-	main.battle_ally_queue = []
+	main._on_rock_target_selected(Vector2i(6, 6))
+	print("Clicking an occupied tile is refused and the picker stays open: state=%s (expected ally_pick), no spectre yet=%s (expected true)" % [main.battle_menu_state, not main.battle_allies.any(func(a): return str(a.get("kind", "")) == "spectre")])
+	main._on_rock_target_selected(Vector2i(4, 2))
+	var placed: Dictionary = {}
+	for a in main.battle_allies:
+		if str(a.get("kind", "")) == "spectre":
+			placed = a
+	print("Clicking a rock tile raises it right there (it ignores terrain): tile=%s (expected (4, 2))" % [placed.get("tile", "none")])
+
+	# It walks through rock and strikes the nearest enemy on its own turn.
+	_reset(main, player)
+	var foe := _make_goblin(main, Vector2i(2, 7))
+	main.battle_units = [foe]
+	var ghost: Dictionary = main._make_spectre(Vector2i(2, 2), caster)
+	for y in [3, 4, 5]:
+		main.battle_terrain[Vector2i(2, y)] = {"type": "rock"}
+	main.battle_allies = [ghost]
+	main._auto_ally_act(ghost)
+	print("On its own turn it walks THROUGH a wall of rock toward the enemy: it moved from y=2 to y=%d (expected %d, its full move of %d)" % [ghost.tile.y, 2 + int(ghost.move_range), ghost.move_range])
+	ghost.tile = Vector2i(2, 6)
+	main._auto_ally_act(ghost)
+	print("...and hits the enemy when it reaches it: goblin HP %d (expected below 999)" % [foe.hp])
+
+	# Its price follows the caster's own currency: HP for the Necromancer, stamina for anyone without mana.
+	_reset(main, player)
+	var necro: Dictionary = _member_unit(main, player, "necromancer", "staff_worn_wood", Vector2i(1, 4))
+	var necro_cost_text := ""
+	for e in main.member_special_pool(necro.member):
+		if str(e.special.name) == "I SUMMON THEE":
+			necro_cost_text = e.cost_text
+	print("A Necromancer pays in HP, half her max (%d): '%s' (expected ' (%d HP)')" % [necro.max_hp, necro_cost_text, int(round(necro.max_hp * 0.5))])
+	var knight_u: Dictionary = _member_unit(main, player, "knight", "staff_worn_bone", Vector2i(1, 4))
+	var knight_cost := ""
+	for e in main.member_special_pool(knight_u.member):
+		if str(e.special.name) == "I SUMMON THEE":
+			knight_cost = e.cost_text
+	print("Someone with no mana pool pays stamina, half of %d: '%s' (expected ' (%d STA)')" % [knight_u.max_stamina, knight_cost, int(round(knight_u.max_stamina * 0.5))])
 	main.battle_allies = [caster]
-	main._start_ally_turn()
-	main._on_battle_ally_action("special")
-	main._on_battle_ally_action("special_5")
-	main._on_battle_ally_action("back")
-	print("Back out of the picker returns to the special list: state=%s (expected ally_special)" % [main.battle_menu_state])
+	player.set_spell_level_of(druid, "staff_i_summon_thee", 2)
+	var ex_unit: Dictionary = main._make_member_battle_unit(druid, Vector2i(1, 4), 1.0)
+	var ex_spectre: Dictionary = main._make_spectre(Vector2i(3, 3), ex_unit)
+	print("At EX the spectre is much stronger (attack %.2f vs %.2f), dodges 60%% (%.2f), and the cast costs 40%% of her mana (%d of %d): (expected true, 0.60, %d)" % [
+		ex_spectre.attack, spectre.attack, ex_spectre.dodge_chance, int(round(ex_unit.max_mana * 0.4)), ex_unit.max_mana, int(round(ex_unit.max_mana * 0.4))
+	])
+	player.spell_levels.clear()
 
 	# =========================================================
 	# Downed allies

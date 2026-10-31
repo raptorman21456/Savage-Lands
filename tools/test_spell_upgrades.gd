@@ -94,40 +94,46 @@ func _init() -> void:
 	print("Every spell in the table is a real special of a caster or the Staff: %s (expected true)" % [all_real])
 	print("Prices: + costs %s, EX costs %s; level 0 and level 3 have none: %s %s (expected {} {})" % [SU.price(1), SU.price(2), SU.price(0), SU.price(3)])
 
+	# A spell upgrade belongs to its CASTER, so the party is recruited first: the Druid (with a Staff), the Shaman, the Necromancer, a Guardian.
+	var druid = player.recruit("druid")
+	var shaman = player.recruit("shaman")
+	var necro = player.recruit("necromancer")
+	var guardian = player.recruit("guardian")
+	player.equip_ally_weapon(druid, "staff_fine_steel")
 	# --- buying: with banked Essence
 	var real_slot: Dictionary = SD.load_data()
 	SD.save_data({"essence": 0, "upgrades": {}, "best_wave": 0})
 	print("A fresh run has no upgrades: %s (expected {})" % [player.spell_levels])
-	print("With no Essence banked you cannot upgrade: %s (expected false), banked %d (expected 0)" % [player.try_upgrade_spell("druid_heal"), SD.banked_essence()])
+	print("With no Essence banked you cannot upgrade: %s (expected false), banked %d (expected 0)" % [player.try_upgrade_spell(druid, "druid_heal"), SD.banked_essence()])
 	player.coins = 5000                                         # coins and shards do not matter any more
 	player.runic_shards = 99
-	print("...coins and shards do not help: %s (expected false)" % [player.try_upgrade_spell("druid_heal")])
-	SD.save_data({"essence": 59, "upgrades": {}, "best_wave": 0})
-	print("59 Essence is one short of the first upgrade: %s (expected false), still banked %d (expected 59)" % [player.try_upgrade_spell("druid_heal"), SD.banked_essence()])
+	print("...coins and shards do not help: %s (expected false)" % [player.try_upgrade_spell(druid, "druid_heal")])
+	SD.save_data({"essence": 9, "upgrades": {}, "best_wave": 0})
+	print("9 Essence is one short of the first upgrade: %s (expected false), still banked %d (expected 9)" % [player.try_upgrade_spell(druid, "druid_heal"), SD.banked_essence()])
 	SD.save_data({"essence": 1000, "upgrades": {"strength": 1}, "best_wave": 0})
 	var coins_before: int = player.coins
 	var shards_before: int = player.runic_shards
-	print("Restore -> Restore+: ok=%s (expected true), level %d (expected 1), Essence 1000 -> %d (expected 940)" % [player.try_upgrade_spell("druid_heal"), player.spell_level("druid_heal"), SD.banked_essence()])
-	var second_ok: bool = player.try_upgrade_spell("druid_heal")
-	print("Restore+ -> Restore EX: ok=%s (expected true), level %d (expected 2), Essence now %d (expected 780)" % [second_ok, player.spell_level("druid_heal"), SD.banked_essence()])
+	print("Restore -> Restore+: ok=%s (expected true), level %d (expected 1), Essence 1000 -> %d (expected 990, the doc says + costs 10)" % [player.try_upgrade_spell(druid, "druid_heal"), player.spell_level_of(druid, "druid_heal"), SD.banked_essence()])
+	var second_ok: bool = player.try_upgrade_spell(druid, "druid_heal")
+	print("Restore+ -> Restore EX: ok=%s (expected true), level %d (expected 2), Essence now %d (expected 950, EX costs 40 more)" % [second_ok, player.spell_level_of(druid, "druid_heal"), SD.banked_essence()])
 	print("It cost no coins or shards: %s (expected true), and the Church upgrades in the slot are untouched: %s (expected {strength: 1})" % [player.coins == coins_before and player.runic_shards == shards_before, SD.load_data().upgrades])
-	print("There is nothing past EX: %s (expected false); and something that is not a spell cannot be bought: %s (expected false)" % [player.try_upgrade_spell("druid_heal"), player.try_upgrade_spell("knight_charge")])
+	print("There is nothing past EX: %s (expected false); and something that is not a spell cannot be bought: %s (expected false)" % [player.try_upgrade_spell(druid, "druid_heal"), player.try_upgrade_spell(druid, "knight_charge")])
 	print("The upgrade is the run's only: a fresh Player has none: %s (expected {})" % [load("res://scripts/Player.gd").new().spell_levels])
 	player.spell_levels.clear()
 
 	# --- the Wizard's Tower's Spells tab
-	SD.save_data({"essence": 100, "upgrades": {}, "best_wave": 0})
+	SD.save_data({"essence": 45, "upgrades": {}, "best_wave": 0})
 	main._open_shop("enchant")
 	print("The Tower shows both tabs: enchant %s, spells %s (expected true, true)" % [main.hud.shop_enchant_tab_button.visible, main.hud.shop_spells_tab_button.visible])
 	main.hud._select_shop_tab("spells")
 	print("...and the Spells tab lists every spell: %d rows (expected 12), visible=%s (expected true)" % [main.hud.shop_spells_row_nodes.size(), main.hud.shop_spells_scroll.visible])
 	var rows0: Array = main.spell_upgrade_rows()
-	print("Prices read in Essence: '%s' (expected 60 Essence); with 100 banked every + is affordable but no EX yet: %s (expected true)" % [rows0[0].price_text, rows0.all(func(r): return r.can_buy)])
-	main._on_spell_upgrade_pressed("shaman_soothing_rain")
-	print("Pressing a row buys it: Soothing Rain level %d (expected 1), Essence left %d (expected 40)" % [player.spell_level("shaman_soothing_rain"), SD.banked_essence()])
+	print("Prices read in Essence: '%s' (expected 10 Essence); with 45 banked every + is affordable but no EX yet: %s (expected true)" % [rows0[0].price_text, rows0.all(func(r): return r.can_buy)])
+	main._on_spell_upgrade_pressed(Player.spell_key(shaman, "shaman_soothing_rain"))
+	print("Pressing a row buys it: Soothing Rain level %d (expected 1), Essence left %d (expected 35)" % [player.spell_level_of(shaman, "shaman_soothing_rain"), SD.banked_essence()])
 	var rows: Array = main.spell_upgrade_rows()
-	var rain: Dictionary = rows.filter(func(r): return r.id == "shaman_soothing_rain")[0]
-	print("Its row now offers Soothing Rain+ -> Soothing Rain EX for '%s' (expected 160 Essence), which 40 Essence cannot buy: %s (expected false)" % [rain.price_text, rain.can_buy])
+	var rain: Dictionary = rows.filter(func(r): return r.id == Player.spell_key(shaman, "shaman_soothing_rain"))[0]
+	print("Its row now offers Soothing Rain+ -> Soothing Rain EX for '%s' (expected 40 Essence), which the 35 left cannot buy: %s (expected false)" % [rain.price_text, rain.can_buy])
 	main.hud.hide_shop()
 	main.shop_open = false
 	paused = false
@@ -137,14 +143,11 @@ func _init() -> void:
 	# =========================================================
 	# the casts, at each level
 	# =========================================================
-	var druid = player.recruit("druid")
-	var shaman = player.recruit("shaman")
-	var necro = player.recruit("necromancer")
-	var guardian = player.recruit("guardian")
+	# (the casters were recruited above, for the Tower)
 	var heal_ok := true
 	var heal_got := []
 	for level in 3:
-		player.spell_levels["druid_heal"] = level
+		player.set_spell_level_of(druid, "druid_heal", level)
 		_reset(main, player)
 		var d: Dictionary = main._make_member_battle_unit(druid, Vector2i(1, 4), 1.0)
 		d.mods = {}
@@ -168,7 +171,7 @@ func _init() -> void:
 
 	var empower := []
 	for level in 3:
-		player.spell_levels["druid_buff"] = level
+		player.set_spell_level_of(druid, "druid_buff", level)
 		_reset(main, player)
 		var d2: Dictionary = main._make_member_battle_unit(druid, Vector2i(1, 4), 1.0)
 		d2.mods = {}
@@ -186,7 +189,7 @@ func _init() -> void:
 
 	var vit := []
 	for level in 3:
-		player.spell_levels["druid_sprint"] = level
+		player.set_spell_level_of(druid, "druid_sprint", level)
 		_reset(main, player)
 		var d3: Dictionary = main._make_member_battle_unit(druid, Vector2i(1, 4), 1.0)
 		d3.mods = {}
@@ -202,7 +205,7 @@ func _init() -> void:
 
 	var charm := []
 	for level in 3:
-		player.spell_levels["shaman_how_charming"] = level
+		player.set_spell_level_of(shaman, "shaman_how_charming", level)
 		_reset(main, player)
 		var s1: Dictionary = main._make_member_battle_unit(shaman, Vector2i(3, 4), 1.0)
 		s1.weapon = {"damage_mult": 1.0}
@@ -215,7 +218,7 @@ func _init() -> void:
 
 	var rain_got := []
 	for level in 3:
-		player.spell_levels["shaman_soothing_rain"] = level
+		player.set_spell_level_of(shaman, "shaman_soothing_rain", level)
 		_reset(main, player)
 		var s2: Dictionary = main._make_member_battle_unit(shaman, Vector2i(3, 4), 1.0)
 		s2.weapon = {"damage_mult": 1.0}
@@ -237,7 +240,7 @@ func _init() -> void:
 
 	var chant_got := []
 	for level in 3:
-		player.spell_levels["shaman_cleansing_chant"] = level
+		player.set_spell_level_of(shaman, "shaman_cleansing_chant", level)
 		_reset(main, player)
 		var s3: Dictionary = main._make_member_battle_unit(shaman, Vector2i(3, 4), 1.0)
 		s3.weapon = {"damage_mult": 1.0}
@@ -261,7 +264,7 @@ func _init() -> void:
 
 	var rot := []
 	for level in 3:
-		player.spell_levels["necromancer_curse_of_rot"] = level
+		player.set_spell_level_of(necro, "necromancer_curse_of_rot", level)
 		_reset(main, player)
 		var n1: Dictionary = main._make_member_battle_unit(necro, Vector2i(1, 4), 1.0)
 		n1.mods = {}
@@ -287,7 +290,7 @@ func _init() -> void:
 
 	var revive := []
 	for level in 3:
-		player.spell_levels["necromancer_revival_blessing"] = level
+		player.set_spell_level_of(necro, "necromancer_revival_blessing", level)
 		_reset(main, player)
 		var n2: Dictionary = main._make_member_battle_unit(necro, Vector2i(1, 4), 1.0)
 		n2.mods = {}
@@ -300,7 +303,7 @@ func _init() -> void:
 
 	var skel := []
 	for level in 3:
-		player.spell_levels["necromancer_summon_the_dead"] = level
+		player.set_spell_level_of(necro, "necromancer_summon_the_dead", level)
 		_reset(main, player)
 		var n3: Dictionary = main._make_member_battle_unit(necro, Vector2i(3, 4), 1.0)
 		n3.mods = {}
@@ -319,7 +322,7 @@ func _init() -> void:
 
 	# Summon the Dead asks how many to raise, from 1 to the most she can (one per enemy slain last battle, and as many as her HP pays for).
 	var summon_menu := func(kills: int, hp: int, level: int) -> Dictionary:
-		player.spell_levels["necromancer_summon_the_dead"] = level
+		player.set_spell_level_of(necro, "necromancer_summon_the_dead", level)
 		_reset(main, player)
 		var n: Dictionary = main._make_member_battle_unit(necro, Vector2i(3, 4), 1.0)
 		n.mods = {}
@@ -375,7 +378,7 @@ func _init() -> void:
 	player.equip_ally_weapon(druid, "staff_fine_steel")
 	var fire := []
 	for level in 3:
-		player.spell_levels["staff_i_cast_fireball"] = level
+		player.set_spell_level_of(druid, "staff_i_cast_fireball", level)
 		_reset(main, player)
 		var d4: Dictionary = main._make_member_battle_unit(druid, Vector2i(1, 4), 1.0)
 		d4.mods = {}
@@ -395,7 +398,7 @@ func _init() -> void:
 
 	var land := []
 	for level in 3:
-		player.spell_levels["staff_landfall"] = level
+		player.set_spell_level_of(druid, "staff_landfall", level)
 		_reset(main, player)
 		var d5: Dictionary = main._make_member_battle_unit(druid, Vector2i(1, 4), 1.0)
 		d5.mods = {}
@@ -410,30 +413,42 @@ func _init() -> void:
 	print("Landfall: (attack x 3) + (magic x .5) = 40, then x 3.5 + .65 = 48, then x 4 + .8 = 56 (attack 10, magic 20): %s (expected [40, 48, 56])" % [land])
 	player.spell_levels.clear()
 
-	var chan := []
+	var ghosts := []
 	for level in 3:
-		player.spell_levels["staff_channel"] = level
+		player.set_spell_level_of(druid, "staff_i_summon_thee", level)
 		_reset(main, player)
 		var d6: Dictionary = main._make_member_battle_unit(druid, Vector2i(1, 4), 1.0)
 		d6.mods = {}
-		var friend: Dictionary = main._make_member_battle_unit(shaman, Vector2i(2, 4), 1.0)
-		friend.mods = {}
-		friend.max_mana = 100                     # (pinned: the check is about the percentage, not the Shaman's levelled magic)
-		friend.mana = 0
-		main.battle_allies = [d6, friend]
+		d6.attack = 10.0
+		d6.magic = 20.0
+		d6.max_hp = 40                            # (pinned: the checks are about the percentages)
+		d6.max_mana = 100
+		d6.mana = 100
+		main.battle_allies = [d6]
 		main.battle_units = [_make_goblin(main, Vector2i(7, 7))]
-		d6.mana = d6.max_mana
-		main.battle_ally_target = friend
-		await _cast(main, d6, SU.display_name("staff_channel", level))
+		main.battle_ally_target = Vector2i(3, 3)
+		await _cast(main, d6, SU.display_name("staff_i_summon_thee", level))
 		main.battle_ally_target = null
-		chan.append(int(round(100.0 * float(friend.mana) / float(friend.max_mana))))
-	print("Channel restores 20%%, 30%%, 40%% of an ally's mana: %s (expected [20, 30, 40])" % [chan])
+		var ghost: Dictionary = {}
+		for a in main.battle_allies:
+			if str(a.get("kind", "")) == "spectre":
+				ghost = a
+		ghosts.append([int(round(float(ghost.get("attack", 0.0)))), int(ghost.get("max_hp", 0)), snappedf(float(ghost.get("dodge_chance", 0.0)), 0.01), 100 - int(d6.mana)])
+	print("I SUMMON THEE [attack, max HP, dodge, mana cost] at base, +, EX (caster: attack 10, magic 20, 40 HP, 100 mana): %s (expected [[24, 20, 0.5, 50], [30, 26, 0.5, 50], [36, 32, 0.6, 40]])" % [ghosts])
 	player.spell_levels.clear()
 
 	# the Party screen and the command menu show the upgraded names
-	player.spell_levels["druid_heal"] = 2
-	player.spell_levels["staff_landfall"] = 1
+	player.set_spell_level_of(druid, "druid_heal", 2)
+	player.set_spell_level_of(druid, "staff_landfall", 1)
 	var du: Dictionary = main.member_preview(druid)
 	var names: Array = main._ally_special_pool(du).map(func(s): return s.name)
 	print("The command menu and Party screen use the upgraded names: Restore EX in %s (expected true), Landfall+ in %s (expected true)" % [names.has("Restore EX"), names.has("Landfall+")])
+
+	# an upgrade belongs to its CASTER: a Knight holding another Staff still casts the plain Landfall
+	var knight = player.recruit("knight")
+	player.owned_weapons["staff_worn_wood"] = true
+	player.equip_ally_weapon(knight, "staff_worn_wood")
+	var knight_names: Array = main._ally_special_pool(main.member_preview(knight)).map(func(s): return s.name)
+	print("The Druid's Landfall+ is hers alone: the Knight's Staff still offers plain Landfall: %s (expected true), not Landfall+: %s (expected true)" % [knight_names.has("Landfall"), not knight_names.has("Landfall+")])
+	print("...and his own copy is bought separately: level %d for him, %d for her (expected 0, 1)" % [player.spell_level_of(knight, "staff_landfall"), player.spell_level_of(druid, "staff_landfall")])
 	quit()

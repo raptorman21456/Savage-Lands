@@ -589,6 +589,15 @@ Object.assign(Sim.prototype, {
       case "energy_buff": p.potion_energy_turns = MC.POTION_BUFF_TURNS; this.log("Your legs feel lighter -- extra reach on your next turns of movement!"); break;
       case "restore_stamina": p.reset_stamina(); this.log("Stamina rushes back into you!"); break;
     }
+    // Battle Medic: a healing item used in battle lashes every enemy for a little damage.
+    if (p.meta_battle_medic_damage > 0) {
+      this.log(`Battle Medic! The healing item lashes every enemy for ${p.meta_battle_medic_damage} damage.`);
+      for (const foe of this.battle_units.slice()) {
+        const fi = this.battle_units.indexOf(foe);
+        if (fi >= 0) this._apply_single_hit(fi, 1.0, "battle_medic", p.current_weapon, "You", null, p.meta_battle_medic_damage, true);
+      }
+      if (this.battle_units.length === 0) { this._battle_victory(); return; }
+    }
     await this._end_player_turn();
   },
   _cleanse_player_status() {
@@ -602,6 +611,7 @@ Object.assign(Sim.prototype, {
     this.log("You brace for impact.");
     this.stat_action("defend");
     if (p.block_heal_amount() > 0) p.heal(p.block_heal_amount());
+    if (p.meta_take_a_breather) p.heal(Math.max(1, Math.trunc(p.max_health / 16)));   // Take a Breather: Defend is the hero's wait
     await this._end_player_turn();
   },
   async _battle_player_taunt() {

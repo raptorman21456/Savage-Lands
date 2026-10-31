@@ -1,12 +1,14 @@
 extends SceneTree
 
-# Dev-only cheat keys (Main.gd:_handle_debug_input) -- F1/F2 jump worlds
-# forward/backward with a matching wave and a freshly-spawned squad, F3
+# Dev-only quick keys (Main.gd:_handle_debug_input) -- F2 jumps a world back
+# with a matching wave and a freshly-spawned squad, F3
 # grants+equips a random weapon, F4/F5 top off coins/HP-stamina. Not reached
 # by any player input path, so tested by calling the underlying functions
 # directly rather than simulating keypresses. Compared against each world's
 # stable "id" field, not its user-editable display "name" (text/
-# strings.json can rename any of them).
+# strings.json can rename any of them). (F1 now opens the Debug menu, which
+# only works once it is turned on in Settings; the World tab's "Next world"
+# button in the old arena calls _debug_jump_world(1) -- see test_debug_menu.gd.)
 
 func _init() -> void:
 	# Fixed seed: every random roll below repeats run to run, so a changed result

@@ -177,7 +177,7 @@ func _build_curios(container: VBoxContainer) -> void:
 		var at_cap: bool = not unlimited and held >= cap
 		var count_text: String = "%s (%d)" % [info.name, held] if unlimited else "%s (%d/%d)" % [info.name, held, cap]
 		container.add_child(_make_shop_row(
-			"quiver", count_text, info.get("description", ""),
+			"arrow_%s" % kind, count_text, info.get("description", ""),
 			"%d c" % price, "Full" if at_cap else "Buy", at_cap or _player.coins < price,
 			_on_buy_arrow_pressed.bind(kind)
 		))

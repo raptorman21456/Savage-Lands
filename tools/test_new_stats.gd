@@ -44,7 +44,7 @@ func _init() -> void:
 	# then that the stats actually start auto-growing. ---
 	var data: Dictionary = save_data_script.load_data()
 	data.essence = 1000
-	for id in ["stamina", "strength", "agility", "resilience_unlock", "reflexes_unlock", "dexterity_unlock"]:
+	for id in ["legacy", "stamina", "stamina", "stamina", "strength", "agility", "vigor", "resilience_unlock", "reflexes_unlock", "dexterity_unlock"]:
 		var bought: bool = save_data_script.try_buy_upgrade(data, id)
 		print("bought prereq/unlock '%s': %s (expected true)" % [id, bought])
 	save_data_script.save_data(data)

@@ -358,6 +358,11 @@ const BATTLE_CARD_SLOTS := 7                  # the hero and up to six more (a f
 const BATTLE_MENU_X := 240.0
 const BATTLE_BAR_H := 30.0                    # the bottom status/key-hint bar
 const BattleStyleScript := preload("res://scripts/BattleStyle.gd")
+const BattleStatusesScript := preload("res://scripts/BattleStatuses.gd")
+const UIIconsScript := preload("res://scripts/UIIcons.gd")
+const IconStripScript := preload("res://scripts/IconStrip.gd")
+# Battle status pictures are 16x16 art: shown one-to-one beside a card's chip line or a popup's, and doubled in the details box's rows.
+const STATUS_ICON_PX := 16.0
 const BATTLE_GOLD := BattleStyleScript.GOLD
 const BATTLE_ALLY_BLUE := BattleStyleScript.ALLY_BLUE
 const BATTLE_ENEMY_RED := BattleStyleScript.ENEMY_RED
@@ -705,11 +710,11 @@ func _ready() -> void:
 	purse_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	banner_box.add_child(purse_row)
 	var coin_icon := TextureRect.new()
-	coin_icon.texture = load("res://assets/coin.png")
+	coin_icon.texture = UIIconsScript.texture("stat_coin")
 	coin_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	coin_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	coin_icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	coin_icon.custom_minimum_size = Vector2(18, 18)
+	coin_icon.custom_minimum_size = Vector2(16, 16)
 	purse_row.add_child(coin_icon)
 	coins_label = Label.new()
 	coins_label.add_theme_font_size_override("font_size", 17)
@@ -1010,7 +1015,8 @@ func _ready() -> void:
 	shop_title_row.add_child(shop_title_spacer)
 
 	var shop_coin_icon := TextureRect.new()
-	shop_coin_icon.texture = load("res://assets/coin.png")
+	shop_coin_icon.texture = UIIconsScript.texture("stat_coin")
+	shop_coin_icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	shop_coin_icon.custom_minimum_size = Vector2(22, 22)
 	shop_coin_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	shop_title_row.add_child(shop_coin_icon)
@@ -2085,7 +2091,31 @@ func _make_party_card(i: int) -> Dictionary:
 	card["status"] = _battle_label(panel, Vector2(10, 66), 12, BATTLE_GOLD)
 	card["status"].size = Vector2(BATTLE_CARD_W - 16, 18)
 	card["status"].clip_text = true
+	card["tray"] = _make_status_tray(panel, Vector2(10, 65), 3)
 	return card
+
+# A row of small status pictures that sits ahead of a chip line. The slots are made once and stay hidden until a unit has a
+# status with a picture to show in them.
+func _make_status_tray(parent: Control, origin: Vector2, count: int) -> Array:
+	var slots: Array = []
+	for i in count:
+		var slot: TextureRect = IconStripScript.new()
+		slot.position = origin + Vector2(i * (STATUS_ICON_PX + 2.0), 0.0)
+		slot.size = Vector2(STATUS_ICON_PX, STATUS_ICON_PX)
+		slot.visible = false
+		parent.add_child(slot)
+		slots.append(slot)
+	return slots
+
+# Puts the statuses' pictures in a tray (each status with one, once, in order) and gives back the width they take, 0 with none.
+func _fill_status_tray(slots: Array, statuses: Array) -> float:
+	var ids: Array = BattleStatusesScript.ids_with_icons(statuses)
+	for i in slots.size():
+		if i < ids.size():
+			UIIconsScript.show_status(slots[i], str(ids[i]))
+		else:
+			slots[i].show_strip(null)
+	return mini(ids.size(), slots.size()) * (STATUS_ICON_PX + 2.0)
 
 # A plate over a unit: a health bar with a thin resource bar under it (stamina or mana; none for a foe).
 func _make_plate() -> Dictionary:
@@ -2181,6 +2211,10 @@ func set_party_cards(rows: Array) -> void:
 			chips.append("+%d" % (statuses.size() - 2))
 		c.status.text = "  ".join(chips)
 		c.status.add_theme_color_override("font_color", Color(1.0, 0.6, 0.45) if any_bad else BATTLE_GOLD)
+		var tray_w: float = _fill_status_tray(c.tray, statuses)
+		var text_x: float = 10.0 + (tray_w + 2.0 if tray_w > 0.0 else 0.0)
+		c.status.position.x = text_x
+		c.status.size.x = BATTLE_CARD_W - 6.0 - text_x
 		# Hovering the card reads out what each status does.
 		c.panel.tooltip_text = "\n".join(tip_lines)
 
@@ -2341,6 +2375,7 @@ func _build_battle_overlays() -> void:
 	battle_popup["status"] = _battle_label(popup, Vector2(8, 62), 12, BATTLE_GOLD)
 	battle_popup["status"].size = Vector2(170, 30)
 	battle_popup["status"].autowrap_mode = TextServer.AUTOWRAP_WORD
+	battle_popup["tray"] = _make_status_tray(popup, Vector2(8, 62), 4)
 
 	# The details box a click opens, down the right-hand side.
 	var grid_right: float = battle_grid_origin.x + BATTLE_GRID_FOOTPRINT_PX
@@ -2387,9 +2422,15 @@ func _build_battle_overlays() -> void:
 		mark.rotation = PI / 4.0
 		mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		row.add_child(mark)
+		# A status with a picture shows it (doubled) where the gold diamond would be, and its words move over to make room.
+		var picture: TextureRect = IconStripScript.new()
+		picture.position = Vector2(4, 2)
+		picture.size = Vector2(32, 32)
+		picture.visible = false
+		row.add_child(picture)
 		var name_label := _battle_label(row, Vector2(26, 2), 14, BATTLE_TEXT)
 		var detail_label := _battle_label(row, Vector2(26, 19), 11, BATTLE_DIM)
-		var entry := {"row": row, "mark": mark, "name": name_label, "detail": detail_label, "desc": ""}
+		var entry := {"row": row, "mark": mark, "picture": picture, "name": name_label, "detail": detail_label, "desc": ""}
 		row.mouse_entered.connect(func(): _show_status_tooltip(entry))
 		row.mouse_exited.connect(_hide_status_tooltip)
 		battle_details["rows"].append(entry)
@@ -2455,10 +2496,16 @@ func show_unit_popup(row: Dictionary, tile: Vector2i, span: int = 1) -> void:
 	for e in statuses:
 		chips.append(_status_chip_text(e))
 	p.status.text = "  ".join(chips)
-	p.status.position = Vector2(8, 62 if has_res else 46)
-	# The chip line wraps at about 25 letters; the card grows a line for each.
-	var chip_lines: int = ceili(float(p.status.text.length()) / 25.0) if chips.size() > 0 else 0
-	p.status.size = Vector2(170, maxf(16.0, chip_lines * 15.0))
+	var status_y: float = 62.0 if has_res else 46.0
+	var tray_w: float = _fill_status_tray(p.tray, statuses)
+	for slot in p.tray:
+		slot.position.y = status_y - 1.0
+	var text_x: float = 8.0 + (tray_w + 2.0 if tray_w > 0.0 else 0.0)
+	p.status.position = Vector2(text_x, status_y)
+	# The chip line wraps at about 25 letters across the whole card (fewer when pictures take some of the width); the card grows a line for each.
+	var per_line: float = 25.0 * (178.0 - text_x) / 170.0
+	var chip_lines: int = ceili(float(p.status.text.length()) / per_line) if chips.size() > 0 else 0
+	p.status.size = Vector2(178.0 - text_x, maxf(16.0, chip_lines * 15.0))
 	var height: float = (62.0 if has_res else 46.0) + (chip_lines * 15.0 + 6.0 if chips.size() > 0 else 0.0) + 8.0
 	p.panel.size = Vector2(184, height)
 	var origin: Vector2 = battle_grid_origin + Vector2(tile) * battle_tile_size
@@ -2517,6 +2564,10 @@ func show_unit_details(row: Dictionary) -> void:
 			r.detail.text = str(e.get("detail", ""))
 			r.desc = "%s: %s" % [e.name, e.desc]
 			r.mark.color = BATTLE_GOLD if bool(e.get("good", false)) else Color(1.0, 0.55, 0.4)
+			var pictured: bool = UIIconsScript.show_status(r.picture, str(e.get("id", "")))
+			r.mark.visible = not pictured
+			r.name.position.x = 44.0 if pictured else 26.0
+			r.detail.position.x = 44.0 if pictured else 26.0
 	if statuses.is_empty():
 		d.caption.text = "STATUS EFFECTS: none"
 	else:
@@ -2872,7 +2923,7 @@ func update_enemies(count: int) -> void:
 	enemies_label.text = "%d nearby" % count
 
 func update_wave(wave: int) -> void:
-	wave_label.text = "Wave %d" % wave
+	wave_label.text = "%s %d" % [Wording.DANGER, wave]
 
 func update_world(text: String) -> void:
 	world_label.text = text
@@ -2920,7 +2971,7 @@ func update_stats(intimidation: int, strength: int, vigor: int, agility: int, mi
 	# AGILITY_BONUS_PER_LEVEL gained) purely for display. The real
 	# stat_agility driving movement/attack cooldown is untouched.
 	var speed_display: int = 5 + int(agility - PlayerScript.AGILITY_START) / PlayerScript.AGILITY_BONUS_PER_LEVEL
-	stats_label.text = "INT %d   STR %d   VIG %d   AGI %d   MGT %d" % [intimidation, strength, vigor, speed_display, might]
+	stats_label.text = "INM %d   STR %d   VGR %d   AGI %d   MGT %d" % [intimidation, strength, vigor, speed_display, might]
 
 func update_items(count: int) -> void:
 	items_label.text = "%d" % count
@@ -2971,7 +3022,7 @@ func _populate_game_over_stats(essence_earned: int, total_essence: int, stats: D
 	var summary_lines := [
 		"This run earned %d Essence. (Total: %d)" % [essence_earned, total_essence],
 		"Spend it at the Church in town.",
-		"Waves cleared: %d" % stats.get("waves_cleared", 0),
+		"%s reached: %d" % [Wording.DANGER, stats.get("waves_cleared", 0)],
 		"World reached: %s" % stats.get("world_reached", "Plains"),
 		"Bosses/minibosses defeated: %d" % stats.get("bosses_defeated", 0),
 		"Damage dealt: %d" % stats.get("damage_dealt", 0),
@@ -3169,7 +3220,7 @@ func _input(event: InputEvent) -> void:
 func update_coins(amount: int) -> void:
 	coins_label.text = "%d" % amount
 
-func show_shop(coins: int, runic_shards: int, offering: Array, prices: Array, current_weapon_name: String, owned_weapons: Dictionary, current_armor_name: String, potion_count: int, reroll_cost: int, is_bow_equipped: bool = false, owned_arrows: Dictionary = {}, arrow_prices: Dictionary = {}, arrow_cap: int = WeaponsScript.ARROW_MAX_HELD, current_shield_name: String = "None", owned_shields: Dictionary = {}, player_might: int = 0, shopkeeper_lines: Array = [], unlimited_arrows: bool = false, player_intimidation: int = 0) -> void:
+func show_shop(coins: int, runic_shards: int, offering: Array, prices: Array, current_weapon_name: String, owned_weapons: Dictionary, current_armor_name: String, potion_count: int, reroll_cost: int, is_bow_equipped: bool = false, owned_arrows: Dictionary = {}, arrow_prices: Dictionary = {}, arrow_cap: int = WeaponsScript.ARROW_MAX_HELD, current_shield_name: String = "None", owned_shields: Dictionary = {}, player_might: int = 0, shopkeeper_lines: Array = [], unlimited_arrows: bool = false, player_intimidation: int = 0, light_metal: bool = false) -> void:
 	for n in shop_row_nodes:
 		n.queue_free()
 	shop_row_nodes.clear()
@@ -3198,6 +3249,8 @@ func show_shop(coins: int, runic_shards: int, offering: Array, prices: Array, cu
 		# try_buy_weapon for the matching server-side block. Mythic alone also
 		# gates on a second stat, required_intimidation.
 		var required_might: int = int(item.get("required_might", 0))
+		if light_metal:
+			required_might = int(ceil(float(required_might) / 2.0))     # Light Metal (Church): half the Might
 		var might_locked: bool = item.category == "weapon" and required_might > player_might
 		var required_intimidation: int = int(item.get("required_intimidation", 0))
 		var intimidation_locked: bool = item.category == "weapon" and required_intimidation > player_intimidation
@@ -3237,7 +3290,7 @@ func show_shop(coins: int, runic_shards: int, offering: Array, prices: Array, cu
 		if might_locked:
 			stat_lock_label = "MGT %d" % required_might
 		if intimidation_locked:
-			stat_lock_label = ("%s/INT %d" % [stat_lock_label, required_intimidation]) if stat_lock_label != "" else ("INT %d" % required_intimidation)
+			stat_lock_label = ("%s/INM %d" % [stat_lock_label, required_intimidation]) if stat_lock_label != "" else ("INM %d" % required_intimidation)
 		price_label.text = stat_lock_label if stat_locked else ("OWNED" if already_owned else "%d" % prices[i])
 		price_label.add_theme_font_size_override("font_size", 15)
 		price_label.add_theme_color_override("font_color", Color(1, 0.4, 0.4) if stat_locked else (Color(0.55, 0.85, 0.4) if already_owned else Color(1, 0.85, 0.3)))
@@ -3602,6 +3655,8 @@ func update_battle_grid(grid_w: int, grid_h: int, terrain: Dictionary, player_ti
 			ally_icon.texture = ENEMY_ICONS.get("Wolf", null) if is_wolf_ally else BLADE_ALLY_ICON
 			# Roster members wear their kind's colour on the shared companion icon.
 			ally_icon.modulate = a.member.rules().get("tint", Color(1, 1, 1)) if (a.has("member") and not is_wolf_ally) else (Color(0.82, 0.88, 0.8) if a.get("kind", "") == "skeleton" else Color(1, 1, 1))
+			if a.get("kind", "") == "spectre":
+				ally_icon.modulate = Color(0.65, 0.85, 1.0, 0.8)   # I SUMMON THEE's spectre: a pale, see-through blue
 			# Whoever the player is commanding right now glows, like the current target.
 			if a.get("acting", false):
 				ally_icon.modulate = ally_icon.modulate * Color(1.4, 1.4, 0.75)

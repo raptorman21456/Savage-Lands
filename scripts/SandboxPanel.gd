@@ -313,11 +313,11 @@ func _build_character(box: VBoxContainer) -> void:
 	_spin(r3, cfg.coins, 0, 99999, func(v):
 		cfg.coins = int(v)
 		_changed())
-	var r4 := _row(box, "Waves cleared this run")
+	var r4 := _row(box, Wording.DANGER + " reached this run")
 	_spin(r4, cfg.waves_cleared, 0, 200, func(v):
 		cfg.waves_cleared = int(v)
 		_changed(["Character"]))
-	_note(box, "(Waves cleared only matters for the Hardened upgrade: +HP per wave.)")
+	_note(box, "(Danger reached only matters for the Hardened upgrade: +HP each time the danger rises.)")
 	_heading(box, "Stat points")
 	_note(box, "Every level-up gives +1 to each core stat automatically, plus ONE bonus point you place here (level - 1 in total).")
 	var per_agility: int = PlayerScriptConst().AGILITY_BONUS_PER_LEVEL + p.meta_levelup_bonus_agility
@@ -620,11 +620,11 @@ func _build_party(box: VBoxContainer) -> void:
 	var p = _pl()
 	_heading(box, "Party")
 	var cap: int = p.party_capacity()
-	_note(box, "Capacity %d / %d (wolves and mercenaries count; raise it with Pack Leader / Warlord / Wolf Fang). Allies fight when you command them each round." % [p.party_members.size() + p.party.size(), cap])
+	_note(box, "Capacity %d / %d (wolves and mercenaries count; raise it with Leader's Instincts / Wolf Fang). Allies fight when you command them each round." % [p.party_members.size() + p.party.size(), cap])
 	for m in p.party_members:
 		_note(box, "%s (granted by an Astral upgrade)" % str(m.get("name", "Ally")), Color(0.6, 0.9, 0.6))
 	if int(cfg.upgrades.get("beastmaster", 0)) > 0:
-		_note(box, "Traitor Wolf (granted by Beastmaster)", Color(0.6, 0.9, 0.6))
+		_note(box, "Traitor Wolf (granted by Man's Best Friend)", Color(0.6, 0.9, 0.6))
 	for i in cfg.party.size():
 		var entry: Dictionary = cfg.party[i]
 		var rules: Dictionary = PartyRulesScript.rules(str(entry.kind))

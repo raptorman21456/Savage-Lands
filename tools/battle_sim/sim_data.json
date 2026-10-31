@@ -534,7 +534,7 @@
 			"xp_reward": 715
 		}
 	],
-	"exported": "2026-10-08T20:22:37",
+	"exported": "2026-10-27T21:26:52",
 	"foods": [
 		{
 			"description": "Heals 5 HP and restores 15 stamina.",
@@ -615,7 +615,8 @@
 			"icon": "food_fish",
 			"id": "food_minnow",
 			"name": "Fried Minnow",
-			"price": 0,
+			"price": 10,
+			"sell": 8,
 			"shop_description": "",
 			"stamina_amount": 10,
 			"vendor": "fish"
@@ -627,7 +628,8 @@
 			"icon": "food_fish",
 			"id": "food_bass",
 			"name": "Grilled Bass",
-			"price": 0,
+			"price": 24,
+			"sell": 20,
 			"shop_description": "",
 			"stamina_amount": 28,
 			"vendor": "fish"
@@ -639,6 +641,7 @@
 		"ALLY_GUARD_MANA": 15,
 		"ALLY_MAX_HP_PCT": 0.7,
 		"ALLY_MOVE_RANGE": 2,
+		"AMBIENT_SPAWN_INTERVAL": 1.6,
 		"ARCHER_ATTACK_RANGE": 4,
 		"ARCHER_WAVE_START": 1,
 		"ARROW_BOMB_FLAT_DMG": 20,
@@ -669,6 +672,8 @@
 		"BOSS_ENRAGE_DAMAGE_MULT": 1.5,
 		"BOSS_ENRAGE_HP_THRESHOLD": 0.3,
 		"BOSS_LEVEL_SCALING_FACTOR": 0.5,
+		"BOSS_SPAWN_RADIUS": 2600.0,
+		"BOSS_WAKE_RADIUS": 750.0,
 		"BOSS_WAVE_INTERVAL": 5,
 		"BRUTE_KNOCKBACK_RESIST_CHANCE": 0.6,
 		"BRUTE_WAVE_START": 3,
@@ -695,10 +700,28 @@
 		"CENTAUR_ARCHER_ATTACK_RANGE": 3,
 		"CENTAUR_PACK_SIZE": 3,
 		"CENTAUR_WAVE_START": 7,
-		"CHANNEL_RESTORE_PCT": 0.2,
 		"CHAOS_SHARD_MAX_MULT": 1.6,
 		"CHAOS_SHARD_MIN_MULT": 0.5,
+		"CHEST_CONTENTS": {
+			"crater": {
+				"id": "wildfire_core",
+				"kind": "talisman"
+			},
+			"gull_lighthouse": {
+				"kind": "legendary"
+			},
+			"lava_causeway": {
+				"id": "ember_charm",
+				"kind": "talisman"
+			},
+			"old_mine": {
+				"id": "stone_amulet",
+				"kind": "talisman"
+			}
+		},
 		"CLIFF_FALL_DAMAGE_PCT": 0.05,
+		"CLOVER_CHANCE": 0.001,
+		"CLOVER_STEP": 100.0,
 		"CONCUSSION_INFLICT_CHANCE": 0.5,
 		"DEATH_BURST_PARTICLE_COUNT": 6,
 		"DECO_BUSH_COUNT": 18,
@@ -712,10 +735,20 @@
 		"DEFAULT_BATTLE_GRID_SIZE": 8,
 		"DEFEND_DAMAGE_REDUCTION": 0.5,
 		"DEFEND_FULL_NEGATE_THRESHOLD": 10,
+		"DESPAWN_DISTANCE": 4300.0,
 		"DIAMONDS_MISS_CHANCE": 0.2,
 		"DIAMONDS_MISS_SELF_DAMAGE_PCT": 0.2,
 		"DRUID_BUFF_DMG_PCT": 0.3,
 		"DRUID_BUFF_TURNS": 3,
+		"DRUID_CAMP_OFFSET": [
+			0.0,
+			-330.0
+		],
+		"DRUID_HEARTWOOD_OFFSET": [
+			-700.0,
+			-420.0
+		],
+		"DRUID_TOUCH_RADIUS": 150.0,
 		"ELITE_CHANCE": 0.15,
 		"ELITE_DAMAGE_MULT": 1.3,
 		"ELITE_HP_MULT": 1.6,
@@ -764,7 +797,8 @@
 				"harm": "magical",
 				"ignore_line": true,
 				"inflicts_blind": true,
-				"inflicts_fear": true
+				"inflicts_fear": true,
+				"mage": true
 			},
 			"Archmage": {
 				"attack_range": 2,
@@ -774,6 +808,7 @@
 				"ignore_line": true,
 				"is_boss_tier": true,
 				"knockback_resist": 0.4,
+				"mage": true,
 				"move_range": 1,
 				"sweeps": true,
 				"windup": true
@@ -958,9 +993,26 @@
 		"GNOME_WAVE_START": 2,
 		"GOBLIN_PACK_DAMAGE_MULT": 1.5,
 		"GOLD_KILL_COIN_BONUS": 1,
+		"INTERIOR_ORIGIN": [
+			36000.0,
+			0.0
+		],
+		"INTERIOR_SLOT": 2600.0,
 		"KILLS_PER_TIER": 12,
 		"KNIFE_STEALTH_CRIT_BONUS": 30,
+		"KNIGHT_RUINS_OFFSET": [
+			0.0,
+			-430.0
+		],
 		"LANDFALL_STUN_CHANCE": 0.25,
+		"LANDMARK_BOSS_SCRIPTS": {
+			"archmage": null,
+			"elder_oak": null,
+			"leviathan": null,
+			"lizen_warband": null,
+			"red_wyrm": null,
+			"white_dragon": null
+		},
 		"LIFESTEAL_PCT": 0.5,
 		"LOW_SWEEP_CHANCE": 0.8,
 		"MANA_PER_HP": 5,
@@ -973,6 +1025,14 @@
 		"MERCENARY_SPEED": 5.0,
 		"MERCHANT_EVENT_DISCOUNT": 0.6,
 		"MIGHT_ALLY_DAMAGE_PCT_PER_POINT": 0.005,
+		"MINIBOSS_CHANCE": 0.04,
+		"MINIBOSS_SCRIPTS": {
+			"black_dragonlet": null,
+			"iron_construct": null,
+			"lava_construct": null,
+			"treant": null,
+			"voidwing": null
+		},
 		"MINIGAME_BLOCK_HELD_REDUCTION": 0.5,
 		"MINIGAME_BRACE_HELD_REDUCTION": 0.25,
 		"MINIGAME_DODGE_BASE_CHANCE": 0.3,
@@ -1010,8 +1070,8 @@
 		"PLAYER_CONCUSSION_CHANCE": 0.5,
 		"PLAYER_CONCUSSION_TURNS": 2,
 		"PLAYER_SPAWN_POSITION": [
-			2400.0,
-			2545.0
+			12919.2001953125,
+			7573.15966796875
 		],
 		"POISON_DAMAGE_PCT": 0.1,
 		"POISON_TURNS": 5,
@@ -1048,6 +1108,17 @@
 			"monster_slayer",
 			"treasure_hunter"
 		],
+		"REGION_ENEMY_SCRIPTS": {
+			"archer": null,
+			"brute": null,
+			"centaur_pack": null,
+			"fae_hut": null,
+			"gnome_pack": null,
+			"goblin": null,
+			"orc": null,
+			"shade": null,
+			"wolf": null
+		},
 		"REROLL_BASE_COST": 10,
 		"REROLL_COST_INCREMENT": 10,
 		"RESERVED_TERRAIN_TYPES": [
@@ -1064,6 +1135,10 @@
 		"RESILIENCE_POTION_DAMAGE_REDUCTION_PCT": 0.2,
 		"RIPOSTE_DAMAGE_PCT": 0.5,
 		"ROCK_COVER_REDUCTION": 0.25,
+		"ROOM_ACTIVE_MARGIN": 1400.0,
+		"ROOM_SPAWN_CLEARANCE": 150.0,
+		"ROOM_SPAWN_MIN": 800.0,
+		"ROOM_TOP_UP": 3,
 		"RUBBLE_CRUMBLE_CHANCE": 0.4,
 		"SEER_REROLL_COST": 15,
 		"SEER_STOCK_SIZE": 5,
@@ -1085,7 +1160,13 @@
 			"hp_regen_turn",
 			"hp_regen_per_20_max_hp",
 			"stamina_regen",
-			"double_secondary_chance"
+			"double_secondary_chance",
+			"spell_potency_pct",
+			"spell_echo_chance",
+			"spell_clapback_chance",
+			"spell_clapback_mage_pct",
+			"mana_regen_pct",
+			"spell_cost_pct"
 		],
 		"SHOP_CATEGORY_WEIGHTS": {
 			"armor": 16.7,
@@ -1097,6 +1178,7 @@
 		"SHOP_TOTAL_SLOTS": 6,
 		"SHRINE_EFFECT_WAVES": 3,
 		"SILVER_CLEANSE_CHANCE": 0.15,
+		"SPECTRE_ID": "staff_i_summon_thee",
 		"SPRING_HEAL_AMOUNT": 15,
 		"STAMINA_REGEN_ON_ATTACK": 10,
 		"STAMINA_REGEN_ON_DEFEND": 15,
@@ -1104,13 +1186,14 @@
 		"STEALTH_STAMINA_COST": 20,
 		"STEALTH_TURNS": 3,
 		"STONE_AMULET_MATERIAL_BOOST_MULT": 2.0,
+		"SUMMON_PICK_LIMIT": 24,
 		"SWARM_BONUS_GOBLINS": 4,
 		"TARGET_DECONFLICT_TOLERANCE": 1,
 		"TARGET_PRACTICE_BOSS_CHANCE": 0.05,
 		"TARGET_PRACTICE_CHANCE": 0.3,
 		"TOWN_AREA_ORIGIN": [
-			1500.0,
-			1075.0
+			15900.0,
+			11275.0
 		],
 		"TOWN_BUILDING_SCALE": 3.0,
 		"TOWN_BUILT_KINDS": [
@@ -1219,22 +1302,6 @@
 				"size": [
 					108.0,
 					192.0
-				]
-			},
-			"fishing": {
-				"door": [
-					70.0,
-					60.0
-				],
-				"name": "Fishing Hole",
-				"outside": true,
-				"pos": [
-					-110.0,
-					255.0
-				],
-				"size": [
-					0.0,
-					0.0
 				]
 			},
 			"flea_market": {
@@ -1361,8 +1428,7 @@
 		},
 		"TOWN_NPC_SCALE": 2.0,
 		"TOWN_OUTSKIRTS_KINDS": [
-			"horse_racing",
-			"fishing"
+			"horse_racing"
 		],
 		"TOWN_SIZE": [
 			1800.0,
@@ -1403,8 +1469,8 @@
 		"WOOD_DOUBLE_HIT_CHANCE": 0.1,
 		"WORLD_BOSS_WAVE": 10,
 		"WORLD_SIZE": [
-			4800.0,
-			3400.0
+			33600.0,
+			23800.0
 		]
 	},
 	"party": {
@@ -1422,6 +1488,7 @@
 						"speed": 4.0
 					},
 					"caster": false,
+					"description": "A bare-knuckle fighter whose fists land twice as often as anyone expects. Fists and knuckle gloves reach one tile further in these hands.",
 					"favour": {
 						"range_bonus": 1.0,
 						"weapons": [
@@ -1472,6 +1539,7 @@
 						"speed": 5.0
 					},
 					"caster": true,
+					"description": "A wild-woods healer who would rather mend than maim. Her spells restore and embolden her friends, and when she must move, she moves twice as far. Fragile, and worth protecting.",
 					"favour": {
 						"magic_mult": 1.15,
 						"weapon": "staff"
@@ -1515,6 +1583,7 @@
 					},
 					"caster": false,
 					"defense_cap": 0.9,
+					"description": "A wall that walks. It only ever takes one step, hits twice as hard with a shield in hand, and shouts loud enough to rattle every enemy on the field.",
 					"growth": {
 						"attack": 1.0,
 						"defense": 2.0,
@@ -1555,6 +1624,7 @@
 					},
 					"cannot_dodge": true,
 					"caster": false,
+					"description": "A veteran who holds the line. Strongest with a greatsword, able to keep a shield up even behind a two-handed weapon, and far too proud to dodge.",
 					"favour": {
 						"special_stamina_discount": 0.2,
 						"weapon": "greatsword"
@@ -1602,6 +1672,7 @@
 					},
 					"caster": false,
 					"defense_fixed": 0.0,
+					"description": "A sharpshooter who ignores range and cover, but will only ever fight with a bow. Arrows are cheap while the Marksman is around, and every other weapon costs more.",
 					"favour": {
 						"crit_chance_mult": 1.5,
 						"weapon": "bow"
@@ -1649,6 +1720,7 @@
 						"speed": 5.0
 					},
 					"caster": true,
+					"description": "Pays for every spell in blood and grows a little stronger with each kill. Rots enemies from within and raises the fallen to fight again.",
 					"favour": {
 						"kill_heal": 2.0,
 						"weapon": "staff"
@@ -1693,6 +1765,7 @@
 						"speed": 5.0
 					},
 					"caster": false,
+					"description": "Quick hands, quicker feet. Would rather lift an enemy's coin purse than its life, right up until the moment it decides otherwise. Always half in shadow: foes only notice the Rogue from close by, and its Stealth lasts longer, costs less and bites harder.",
 					"favour": {
 						"damage_pct": 0.25,
 						"weapon": "dagger"
@@ -1721,6 +1794,12 @@
 						"fortitude"
 					],
 					"steal_chance": 0.25,
+					"stealth": {
+						"cost": 10,
+						"crit_bonus": 1.0,
+						"passive_sight": 3,
+						"turns": 5
+					},
 					"tint": [
 						0.850000023841858,
 						0.699999988079071,
@@ -1740,6 +1819,7 @@
 					},
 					"caster": true,
 					"charm_range": 4,
+					"description": "Carries four talismans and shares their power with everyone nearby. Heals, cleanses, and keeps the whole party in tune.",
 					"favour": {
 						"talisman_share": 0.5,
 						"weapon": "staff"
@@ -1783,6 +1863,7 @@
 						"speed": 5.0
 					},
 					"caster": false,
+					"description": "A traitor wolf that turned on its pack. The old magic that made wolves so savage still runs through it, so it fights harder than any hound should. It cannot level, wear gear or carry a weapon, and three faints will be its last.",
 					"final_mult": {
 						"attack": 1.25,
 						"defense": 0.75,
@@ -1826,6 +1907,7 @@
 				"magic": 1.0,
 				"speed": 1.0
 			},
+			"SPECIAL_SLOTS": 3,
 			"SPEED_PER_EXTRA_TILE": 4.0,
 			"SPEED_START": 5.0,
 			"STAT_NAMES": [
@@ -1853,6 +1935,7 @@
 					"speed": 4.0
 				},
 				"caster": false,
+				"description": "A bare-knuckle fighter whose fists land twice as often as anyone expects. Fists and knuckle gloves reach one tile further in these hands.",
 				"favour": {
 					"range_bonus": 1.0,
 					"weapons": [
@@ -1903,6 +1986,7 @@
 					"speed": 5.0
 				},
 				"caster": true,
+				"description": "A wild-woods healer who would rather mend than maim. Her spells restore and embolden her friends, and when she must move, she moves twice as far. Fragile, and worth protecting.",
 				"favour": {
 					"magic_mult": 1.15,
 					"weapon": "staff"
@@ -1946,6 +2030,7 @@
 				},
 				"caster": false,
 				"defense_cap": 0.9,
+				"description": "A wall that walks. It only ever takes one step, hits twice as hard with a shield in hand, and shouts loud enough to rattle every enemy on the field.",
 				"growth": {
 					"attack": 1.0,
 					"defense": 2.0,
@@ -1986,6 +2071,7 @@
 				},
 				"cannot_dodge": true,
 				"caster": false,
+				"description": "A veteran who holds the line. Strongest with a greatsword, able to keep a shield up even behind a two-handed weapon, and far too proud to dodge.",
 				"favour": {
 					"special_stamina_discount": 0.2,
 					"weapon": "greatsword"
@@ -2033,6 +2119,7 @@
 				},
 				"caster": false,
 				"defense_fixed": 0.0,
+				"description": "A sharpshooter who ignores range and cover, but will only ever fight with a bow. Arrows are cheap while the Marksman is around, and every other weapon costs more.",
 				"favour": {
 					"crit_chance_mult": 1.5,
 					"weapon": "bow"
@@ -2080,6 +2167,7 @@
 					"speed": 5.0
 				},
 				"caster": true,
+				"description": "Pays for every spell in blood and grows a little stronger with each kill. Rots enemies from within and raises the fallen to fight again.",
 				"favour": {
 					"kill_heal": 2.0,
 					"weapon": "staff"
@@ -2124,6 +2212,7 @@
 					"speed": 5.0
 				},
 				"caster": false,
+				"description": "Quick hands, quicker feet. Would rather lift an enemy's coin purse than its life, right up until the moment it decides otherwise. Always half in shadow: foes only notice the Rogue from close by, and its Stealth lasts longer, costs less and bites harder.",
 				"favour": {
 					"damage_pct": 0.25,
 					"weapon": "dagger"
@@ -2152,6 +2241,12 @@
 					"fortitude"
 				],
 				"steal_chance": 0.25,
+				"stealth": {
+					"cost": 10,
+					"crit_bonus": 1.0,
+					"passive_sight": 3,
+					"turns": 5
+				},
 				"tint": [
 					0.850000023841858,
 					0.699999988079071,
@@ -2171,6 +2266,7 @@
 				},
 				"caster": true,
 				"charm_range": 4,
+				"description": "Carries four talismans and shares their power with everyone nearby. Heals, cleanses, and keeps the whole party in tune.",
 				"favour": {
 					"talisman_share": 0.5,
 					"weapon": "staff"
@@ -2214,6 +2310,7 @@
 					"speed": 5.0
 				},
 				"caster": false,
+				"description": "A traitor wolf that turned on its pack. The old magic that made wolves so savage still runs through it, so it fights harder than any hound should. It cannot level, wear gear or carry a weapon, and three faints will be its last.",
 				"final_mult": {
 					"attack": 1.25,
 					"defense": 0.75,
@@ -2257,21 +2354,23 @@
 		"BLOODMOON_SPEED_PCT_PER_STACK": 0.075,
 		"BODY_RADIUS": 16.0,
 		"COOLDOWN_REDUCTION_PER_AGILITY": 0.003,
-		"DEXTERITY_CRIT_CAP": 0.15,
-		"DEXTERITY_PCT_PER_POINT": 0.0075,
+		"DEXTERITY_CRIT_CAP": 0.1,
+		"DEXTERITY_PCT_PER_POINT": 0.005,
 		"EXHAUSTED_CLEAR_STAMINA_PCT": 0.5,
 		"EXHAUSTED_STAMINA_REGEN_MULT": 0.5,
 		"FLASH_DURATION": 0.15,
 		"INVINCIBILITY_TIME": 0.9,
 		"ITEM_HEAL_AMOUNT": 5,
+		"MAN_BEST_FRIEND_WOLF_BATTLES": 25,
 		"MAX_LEVEL": 99,
 		"MAX_STAMINA": 100,
 		"MIN_ATTACK_COOLDOWN": 0.12,
 		"MISS_CHANCE": 0.05,
 		"MISS_CHANCE_MASTERED": 0.025,
 		"REFLEXES_DODGE_CAP": 0.15,
-		"REFLEXES_PCT_PER_POINT": 0.0075,
+		"REFLEXES_PCT_PER_POINT": 0.005,
 		"RESILIENCE_PCT_PER_POINT": 0.01,
+		"STAMINA_BAR": 100,
 		"WORLDWALKER_DAMAGE_BONUS_PCT": 0.1,
 		"WORLDWALKER_HP_BONUS_PCT": 0.15,
 		"XP_BASE": 20,
@@ -2488,6 +2587,7 @@
 					"burn_chance_multihit": 0.02,
 					"ember_burn": 1
 				},
+				"found": true,
 				"id": "ember_charm",
 				"name": "Ember Charm",
 				"price": 70,
@@ -2555,6 +2655,7 @@
 				"effects": {
 					"material_passive_boost": 1
 				},
+				"found": true,
 				"id": "stone_amulet",
 				"name": "Stone Amulet",
 				"price": 120,
@@ -2612,6 +2713,87 @@
 				"rarity": "common"
 			},
 			{
+				"description": "Whenever you cast a spell, a 20% chance you also strike the nearest enemy for your STR + half your MAG, with +30% damage if it is a mage.",
+				"effects": {
+					"spell_clapback_chance": 0.2,
+					"spell_clapback_mage_pct": 0.3
+				},
+				"id": "clapback",
+				"name": "Clapback",
+				"price": 85,
+				"rarity": "rare"
+			},
+			{
+				"description": "+1 Resilience and Fortitude for every 3 Magic you have.",
+				"effects": {
+					"res_ftd_per_3_mag": 1
+				},
+				"id": "heavy_cloak",
+				"name": "Heavy Cloak",
+				"price": 55,
+				"rarity": "common"
+			},
+			{
+				"description": "Regain 5% of your max mana at the end of each of your turns (the Necromancer heals 5% of her max HP).",
+				"effects": {
+					"mana_regen_pct": 0.05
+				},
+				"id": "spell_bank",
+				"name": "Spell Bank",
+				"price": 70,
+				"rarity": "uncommon"
+			},
+			{
+				"description": "Spells cost 33% less mana (a Necromancer pays 33% less HP).",
+				"effects": {
+					"spell_cost_pct": 0.33
+				},
+				"id": "dreamcatcher",
+				"name": "Dreamcatcher",
+				"price": 75,
+				"rarity": "uncommon"
+			},
+			{
+				"description": "Spells have +25% potency.",
+				"effects": {
+					"spell_potency_pct": 0.25
+				},
+				"id": "snail_shell",
+				"name": "Snail Shell",
+				"price": 95,
+				"rarity": "rare"
+			},
+			{
+				"description": "10% chance for a spell to cast twice: the second cast is free, and you choose its target again.",
+				"effects": {
+					"spell_echo_chance": 0.1
+				},
+				"id": "lingering_echo",
+				"name": "Lingering Echo",
+				"price": 60,
+				"rarity": "common"
+			},
+			{
+				"description": "I CAST FIREBALL skips its charging turn.",
+				"effects": {
+					"fireball_instant": 1
+				},
+				"id": "blazing_battery",
+				"name": "Blazing Battery",
+				"price": 90,
+				"rarity": "rare"
+			},
+			{
+				"description": "Every summon is doubled: twice the skeletons, twice the spectres.",
+				"effects": {
+					"summon_double": 1
+				},
+				"id": "loud_whistle",
+				"name": "Loud Whistle",
+				"price": 100,
+				"rarity": "rare"
+			},
+			{
 				"description": "Regain 1 HP at the start of each of your battle turns, plus 1 more for every 20 max HP you have.",
 				"effects": {
 					"hp_regen_per_20_max_hp": 1,
@@ -2667,6 +2849,7 @@
 				"effects": {
 					"double_secondary_chance": 1
 				},
+				"found": true,
 				"id": "lucky_clover",
 				"name": "Lucky Clover",
 				"price": 110,
@@ -2873,6 +3056,7 @@
 				"effects": {
 					"wildfire_core": 1
 				},
+				"found": true,
 				"id": "wildfire_core",
 				"name": "Wildfire Core",
 				"price": 130,
@@ -2892,7 +3076,8 @@
 			"harm": "magical",
 			"ignore_line": true,
 			"inflicts_blind": true,
-			"inflicts_fear": true
+			"inflicts_fear": true,
+			"mage": true
 		},
 		"Archmage": {
 			"attack_range": 2,
@@ -2902,6 +3087,7 @@
 			"ignore_line": true,
 			"is_boss_tier": true,
 			"knockback_resist": 0.4,
+			"mage": true,
 			"move_range": 1,
 			"sweeps": true,
 			"windup": true
@@ -3076,365 +3262,349 @@
 	"upgrades": {
 		"defs": {
 			"adrenaline": {
-				"base_cost": 30,
-				"cost_step": 18,
-				"description": "+8% extra damage DEALT per level while below 30% HP -- a berserker's edge when the fight turns desperate.",
+				"costs": [
+					4,
+					6,
+					9
+				],
+				"description": "+8% extra damage DEALT per level while below 30% HP.",
 				"max_level": 3,
 				"name": "Adrenaline",
 				"prereqs": [
 					{
 						"id": "reflexes_unlock",
 						"min_level": 1
+					},
+					{
+						"id": "agility",
+						"min_level": 1
 					}
 				],
 				"stat_bonus": 0.08
 			},
+			"aegis_transcendence": {
+				"costs": [
+					40
+				],
+				"description": "Walk into a shop with a full stamina bar and it is 10% cheaper, for every full 100 Stamina you carry.",
+				"max_level": 1,
+				"name": "Aegis & Transcendence",
+				"prereqs": [
+					{
+						"id": "golden_touch",
+						"min_level": 1
+					},
+					{
+						"id": "unbreakable_guard",
+						"min_level": 1
+					}
+				],
+				"stat_bonus": 0.1
+			},
 			"agility": {
-				"base_cost": 15,
-				"cost_step": 8,
-				"description": "Choosing Agility on level-up grants +10 more per level owned, instead of a flat starting bonus.",
-				"name": "Swiftness",
+				"costs": [
+					1
+				],
+				"description": "Putting a level-up into Agility grants +10 more.",
+				"max_level": 1,
+				"name": "Endurance Training",
+				"prereqs": [
+					{
+						"id": "legacy",
+						"min_level": 1
+					}
+				],
+				"stat_bonus": 10
+			},
+			"battle_hardened": {
+				"costs": [
+					1
+				],
+				"description": "Puts the Knight within reach: find him in the Ruined Settlement and he joins your party. Unlocks the party system, and dismissing party members for a while.",
+				"max_level": 1,
+				"name": "Friends in High Places",
+				"prereqs": [
+					{
+						"id": "berserker_edge",
+						"min_level": 5
+					},
+					{
+						"id": "adrenaline",
+						"min_level": 3
+					}
+				],
+				"stat_bonus": 1
+			},
+			"battle_medic": {
+				"costs": [
+					25
+				],
+				"description": "Using a healing item in battle deals 5 damage to every enemy.",
+				"max_level": 1,
+				"name": "Battle Medic",
+				"prereqs": [
+					{
+						"id": "potions",
+						"min_level": 2
+					},
+					{
+						"id": "pack_leader",
+						"min_level": 2
+					}
+				],
+				"stat_bonus": 5
+			},
+			"beastmaster": {
+				"costs": [
+					1
+				],
+				"description": "Every run starts with a Traitor Wolf already in your pack, loyal for 25 battles.",
+				"max_level": 1,
+				"name": "Man's Best Friend",
+				"prereqs": [
+					{
+						"id": "pack_leader",
+						"min_level": 2
+					}
+				],
+				"stat_bonus": 1
+			},
+			"berserker_edge": {
+				"costs": [
+					2,
+					3,
+					4,
+					6,
+					10
+				],
+				"description": "+1% chance per level for ANY attack, with any weapon, to strike twice -- stacks with a weapon's own double-hit passive.",
+				"max_level": 5,
+				"name": "Pure Spite",
 				"prereqs": [
 					{
 						"id": "strength",
 						"min_level": 1
 					}
 				],
-				"stat_bonus": 10
-			},
-			"appraisal": {
-				"base_cost": 25,
-				"cost_step": 15,
-				"description": "+20 starting coins per level, stacking with Nest Egg.",
-				"name": "Appraisal",
-				"prereqs": [
-					{
-						"id": "haggling",
-						"min_level": 1
-					}
-				],
-				"stat_bonus": 20
-			},
-			"battle_hardened": {
-				"base_cost": 350,
-				"cost_step": 0,
-				"description": "Warrior capstone -- unlocks the Knight as a permanent ally who fights beside you in every battle.",
-				"max_level": 1,
-				"name": "Friends in High Places",
-				"prereqs": [
-					{
-						"id": "berserker_edge",
-						"min_level": 3
-					},
-					{
-						"id": "adrenaline",
-						"min_level": 2
-					}
-				],
-				"stat_bonus": 1
-			},
-			"battle_medic": {
-				"base_cost": 250,
-				"cost_step": 0,
-				"description": "Survivor + Warrior convergence -- healing items also restore stamina.",
-				"max_level": 1,
-				"name": "Battle Medic",
-				"prereqs": [
-					{
-						"id": "potions",
-						"min_level": 1
-					},
-					{
-						"id": "vigor",
-						"min_level": 1
-					}
-				],
-				"stat_bonus": 1
-			},
-			"beastmaster": {
-				"base_cost": 300,
-				"cost_step": 0,
-				"description": "Every run starts with a Traitor Wolf already in your pack -- no need to find and defeat one.",
-				"max_level": 1,
-				"name": "Beastmaster",
-				"prereqs": [
-					{
-						"id": "pack_leader",
-						"min_level": 1
-					}
-				],
-				"stat_bonus": 1
-			},
-			"berserker_edge": {
-				"base_cost": 30,
-				"cost_step": 18,
-				"description": "+8% chance per level for ANY attack, with any weapon, to strike twice -- stacks with a weapon's own double-hit passive.",
-				"name": "Berserker's Edge",
-				"prereqs": [
-					{
-						"id": "vigor",
-						"min_level": 1
-					}
-				],
-				"stat_bonus": 0.08
+				"stat_bonus": 0.01
 			},
 			"black_market": {
-				"base_cost": 80,
-				"cost_step": 40,
+				"costs": [
+					40,
+					60,
+					90
+				],
 				"description": "Shop rerolls cost 20% less per level.",
 				"max_level": 3,
 				"name": "Black Market",
 				"prereqs": [
 					{
-						"id": "silver_tongue",
+						"id": "silver_muscles",
+						"min_level": 1
+					},
+					{
+						"id": "light_metal",
 						"min_level": 1
 					}
 				],
 				"stat_bonus": 0.2
 			},
 			"block_master": {
-				"base_cost": 35,
-				"cost_step": 20,
-				"description": "+15% chance per level to completely negate all incoming damage while Defending.",
+				"costs": [
+					4,
+					6,
+					9
+				],
+				"description": "+10% chance per level to completely negate a hit while Defending.",
 				"max_level": 3,
-				"name": "Block Master",
+				"name": "Parry Master",
 				"prereqs": [
 					{
 						"id": "resilience_unlock",
 						"min_level": 1
 					}
 				],
-				"stat_bonus": 0.15
+				"stat_bonus": 0.1
 			},
 			"coins": {
-				"base_cost": 10,
-				"cost_step": 6,
+				"costs": [
+					1,
+					2,
+					3,
+					5,
+					8
+				],
 				"description": "+15 starting coins per level.",
-				"name": "Nest Egg",
-				"stat_bonus": 15
-			},
-			"dexterity_unlock": {
-				"base_cost": 25,
-				"cost_step": 15,
-				"description": "Unlocks Dexterity as a level-up choice -- 0.75% chance per point owned for an attack to critically strike (double damage, ignores cover), capped at 15%.",
-				"max_level": 1,
-				"name": "Dexterity",
+				"max_level": 5,
+				"name": "Inheritance",
 				"prereqs": [
 					{
-						"id": "agility",
+						"id": "legacy",
+						"min_level": 1
+					}
+				],
+				"stat_bonus": 15
+			},
+			"continual_growth": {
+				"costs": [
+					2
+				],
+				"description": "Putting a level-up into Might grants +1 more.",
+				"max_level": 1,
+				"name": "Continual Growth",
+				"prereqs": [
+					{
+						"id": "legacy",
 						"min_level": 1
 					}
 				],
 				"stat_bonus": 1
 			},
-			"favour": {
-				"base_cost": 250,
-				"cost_step": 100,
-				"description": "1% chance per level, on any hit that would drop you to 0 HP, to survive with 1 HP instead (once per battle), capped at 5%.",
-				"max_level": 5,
-				"name": "Favour",
+			"continual_learning": {
+				"costs": [
+					10
+				],
+				"description": "Unlocks Intelligence, which grows by +1 every level-up. (Intelligence is not a stat in the game yet, so this does nothing until it is.)",
+				"max_level": 1,
+				"name": "Continual Learning",
 				"prereqs": [
 					{
-						"id": "undying",
+						"id": "legacy",
 						"min_level": 1
+					}
+				],
+				"stat_bonus": 1
+			},
+			"deep_well": {
+				"costs": [
+					8
+				],
+				"description": "+20 max mana for every caster in your party (a Necromancer's mana is her HP: 5 mana is 1 HP).",
+				"max_level": 1,
+				"name": "Deep Well",
+				"prereqs": [
+					{
+						"id": "release_grudge",
+						"min_level": 1
+					}
+				],
+				"stat_bonus": 20
+			},
+			"dexterity_unlock": {
+				"costs": [
+					1
+				],
+				"description": "Unlocks Dexterity as a level-up choice -- 0.5% chance per point owned for an attack to critically strike (double damage, ignores cover), capped at 10%.",
+				"max_level": 1,
+				"name": "Deft Fingers",
+				"prereqs": [
+					{
+						"id": "vigor",
+						"min_level": 1
+					},
+					{
+						"id": "strength",
+						"min_level": 1
+					}
+				],
+				"stat_bonus": 1
+			},
+			"field_surgeon": {
+				"costs": [
+					8,
+					12,
+					18,
+					27,
+					40
+				],
+				"description": "Healing potions in the shop cost 1% less per level.",
+				"max_level": 5,
+				"name": "Herbalist",
+				"prereqs": [
+					{
+						"id": "potions",
+						"min_level": 2
 					}
 				],
 				"stat_bonus": 0.01
 			},
-			"field_surgeon": {
-				"base_cost": 90,
-				"cost_step": 45,
-				"description": "Merchant + Survivor convergence -- healing potions in the shop cost 15% less per level.",
-				"max_level": 2,
-				"name": "Field Surgeon",
-				"prereqs": [
-					{
-						"id": "appraisal",
-						"min_level": 1
-					},
-					{
-						"id": "potions",
-						"min_level": 1
-					}
-				],
-				"stat_bonus": 0.15
-			},
 			"fletcher": {
-				"base_cost": 60,
-				"cost_step": 30,
-				"description": "Special arrows cost 15% less per level, and you can hold 5 more of each per level.",
+				"costs": [
+					4,
+					6,
+					9
+				],
+				"description": "Special arrows cost 5% less per level, and you can hold 3 more of each per level.",
 				"max_level": 3,
 				"name": "Fletcher",
 				"prereqs": [
 					{
-						"id": "haggling",
+						"id": "luck",
 						"min_level": 1
 					}
 				],
-				"stat_bonus": 0.15
+				"stat_bonus": 0.05
 			},
 			"golden_touch": {
-				"base_cost": 350,
-				"cost_step": 0,
-				"description": "Merchant capstone -- every shop visit offers one extra weapon, guaranteed Masterwork quality or better.",
+				"costs": [
+					15
+				],
+				"description": "Every shop visit offers one extra weapon, guaranteed Fine quality or better.",
 				"max_level": 1,
-				"name": "Merchant Prince",
+				"name": "Merchant's Favour",
 				"prereqs": [
 					{
-						"id": "silver_tongue",
-						"min_level": 1
-					},
-					{
-						"id": "appraisal",
+						"id": "silver_muscles",
 						"min_level": 1
 					}
 				],
 				"stat_bonus": 1
 			},
 			"haggling": {
-				"base_cost": 20,
-				"cost_step": 12,
-				"description": "+10% bonus coins per level from every source.",
+				"costs": [
+					4,
+					6,
+					9,
+					13,
+					20
+				],
+				"description": "+5% bonus coins per level from every source.",
 				"max_level": 5,
-				"name": "Haggling",
+				"name": "Magpie",
 				"prereqs": [
 					{
 						"id": "intimidation",
 						"min_level": 1
 					}
 				],
-				"stat_bonus": 0.1
-			},
-			"hardened": {
-				"base_cost": 150,
-				"cost_step": 80,
-				"description": "+2 max HP per level for every wave you clear this run, permanently stacking for the rest of that run.",
-				"max_level": 3,
-				"name": "Hardened",
-				"prereqs": [
-					{
-						"id": "pack_leader",
-						"min_level": 1
-					}
-				],
-				"stat_bonus": 2
+				"stat_bonus": 0.05
 			},
 			"herbalism": {
-				"base_cost": 20,
-				"cost_step": 12,
-				"description": "+15% bonus healing per level from every healing item.",
+				"costs": [
+					8,
+					12,
+					18,
+					27,
+					40
+				],
+				"description": "+5% bonus healing per level from every healing item.",
 				"max_level": 5,
-				"name": "Herbalism",
+				"name": "Field Surgeon",
 				"prereqs": [
 					{
-						"id": "resilience_unlock",
-						"min_level": 1
+						"id": "potions",
+						"min_level": 2
 					}
 				],
-				"stat_bonus": 0.15
+				"stat_bonus": 0.05
 			},
-			"intimidation": {
-				"base_cost": 15,
-				"cost_step": 8,
-				"description": "Choosing Intimidation on level-up grants +1 more per level owned (cheaper shops sooner), instead of a flat starting bonus.",
-				"name": "Presence",
-				"prereqs": [
-					{
-						"id": "coins",
-						"min_level": 1
-					}
+			"heroic_destiny": {
+				"costs": [
+					1
 				],
-				"stat_bonus": 1
-			},
-			"investor": {
-				"base_cost": 200,
-				"cost_step": 0,
-				"description": "The shop rolls 3 more weapon options every visit.",
+				"description": "You start every run with a wooden club and a wooden shield.",
 				"max_level": 1,
-				"name": "Investor",
-				"prereqs": [
-					{
-						"id": "golden_touch",
-						"min_level": 1
-					}
-				],
-				"stat_bonus": 3
-			},
-			"last_stand": {
-				"base_cost": 50,
-				"cost_step": 30,
-				"description": "+1 Defense and Fortitude per level for every 10% HP you're missing -- the more hurt you are, the tankier you get.",
-				"max_level": 5,
-				"name": "Last Stand",
-				"prereqs": [
-					{
-						"id": "resilience_unlock",
-						"min_level": 1
-					}
-				],
-				"stat_bonus": 0.01
-			},
-			"luck": {
-				"base_cost": 20,
-				"cost_step": 12,
-				"description": "Improves shop weapon-tier odds toward Fine, Masterwork, and Legendary.",
-				"name": "Fortune",
-				"prereqs": [
-					{
-						"id": "intimidation",
-						"min_level": 1
-					}
-				],
-				"stat_bonus": 0.15
-			},
-			"mental_mush": {
-				"base_cost": 30,
-				"cost_step": 18,
-				"description": "Fortitude grows by +1 more per level owned on every level-up.",
-				"max_level": 3,
-				"name": "Mental Mush",
-				"prereqs": [
-					{
-						"id": "warded_mind",
-						"min_level": 1
-					}
-				],
-				"stat_bonus": 1
-			},
-			"momentum": {
-				"base_cost": 40,
-				"cost_step": 25,
-				"description": "+3% damage per level for the rest of the battle, per enemy you defeat this battle -- stacks, resets each fight.",
-				"max_level": 5,
-				"name": "Momentum",
-				"prereqs": [
-					{
-						"id": "berserker_edge",
-						"min_level": 1
-					}
-				],
-				"stat_bonus": 0.03
-			},
-			"pack_bond": {
-				"base_cost": 200,
-				"cost_step": 100,
-				"description": "Your Traitor Wolf's loyalty lasts 3 waves longer per level before it leaves your pack.",
-				"max_level": 3,
-				"name": "Pack Bond",
-				"prereqs": [
-					{
-						"id": "beastmaster",
-						"min_level": 1
-					}
-				],
-				"stat_bonus": 3
-			},
-			"pack_leader": {
-				"base_cost": 500,
-				"cost_step": 0,
-				"description": "+1 max party slot (3 total) -- a second recruited ally can now fight alongside your Knight.",
-				"max_level": 1,
-				"name": "Pack Leader",
+				"name": "Heroic Destiny",
 				"prereqs": [
 					{
 						"id": "battle_hardened",
@@ -3443,11 +3613,192 @@
 				],
 				"stat_bonus": 1
 			},
+			"innate_power": {
+				"costs": [
+					15
+				],
+				"description": "+33% potency on every spell.",
+				"max_level": 1,
+				"name": "Innate Power",
+				"prereqs": [
+					{
+						"id": "deep_well",
+						"min_level": 1
+					}
+				],
+				"stat_bonus": 0.33
+			},
+			"intimidation": {
+				"costs": [
+					2
+				],
+				"description": "Putting a level-up into Intimidation grants +1 more (cheaper shops sooner).",
+				"max_level": 1,
+				"name": "Presence",
+				"prereqs": [
+					{
+						"id": "coins",
+						"min_level": 5
+					}
+				],
+				"stat_bonus": 1
+			},
+			"last_stand": {
+				"costs": [
+					8,
+					12,
+					18,
+					27,
+					40
+				],
+				"description": "+1% damage reduction per level for every 10% of your HP you're missing.",
+				"max_level": 5,
+				"name": "Last Stand",
+				"prereqs": [
+					{
+						"id": "adrenaline",
+						"min_level": 3
+					},
+					{
+						"id": "block_master",
+						"min_level": 3
+					}
+				],
+				"stat_bonus": 0.01
+			},
+			"legacy": {
+				"costs": [
+					1
+				],
+				"description": "The foundation of all mortal power. Unlocks the first upgrade of every branch.",
+				"hub": true,
+				"max_level": 1,
+				"name": "Legacy",
+				"stat_bonus": 1
+			},
+			"light_metal": {
+				"costs": [
+					25
+				],
+				"description": "Weapons ask for half the Might to wield (rounded up).",
+				"max_level": 1,
+				"name": "Light Metal",
+				"prereqs": [
+					{
+						"id": "rage",
+						"min_level": 5
+					},
+					{
+						"id": "golden_touch",
+						"min_level": 1
+					}
+				],
+				"stat_bonus": 1
+			},
+			"luck": {
+				"costs": [
+					2
+				],
+				"description": "Improves shop weapon-tier odds toward Fine, Masterwork, and Legendary.",
+				"max_level": 1,
+				"name": "Good Fortune",
+				"prereqs": [
+					{
+						"id": "coins",
+						"min_level": 5
+					}
+				],
+				"stat_bonus": 0.15
+			},
+			"momentum": {
+				"costs": [
+					4,
+					6,
+					9,
+					13,
+					20
+				],
+				"description": "+8% damage per level for the rest of the battle, per enemy you defeat this battle -- stacks, resets each fight.",
+				"max_level": 5,
+				"name": "Momentum",
+				"prereqs": [
+					{
+						"id": "berserker_edge",
+						"min_level": 5
+					}
+				],
+				"stat_bonus": 0.08
+			},
+			"otherworldly_power": {
+				"costs": [
+					184
+				],
+				"description": "Allows the wizards to breach the veil. Unlocks the true ending. Needs every other upgrade, fully bought.",
+				"max_level": 1,
+				"name": "Otherworldly Power",
+				"requires_all": true,
+				"stat_bonus": 1
+			},
+			"pack_bond": {
+				"costs": [
+					40,
+					60,
+					90
+				],
+				"description": "Your wolves stay 4 battles longer per level before they leave your pack.",
+				"max_level": 3,
+				"name": "Pack Bond",
+				"prereqs": [
+					{
+						"id": "beastmaster",
+						"min_level": 1
+					}
+				],
+				"stat_bonus": 4
+			},
+			"pack_leader": {
+				"costs": [
+					15,
+					22
+				],
+				"description": "+1 max party slot per level.",
+				"max_level": 2,
+				"name": "Leader's Instincts",
+				"prereqs": [
+					{
+						"id": "vigor",
+						"min_level": 1
+					},
+					{
+						"id": "battle_hardened",
+						"min_level": 1
+					}
+				],
+				"stat_bonus": 1
+			},
+			"painful_memories": {
+				"costs": [
+					2
+				],
+				"description": "Rage grows by +1 every level-up. (Rage is not a stat in the game yet, so this does nothing until it is.)",
+				"max_level": 1,
+				"name": "Painful Memories",
+				"prereqs": [
+					{
+						"id": "legacy",
+						"min_level": 1
+					}
+				],
+				"stat_bonus": 1
+			},
 			"potions": {
-				"base_cost": 25,
-				"cost_step": 15,
-				"description": "+1 healing item at the start of every run.",
-				"name": "Provisions",
+				"costs": [
+					4,
+					6
+				],
+				"description": "+1 healing item at the start of every run, per level.",
+				"max_level": 2,
+				"name": "Preparations",
 				"prereqs": [
 					{
 						"id": "resilience_unlock",
@@ -3457,253 +3808,298 @@
 				"stat_bonus": 1
 			},
 			"prodigy": {
-				"base_cost": 450,
-				"cost_step": 0,
-				"description": "The level-up bonus-stat choice now grants +2 instead of +1.",
+				"costs": [
+					1
+				],
+				"description": "The level-up bonus-stat choice grants +2 instead of +1.",
 				"max_level": 1,
-				"name": "Prodigy",
+				"name": "Scholar",
 				"prereqs": [
 					{
 						"id": "pack_leader",
-						"min_level": 1
+						"min_level": 2
 					}
 				],
 				"stat_bonus": 1
 			},
 			"rage": {
-				"base_cost": 45,
-				"cost_step": 25,
+				"costs": [
+					8,
+					12,
+					18,
+					27,
+					40
+				],
 				"description": "+10% bonus damage per level while Berserk is active (triggered by killing an enemy mid-battle).",
 				"max_level": 5,
-				"name": "Rage",
+				"name": "RAGE",
 				"prereqs": [
 					{
 						"id": "momentum",
-						"min_level": 1
+						"min_level": 5
+					},
+					{
+						"id": "adrenaline",
+						"min_level": 3
 					}
 				],
 				"stat_bonus": 0.1
 			},
 			"reflexes_unlock": {
-				"base_cost": 20,
-				"cost_step": 12,
-				"description": "Unlocks Reflexes as a level-up choice -- 0.75% chance per point owned to fully dodge an incoming hit, capped at 15%.",
+				"costs": [
+					2
+				],
+				"description": "Unlocks Reflexes as a level-up choice -- 0.5% chance per point owned to fully dodge an incoming hit, capped at 15%.",
 				"max_level": 1,
-				"name": "Reflexes",
+				"name": "Sharp Mind",
 				"prereqs": [
 					{
+						"id": "strength",
+						"min_level": 1
+					},
+					{
 						"id": "agility",
+						"min_level": 1
+					},
+					{
+						"id": "vigor",
+						"min_level": 1
+					}
+				],
+				"stat_bonus": 1
+			},
+			"release_grudge": {
+				"costs": [
+					2
+				],
+				"description": "Allows the recruitment of magical party members (the Druid, the Necromancer, the Shaman) and unlocks the Magic stat for every party member (not you), who also gain +1 Magic every level-up.",
+				"max_level": 1,
+				"name": "Release Grudge",
+				"prereqs": [
+					{
+						"id": "legacy",
 						"min_level": 1
 					}
 				],
 				"stat_bonus": 1
 			},
 			"resilience_unlock": {
-				"base_cost": 18,
-				"cost_step": 10,
+				"costs": [
+					2
+				],
 				"description": "Unlocks Resilience as a level-up choice -- +1 Defense per point owned, pooled with your armour. Defense has diminishing returns and never passes 80% reduction.",
 				"max_level": 1,
-				"name": "Resilience",
+				"name": "Leather Skin",
 				"prereqs": [
 					{
 						"id": "stamina",
-						"min_level": 1
+						"min_level": 3
 					}
 				],
 				"stat_bonus": 1
 			},
 			"riposte": {
-				"base_cost": 35,
-				"cost_step": 20,
-				"description": "+10% chance per level, when Reflexes fully dodges a hit, to immediately counter-attack whoever swung at you for 50% damage.",
+				"costs": [
+					8,
+					12,
+					18,
+					27
+				],
+				"description": "+2% chance per level, when Reflexes fully dodges a hit, to immediately counter-attack whoever swung at you for 50% damage.",
 				"max_level": 4,
 				"name": "Riposte",
 				"prereqs": [
 					{
-						"id": "reflexes_unlock",
+						"id": "adrenaline",
+						"min_level": 3
+					},
+					{
+						"id": "dexterity_unlock",
 						"min_level": 1
 					}
 				],
-				"stat_bonus": 0.1
+				"stat_bonus": 0.02
 			},
 			"second_breath": {
-				"base_cost": 25,
-				"cost_step": 15,
-				"description": "+5 Stamina automatically at the start of every one of your turns, stacking with everything else.",
-				"max_level": 4,
-				"name": "Second Breath",
+				"costs": [
+					2,
+					3
+				],
+				"description": "+5 Stamina automatically at the start of every one of your turns, per level.",
+				"max_level": 2,
+				"name": "Full Breath",
 				"prereqs": [
 					{
 						"id": "stamina",
-						"min_level": 1
+						"min_level": 3
 					}
 				],
 				"stat_bonus": 5
 			},
-			"second_wind": {
-				"base_cost": 60,
-				"cost_step": 30,
-				"description": "+1 healing item at the start of every run, stacking with Provisions.",
-				"max_level": 2,
-				"name": "Second Wind",
-				"prereqs": [
-					{
-						"id": "undying",
-						"min_level": 1
-					}
+			"silver_muscles": {
+				"costs": [
+					8
 				],
-				"stat_bonus": 1
-			},
-			"shield_mastery": {
-				"base_cost": 35,
-				"cost_step": 20,
-				"description": "+8% shield block chance per level, on any shield you carry.",
-				"max_level": 3,
-				"name": "Shield Mastery",
-				"prereqs": [
-					{
-						"id": "resilience_unlock",
-						"min_level": 1
-					}
-				],
-				"stat_bonus": 0.08
-			},
-			"silver_tongue": {
-				"base_cost": 120,
-				"cost_step": 0,
-				"description": "Every weapon special costs 0 stamina, permanently, with any weapon you ever equip.",
+				"description": "Every weapon special costs 5 less stamina, with any weapon you equip.",
 				"max_level": 1,
-				"name": "Silver Tongue",
+				"name": "Silver Muscles",
 				"prereqs": [
 					{
 						"id": "luck",
 						"min_level": 1
+					},
+					{
+						"id": "haggling",
+						"min_level": 5
 					}
 				],
-				"stat_bonus": 1
+				"stat_bonus": 5
 			},
-			"smort_savage": {
-				"base_cost": 40,
-				"cost_step": 0,
-				"description": "The bonus pick you put into Fortitude counts double.",
+			"smart_savage": {
+				"costs": [
+					10
+				],
+				"description": "Unlocks Fortitude as a level-up choice, and it grows by +1 every level-up. Fortitude has diminishing returns and never passes 80% reduction of MAGICAL harm.",
 				"max_level": 1,
-				"name": "Smort Savage",
+				"name": "Smart Savage",
 				"prereqs": [
 					{
-						"id": "mental_mush",
+						"id": "legacy",
 						"min_level": 1
 					}
 				],
 				"stat_bonus": 1
 			},
 			"stamina": {
-				"base_cost": 15,
-				"cost_step": 8,
-				"description": "+15 max Stamina per level (more room for Heavy Attacks and specials).",
-				"name": "Endurance",
-				"stat_bonus": 15
-			},
-			"strength": {
-				"base_cost": 15,
-				"cost_step": 8,
-				"description": "Choosing Strength on level-up grants +1 more per level owned, instead of a flat starting bonus.",
-				"name": "Brawn",
-				"stat_bonus": 1
-			},
-			"unbreakable_guard": {
-				"base_cost": 250,
-				"cost_step": 0,
-				"description": "Your equipped shield stays active even with a two-handed weapon equipped.",
-				"max_level": 1,
-				"name": "Unbreakable Guard",
+				"costs": [
+					1,
+					1,
+					2
+				],
+				"description": "+20 max Stamina per level.",
+				"max_level": 3,
+				"name": "Deep Lungs",
 				"prereqs": [
 					{
-						"id": "shield_mastery",
+						"id": "legacy",
+						"min_level": 1
+					}
+				],
+				"stat_bonus": 20
+			},
+			"strength": {
+				"costs": [
+					1
+				],
+				"description": "Putting a level-up into Strength grants +1 more.",
+				"max_level": 1,
+				"name": "Physical Training",
+				"prereqs": [
+					{
+						"id": "legacy",
+						"min_level": 1
+					}
+				],
+				"stat_bonus": 1
+			},
+			"take_a_breather": {
+				"costs": [
+					2
+				],
+				"description": "Defending (the way you skip a turn) heals you for 1/16 of your max HP.",
+				"max_level": 1,
+				"name": "Take a Breather",
+				"prereqs": [
+					{
+						"id": "stamina",
 						"min_level": 3
 					}
 				],
 				"stat_bonus": 1
 			},
-			"undying": {
-				"base_cost": 350,
-				"cost_step": 0,
-				"description": "Survivor capstone -- unlocks a battle Skill: instantly heal 40% of max HP, once every 4 turns.",
+			"unbreakable_guard": {
+				"costs": [
+					25
+				],
+				"description": "Your equipped shield stays active even with a two-handed weapon equipped. Needs every other Sustain upgrade, fully bought.",
 				"max_level": 1,
-				"name": "Guardian's Ultimatum",
+				"name": "Unbreakable Guard",
 				"prereqs": [
 					{
-						"id": "vampiric_grit",
+						"id": "stamina",
 						"min_level": 3
 					},
 					{
-						"id": "vigilant_defense",
+						"id": "resilience_unlock",
+						"min_level": 1
+					},
+					{
+						"id": "take_a_breather",
+						"min_level": 1
+					},
+					{
+						"id": "second_breath",
 						"min_level": 2
+					},
+					{
+						"id": "potions",
+						"min_level": 2
+					},
+					{
+						"id": "herbalism",
+						"min_level": 5
+					},
+					{
+						"id": "vampiric_grit",
+						"min_level": 1
+					},
+					{
+						"id": "block_master",
+						"min_level": 3
+					},
+					{
+						"id": "last_stand",
+						"min_level": 5
 					}
 				],
 				"stat_bonus": 1
 			},
 			"vampiric_grit": {
-				"base_cost": 30,
-				"cost_step": 18,
-				"description": "+5% lifesteal per level on every hit, with any weapon.",
-				"name": "Vampiric Grit",
+				"costs": [
+					8
+				],
+				"description": "+5% lifesteal on every hit, with any weapon.",
+				"max_level": 1,
+				"name": "Bloodlust",
 				"prereqs": [
 					{
 						"id": "potions",
-						"min_level": 1
+						"min_level": 2
 					}
 				],
 				"stat_bonus": 0.05
 			},
-			"vigilant_defense": {
-				"base_cost": 30,
-				"cost_step": 18,
-				"description": "Heal 3 HP per level every time you Defend.",
-				"name": "Vigilant Defense",
-				"prereqs": [
-					{
-						"id": "herbalism",
-						"min_level": 1
-					}
-				],
-				"stat_bonus": 3
-			},
 			"vigor": {
-				"base_cost": 15,
-				"cost_step": 8,
-				"description": "Choosing Vigor on level-up grants +2 more per level owned, instead of a flat starting bonus.",
-				"name": "Vitality",
+				"costs": [
+					1
+				],
+				"description": "Putting a level-up into Vigor grants +2 more.",
+				"max_level": 1,
+				"name": "Dense Muscles",
 				"prereqs": [
 					{
-						"id": "agility",
+						"id": "legacy",
 						"min_level": 1
 					}
 				],
 				"stat_bonus": 2
 			},
-			"war_chest": {
-				"base_cost": 250,
-				"cost_step": 0,
-				"description": "Merchant + Survivor convergence -- your equipped armor's damage reduction is permanently boosted.",
-				"max_level": 1,
-				"name": "War Chest",
-				"prereqs": [
-					{
-						"id": "luck",
-						"min_level": 1
-					},
-					{
-						"id": "resilience_unlock",
-						"min_level": 1
-					}
-				],
-				"stat_bonus": 0.05
-			},
 			"war_profiteer": {
-				"base_cost": 200,
-				"cost_step": 0,
-				"description": "Warrior + Merchant convergence -- +2 coins per level for every enemy you defeat.",
-				"max_level": 3,
+				"costs": [
+					25
+				],
+				"description": "Every enemy you defeat in a run makes the shops 0.2% cheaper, for the rest of that run.",
+				"max_level": 1,
 				"name": "War Profiteer",
 				"prereqs": [
 					{
@@ -3715,65 +4111,33 @@
 						"min_level": 1
 					}
 				],
-				"stat_bonus": 2
-			},
-			"warband": {
-				"base_cost": 400,
-				"cost_step": 0,
-				"description": "Warrior + Merchant convergence -- your recruited party members hit noticeably harder (better-equipped mercenaries).",
-				"max_level": 1,
-				"name": "Warband",
-				"prereqs": [
-					{
-						"id": "battle_hardened",
-						"min_level": 1
-					},
-					{
-						"id": "golden_touch",
-						"min_level": 1
-					}
-				],
-				"stat_bonus": 0.15
-			},
-			"warded_mind": {
-				"base_cost": 20,
-				"cost_step": 12,
-				"description": "Unlocks Fortitude as a level-up choice -- +1 Fortitude per point, on top of your armour's. Fortitude has diminishing returns and never passes 80% reduction of MAGICAL harm.",
-				"max_level": 1,
-				"name": "Warded Mind",
-				"stat_bonus": 1
-			},
-			"warlord": {
-				"base_cost": 600,
-				"cost_step": 0,
-				"description": "+1 more max party slot (4 total).",
-				"max_level": 1,
-				"name": "Warlord",
-				"prereqs": [
-					{
-						"id": "pack_leader",
-						"min_level": 1
-					}
-				],
-				"stat_bonus": 1
+				"stat_bonus": 0.002
 			},
 			"windfall": {
-				"base_cost": 50,
-				"cost_step": 25,
-				"description": "+20% chance per level for a defeated enemy to drop a bonus 5-15 gold windfall.",
+				"costs": [
+					8,
+					12,
+					18
+				],
+				"description": "+10% chance per level for a defeated enemy to drop a bonus 1-3 gold.",
 				"max_level": 3,
-				"name": "Windfall",
+				"name": "Keen Eye",
 				"prereqs": [
 					{
 						"id": "haggling",
+						"min_level": 5
+					},
+					{
+						"id": "intimidation",
 						"min_level": 1
 					}
 				],
-				"stat_bonus": 0.2
+				"stat_bonus": 0.1
 			},
 			"worldwalker": {
-				"base_cost": 400,
-				"cost_step": 0,
+				"costs": [
+					1
+				],
 				"description": "The strength you earned conquering the Nothingness -- always-on +15% max HP and +10% damage. Unlocked only after beating the game once.",
 				"max_level": 1,
 				"name": "Worldwalker",
@@ -3808,9 +4172,11 @@
 			}
 		],
 		"ids": [
+			"legacy",
 			"strength",
 			"agility",
-			"vigor",
+			"continual_growth",
+			"painful_memories",
 			"reflexes_unlock",
 			"berserker_edge",
 			"adrenaline",
@@ -3818,47 +4184,44 @@
 			"battle_hardened",
 			"pack_leader",
 			"prodigy",
-			"warlord",
 			"beastmaster",
 			"pack_bond",
+			"heroic_destiny",
 			"riposte",
 			"momentum",
 			"rage",
-			"hardened",
 			"coins",
 			"intimidation",
 			"luck",
 			"haggling",
-			"silver_tongue",
-			"appraisal",
+			"silver_muscles",
 			"golden_touch",
-			"investor",
 			"fletcher",
 			"field_surgeon",
 			"windfall",
+			"light_metal",
 			"black_market",
 			"stamina",
+			"vigor",
 			"resilience_unlock",
+			"take_a_breather",
+			"second_breath",
 			"potions",
 			"herbalism",
 			"vampiric_grit",
-			"vigilant_defense",
-			"undying",
-			"second_wind",
 			"block_master",
-			"second_breath",
-			"favour",
 			"last_stand",
-			"shield_mastery",
 			"unbreakable_guard",
 			"worldwalker",
-			"warband",
-			"battle_medic",
-			"war_chest",
+			"release_grudge",
+			"deep_well",
+			"innate_power",
+			"smart_savage",
+			"continual_learning",
 			"war_profiteer",
-			"warded_mind",
-			"mental_mush",
-			"smort_savage"
+			"battle_medic",
+			"aegis_transcendence",
+			"otherworldly_power"
 		]
 	},
 	"weapons": {

@@ -108,6 +108,14 @@ const TALISMANS := {
 	"bloodmoon_fang": {"group": "Wildcard", "overview": "Each hit you land stacks Bloodlust (+5% damage, +7.5% move speed). 3 turns with no hit landed by anyone crashes it, halving all your stats.", "lore": "Sharpened under a red sky; always hungry."},
 	"ironclad_ward": {"group": "Wildcard", "overview": "You can only Move every other turn, but your defense is multiplied by 250%.", "lore": "A wall that agreed to follow you around."},
 	"wildfire_core": {"group": "Wildcard", "overview": "A burning enemy that dies explodes for 3x its fire damage, hurting and igniting everything nearby, allies and you included.", "lore": "A spark that learned to hunt."},
+	"clapback": {"group": "Sorcery", "overview": "Whenever you cast a spell, a 20% chance you also strike the nearest enemy for your STR + half your MAG, with +30% damage if it is a mage.", "lore": "The last word is never the spell's."},
+	"heavy_cloak": {"group": "Sorcery", "overview": "+1 Resilience and Fortitude for every 3 Magic you have.", "lore": "The more you know, the less the world can reach you."},
+	"spell_bank": {"group": "Sorcery", "overview": "Regain 5% of your max mana at the end of each of your turns (the Necromancer heals 5% of her max HP).", "lore": "Interest, paid in power."},
+	"dreamcatcher": {"group": "Sorcery", "overview": "Spells cost 33% less mana (a Necromancer pays 33% less HP).", "lore": "It lets the cost of a spell slip through its web."},
+	"snail_shell": {"group": "Sorcery", "overview": "Spells have +25% potency.", "lore": "Slow, spiralled, and heavy with everything it has ever carried."},
+	"lingering_echo": {"group": "Sorcery", "overview": "10% chance for a spell to cast twice: the second cast is free, and you choose its target again.", "lore": "A word said in a stone room comes back."},
+	"blazing_battery": {"group": "Sorcery", "overview": "I CAST FIREBALL skips its charging turn.", "lore": "Charged once, burns forever."},
+	"loud_whistle": {"group": "Sorcery", "overview": "Every summon is doubled: twice the skeletons, twice the spectres.", "lore": "Too loud for the living. The dead hear it twice."},
 }
 
 # A weapon's lore by its variant (a Mythic has its own, the rest go by base weapon).
