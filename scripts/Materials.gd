@@ -10,16 +10,16 @@ class_name Materials
 # material meanwhile). Every chance and amount is a DRAFT.
 
 const ITEMS := {
-	"dragon_scale": {"name": "Dragon Scale", "description": "A hard, warm scale prised from a dragon's hide. Dragonskin Plating is made of these."},
-	"mage_hair": {"name": "Mage Hair", "description": "A lock of wiry hair, still crackling faintly. Needed for Bloodrage Hide."},
-	"bear_pelt": {"name": "Bear Pelt", "description": "A thick, heavy bear pelt. Needed for Bloodrage Hide."},
+	"dragon_scale": {"name": "Dragon Scale", "description": "A hard, warm scale prised from a dragon's hide. Dragonskin Plate is made of these."},
+	"mage_hair": {"name": "Mage Hair", "description": "A lock of wiry hair, still crackling faintly. Needed for Bloodsplattered Hide."},
+	"bear_pelt": {"name": "Bear Pelt", "description": "A thick, heavy bear pelt. Needed for Bloodsplattered Hide."},
 	"spider_silk": {"name": "Spider Silk", "description": "Fine, strong, nearly invisible thread. Shadowweave is spun from it."},
-	"feather": {"name": "Feather", "description": "A long, light feather. Windrunner's Jerkin is stitched with them."},
+	"feather": {"name": "Feather", "description": "A long, light feather. Sprinter's Jerkin is stitched with them."},
 }
 
 const DROPS := {
 	"Black Dragonlet": [{"id": "dragon_scale", "chance": 1.0, "min": 2, "max": 4}],
-	"White Dragon": [{"id": "dragon_scale", "chance": 1.0, "min": 3, "max": 5}],
+	"White Drake": [{"id": "dragon_scale", "chance": 1.0, "min": 3, "max": 5}],
 	"Red Wyrm": [{"id": "dragon_scale", "chance": 1.0, "min": 3, "max": 5}],
 	"Apprentice Mage": [{"id": "mage_hair", "chance": 0.35, "min": 1, "max": 1}],
 }

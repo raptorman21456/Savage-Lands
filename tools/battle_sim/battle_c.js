@@ -102,7 +102,7 @@ Object.assign(Sim.prototype, {
     if (this.battle_player_defending) {
       let negate = p.meta_block_negate_chance;
       if (negate > 0 && this.rng.randf() < negate) return 0;
-      // Bastion Mail raises the threshold Defend negates a hit below.
+      // Bastionmail raises the threshold Defend negates a hit below.
       const threshold = MC.DEFEND_FULL_NEGATE_THRESHOLD + p.shield_defend_threshold_bonus() + Math.trunc(p.armor_trait_value("defend_threshold_bonus", 0));
       if (dmg < threshold) return 0;
       reduced = round(reduced * (1.0 - MC.DEFEND_DAMAGE_REDUCTION));

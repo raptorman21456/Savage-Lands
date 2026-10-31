@@ -43,7 +43,7 @@ class Sim {
     this.player_concussed_turns = 0; this.player_bleed_turns = 0; this.player_blind_turns = 0;
     this.battle_feared_by_index = -1; this.battle_fear_cascade_depth = 0; this.battle_feared_unreachable = false;
     this.battle_momentum_stacks = 0; this.battle_momentum_chain_stacks = 0;
-    // armour traits (Armor.gd): Bloodrage Hide's stacks, Shadowweave's pending crit, Spellward's one free ward
+    // armour traits (Armor.gd): Bloodsplattered Hide's stacks, Shadowweave's pending crit, Spellward's one free ward
     this.battle_bloodrage_stacks = 0; this.battle_bloodrage_turns = 0; this.battle_shadow_crit = false; this.battle_spellward_used = false;
     this.battle_bloodmoon_quiet_turns = 0; this.battle_had_combat_action_this_cycle = false;
     this.battle_first_attack_used = false;
@@ -78,7 +78,7 @@ class Sim {
     if (this.player.berserk_turns_remaining > 0) bonus += this._berserk_move_bonus();
     if (this.player.potion_energy_turns > 0) bonus += MC.ENERGY_POTION_MOVE_BONUS;
     bonus += Math.trunc(this.player.talisman_bonus("move_range"));
-    // Armour: Windrunner's Jerkin +1, Fortress Plate -1.
+    // Armour: Sprinter's Jerkin +1, Fortplate -1.
     bonus += Math.trunc(this.player.armor_trait_value("move_bonus", 0));
     return Math.max(1, MC.PLAYER_BASE_MOVE_RANGE + bonus);
   }

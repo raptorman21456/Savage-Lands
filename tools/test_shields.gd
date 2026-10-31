@@ -222,7 +222,7 @@ func _init() -> void:
 	var expected_thorns_dmg: int = int(round(40 * player.shield_special_pct()))
 	print("Iron Bulwark's thorns reflect a %% of the raw hit back: dealt=%d (expected %d)" % [999 - g_thorns.hp, expected_thorns_dmg])
 
-	# --- Phantom Guard "evasive": a dodge pauses the attacker's turn (the
+	# --- Phantom Kite "evasive": a dodge pauses the attacker's turn (the
 	# only mid-resolution await in the whole turn cycle -- see
 	# _prompt_evasion_reposition's doc comment) so the player can dodge-roll
 	# exactly one tile: back, left, or right relative to the attacker. Fired

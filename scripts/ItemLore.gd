@@ -17,6 +17,7 @@ const WEAPONS := {
 	"knuckle_gloves": "Remembers every brawl.",
 	"hand_picks": "Built for breaking rock.",
 	"staff": "A branch that remembers being a tree.",
+	"wand": "A twig that has learned some manners.",
 }
 
 # A Mythic weapon's own line, by its base weapon.

@@ -16,7 +16,7 @@ func _init() -> void:
 	var goblin_script = load("res://scripts/Enemy.gd")
 	var orc_script = load("res://scripts/Orc.gd")
 
-	# --- A miniboss fight (Iron Construct) gets the bigger 15x15 arena. ---
+	# --- A miniboss fight (Steel Construct) gets the bigger 15x15 arena. ---
 	var boss = boss_script.new()
 	main.add_child(boss)
 	main._setup_battle_grid([boss])

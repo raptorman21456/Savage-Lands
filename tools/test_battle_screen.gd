@@ -136,7 +136,7 @@ func _init() -> void:
 	main._refresh_battle_display()
 	print("A caster has Magic: %s (expected [Attack, Magic, Strategy])" % [_list_texts(hud.battle_menus.ally_main)])
 	main._on_battle_ally_action("open_magic")
-	print("The Druid's magic list is her three spells: %s (expected [Restore (40 MP), Empower (30 MP), Vitalize (40 MP)])" % [_list_texts(hud.battle_menus.ally_list)])
+	print("The Druid's magic list is her three spells: %s (expected [Vitalize (25 MP), Empower (35 MP), Call the Wild (50 MP)])" % [_list_texts(hud.battle_menus.ally_list)])
 	main._on_battle_ally_action("back")
 	print("Backing out of a list returns to the member's root list: state=%s (expected main)" % [main.battle_menu_state])
 	main.battle_commanding_ally = guardian_unit

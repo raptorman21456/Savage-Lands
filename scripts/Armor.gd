@@ -8,7 +8,7 @@ class_name Armor
 #                     levels for metal armour. Points are pooled with Resilience and the shield and bent
 #                     into a cut by Defense.gd (diminishing returns, never past 80%).
 #   fortitude         points of protection against MAGICAL harm, on the same curve (see
-#                     Player.fortitude_reduction). May be negative: Thornmail's spikes make you
+#                     Player.fortitude_reduction). May be negative: Spinemail's spikes make you
 #                     easier to burn with spells.
 #   fall_damage_mult  scales cliff-fall damage (1.0 normal, 0.0 none).
 #   trait / trait_params  the armour's signature effect and drawback, read at the combat sites
@@ -38,7 +38,7 @@ class_name Armor
 
 static var TIERS := [
 	{
-		"id": "armor_rags", "name": "Rags", "price": 0,
+		"id": "armor_rags", "name": "Jacket", "price": 0,
 		"damage_reduction": 0.0, "fortitude": 0, "fall_damage_mult": 1.0,
 		"trait": "", "trait_params": {},
 		"description": "No protection of any kind.",
@@ -54,7 +54,7 @@ static var TIERS := [
 		"icon": "armor_leather", "icon_fallback": "armor_leather",
 	},
 	{
-		"id": "armor_thornmail", "name": "Thornmail", "price": 85, "metal": true,
+		"id": "armor_thornmail", "name": "Spinemail", "price": 85, "metal": true,
 		"damage_reduction": 0.30, "fortitude": -5, "fall_damage_mult": 1.0,
 		"trait": "thorns", "trait_params": {"reflect_pct": 0.30},
 		"description": "+30 Defense, -5 Fortitude. 30% of the damage a melee attacker deals to you is thrown straight back. Ranged and magical attacks sail past the spikes, and spells hurt a little more.",
@@ -62,7 +62,7 @@ static var TIERS := [
 		"icon": "armor_steel", "icon_fallback": "armor_steel",
 	},
 	{
-		"id": "armor_fortress", "name": "Fortress Plate", "price": 90, "metal": true, "high_grade": true,
+		"id": "armor_fortress", "name": "Fortplate", "price": 90, "metal": true, "high_grade": true,
 		"damage_reduction": 0.55, "fortitude": 0, "fall_damage_mult": 1.5,
 		"trait": "fortress", "trait_params": {"move_bonus": -1, "push_immune": true},
 		"description": "+55 Defense, 0 Fortitude. Nothing sweeps you off a water tile -- but you move 1 tile less, and cliff falls deal 50% more damage.",
@@ -70,7 +70,7 @@ static var TIERS := [
 		"icon": "armor_steel", "icon_fallback": "armor_steel",
 	},
 	{
-		"id": "armor_dragonskin", "name": "Dragonskin Plating", "price": 160, "high_grade": true,
+		"id": "armor_dragonskin", "name": "Dragonskin Plate", "price": 160, "high_grade": true,
 		"damage_reduction": 0.45, "fortitude": 35, "fall_damage_mult": 0.0,
 		"trait": "", "trait_params": {},
 		"recipe": {"materials": {"dragon_scale": 8}, "coins": 120},
@@ -79,7 +79,7 @@ static var TIERS := [
 		"icon": "armor_dragonskin", "icon_fallback": "armor_dragonskin",
 	},
 	{
-		"id": "armor_stonehide", "name": "Stonehide Mail", "price": 60, "metal": true,
+		"id": "armor_stonehide", "name": "Stonehide", "price": 60, "metal": true,
 		"damage_reduction": 0.10, "fortitude": 5, "fall_damage_mult": 1.0,
 		"trait": "stonehide", "trait_params": {"flat_reduction": 3},
 		"description": "+10 Defense, +5 Fortitude, and every bodily hit that lands does 3 less damage (never below 1). A wall against goblin packs; a big single blow shrugs it off.",
@@ -87,7 +87,7 @@ static var TIERS := [
 		"icon": "armor_iron", "icon_fallback": "armor_iron",
 	},
 	{
-		"id": "armor_bastion", "name": "Bastion Mail", "price": 80, "metal": true,
+		"id": "armor_bastion", "name": "Bastionmail", "price": 80, "metal": true,
 		"damage_reduction": 0.25, "fortitude": 5, "fall_damage_mult": 1.0,
 		"trait": "bastion", "trait_params": {"defend_threshold_bonus": 8, "defend_stamina_bonus": 10},
 		"description": "+25 Defense, +5 Fortitude. Built for bracing: Defend negates hits 8 points bigger than usual, and Defend and Taunt give back 10 more stamina. Nothing special unless you brace.",
@@ -103,7 +103,7 @@ static var TIERS := [
 		"icon": "armor_rags", "icon_fallback": "armor_rags",
 	},
 	{
-		"id": "armor_cinder", "name": "Cinder Mail", "price": 100, "metal": true,
+		"id": "armor_cinder", "name": "Cindermail", "price": 100, "metal": true,
 		"damage_reduction": 0.25, "fortitude": 10, "fall_damage_mult": 1.0,
 		"trait": "cinder", "trait_params": {"ignite_melee": true, "max_stamina_bonus": -10},
 		"description": "+25 Defense, +10 Fortitude. Whatever hits you in melee catches fire. The heat wears you down: -10 max stamina.",
@@ -111,7 +111,7 @@ static var TIERS := [
 		"icon": "armor_iron", "icon_fallback": "armor_iron",
 	},
 	{
-		"id": "armor_bloodrage", "name": "Bloodrage Hide", "price": 70,
+		"id": "armor_bloodrage", "name": "Bloodsplattered Hide", "price": 70,
 		"damage_reduction": 0.10, "fortitude": 26, "fall_damage_mult": 1.0,
 		"trait": "bloodrage", "trait_params": {"max_stacks": 5, "dmg_per_stack": 0.10, "turns": 2},
 		"recipe": {"materials": {"mage_hair": 3, "bear_pelt": 3}, "coins": 40},
@@ -129,7 +129,7 @@ static var TIERS := [
 		"icon": "armor_leather", "icon_fallback": "armor_leather",
 	},
 	{
-		"id": "armor_windrunner", "name": "Windrunner's Jerkin", "price": 95,
+		"id": "armor_windrunner", "name": "Sprinter's Jerkin", "price": 95,
 		"damage_reduction": 0.10, "fortitude": 28, "fall_damage_mult": 0.0,
 		"trait": "windrunner", "trait_params": {"move_bonus": 1, "speed_bonus": 2},
 		"recipe": {"materials": {"feather": 5}, "coins": 50},

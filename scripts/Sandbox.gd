@@ -38,7 +38,7 @@ const ENEMY_FILES := [
 	"Leviathan", "LizenWarband", "ElderOak", "WhiteDragon", "RedWyrm", "Archmage",
 ]
 # The Nothingness boss rush's per-fight power (Main.NOTHINGNESS_POWER_TIERS).
-const NOTHINGNESS_ORDER := ["Leviathan", "Lizen Warband", "Elder Oak", "White Dragon", "Red Wyrm", "Archmage"]
+const NOTHINGNESS_ORDER := ["Leviathan", "Lizen Warband", "Elder Oak", "White Drake", "Red Wyrm", "Archmage"]
 
 # Upgrades that actually change how a tile battle plays (the rest are shop /
 # economy / run-start perks) -- the panel's "combat only" filter and "max combat".
@@ -276,7 +276,7 @@ static func apply_build(main, cfg: Dictionary) -> void:
 		if str(sid) != "" and p.weapon_whisperer_specials.size() < 3:
 			p.weapon_whisperer_specials.append(str(sid))
 	p._rebuild_talisman_cache()
-	# Max stamina counts talismans and the worn armour (Cinder Mail's heat).
+	# Max stamina counts talismans and the worn armour (Cindermail's heat).
 	p.max_stamina = p._base_max_stamina + int(p.talisman_bonus("max_stamina")) + p.armor_max_stamina_bonus()
 	p.stamina = mini(p.stamina, p.max_stamina)
 

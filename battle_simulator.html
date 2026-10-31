@@ -230,7 +230,7 @@ const SIM_DATA = {
 			"fortitude": 0,
 			"icon": "armor_rags",
 			"id": "armor_rags",
-			"name": "Rags",
+			"name": "Jacket",
 			"price": 0,
 			"shop_description": "Technically clothing. I wouldn't call it armor, but it's free.",
 			"trait": "",
@@ -259,7 +259,7 @@ const SIM_DATA = {
 			"icon_fallback": "armor_steel",
 			"id": "armor_thornmail",
 			"metal": true,
-			"name": "Thornmail",
+			"name": "Spinemail",
 			"price": 85,
 			"shop_description": "Hit it and you'll wish you hadn't. Spells don't mind it nearly as much.",
 			"trait": "thorns",
@@ -277,7 +277,7 @@ const SIM_DATA = {
 			"icon_fallback": "armor_steel",
 			"id": "armor_fortress",
 			"metal": true,
-			"name": "Fortress Plate",
+			"name": "Fortplate",
 			"price": 90,
 			"shop_description": "Stops almost anything short. Just don't trip near a cliff wearing it.",
 			"trait": "fortress",
@@ -295,7 +295,7 @@ const SIM_DATA = {
 			"icon": "armor_dragonskin",
 			"icon_fallback": "armor_dragonskin",
 			"id": "armor_dragonskin",
-			"name": "Dragonskin Plating",
+			"name": "Dragonskin Plate",
 			"price": 160,
 			"recipe": {
 				"coins": 120,
@@ -316,7 +316,7 @@ const SIM_DATA = {
 			"icon_fallback": "armor_iron",
 			"id": "armor_stonehide",
 			"metal": true,
-			"name": "Stonehide Mail",
+			"name": "Stonehide",
 			"price": 60,
 			"shop_description": "Small hits just stop mattering. Big ones, well. Let's not talk about the big ones.",
 			"trait": "stonehide",
@@ -333,7 +333,7 @@ const SIM_DATA = {
 			"icon_fallback": "armor_iron",
 			"id": "armor_bastion",
 			"metal": true,
-			"name": "Bastion Mail",
+			"name": "Bastionmail",
 			"price": 80,
 			"shop_description": "Plant your feet and let them come. It's meant for exactly that.",
 			"trait": "bastion",
@@ -367,7 +367,7 @@ const SIM_DATA = {
 			"icon_fallback": "armor_iron",
 			"id": "armor_cinder",
 			"metal": true,
-			"name": "Cinder Mail",
+			"name": "Cindermail",
 			"price": 100,
 			"shop_description": "Still warm from the forge. Stays that way, somehow.",
 			"trait": "cinder",
@@ -384,7 +384,7 @@ const SIM_DATA = {
 			"icon": "armor_leather",
 			"icon_fallback": "armor_leather",
 			"id": "armor_bloodrage",
-			"name": "Bloodrage Hide",
+			"name": "Bloodsplattered Hide",
 			"price": 70,
 			"recipe": {
 				"coins": 40,
@@ -431,7 +431,7 @@ const SIM_DATA = {
 			"icon": "armor_leather",
 			"icon_fallback": "armor_leather",
 			"id": "armor_windrunner",
-			"name": "Windrunner's Jerkin",
+			"name": "Sprinter's Jerkin",
 			"price": 95,
 			"recipe": {
 				"coins": 50,
@@ -696,14 +696,14 @@ const SIM_DATA = {
 		{
 			"contact_damage": 8,
 			"max_health": 250,
-			"name": "Iron Construct",
+			"name": "Steel Construct",
 			"script": "IronConstruct",
 			"xp_reward": 710
 		},
 		{
 			"contact_damage": 7,
 			"max_health": 190,
-			"name": "Lava Construct",
+			"name": "Magma Construct",
 			"script": "LavaConstruct",
 			"xp_reward": 548
 		},
@@ -738,7 +738,7 @@ const SIM_DATA = {
 		{
 			"contact_damage": 7,
 			"max_health": 238,
-			"name": "White Dragon",
+			"name": "White Drake",
 			"script": "WhiteDragon",
 			"xp_reward": 693
 		},
@@ -757,7 +757,7 @@ const SIM_DATA = {
 			"xp_reward": 715
 		}
 	],
-	"exported": "2026-10-30T22:35:50",
+	"exported": "2026-10-31T13:09:55",
 	"foods": [
 		{
 			"description": "Heals 5 HP and restores 15 stamina.",
@@ -893,7 +893,7 @@ const SIM_DATA = {
 		"BLINDNESS_MISS_CHANCE": 0.75,
 		"BLINDNESS_TURNS": 2,
 		"BLOODMOON_QUIET_TURNS_LIMIT": 3,
-		"BONE_DREAD_CHANCE": 0.075,
+		"BONE_DREAD_CHANCE": 0.1,
 		"BONK_CONCUSSED_TURNS": 3,
 		"BOSS_BATTLE_GRID_SIZE": 15,
 		"BOSS_ENRAGE_DAMAGE_MULT": 1.5,
@@ -1004,17 +1004,17 @@ const SIM_DATA = {
 			"Fae Hut": 3.0,
 			"Gnome": 5.0,
 			"Goblin": 6.0,
-			"Iron Construct": 2.0,
-			"Lava Construct": 3.0,
 			"Leviathan": 3.0,
 			"Lizen Warband": 5.0,
+			"Magma Construct": 3.0,
 			"Orc": 3.0,
 			"Red Wyrm": 4.0,
 			"Shade": 7.0,
+			"Steel Construct": 2.0,
 			"Traitor Wolf": 8.0,
 			"Treant": 2.0,
 			"Voidwing": 9.0,
-			"White Dragon": 4.0,
+			"White Drake": 4.0,
 			"Wolf": 8.0
 		},
 		"ENEMY_SPEED_DEFAULT": 5.0,
@@ -1094,28 +1094,6 @@ const SIM_DATA = {
 			"Goblin": {
 				"pack_bonus_mult": 1.5
 			},
-			"Iron Construct": {
-				"armored": true,
-				"enrage_mult": 1.5,
-				"enrage_threshold": 0.3,
-				"inflicts_concussion": true,
-				"is_boss_tier": true,
-				"is_miniboss": true,
-				"knockback_resist": 1.0,
-				"move_range": 1,
-				"windup": true
-			},
-			"Lava Construct": {
-				"armored": true,
-				"enrage_mult": 1.5,
-				"enrage_threshold": 0.3,
-				"harm": "both",
-				"is_boss_tier": true,
-				"is_miniboss": true,
-				"knockback_resist": 0.65,
-				"move_range": 1,
-				"windup": true
-			},
 			"Leviathan": {
 				"armored": true,
 				"attack_range": 2,
@@ -1134,6 +1112,17 @@ const SIM_DATA = {
 				"knockback_resist": 0.5,
 				"move_range": 2,
 				"quick_jab_chance": 0.5,
+				"windup": true
+			},
+			"Magma Construct": {
+				"armored": true,
+				"enrage_mult": 1.5,
+				"enrage_threshold": 0.3,
+				"harm": "both",
+				"is_boss_tier": true,
+				"is_miniboss": true,
+				"knockback_resist": 0.65,
+				"move_range": 1,
 				"windup": true
 			},
 			"Orc": {
@@ -1164,7 +1153,19 @@ const SIM_DATA = {
 				"dodge_chance": 0.4,
 				"harm": "magical",
 				"inflicts_fear": true,
+				"is_undead": true,
 				"move_range": 3
+			},
+			"Steel Construct": {
+				"armored": true,
+				"enrage_mult": 1.5,
+				"enrage_threshold": 0.3,
+				"inflicts_concussion": true,
+				"is_boss_tier": true,
+				"is_miniboss": true,
+				"knockback_resist": 1.0,
+				"move_range": 1,
+				"windup": true
 			},
 			"Traitor Wolf": {
 				"move_range": 3
@@ -1192,7 +1193,7 @@ const SIM_DATA = {
 				"move_range": 3,
 				"windup": true
 			},
-			"White Dragon": {
+			"White Drake": {
 				"armored": true,
 				"enrage_mult": 1.5,
 				"enrage_threshold": 0.3,
@@ -1201,6 +1202,7 @@ const SIM_DATA = {
 				"knockback_resist": 0.7,
 				"move_range": 1,
 				"sweeps": true,
+				"tundric": true,
 				"windup": true
 			},
 			"Wolf": {
@@ -1212,6 +1214,7 @@ const SIM_DATA = {
 		"FAE_HUT_SPAWN_INTERVAL": 3,
 		"FAE_HUT_WAVE_START": 3,
 		"FEAR_CASCADE_LIMIT": 8,
+		"FEAR_TURNS": 2,
 		"FIREBALL_FALLOFF_PER_TILE": 5.0,
 		"FOLLOWER_TRAIL_SPACING": 18,
 		"GNOME_DAMAGE_PCT_PER_PACKMATE": 0.2,
@@ -1219,6 +1222,7 @@ const SIM_DATA = {
 		"GNOME_PACK_SIZE_MAX": 5,
 		"GNOME_WAVE_START": 2,
 		"GOBLIN_PACK_DAMAGE_MULT": 1.5,
+		"GOLD_KILL_BANK_PCT": 0.01,
 		"GOLD_KILL_COIN_BONUS": 1,
 		"INTERIOR_ORIGIN": [
 			36000.0,
@@ -1300,9 +1304,12 @@ const SIM_DATA = {
 			12919.2001953125,
 			7573.15966796875
 		],
+		"POISON_BOMB_RADIUS": 1,
 		"POISON_DAMAGE_PCT": 0.1,
 		"POISON_TURNS": 5,
 		"POTION_BUFF_TURNS": 3,
+		"PUMMEL_MAG_MULT": 0.25,
+		"PUMMEL_STR_MULT": 0.85,
 		"QUEST_ENEMY_POOL": [
 			{
 				"name": "Goblin",
@@ -1406,7 +1413,7 @@ const SIM_DATA = {
 		"SHOP_LOCK_COST": 5,
 		"SHOP_TOTAL_SLOTS": 6,
 		"SHRINE_EFFECT_WAVES": 3,
-		"SILVER_CLEANSE_CHANCE": 0.15,
+		"SILVER_CLEANSE_CHANCE": 0.05,
 		"SPECTRE_ID": "staff_i_summon_thee",
 		"SPRING_HEAL_AMOUNT": 15,
 		"STAMINA_REGEN_ON_ATTACK": 10,
@@ -1952,7 +1959,7 @@ const SIM_DATA = {
 					"description": "Pays for every spell in blood and grows a little stronger with each kill. Rots enemies from within and raises the fallen to fight again.",
 					"favour": {
 						"kill_heal": 2.0,
-						"weapon": "staff"
+						"weapon": "wand"
 					},
 					"growth": {
 						"attack": 0.4,
@@ -2399,7 +2406,7 @@ const SIM_DATA = {
 				"description": "Pays for every spell in blood and grows a little stronger with each kill. Rots enemies from within and raises the fallen to fight again.",
 				"favour": {
 					"kill_heal": 2.0,
-					"weapon": "staff"
+					"weapon": "wand"
 				},
 				"growth": {
 					"attack": 0.4,
@@ -2800,7 +2807,7 @@ const SIM_DATA = {
 			"fortitude": 12,
 			"icon": "shield_phantom",
 			"id": "shield_phantom",
-			"name": "Phantom Guard",
+			"name": "Phantom Kite",
 			"price": 50,
 			"shop_description": "Barely there, and that's the point. You won't even feel it -- until you need it.",
 			"special": "evasive",
@@ -3375,28 +3382,6 @@ const SIM_DATA = {
 		"Goblin": {
 			"pack_bonus_mult": 1.5
 		},
-		"Iron Construct": {
-			"armored": true,
-			"enrage_mult": 1.5,
-			"enrage_threshold": 0.3,
-			"inflicts_concussion": true,
-			"is_boss_tier": true,
-			"is_miniboss": true,
-			"knockback_resist": 1.0,
-			"move_range": 1,
-			"windup": true
-		},
-		"Lava Construct": {
-			"armored": true,
-			"enrage_mult": 1.5,
-			"enrage_threshold": 0.3,
-			"harm": "both",
-			"is_boss_tier": true,
-			"is_miniboss": true,
-			"knockback_resist": 0.65,
-			"move_range": 1,
-			"windup": true
-		},
 		"Leviathan": {
 			"armored": true,
 			"attack_range": 2,
@@ -3415,6 +3400,17 @@ const SIM_DATA = {
 			"knockback_resist": 0.5,
 			"move_range": 2,
 			"quick_jab_chance": 0.5,
+			"windup": true
+		},
+		"Magma Construct": {
+			"armored": true,
+			"enrage_mult": 1.5,
+			"enrage_threshold": 0.3,
+			"harm": "both",
+			"is_boss_tier": true,
+			"is_miniboss": true,
+			"knockback_resist": 0.65,
+			"move_range": 1,
 			"windup": true
 		},
 		"Orc": {
@@ -3445,7 +3441,19 @@ const SIM_DATA = {
 			"dodge_chance": 0.4,
 			"harm": "magical",
 			"inflicts_fear": true,
+			"is_undead": true,
 			"move_range": 3
+		},
+		"Steel Construct": {
+			"armored": true,
+			"enrage_mult": 1.5,
+			"enrage_threshold": 0.3,
+			"inflicts_concussion": true,
+			"is_boss_tier": true,
+			"is_miniboss": true,
+			"knockback_resist": 1.0,
+			"move_range": 1,
+			"windup": true
 		},
 		"Traitor Wolf": {
 			"move_range": 3
@@ -3473,7 +3481,7 @@ const SIM_DATA = {
 			"move_range": 3,
 			"windup": true
 		},
-		"White Dragon": {
+		"White Drake": {
 			"armored": true,
 			"enrage_mult": 1.5,
 			"enrage_threshold": 0.3,
@@ -3482,6 +3490,7 @@ const SIM_DATA = {
 			"knockback_resist": 0.7,
 			"move_range": 1,
 			"sweeps": true,
+			"tundric": true,
 			"windup": true
 		},
 		"Wolf": {
@@ -4838,7 +4847,7 @@ const SIM_DATA = {
 			"STONE_AMULET_MULT": 2.0,
 			"TIERS": [
 				{
-					"damage_scale": 0.55,
+					"damage_scale": 0.6,
 					"price_scale": 0.35,
 					"rank": 0,
 					"required_might": 0,
@@ -4846,7 +4855,7 @@ const SIM_DATA = {
 					"weight": 10
 				},
 				{
-					"damage_scale": 0.8,
+					"damage_scale": 0.75,
 					"price_scale": 0.65,
 					"rank": 1,
 					"required_might": 0,
@@ -4862,7 +4871,7 @@ const SIM_DATA = {
 					"weight": 30
 				},
 				{
-					"damage_scale": 1.3,
+					"damage_scale": 1.25,
 					"price_scale": 1.7,
 					"rank": 3,
 					"required_might": 8,
@@ -4870,7 +4879,7 @@ const SIM_DATA = {
 					"weight": 18
 				},
 				{
-					"damage_scale": 1.7,
+					"damage_scale": 1.5,
 					"price_scale": 2.6,
 					"rank": 4,
 					"required_might": 15,
@@ -4878,11 +4887,11 @@ const SIM_DATA = {
 					"weight": 6.5
 				},
 				{
-					"damage_scale": 2.5,
+					"damage_scale": 2.25,
 					"price_scale": 6.0,
 					"rank": 5,
 					"required_intimidation": 20,
-					"required_might": 50,
+					"required_might": 35,
 					"tier_name": "Mythic",
 					"weight": 0.5
 				}
@@ -4953,11 +4962,11 @@ const SIM_DATA = {
 				}
 			},
 			"bow": {
-				"description": "Every arrow finds exactly where it's aimed, stone and armor be damned, and there's nowhere on the whole field left to hide -- though the further out it flies, the more it loses on the way.",
-				"name": "Aimbot",
+				"description": "Every arrow finds exactly where it's aimed, stone and armor be damned, and there's nowhere on the whole field left to hide -- and the further out it flies, the harder it lands.",
+				"name": "Sniper Rifle",
 				"passive": {
 					"passive_armor_pierce_pct": 0.3,
-					"passive_damage_per_tile_distance": -0.05,
+					"passive_damage_per_tile_distance": 0.05,
 					"passive_ignore_cover": true,
 					"passive_unlimited_range": true
 				}
@@ -4973,7 +4982,7 @@ const SIM_DATA = {
 				"description": "Somehow, impossibly, longer than it looks -- everything you swing at was already within reach before you started swinging, and it hits harder the further out it goes.",
 				"name": "The Looongblade",
 				"passive": {
-					"passive_damage_per_tile_distance": 0.05,
+					"passive_damage_per_tile_distance": 0.15,
 					"passive_extra_range": 1
 				}
 			},
@@ -4981,22 +4990,23 @@ const SIM_DATA = {
 				"description": "Said to been abandoned by a certain norse god for another hammer. Sure, it has a great personality, but it's hard to tell when it's constantly complaining about being dumped -- and about that stagger nobody seems to walk off.",
 				"name": "Second Best",
 				"passive": {
-					"passive_guaranteed_knockback": true,
-					"passive_stun_chance": 0.2
+					"passive_concuss_chance": 0.2,
+					"passive_guaranteed_knockback": true
 				}
 			},
 			"hand_picks": {
 				"description": "Once wielded by an unkillable prisoner, these were once a makeshift weapon. However, in the right hands...",
-				"name": "Frying Pans",
+				"name": "Emerald Picks",
 				"passive": {
-					"passive_free_special_chance": 0.1
+					"passive_free_special_chance": 0.2
 				}
 			},
 			"knuckle_gloves": {
 				"description": "Though they haven't seen much combat, these really pack a punch. They seem to be made of fake gold.",
 				"name": "Grunkle Gloves",
 				"passive": {
-					"passive_stun_chance": 0.2,
+					"passive_crit_chance_mult": 1.3,
+					"passive_crit_damage_mult": 1.2,
 					"passive_undead_boss_bonus": 0.3
 				}
 			},
@@ -5005,10 +5015,19 @@ const SIM_DATA = {
 				"name": "The Great Toothpicke",
 				"passive": {
 					"passive_heal_chance": 0.25,
-					"passive_heal_flat": 5
+					"passive_heal_flat": 5,
+					"passive_heal_max_hp_pct": 0.05,
+					"passive_poison_chance": 0.25
 				}
 			},
 			"staff": {
+				"description": "Its owner was never quite the wizard he claimed, but the staff has never once let him down. Whatever it is meant to do on the side, it does a bit more often.",
+				"name": "Goondorf's Staff",
+				"passive": {
+					"passive_secondary_chance_mult": 1.33
+				}
+			},
+			"wand": {
 				"description": "Whoever carries it learns the old words twice as fast.",
 				"name": "Moonstick",
 				"passive": {
@@ -5018,7 +5037,7 @@ const SIM_DATA = {
 		},
 		"tiers": [
 			{
-				"damage_scale": 0.55,
+				"damage_scale": 0.6,
 				"price_scale": 0.35,
 				"rank": 0,
 				"required_might": 0,
@@ -5026,7 +5045,7 @@ const SIM_DATA = {
 				"weight": 10
 			},
 			{
-				"damage_scale": 0.8,
+				"damage_scale": 0.75,
 				"price_scale": 0.65,
 				"rank": 1,
 				"required_might": 0,
@@ -5042,7 +5061,7 @@ const SIM_DATA = {
 				"weight": 30
 			},
 			{
-				"damage_scale": 1.3,
+				"damage_scale": 1.25,
 				"price_scale": 1.7,
 				"rank": 3,
 				"required_might": 8,
@@ -5050,7 +5069,7 @@ const SIM_DATA = {
 				"weight": 18
 			},
 			{
-				"damage_scale": 1.7,
+				"damage_scale": 1.5,
 				"price_scale": 2.6,
 				"rank": 4,
 				"required_might": 15,
@@ -5058,11 +5077,11 @@ const SIM_DATA = {
 				"weight": 6.5
 			},
 			{
-				"damage_scale": 2.5,
+				"damage_scale": 2.25,
 				"price_scale": 6.0,
 				"rank": 5,
 				"required_intimidation": 20,
-				"required_might": 50,
+				"required_might": 35,
 				"tier_name": "Mythic",
 				"weight": 0.5
 			}
@@ -5079,7 +5098,7 @@ const SIM_DATA = {
 		{
 			"boss": "Leviathan",
 			"id": "beach",
-			"miniboss": "Lava Construct",
+			"miniboss": "Magma Construct",
 			"name": "Beach",
 			"terrain": []
 		},
@@ -5104,7 +5123,7 @@ const SIM_DATA = {
 		{
 			"boss": "Leviathan",
 			"id": "desert",
-			"miniboss": "Iron Construct",
+			"miniboss": "Steel Construct",
 			"name": "Desert",
 			"terrain": [
 				"quicksand"
@@ -5113,14 +5132,14 @@ const SIM_DATA = {
 		{
 			"boss": "Elder Oak",
 			"id": "caves",
-			"miniboss": "Lava Construct",
+			"miniboss": "Magma Construct",
 			"name": "Caves",
 			"terrain": [
 				"crumbling"
 			]
 		},
 		{
-			"boss": "White Dragon",
+			"boss": "White Drake",
 			"id": "tundra",
 			"miniboss": "Black Dragonlet",
 			"name": "Tundra",
@@ -5129,7 +5148,7 @@ const SIM_DATA = {
 			]
 		},
 		{
-			"boss": "White Dragon",
+			"boss": "White Drake",
 			"id": "mountains",
 			"miniboss": "Voidwing",
 			"name": "Mountains",
@@ -5140,7 +5159,7 @@ const SIM_DATA = {
 		{
 			"boss": "Red Wyrm",
 			"id": "volcano",
-			"miniboss": "Lava Construct",
+			"miniboss": "Magma Construct",
 			"name": "Volcano",
 			"terrain": [
 				"embers"
@@ -5477,7 +5496,7 @@ class Player {
     this.equipped_talismans = (cfg.talismans || []).slice();
     this.real_miss = cfg.real_miss !== false;
     this._rebuild_talisman_cache();
-    // Max stamina counts talismans and the worn armour (Cinder Mail's heat), as the game's Sandbox does.
+    // Max stamina counts talismans and the worn armour (Cindermail's heat), as the game's Sandbox does.
     this.max_stamina = this._base_max_stamina + Math.trunc(this.talisman_bonus("max_stamina")) + this.armor_max_stamina_bonus();
 
     const wsel = cfg.weapon || { base: "club" };
@@ -5661,7 +5680,7 @@ class Player {
     return this.equipped_shield[key] ?? dflt;
   }
   shield_push_immune() {
-    if (this.armor_trait_value("push_immune", false)) return true;   // Fortress Plate
+    if (this.armor_trait_value("push_immune", false)) return true;   // Fortplate
     return this._shield_stat("push_immune", false);
   }
   shield_defend_threshold_bonus() { return this._shield_stat("defend_threshold_bonus", 0); }
@@ -5953,7 +5972,7 @@ class Sim {
     this.player_concussed_turns = 0; this.player_bleed_turns = 0; this.player_blind_turns = 0;
     this.battle_feared_by_index = -1; this.battle_fear_cascade_depth = 0; this.battle_feared_unreachable = false;
     this.battle_momentum_stacks = 0; this.battle_momentum_chain_stacks = 0;
-    // armour traits (Armor.gd): Bloodrage Hide's stacks, Shadowweave's pending crit, Spellward's one free ward
+    // armour traits (Armor.gd): Bloodsplattered Hide's stacks, Shadowweave's pending crit, Spellward's one free ward
     this.battle_bloodrage_stacks = 0; this.battle_bloodrage_turns = 0; this.battle_shadow_crit = false; this.battle_spellward_used = false;
     this.battle_bloodmoon_quiet_turns = 0; this.battle_had_combat_action_this_cycle = false;
     this.battle_first_attack_used = false;
@@ -5988,7 +6007,7 @@ class Sim {
     if (this.player.berserk_turns_remaining > 0) bonus += this._berserk_move_bonus();
     if (this.player.potion_energy_turns > 0) bonus += MC.ENERGY_POTION_MOVE_BONUS;
     bonus += Math.trunc(this.player.talisman_bonus("move_range"));
-    // Armour: Windrunner's Jerkin +1, Fortress Plate -1.
+    // Armour: Sprinter's Jerkin +1, Fortplate -1.
     bonus += Math.trunc(this.player.armor_trait_value("move_bonus", 0));
     return Math.max(1, MC.PLAYER_BASE_MOVE_RANGE + bonus);
   }
@@ -6529,10 +6548,12 @@ Object.assign(Sim.prototype, {
       if (ut.is_undead || ut.is_boss_tier) dmg = round(dmg * (1.0 + undead_boss_bonus));
     }
     let is_crit = blind_forced_crit || stealth_forced_crit || bleeding_cut_forced_crit || shadow_forced_crit;
-    if (you && !is_crit && p.crit_chance_total() > 0 && rng.randf() < p.crit_chance_total()) is_crit = true;
-    if (is_crit) dmg = round(dmg * p.crit_damage_mult());
+    // Grunkle Gloves: 1.3x the wielder's crit chance and 1.2x crit damage.
+    const crit_chance = p.crit_chance_total() * (weapon.passive_crit_chance_mult || 1.0);
+    if (you && !is_crit && crit_chance > 0 && rng.randf() < crit_chance) is_crit = true;
+    if (is_crit) dmg = round(dmg * p.crit_damage_mult() * (weapon.passive_crit_damage_mult || 1.0));
     if (you && p.potion_attack_turns > 0) dmg = round(dmg * (1.0 + MC.ATTACK_POTION_DAMAGE_BONUS_PCT));
-    // Bloodrage Hide: every hit taken stacks extra damage dealt, for a couple of turns.
+    // Bloodsplattered Hide: every hit taken stacks extra damage dealt, for a couple of turns.
     if (you && this.battle_bloodrage_stacks > 0) dmg = round(dmg * (1.0 + this.battle_bloodrage_stacks * p.armor_trait_value("dmg_per_stack", 0.1)));
     const distance_pct = weapon.passive_damage_per_tile_distance || 0;
     if (you && distance_pct !== 0) {
@@ -6624,7 +6645,12 @@ Object.assign(Sim.prototype, {
     const passive_ls = weapon.passive_lifesteal_pct || 0;
     if (passive_ls > 0 && dmg > 0) { const h = Math.max(1, round(dmg * passive_ls)); p.heal(h); this.log(`Your weapon drains ${h} HP from the wound.`); }
     const heal_chance = weapon.passive_heal_chance || 0;
-    if (heal_chance > 0 && rng.randf() < this._proc(heal_chance)) { const hf = Math.trunc(weapon.passive_heal_flat || 0); p.heal(hf); this.log(`Your spear drinks deep -- you feel ${hf} HP return.`); }
+    if (heal_chance > 0 && rng.randf() < this._proc(heal_chance)) { const hf = Math.trunc(weapon.passive_heal_flat || 0) + round(p.max_health * (weapon.passive_heal_max_hp_pct || 0)); p.heal(hf); this.log(`Your spear drinks deep -- you feel ${hf} HP return.`); }
+    // The Great Toothpicke's poison chance, and Second Best's concussion chance.
+    const poison_chance = weapon.passive_poison_chance || 0;
+    if (poison_chance > 0 && u.hp > 0 && rng.randf() < this._proc(poison_chance)) { u.poison_turns = MC.POISON_TURNS; u.poison_dmg = Math.max(1, round(u.max_hp * MC.POISON_DAMAGE_PCT)); this.log(`The ${u.name} is poisoned!`); }
+    const concuss_chance = weapon.passive_concuss_chance || 0;
+    if (concuss_chance > 0 && u.hp > 0 && rng.randf() < this._proc(concuss_chance)) { u.concussed_turns = MC.BONK_CONCUSSED_TURNS; this.log(`The ${u.name} is concussed!`); }
     const self_damage_pct = weapon.passive_self_damage_pct || 0;
     if (self_damage_pct > 0 && dmg > 0 && you) {
       const recoil = Math.max(1, round(dmg * self_damage_pct));
@@ -6643,7 +6669,7 @@ Object.assign(Sim.prototype, {
     if (u.hp <= 0) {
       this.log(`The ${u.name} falls!`, "good");
       if (you && (weapon.material_id || "") === "gold") {
-        let bonus = MC.GOLD_KILL_COIN_BONUS;
+        let bonus = Math.max(MC.GOLD_KILL_COIN_BONUS, Math.ceil(p.coins * MC.GOLD_KILL_BANK_PCT));
         if (p.talisman_bonus("material_passive_boost") > 0) bonus = round(bonus * MC.STONE_AMULET_MATERIAL_BOOST_MULT);
         p.add_coins(bonus);
         this.log("Your golden blade leaves a coin behind!");
@@ -6893,7 +6919,7 @@ Object.assign(Sim.prototype, {
     if (this.player.current_weapon.passive_free_specials) { action = clone(action); action.stamina_cost = 0; }
     const free_chance = this.player.current_weapon.passive_free_special_chance || 0;
     if (action.stamina_cost > 0 && free_chance > 0 && this.rng.randf() < this._proc(free_chance)) {
-      action = clone(action); action.stamina_cost = 0; this.log("Frying Pans serves it up for free!");
+      action = clone(action); action.stamina_cost = 0; this.log("Emerald Picks serves it up for free!");
     }
     await this._battle_perform_attack(action);
   },
@@ -7249,7 +7275,7 @@ Object.assign(Sim.prototype, {
     if (this.battle_player_defending) {
       let negate = p.meta_block_negate_chance;
       if (negate > 0 && this.rng.randf() < negate) return 0;
-      // Bastion Mail raises the threshold Defend negates a hit below.
+      // Bastionmail raises the threshold Defend negates a hit below.
       const threshold = MC.DEFEND_FULL_NEGATE_THRESHOLD + p.shield_defend_threshold_bonus() + Math.trunc(p.armor_trait_value("defend_threshold_bonus", 0));
       if (dmg < threshold) return 0;
       reduced = round(reduced * (1.0 - MC.DEFEND_DAMAGE_REDUCTION));
@@ -8382,7 +8408,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const capital = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 const DIR_ARROW = (d) => (d.x === 1 ? "→" : d.x === -1 ? "←" : d.y === 1 ? "↓" : "↑");
 
-const NOTHINGNESS_ORDER = ["Leviathan", "Lizen Warband", "Elder Oak", "White Dragon", "Red Wyrm", "Archmage"];
+const NOTHINGNESS_ORDER = ["Leviathan", "Lizen Warband", "Elder Oak", "White Drake", "Red Wyrm", "Archmage"];
 // Astral upgrades that touch the tile battle (the rest are shop/economy/run-start perks). Update when the tree changes.
 const COMBAT_UPGRADES = new Set(["smart_savage", "continual_growth", "strength", "agility", "vigor", "reflexes_unlock", "berserker_edge", "adrenaline", "dexterity_unlock", "battle_hardened",
   "pack_leader", "prodigy", "beastmaster", "pack_bond", "riposte", "momentum", "rage", "intimidation", "luck", "silver_muscles", "haggling", "light_metal", "painful_memories",
@@ -8937,7 +8963,7 @@ function uiPrompt(type, data) {
   if (autoRunning) return Promise.resolve(type === "evasion" ? Object.keys(data.options)[0] : type === "water_push" ? false : data.default);
   return new Promise((resolve) => {
     if (type === "evasion") {
-      const r = modal(`<h2>Dodge-roll!</h2><div>Your Phantom Guard grants a free dodge-roll. Pick a direction:</div><div class="row">${Object.keys(data.options).map((k) => `<button data-choice="${k}">${capital(k)}</button>`).join("")}</div>`);
+      const r = modal(`<h2>Dodge-roll!</h2><div>Your Phantom Kite grants a free dodge-roll. Pick a direction:</div><div class="row">${Object.keys(data.options).map((k) => `<button data-choice="${k}">${capital(k)}</button>`).join("")}</div>`);
       r.onclick = (e) => { const c = e.target.dataset.choice; if (c) { closeModal(); resolve(c); } };
     } else {
       const r = modal(`<h2>${esc(data.text)}</h2><div class="row"><button data-choice="1">${esc(data.yes)}</button><button data-choice="0">${esc(data.no)}</button></div>`);

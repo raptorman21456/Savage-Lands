@@ -60,7 +60,7 @@ func _init() -> void:
 			])
 		if v.tier_name == "Masterwork" and v.material_name == "Golden" and not found_masterwork_gold:
 			found_masterwork_gold = true
-			var expected_dmg2: float = weapons_script.SPEAR.damage_mult * 1.3 * 1.25
+			var expected_dmg2: float = weapons_script.SPEAR.damage_mult * 1.25 * 1.25
 			var expected_price2: int = int(round(weapons_script.SPEAR.price * 1.7 * 1.4))
 			print("Masterwork Golden Spear composes correctly: name=%s (expected 'Masterwork Golden Spear'), dmg=%.3f (expected %.3f), price=%d (expected %d), break_chance=%.2f (expected 0.00)" % [
 				v.name, v.damage_mult, expected_dmg2, v.price, expected_price2, v.break_chance
@@ -195,7 +195,15 @@ func _init() -> void:
 	player.meta_bonus_coin_pct = 0.0
 	main.battle_units = [{"ref": null, "tile": Vector2i(3, 2), "hp": 1, "max_hp": 1, "move_range": 2, "damage": 0, "name": "Goblin"}]
 	main._apply_single_hit(0, 1.0, "", gold_weapon, "You", Vector2i(-1, -1), 999, false)
-	print("Gold's Gilded Strike: +1 coin for the killing blow: coins=%d (expected 1)" % [player.coins])
+	print("Gold's Gilded Strike: +1 coin for the killing blow when the bank is empty: coins=%d (expected 1)" % [player.coins])
+	player.coins = 500
+	main.battle_units = [{"ref": null, "tile": Vector2i(3, 2), "hp": 1, "max_hp": 1, "move_range": 2, "damage": 0, "name": "Goblin"}]
+	main._apply_single_hit(0, 1.0, "", gold_weapon, "You", Vector2i(-1, -1), 999, false)
+	print("...and 1%% of the bank (rounded up) when there is one: 500 -> %d (expected 505)" % [player.coins])
+	player.coins = 150
+	main.battle_units = [{"ref": null, "tile": Vector2i(3, 2), "hp": 1, "max_hp": 1, "move_range": 2, "damage": 0, "name": "Goblin"}]
+	main._apply_single_hit(0, 1.0, "", gold_weapon, "You", Vector2i(-1, -1), 999, false)
+	print("...rounding up: 150 -> %d (expected 152, 1.5 becomes 2)" % [player.coins])
 	player.coins = 0
 	main.battle_units = [{"ref": null, "tile": Vector2i(3, 2), "hp": 1, "max_hp": 1, "move_range": 2, "damage": 0, "name": "Goblin"}]
 	main._apply_single_hit(0, 1.0, "", gold_weapon, "Your Wolf", Vector2i(2, 2), 999, false)
@@ -210,7 +218,7 @@ func _init() -> void:
 	print("Steel carries no material passive: coins unchanged=%d (expected 0)" % [player.coins])
 	player.berserk_turns_remaining = 0
 
-	# Bone's Dreadful Strike: a flat 7.5% chance regardless of weapon type
+	# Bone's Dreadful Strike: a flat 10% chance regardless of weapon type
 	# (2026-09-29 -- was scaled by weapon cooldown_mult), amplified by Stone
 	# Amulet.
 	var bone_spear: Dictionary = weapons_script.SPEAR.duplicate(true)
@@ -220,33 +228,32 @@ func _init() -> void:
 	var dread_procs := 0
 	var dread_trials := 1000
 	for i in dread_trials:
-		dread_target.feared = false
+		dread_target.fear_turns = 0
 		main._apply_single_hit(0, 1.0, "", bone_spear, "You", Vector2i(-1, -1), 1, false)
-		if dread_target.feared:
+		if int(dread_target.get("fear_turns", 0)) > 0:
 			dread_procs += 1
-	print("Bone's Dreadful Strike procs roughly 7.5%% over %d trials: %d (expected roughly 75, within +/-40%%)" % [dread_trials, dread_procs])
+	print("Bone's Dreadful Strike procs roughly 10%% over %d trials: %d (expected roughly 100, within +/-40%%)" % [dread_trials, dread_procs])
 	player._talisman_cache["material_passive_boost"] = 1.0
 	var dread_boosted := 0
 	for i in dread_trials:
-		dread_target.feared = false
+		dread_target.fear_turns = 0
 		main._apply_single_hit(0, 1.0, "", bone_spear, "You", Vector2i(-1, -1), 1, false)
-		if dread_target.feared:
+		if int(dread_target.get("fear_turns", 0)) > 0:
 			dread_boosted += 1
-	print("Stone Amulet raises Dreadful Strike's chance to roughly 11.25%%: %d (expected roughly 112, clearly more than %d)" % [dread_boosted, dread_procs])
+	print("Stone Amulet doubles Dreadful Strike's chance to roughly 20%%: %d (expected roughly 200, clearly more than %d)" % [dread_boosted, dread_procs])
 	player._talisman_cache.erase("material_passive_boost")
-	dread_target.feared = false
+	dread_target.fear_turns = 0
 
-	# The feared flag itself skips the whole enemy turn once, then clears --
-	# same shape as Frozen/Stunned (see _process_enemy_turn).
+	# Fear makes the enemy run for two of its turns instead of acting, then clears (see _process_enemy_turn).
 	main.battle_player_tile = Vector2i(1, 0)
 	player.health = player.max_health
 	var feared_enemy := _make_enemy(main, Vector2i(0, 0), 999)
 	feared_enemy.damage = 50
-	feared_enemy["feared"] = true
+	feared_enemy["fear_turns"] = 2
 	main.battle_units = [feared_enemy]
 	main._process_enemy_turn()
-	print("a feared enemy skips its turn entirely, even adjacent to the player: player_health=%d (expected unchanged %d), feared=%s (expected false)" % [
-		player.health, player.max_health, feared_enemy.feared
+	print("a feared enemy runs instead of attacking, even adjacent to the player: player_health=%d (expected unchanged %d), fear_turns left=%d (expected 1)" % [
+		player.health, player.max_health, feared_enemy.fear_turns
 	])
 
 	# Silver's Cleansing Strike: the helper picks one active affliction (not
@@ -272,7 +279,7 @@ func _init() -> void:
 		main._apply_single_hit(0, 1.0, "", silver_weapon, "You", Vector2i(-1, -1), 1, false)
 		if main.player_poison_turns == 0:
 			silver_cleanses += 1
-	print("Silver's Cleansing Strike procs roughly 15%% of hits over %d trials: %d (expected roughly 75, within +/-40%%)" % [silver_trials, silver_cleanses])
+	print("Silver's Cleansing Strike procs roughly 5%% of hits over %d trials: %d (expected roughly 25, within +/-60%%)" % [silver_trials, silver_cleanses])
 	main.player_poison_turns = 0
 
 	# Obsidian's Splinter Strike (renamed 2026-09-29 from Volatile Shard): a

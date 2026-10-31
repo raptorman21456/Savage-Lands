@@ -162,10 +162,12 @@ Object.assign(Sim.prototype, {
       if (ut.is_undead || ut.is_boss_tier) dmg = round(dmg * (1.0 + undead_boss_bonus));
     }
     let is_crit = blind_forced_crit || stealth_forced_crit || bleeding_cut_forced_crit || shadow_forced_crit;
-    if (you && !is_crit && p.crit_chance_total() > 0 && rng.randf() < p.crit_chance_total()) is_crit = true;
-    if (is_crit) dmg = round(dmg * p.crit_damage_mult());
+    // Grunkle Gloves: 1.3x the wielder's crit chance and 1.2x crit damage.
+    const crit_chance = p.crit_chance_total() * (weapon.passive_crit_chance_mult || 1.0);
+    if (you && !is_crit && crit_chance > 0 && rng.randf() < crit_chance) is_crit = true;
+    if (is_crit) dmg = round(dmg * p.crit_damage_mult() * (weapon.passive_crit_damage_mult || 1.0));
     if (you && p.potion_attack_turns > 0) dmg = round(dmg * (1.0 + MC.ATTACK_POTION_DAMAGE_BONUS_PCT));
-    // Bloodrage Hide: every hit taken stacks extra damage dealt, for a couple of turns.
+    // Bloodsplattered Hide: every hit taken stacks extra damage dealt, for a couple of turns.
     if (you && this.battle_bloodrage_stacks > 0) dmg = round(dmg * (1.0 + this.battle_bloodrage_stacks * p.armor_trait_value("dmg_per_stack", 0.1)));
     const distance_pct = weapon.passive_damage_per_tile_distance || 0;
     if (you && distance_pct !== 0) {
@@ -257,7 +259,12 @@ Object.assign(Sim.prototype, {
     const passive_ls = weapon.passive_lifesteal_pct || 0;
     if (passive_ls > 0 && dmg > 0) { const h = Math.max(1, round(dmg * passive_ls)); p.heal(h); this.log(`Your weapon drains ${h} HP from the wound.`); }
     const heal_chance = weapon.passive_heal_chance || 0;
-    if (heal_chance > 0 && rng.randf() < this._proc(heal_chance)) { const hf = Math.trunc(weapon.passive_heal_flat || 0); p.heal(hf); this.log(`Your spear drinks deep -- you feel ${hf} HP return.`); }
+    if (heal_chance > 0 && rng.randf() < this._proc(heal_chance)) { const hf = Math.trunc(weapon.passive_heal_flat || 0) + round(p.max_health * (weapon.passive_heal_max_hp_pct || 0)); p.heal(hf); this.log(`Your spear drinks deep -- you feel ${hf} HP return.`); }
+    // The Great Toothpicke's poison chance, and Second Best's concussion chance.
+    const poison_chance = weapon.passive_poison_chance || 0;
+    if (poison_chance > 0 && u.hp > 0 && rng.randf() < this._proc(poison_chance)) { u.poison_turns = MC.POISON_TURNS; u.poison_dmg = Math.max(1, round(u.max_hp * MC.POISON_DAMAGE_PCT)); this.log(`The ${u.name} is poisoned!`); }
+    const concuss_chance = weapon.passive_concuss_chance || 0;
+    if (concuss_chance > 0 && u.hp > 0 && rng.randf() < this._proc(concuss_chance)) { u.concussed_turns = MC.BONK_CONCUSSED_TURNS; this.log(`The ${u.name} is concussed!`); }
     const self_damage_pct = weapon.passive_self_damage_pct || 0;
     if (self_damage_pct > 0 && dmg > 0 && you) {
       const recoil = Math.max(1, round(dmg * self_damage_pct));
@@ -276,7 +283,7 @@ Object.assign(Sim.prototype, {
     if (u.hp <= 0) {
       this.log(`The ${u.name} falls!`, "good");
       if (you && (weapon.material_id || "") === "gold") {
-        let bonus = MC.GOLD_KILL_COIN_BONUS;
+        let bonus = Math.max(MC.GOLD_KILL_COIN_BONUS, Math.ceil(p.coins * MC.GOLD_KILL_BANK_PCT));
         if (p.talisman_bonus("material_passive_boost") > 0) bonus = round(bonus * MC.STONE_AMULET_MATERIAL_BOOST_MULT);
         p.add_coins(bonus);
         this.log("Your golden blade leaves a coin behind!");
@@ -526,7 +533,7 @@ Object.assign(Sim.prototype, {
     if (this.player.current_weapon.passive_free_specials) { action = clone(action); action.stamina_cost = 0; }
     const free_chance = this.player.current_weapon.passive_free_special_chance || 0;
     if (action.stamina_cost > 0 && free_chance > 0 && this.rng.randf() < this._proc(free_chance)) {
-      action = clone(action); action.stamina_cost = 0; this.log("Frying Pans serves it up for free!");
+      action = clone(action); action.stamina_cost = 0; this.log("Emerald Picks serves it up for free!");
     }
     await this._battle_perform_attack(action);
   },

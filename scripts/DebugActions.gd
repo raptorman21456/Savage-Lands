@@ -522,7 +522,7 @@ static func give_all(main, kind: String) -> Dictionary:
 			return fail("Nothing to give for %s." % kind)
 	return ok("You now own all %d." % n)
 
-# Takes every piece of a kind of gear away (never what you cannot lose: the Club, the Rags, the Buckler).
+# Takes every piece of a kind of gear away (never what you cannot lose: the Club, the Jacket, the Buckler).
 static func remove_all(main, kind: String) -> Dictionary:
 	var p = player_of(main)
 	var n := 0

@@ -23,13 +23,28 @@ func _init() -> void:
 	print("Normal weapons are not: spear=%s club=%s (expected false, false)" % [weapons.is_ally_only(weapons.get_owned_variant("spear_fine_steel")), weapons.is_ally_only(weapons.CLUB)])
 	print("It never shows up in the player's weapon pool: %s (expected false)" % [weapons.UPGRADABLE_TYPES.any(func(w): return w.id == "staff")])
 	print("...but all_base_types() knows it: %s (expected true)" % [weapons.all_base_types().any(func(w): return w.id == "staff")])
-	print("Its numbers (the user's doc): +2 range=%d, +6 magic=%d, magic damage=%s, blind chance=%.2f (expected 2, 6, true, 0.10)" % [staff.range_bonus, staff.magic_bonus, staff.uses_magic, staff.passive_ranged_blind_chance])
+	print("Its numbers (the user's doc): +2 range=%d, +5 magic=%d, magic damage=%s, fear chance=%.2f, regular attack is Pummel=%s (expected 2, 5, true, 0.10, true)" % [staff.range_bonus, staff.magic_bonus, staff.uses_magic, staff.passive_ranged_fear_chance, staff.pummel])
 	var special_names := []
 	for s in staff.specials:
 		special_names.append(s.name)
-	print("Its three specials: %s (expected I CAST FIREBALL, Landfall, I SUMMON THEE)" % [special_names])
+	print("Its three specials: %s (expected Poison Bomb, Landfall, I SUMMON THEE)" % [special_names])
 	var mythic: Dictionary = weapons.get_owned_variant("staff_mythic")
-	print("The Mythic Staff is Moonstick and doubles magic gain: %s / %.1f (expected Moonstick, 2.0)" % [mythic.get("name", "?"), float(mythic.get("passive_magic_gain_mult", 0.0))])
+	print("The Mythic Staff is Goondorf's Staff and makes secondary effects 33%% likelier: %s / %.2f (expected Goondorf's Staff, 1.33)" % [mythic.get("name", "?"), float(mythic.get("passive_secondary_chance_mult", 0.0))])
+
+	# =========================================================
+	# The Wand
+	# =========================================================
+	var wand: Dictionary = weapons.get_owned_variant("wand_fine_steel")
+	print("The Wand resolves from an id like any weapon: name=%s base=%s (expected Wand, wand)" % [wand.get("name", "?"), weapons.get_base_type(wand).get("id", "")])
+	print("...is party-only and never in the player's pool: ally_only=%s, in pool=%s (expected true, false)" % [weapons.is_ally_only(wand), weapons.UPGRADABLE_TYPES.any(func(w): return w.id == "wand")])
+	print("Its numbers (the doc): +3 range=%d, +6 magic=%d, magic damage=%s, blind chance=%.2f, no close attack=%s (expected 3, 6, true, 0.05, true)" % [wand.range_bonus, wand.magic_bonus, wand.uses_magic, wand.passive_blind_chance, wand.no_close_attack])
+	var wand_specials := []
+	for s in wand.specials:
+		wand_specials.append(s.name)
+	print("Its three specials: %s (expected Purifying Light, FREEZE RAY, I CAST FIREBALL)" % [wand_specials])
+	var wand_mythic: Dictionary = weapons.get_owned_variant("wand_mythic")
+	print("The Mythic Wand is Moonstick and doubles magic gain: %s / %.1f (expected Moonstick, 2.0)" % [wand_mythic.get("name", "?"), float(wand_mythic.get("passive_magic_gain_mult", 0.0))])
+	print("The wand has its own picture: %s (expected true)" % [FileAccess.file_exists("res://assets/weapons/wand_steel.png")])
 
 	player.coins = 1000
 	var coins_before: int = player.coins

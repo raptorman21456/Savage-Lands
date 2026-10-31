@@ -9,7 +9,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const capital = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 const DIR_ARROW = (d) => (d.x === 1 ? "→" : d.x === -1 ? "←" : d.y === 1 ? "↓" : "↑");
 
-const NOTHINGNESS_ORDER = ["Leviathan", "Lizen Warband", "Elder Oak", "White Dragon", "Red Wyrm", "Archmage"];
+const NOTHINGNESS_ORDER = ["Leviathan", "Lizen Warband", "Elder Oak", "White Drake", "Red Wyrm", "Archmage"];
 // Astral upgrades that touch the tile battle (the rest are shop/economy/run-start perks). Update when the tree changes.
 const COMBAT_UPGRADES = new Set(["smart_savage", "continual_growth", "strength", "agility", "vigor", "reflexes_unlock", "berserker_edge", "adrenaline", "dexterity_unlock", "battle_hardened",
   "pack_leader", "prodigy", "beastmaster", "pack_bond", "riposte", "momentum", "rage", "intimidation", "luck", "silver_muscles", "haggling", "light_metal", "painful_memories",
@@ -564,7 +564,7 @@ function uiPrompt(type, data) {
   if (autoRunning) return Promise.resolve(type === "evasion" ? Object.keys(data.options)[0] : type === "water_push" ? false : data.default);
   return new Promise((resolve) => {
     if (type === "evasion") {
-      const r = modal(`<h2>Dodge-roll!</h2><div>Your Phantom Guard grants a free dodge-roll. Pick a direction:</div><div class="row">${Object.keys(data.options).map((k) => `<button data-choice="${k}">${capital(k)}</button>`).join("")}</div>`);
+      const r = modal(`<h2>Dodge-roll!</h2><div>Your Phantom Kite grants a free dodge-roll. Pick a direction:</div><div class="row">${Object.keys(data.options).map((k) => `<button data-choice="${k}">${capital(k)}</button>`).join("")}</div>`);
       r.onclick = (e) => { const c = e.target.dataset.choice; if (c) { closeModal(); resolve(c); } };
     } else {
       const r = modal(`<h2>${esc(data.text)}</h2><div class="row"><button data-choice="1">${esc(data.yes)}</button><button data-choice="0">${esc(data.no)}</button></div>`);

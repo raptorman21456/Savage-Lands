@@ -1,6 +1,6 @@
 extends SceneTree
 
-# Batch C world (World Progression feature): Volcano (Lava Construct / Red
+# Batch C world (World Progression feature): Volcano (Magma Construct / Red
 # Wyrm) -- same end-to-end shape as test_batch_a_worlds.gd /
 # test_batch_b_worlds.gd, run for the single remaining "normal enemy
 # archetype" world before Voidlands (which needs the extra power_tier
@@ -20,7 +20,7 @@ func _init() -> void:
 		e.set_physics_process(false)
 
 	# --- Data sanity ---
-	var names := ["Lava Construct", "Red Wyrm"]
+	var names := ["Magma Construct", "Red Wyrm"]
 	var all_boss_tier := true
 	var all_have_icons := true
 	for n in names:
@@ -30,7 +30,7 @@ func _init() -> void:
 			all_have_icons = false
 	print("Both Volcano enemies are is_boss_tier: %s (expected true)" % [all_boss_tier])
 	print("Both Volcano enemies have HUD icons: %s (expected true)" % [all_have_icons])
-	print("Red Wyrm is tankier than Lava Construct (elder dragon > construct): wyrm_hp=%d > construct_hp=%d (expected true)" % [
+	print("Red Wyrm is tankier than Magma Construct (elder dragon > construct): wyrm_hp=%d > construct_hp=%d (expected true)" % [
 		main.RedWyrmScript.MAX_HEALTH, main.LavaConstructScript.MAX_HEALTH
 	])
 	print("Red Wyrm's breath has a wide reach: attack_range=%d sweeps=%s (expected 2, true)" % [
@@ -51,7 +51,7 @@ func _init() -> void:
 	main._spawn_boss_wave()
 	await physics_frame
 	var mini_enemies: Array = main.get_tree().get_nodes_in_group("enemies")
-	print("Volcano's miniboss wave spawns a Lava Construct: count=%d (expected 1), name=%s (expected Lava Construct)" % [
+	print("Volcano's miniboss wave spawns a Magma Construct: count=%d (expected 1), name=%s (expected Magma Construct)" % [
 		mini_enemies.size(), mini_enemies[0].get_display_name() if mini_enemies.size() == 1 else "none"
 	])
 	var mini_ref = mini_enemies[0] if mini_enemies.size() == 1 else null
@@ -60,7 +60,7 @@ func _init() -> void:
 	if mini_ref != null:
 		var squad: Array = main._gather_squad(mini_ref)
 		main._setup_battle_grid(squad)
-		print("...Lava Construct fights solo, big arena: squad_size=%d w=%d h=%d (expected 1, 15, 15)" % [squad.size(), main.BATTLE_GRID_W, main.BATTLE_GRID_H])
+		print("...Magma Construct fights solo, big arena: squad_size=%d w=%d h=%d (expected 1, 15, 15)" % [squad.size(), main.BATTLE_GRID_W, main.BATTLE_GRID_H])
 
 	main.wave = 90
 	main.current_world_index = main._world_index_for_wave(main.wave)

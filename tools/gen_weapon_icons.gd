@@ -58,7 +58,7 @@ func _init() -> void:
 	var bases := {
 		"club": _club, "spear": _spear, "greatsword": _greatsword, "hammer": _hammer,
 		"battle_axe": _battle_axe, "dagger": _dagger, "bow": _bow,
-		"knuckle_gloves": _knuckle_gloves, "hand_picks": _hand_picks, "staff": _staff,
+		"knuckle_gloves": _knuckle_gloves, "hand_picks": _hand_picks, "staff": _staff, "wand": _wand,
 	}
 	var only := OS.get_cmdline_user_args()
 	var written := 0
@@ -209,6 +209,17 @@ func _staff() -> void:
 	_capsule(33, -2.6, 33, 2.6, 1.0, 1.0, METAL_DK)
 	_disc(36.5, 0, 2.5, EDGE)
 	_disc(38.5, 0, 0.9, METAL_DK)
+
+func _wand() -> void:
+	# A caster's wand (party members only): a short tapered wooden shaft, a wrapped grip, a metal cap and a four-pointed
+	# star of bright metal at the tip.
+	_capsule(0, 0, 25, 0, 1.0, 0.6, WOOD)
+	_capsule(2, 0, 9, 0, 1.4, 1.4, WRAP)
+	_disc(0.4, 0, 1.6, METAL_DK)
+	_capsule(22.5, 0, 25.5, 0, 1.2, 1.2, METAL_DK)
+	_poly([[26, 0], [30.5, -2.2], [35, 0], [30.5, 2.2]], METAL)
+	_poly([[30.5, -6.5], [32.4, 0], [30.5, 6.5], [28.6, 0]], METAL)
+	_disc(30.5, 0, 1.7, EDGE)
 
 func _bow() -> void:
 	# Drawn in canvas coordinates: a D-shaped bow, string on the right.

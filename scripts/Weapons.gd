@@ -204,24 +204,49 @@ static var HAND_PICKS := {
 
 # The Staff: a caster's weapon that only PARTY MEMBERS can wield (the player can never equip
 # one -- see Player.gd:_equip_weapon). Damage comes from the wielder's MAGIC stat, it adds 2
-# tiles of attack range and 6 magic, and every ranged attack (a target 2+ tiles away) has a 10%
-# chance to blind. Its three specials spend MANA (casters), or stamina for anyone without a
-# mana pool. Numbers: the user's design doc; costs are my drafts (Fireball 40, Landfall 60,
-# I SUMMON THEE half the caster's pool). Keys: range_bonus = extra attack range, magic_bonus = flat magic while wielded,
-# uses_magic = damage uses the magic stat, ally_only = the player can't equip it.
+# tiles of attack range and 5 magic, and every ranged attack (a target 2+ tiles away) has a 10%
+# chance to make the target flee in fear. Its regular attack is PUMMEL, which only reaches an enemy within one tile
+# (15 stamina, or mana for a caster: 0.85 x STR + 0.25 x MAG); its three specials spend MANA (casters), or stamina for
+# anyone without a mana pool. Numbers: the user's design doc (2026-10-30); the mana costs are the doc's (Landfall 40%,
+# I SUMMON THEE half of the pool), Poison Bomb's is my draft. Keys: range_bonus = extra attack range, magic_bonus = flat magic
+# while wielded, uses_magic = damage uses the magic stat, ally_only = the player can't equip it, pummel = the regular attack
+# is the adjacent-only Pummel, passive_ranged_fear_chance = chance a ranged hit frightens.
 static var STAFF := {
 	"id": "staff", "name": "Staff", "price": 30,
 	"damage_mult": 1.0, "cooldown_mult": 1.3, "active_duration": 0.18,
 	"shape": "rect", "reach": 40.0, "width": 16.0,
-	"ally_only": true, "uses_magic": true, "range_bonus": 2, "magic_bonus": 6,
-	"passive_ranged_blind_chance": 0.10,
-	"description": "Party members only. +2 range and +6 magic; damage uses the wielder's magic stat. Ranged attacks have a 10% chance to blind.",
+	"ally_only": true, "uses_magic": true, "range_bonus": 2, "magic_bonus": 5,
+	"passive_ranged_fear_chance": 0.10,
+	"pummel": true, "pummel_stamina_cost": 15,
+	"description": "Party members only. +2 range and +5 magic; damage uses the wielder's magic stat. Ranged attacks have a 10% chance to scare the target into running away. Its regular attack is Pummel, which only reaches an enemy within one tile.",
 	"shop_description": "Not for the likes of you. It listens to people who already know how to listen back.",
 	"icon": "staff",
 	"specials": [
-		{"id": "staff_i_cast_fireball", "name": "I CAST FIREBALL", "stamina_cost": 40, "dmg_mult": 1.2, "effect": "fireball", "description": "Takes one turn to charge (no moving). The next turn, a fireball flies to any target on the field, sets it on fire, and explodes in a 3x3: magic x 1.2 damage at the centre, 5 less for every tile away from it."},
-		{"id": "staff_landfall", "name": "Landfall", "stamina_cost": 60, "dmg_mult": 1.0, "effect": "landfall", "description": "Damages every enemy on the field for (attack x 3) + (magic / 2), with a 25% chance to stun each."},
+		{"id": "staff_poison_bomb", "name": "Poison Bomb", "stamina_cost": 35, "dmg_mult": 1.0, "effect": "poison_bomb", "description": "Launch a ball at an enemy that bursts into a flammable cloud of poison gas over the 3x3 around it, lingering for two turns. The target takes (2 x fortitude) + (1.2 x magic). Fire meeting the cloud sets it off, for 1.5 x magic to everything in it."},
+		{"id": "staff_landfall", "name": "Landfall", "stamina_cost": 0, "cost_pct_max": 0.4, "dmg_mult": 1.0, "effect": "landfall", "description": "Costs 40% of your maximum mana (stamina for anyone without mana). Damages every enemy on the field for (attack x 3) + (magic / 2), with a 25% chance to stun each."},
 		{"id": "staff_i_summon_thee", "name": "I SUMMON THEE", "stamina_cost": 0, "cost_pct_max": 0.5, "dmg_mult": 0.0, "effect": "summon_spectre", "description": "Costs half your maximum mana (stamina for anyone without mana, HP for the Necromancer). Pick any empty tile: a spectre rises there and fights for you, walking through anything. Its STR and MAG are 80% of yours, its VGR 50%, its AGI 120% and its DXT 70%; it dodges half of all attacks and strikes the nearest enemy for its STR plus its MAG."},
+	],
+}
+
+# The Wand: the Staff's lighter cousin, also PARTY MEMBERS only, damage from the MAGIC stat. +3 range, six magic, a 5% chance
+# to blind with every attack, and NO close-quarters attack: it cannot strike an enemy standing next to the wielder (its
+# regular attack and nothing else needs a gap). Three specials, all mana (stamina for anyone without a pool). The doc's numbers;
+# the mana price of Freeze Ray is the doc's too (20 + 40% of the pool). Keys: no_close_attack = nothing within one tile can be struck
+# with the regular attack, passive_blind_chance = chance ANY hit blinds (the Staff's fear works only at range).
+static var WAND := {
+	"id": "wand", "name": "Wand", "price": 30,
+	"damage_mult": 1.0, "cooldown_mult": 1.0, "active_duration": 0.14,
+	"shape": "rect", "reach": 40.0, "width": 12.0,
+	"ally_only": true, "uses_magic": true, "range_bonus": 3, "magic_bonus": 6,
+	"passive_blind_chance": 0.05,
+	"no_close_attack": true,
+	"description": "Party members only. +3 range and +6 magic; damage uses the wielder's magic stat. Every attack has a 5% chance to blind. It has no close-quarters attack: it cannot strike an enemy right next to you.",
+	"shop_description": "Thinner than a staff and twice as fussy. It wants a little distance, and it wants you to want it too.",
+	"icon": "wand",
+	"specials": [
+		{"id": "wand_purifying_light", "name": "Purifying Light", "stamina_cost": 0, "cost_pct_max": 0.75, "dmg_mult": 1.0, "effect": "purifying_light", "description": "Costs 75% of your maximum mana (stamina for anyone without mana). A burst of light over the 3x3 around you: every enemy in it is blinded, one affliction comes off you, and undead enemies take 0.5 x magic damage."},
+		{"id": "wand_freeze_ray", "name": "FREEZE RAY", "stamina_cost": 20, "cost_pct_max": 0.4, "dmg_mult": 0.8, "effect": "freeze_ray", "description": "Costs 20 plus 40% of your maximum mana (stamina for anyone without mana). Shoots one enemy with a freezing ray for 0.8 x magic damage. It always freezes its target, unless the target is a tundric (ice-born) creature."},
+		{"id": "wand_i_cast_fireball", "name": "I CAST FIREBALL", "stamina_cost": 0, "cost_pct_max": 0.8, "dmg_mult": 2.5, "effect": "fireball", "blast_radius": 2, "description": "Costs 80% of your maximum mana (stamina for anyone without mana). Takes one turn to charge (no moving). The next turn, a fireball flies to any target on the field and explodes in a 5x5 for magic x 2.5 at the centre, 5 less for every tile away from it, then sets everything left alive in the blast on fire."},
 	],
 }
 
@@ -230,7 +255,7 @@ static var UPGRADABLE_TYPES := [SPEAR, GREATSWORD, HAMMER, BATTLE_AXE, DAGGER, B
 # Weapons only party members can wield: they never appear in the player's shop rolls, Dojo or
 # weapon picker (those read UPGRADABLE_TYPES), but ids, tiers, materials and Mythics work the
 # same -- see all_base_types().
-static var ALLY_ONLY_TYPES := [STAFF]
+static var ALLY_ONLY_TYPES := [STAFF, WAND]
 
 static func all_base_types() -> Array:
 	var out: Array = UPGRADABLE_TYPES.duplicate()
@@ -266,18 +291,18 @@ static func get_base_type(weapon: Dictionary) -> Dictionary:
 # Only the top 3 tiers actually gate anything -- Broken/Worn/Fine stay
 # available to a fresh level-1 run.
 const TIERS := [
-	{"tier_name": "Broken", "damage_scale": 0.55, "price_scale": 0.35, "weight": 10, "rank": 0, "required_might": 0},
-	{"tier_name": "Worn", "damage_scale": 0.8, "price_scale": 0.65, "weight": 35, "rank": 1, "required_might": 0},
+	{"tier_name": "Broken", "damage_scale": 0.6, "price_scale": 0.35, "weight": 10, "rank": 0, "required_might": 0},
+	{"tier_name": "Worn", "damage_scale": 0.75, "price_scale": 0.65, "weight": 35, "rank": 1, "required_might": 0},
 	{"tier_name": "Fine", "damage_scale": 1.0, "price_scale": 1.0, "weight": 30, "rank": 2, "required_might": 0},
-	{"tier_name": "Masterwork", "damage_scale": 1.3, "price_scale": 1.7, "weight": 18, "rank": 3, "required_might": 8},
-	{"tier_name": "Legendary", "damage_scale": 1.7, "price_scale": 2.6, "weight": 6.5, "rank": 4, "required_might": 15},
+	{"tier_name": "Masterwork", "damage_scale": 1.25, "price_scale": 1.7, "weight": 18, "rank": 3, "required_might": 8},
+	{"tier_name": "Legendary", "damage_scale": 1.5, "price_scale": 2.6, "weight": 6.5, "rank": 4, "required_might": 15},
 	# A jackpot roll -- weight 0.5 against everything else summing to 100
 	# means this lands almost exactly 0.5% of the time. Deliberately way
 	# past the smooth Broken->Legendary curve (which never even triples base
 	# damage) so it actually feels broken to find, not just "one more step up."
 	# The only tier gated on a SECOND stat (required_intimidation) -- every
 	# other tier is Might-only.
-	{"tier_name": "Mythic", "damage_scale": 2.5, "price_scale": 6.0, "weight": 0.5, "rank": 5, "required_might": 50, "required_intimidation": 20},
+	{"tier_name": "Mythic", "damage_scale": 2.25, "price_scale": 6.0, "weight": 0.5, "rank": 5, "required_might": 35, "required_intimidation": 20},
 ]
 
 # A Mythic roll isn't "a Mythic Spear" -- it's a specific, fixed named
@@ -290,17 +315,17 @@ static var MYTHIC_WEAPONS := {
 	"spear": {
 		"name": "The Great Toothpicke",
 		"description": "A giant's dinner is still clinging to the wood. ...Ew?",
-		"passive": {"passive_heal_chance": 0.25, "passive_heal_flat": 5},
+		"passive": {"passive_heal_chance": 0.25, "passive_heal_flat": 5, "passive_heal_max_hp_pct": 0.05, "passive_poison_chance": 0.25},
 	},
 	"greatsword": {
 		"name": "The Looongblade",
 		"description": "Somehow, impossibly, longer than it looks -- everything you swing at was already within reach before you started swinging, and it hits harder the further out it goes.",
-		"passive": {"passive_extra_range": 1, "passive_damage_per_tile_distance": 0.05},
+		"passive": {"passive_extra_range": 1, "passive_damage_per_tile_distance": 0.15},
 	},
 	"hammer": {
 		"name": "Second Best",
 		"description": "Said to been abandoned by a certain norse god for another hammer. Sure, it has a great personality, but it's hard to tell when it's constantly complaining about being dumped -- and about that stagger nobody seems to walk off.",
-		"passive": {"passive_guaranteed_knockback": true, "passive_stun_chance": 0.2},
+		"passive": {"passive_guaranteed_knockback": true, "passive_concuss_chance": 0.2},
 	},
 	"battle_axe": {
 		"name": "The Executioner's Axe",
@@ -313,23 +338,30 @@ static var MYTHIC_WEAPONS := {
 		"passive": {"passive_lifesteal_pct": 0.20},
 	},
 	"bow": {
-		"name": "Aimbot",
-		"description": "Every arrow finds exactly where it's aimed, stone and armor be damned, and there's nowhere on the whole field left to hide -- though the further out it flies, the more it loses on the way.",
-		"passive": {"passive_ignore_cover": true, "passive_unlimited_range": true, "passive_armor_pierce_pct": 0.3, "passive_damage_per_tile_distance": -0.05},
+		"name": "Sniper Rifle",
+		"description": "Every arrow finds exactly where it's aimed, stone and armor be damned, and there's nowhere on the whole field left to hide -- and the further out it flies, the harder it lands.",
+		"passive": {"passive_ignore_cover": true, "passive_unlimited_range": true, "passive_armor_pierce_pct": 0.3, "passive_damage_per_tile_distance": 0.05},
 	},
 	"knuckle_gloves": {
 		"name": "Grunkle Gloves",
 		"description": "Though they haven't seen much combat, these really pack a punch. They seem to be made of fake gold.",
-		"passive": {"passive_stun_chance": 0.2, "passive_undead_boss_bonus": 0.3},
+		"passive": {"passive_crit_chance_mult": 1.3, "passive_crit_damage_mult": 1.2, "passive_undead_boss_bonus": 0.3},
 	},
 	"hand_picks": {
-		"name": "Frying Pans",
+		"name": "Emerald Picks",
 		"description": "Once wielded by an unkillable prisoner, these were once a makeshift weapon. However, in the right hands...",
-		"passive": {"passive_free_special_chance": 0.10},
+		"passive": {"passive_free_special_chance": 0.20},
+	},
+	# Party members only. Every secondary effect it rolls for (fear, stun, burn, poison, blind...) is 33% likelier
+	# (Main.gd:_proc).
+	"staff": {
+		"name": "Goondorf's Staff",
+		"description": "Its owner was never quite the wizard he claimed, but the staff has never once let him down. Whatever it is meant to do on the side, it does a bit more often.",
+		"passive": {"passive_secondary_chance_mult": 1.33},
 	},
 	# Party members only. Doubles whatever magic its wielder GAINS from levelling (see
 	# Main.gd:_make_member_battle_unit).
-	"staff": {
+	"wand": {
 		"name": "Moonstick",
 		"description": "Whoever carries it learns the old words twice as fast.",
 		"passive": {"passive_magic_gain_mult": 2.0},

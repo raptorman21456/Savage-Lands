@@ -141,10 +141,12 @@ func _init() -> void:
 	# Dreamcatcher: spells cost 33% less
 	# =========================================================
 	_reset(main, player)
-	var base_cost: int = _cost_of(main, plain, "Restore")
+	var base_cost: int = _cost_of(main, plain, "Vitalize")
 	var thrifty: Dictionary = _unit(main, player, "druid", "staff_fine_steel", Vector2i(1, 4), ["dreamcatcher"])
-	print("Dreamcatcher makes Restore cost 33%% less mana: %d -> %d (expected %d)" % [base_cost, _cost_of(main, thrifty, "Restore"), int(round(base_cost * 0.67))])
-	print("...and I CAST FIREBALL too: %d -> %d (expected %d)" % [_cost_of(main, plain, "I CAST FIREBALL"), _cost_of(main, thrifty, "I CAST FIREBALL"), int(round(_cost_of(main, plain, "I CAST FIREBALL") * 0.67))])
+	print("Dreamcatcher makes Vitalize cost 33%% less mana: %d -> %d (expected %d)" % [base_cost, _cost_of(main, thrifty, "Vitalize"), int(round(base_cost * 0.67))])
+	var wand_plain: Dictionary = _unit(main, player, "druid", "wand_worn_wood", Vector2i(1, 4))
+	var wand_thrifty: Dictionary = _unit(main, player, "druid", "wand_worn_bone", Vector2i(1, 4), ["dreamcatcher"])
+	print("...and the Wand's I CAST FIREBALL too: %d -> %d (expected %d)" % [_cost_of(main, wand_plain, "I CAST FIREBALL"), _cost_of(main, wand_thrifty, "I CAST FIREBALL"), int(round(_cost_of(main, wand_plain, "I CAST FIREBALL") * 0.67))])
 	var necro_cost: int = _cost_of(main, necro_plain, "Curse of Rot")
 	var necro_thrifty: Dictionary = _unit(main, player, "necromancer", "staff_worn_wood", Vector2i(1, 4), ["dreamcatcher"])
 	print("A Necromancer pays 33%% less HP on Curse of Rot: %d -> %d (expected %d mana-worth)" % [necro_cost, _cost_of(main, necro_thrifty, "Curse of Rot"), int(round(necro_cost * 0.67))])
@@ -159,21 +161,21 @@ func _init() -> void:
 	var shelled: Dictionary = _unit(main, player, "druid", "staff_fine_steel", Vector2i(1, 4), ["snail_shell"])
 	print("Snail Shell: potency 1.25 (%.2f); with Innate Power's 33%% added: %.2f (expected 1.25, 1.58)" % [main._potency(shelled), (func(): player.meta_spell_potency_pct = 0.33; return main._potency(shelled)).call()])
 	player.meta_spell_potency_pct = 0.0
-	# Restore heals the hero for 25% of max HP plus a third of her magic -- both scaled by potency
+	# Vitalize heals the hero for 25% of max HP plus a third of her magic -- both scaled by potency
 	_reset(main, player)
 	_begin(main, plain, [_make_goblin(main, Vector2i(6, 6))])
 	main._on_battle_ally_action("special")
-	main._on_battle_ally_action("special_%d" % _special(main, plain, "Restore"))
+	main._on_battle_ally_action("special_%d" % _special(main, plain, "Vitalize"))
 	main._on_battle_ally_action("pick_0")
 	var healed_plain: int = player.health - 100
 	_reset(main, player)
 	shelled = _unit(main, player, "druid", "staff_fine_steel", Vector2i(1, 4), ["snail_shell"])
 	_begin(main, shelled, [_make_goblin(main, Vector2i(6, 6))])
 	main._on_battle_ally_action("special")
-	main._on_battle_ally_action("special_%d" % _special(main, shelled, "Restore"))
+	main._on_battle_ally_action("special_%d" % _special(main, shelled, "Vitalize"))
 	main._on_battle_ally_action("pick_0")
 	var healed_shelled: int = player.health - 100
-	print("Restore heals %d plain and %d with the Snail Shell (expected about %d, 25%% more)" % [healed_plain, healed_shelled, int(round(healed_plain * 1.25))])
+	print("Vitalize heals %d plain and %d with the Snail Shell (expected about %d, 25%% more)" % [healed_plain, healed_shelled, int(round(healed_plain * 1.25))])
 
 	# =========================================================
 	# Lingering Echo: the spell comes round again, free, and the target is chosen afresh
@@ -184,15 +186,15 @@ func _init() -> void:
 	echoer.mods["spell_echo_chance"] = 1.0   # make the roll certain
 	_begin(main, echoer, [_make_goblin(main, Vector2i(6, 6))])
 	var mana_start: int = echoer.mana
-	var restore_cost: int = _cost_of(main, echoer, "Restore")
+	var restore_cost: int = _cost_of(main, echoer, "Vitalize")
 	main._on_battle_ally_action("special")
-	main._on_battle_ally_action("special_%d" % _special(main, echoer, "Restore"))
+	main._on_battle_ally_action("special_%d" % _special(main, echoer, "Vitalize"))
 	main._on_battle_ally_action("pick_0")
 	var after_first: int = player.health
 	var left_open: bool = main.battle_commanding_ally == echoer
 	var echo_list: Array = main._ally_specials(echoer)
-	print("Casting Restore costs %d mana and the command stays open for the echo: paid=%d open=%s (expected %d, true)" % [restore_cost, mana_start - echoer.mana, left_open, restore_cost])
-	print("...the menu offers just the free recast: %s (expected [Echo: Restore] at cost 0)" % [echo_list.map(func(s): return "%s @%d" % [s.name, s.stamina_cost])])
+	print("Casting Vitalize costs %d mana and the command stays open for the echo: paid=%d open=%s (expected %d, true)" % [restore_cost, mana_start - echoer.mana, left_open, restore_cost])
+	print("...the menu offers just the free recast: %s (expected [Echo: Vitalize] at cost 0)" % [echo_list.map(func(s): return "%s @%d" % [s.name, s.stamina_cost])])
 	main._on_battle_ally_action("special")
 	main._on_battle_ally_action("special_0")
 	main._on_battle_ally_action("pick_0")
@@ -203,7 +205,7 @@ func _init() -> void:
 	var plain2: Dictionary = _unit(main, player, "druid", "staff_fine_steel", Vector2i(1, 4))
 	_begin(main, plain2, [_make_goblin(main, Vector2i(6, 6))])
 	main._on_battle_ally_action("special")
-	main._on_battle_ally_action("special_%d" % _special(main, plain2, "Restore"))
+	main._on_battle_ally_action("special_%d" % _special(main, plain2, "Vitalize"))
 	main._on_battle_ally_action("pick_0")
 	print("With no Echo the command simply ends: %s (expected true)" % [main.battle_commanding_ally != plain2])
 	# An Echo not taken up is thrown away
@@ -212,7 +214,7 @@ func _init() -> void:
 	church_echo.mods["spell_echo_chance"] = 1.0
 	_begin(main, church_echo, [_make_goblin(main, Vector2i(6, 6))])
 	main._on_battle_ally_action("special")
-	main._on_battle_ally_action("special_%d" % _special(main, church_echo, "Restore"))
+	main._on_battle_ally_action("special_%d" % _special(main, church_echo, "Vitalize"))
 	main._on_battle_ally_action("pick_0")
 	print("A fresh echo keeps the command open: %s (expected true)" % [main.battle_commanding_ally == church_echo])
 	# Skipping an echo throws it away
@@ -238,14 +240,14 @@ func _init() -> void:
 	# Blazing Battery: the fireball needs no charging turn
 	# =========================================================
 	_reset(main, player)
-	var plain_f: Dictionary = _unit(main, player, "druid", "staff_fine_steel", Vector2i(1, 4))
+	var plain_f: Dictionary = _unit(main, player, "druid", "wand_fine_steel", Vector2i(1, 4))
 	var goblin_a: Dictionary = _make_goblin(main, Vector2i(6, 6))
 	_begin(main, plain_f, [goblin_a])
 	main._on_battle_ally_action("special")
 	main._on_battle_ally_action("special_%d" % _special(main, plain_f, "I CAST FIREBALL"))
 	print("Without the Battery the first cast only charges: charging=%s goblin_hp=%d (expected true, 999)" % [not plain_f.charging.is_empty(), goblin_a.hp])
 	_reset(main, player)
-	var lens: Dictionary = _unit(main, player, "druid", "staff_fine_steel", Vector2i(1, 4), ["blazing_battery"])
+	var lens: Dictionary = _unit(main, player, "druid", "wand_fine_steel", Vector2i(1, 4), ["blazing_battery"])
 	var goblin_b: Dictionary = _make_goblin(main, Vector2i(6, 6))
 	_begin(main, lens, [goblin_b])
 	main._on_battle_ally_action("special")
@@ -285,7 +287,7 @@ func _init() -> void:
 	var plain_foe: Dictionary = _make_goblin(main, Vector2i(3, 4))
 	_begin(main, clapper, [plain_foe])
 	main._on_battle_ally_action("special")
-	main._on_battle_ally_action("special_%d" % _special(main, clapper, "Restore"))
+	main._on_battle_ally_action("special_%d" % _special(main, clapper, "Vitalize"))
 	main._on_battle_ally_action("pick_0")
 	var hit_plain: int = 999 - plain_foe.hp
 	_reset(main, player)
@@ -294,7 +296,7 @@ func _init() -> void:
 	var mage_foe: Dictionary = _make_goblin(main, Vector2i(3, 4), 999, "Apprentice Mage")
 	_begin(main, clapper, [mage_foe])
 	main._on_battle_ally_action("special")
-	main._on_battle_ally_action("special_%d" % _special(main, clapper, "Restore"))
+	main._on_battle_ally_action("special_%d" % _special(main, clapper, "Vitalize"))
 	main._on_battle_ally_action("pick_0")
 	var hit_mage: int = 999 - mage_foe.hp
 	print("The clapback hits for %d, and %d against a mage (expected about 30%% more: %d)" % [hit_plain, hit_mage, int(round(hit_plain * 1.3))])

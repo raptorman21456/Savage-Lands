@@ -6,7 +6,7 @@ const PickupScript := preload("res://scripts/Pickup.gd")
 signal died(xp_reward: int)
 
 # Tundra's world-ending boss (World Progression feature) -- the original boss's
-# windup template (see Main.gd:ENEMY_TRAITS["White Dragon"] -- an icy
+# windup template (see Main.gd:ENEMY_TRAITS["White Drake"] -- an icy
 # breath sweep).
 const SPEED := 42.0
 const WINDUP_SPEED_FRACTION := 0.3
@@ -122,7 +122,7 @@ func get_contact_damage() -> int:
 	return ATTACK_DAMAGE
 
 func get_display_name() -> String:
-	return "White Dragon"
+	return "White Drake"
 
 func set_battle_cooldown(t: float) -> void:
 	attack_cooldown = t

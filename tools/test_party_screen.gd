@@ -118,7 +118,7 @@ func _init() -> void:
 	druid.set_loadout_slot(0, dp[3], dp)
 	druid.set_loadout_slot(1, dp[4], dp)
 	druid.set_loadout_slot(2, dp[5], dp)
-	print("She can swap all three spells out for the Staff's: %s (expected [I CAST FIREBALL, Landfall, I SUMMON THEE, Stealth]) " % [_names(main._ally_specials(main.member_preview(druid)))])
+	print("She can swap all three spells out for the Staff's: %s (expected [Poison Bomb, Landfall, I SUMMON THEE, Stealth]) " % [_names(main._ally_specials(main.member_preview(druid)))])
 	print("A wolf has only its three kit specials and fills all three slots: %d (expected 3)" % [wolf.resolved_loadout(_pool_ids(main, wolf)).size()])
 	print("The Guardian's four kit specials don't all fit: default slots %s (expected Taunt, Body Slam, Haymaker, then Stealth -- Earbursting Bellow waits in the pool)" % [_names(main._ally_specials(main.member_preview(guardian)))])
 	print("Units without a loadout (mercenaries, skeletons) keep the whole pool: %s (expected true)" % [not main._make_skeleton(Vector2i(0, 0)).has("special_ids")])
@@ -211,11 +211,11 @@ func _init() -> void:
 	panel._refresh()
 	await process_frame
 	texts = _texts(party_node)
-	print("Selecting the Druid shows her slots (her spells): %s (expected true for the first)" % [texts.any(func(t): return str(t).begins_with("I CAST FIREBALL"))])
+	print("Selecting the Druid shows her slots (her spells): %s (expected true for the first)" % [texts.any(func(t): return str(t).begins_with("Poison Bomb"))])
 	var druid_slots := []
 	_buttons_with_meta(party_node, "slot", druid_slots)
 	druid_slots[0].pressed.emit()
-	print("...and her pick list offers the rest of her pool, Restore among them: %s (expected true)" % [_texts(panel.popup_view).any(func(t): return str(t).begins_with("Restore (40 MP)"))])
+	print("...and her pick list offers the rest of her pool, Vitalize among them: %s (expected true)" % [_texts(panel.popup_view).any(func(t): return str(t).begins_with("Vitalize (25 MP)"))])
 	panel.close_popup()
 	panel.party_page = "Stats"
 	panel._refresh()

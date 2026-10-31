@@ -66,6 +66,8 @@ func _init() -> void:
 	main.enforce_special_loadouts = false  # these tests exercise individual specials, not the loadout
 	player.max_party_slots = 6
 	player.owned_weapons["staff_fine_steel"] = true
+	player.owned_weapons["wand_fine_steel"] = true
+	player.owned_weapons["wand_mythic"] = true
 	player.owned_weapons["club"] = true
 	for e in main.get_tree().get_nodes_in_group("enemies"):
 		e.set_physics_process(false)
@@ -79,15 +81,19 @@ func _init() -> void:
 	print("A bare-handed Druid: magic=%.1f mana=%d range=%d weapon=%s (expected 10.0, 50, 1, {damage_mult: 1.0})" % [bare.magic, bare.max_mana, bare.attack_range, bare.weapon])
 	player.equip_ally_weapon(druid, "staff_fine_steel")
 	var armed: Dictionary = main._make_member_battle_unit(druid, Vector2i(1, 4), 1.0)
-	print("With a Staff (+6 magic, then her x1.15 favour): magic=%.2f mana=%d (expected 18.40, 92)" % [armed.magic, armed.max_mana])
-	print("...range is 1 + 2 = %d (expected 3), the weapon is %s, and Landfall costs %d mana (expected Staff, 60)" % [armed.attack_range, armed.weapon.name, armed.weapon.specials[1].stamina_cost])
+	print("With a Staff (+5 magic, then her x1.15 favour): magic=%.2f mana=%d (expected 17.25, 86)" % [armed.magic, armed.max_mana])
+	print("...range is 1 + 2 = %d (expected 3), the weapon is %s, and Landfall costs %d%% of her mana (expected Staff, 40)" % [armed.attack_range, armed.weapon.name, int(round(float(armed.weapon.specials[1].cost_pct_max) * 100.0))])
+	# The Wand: +6 magic and +3 range (the Druid has no favour for it); a Moonstick doubles what levelling GAINED.
+	player.unequip_ally_weapon(druid)
+	player.equip_ally_weapon(druid, "wand_fine_steel")
+	var wand_unit: Dictionary = main._make_member_battle_unit(druid, Vector2i(1, 4), 1.0)
+	print("With a Wand (+6 magic, no favour): magic=%.2f mana=%d range=%d (expected 16.00, 80, 4)" % [wand_unit.magic, wand_unit.max_mana, wand_unit.attack_range])
 	druid.bonus.magic = 4.0
 	var gained: Dictionary = main._make_member_battle_unit(druid, Vector2i(1, 4), 1.0)
-	player.owned_weapons["staff_mythic"] = true
 	player.unequip_ally_weapon(druid)
-	player.equip_ally_weapon(druid, "staff_mythic")
+	player.equip_ally_weapon(druid, "wand_mythic")
 	var moon: Dictionary = main._make_member_battle_unit(druid, Vector2i(1, 4), 1.0)
-	print("Levelled-up magic (+4): %.2f; with Moonstick doubling the GAIN: %.2f (expected 23.00, 27.60)" % [gained.magic, moon.magic])
+	print("Levelled-up magic (+4): %.2f; with Moonstick doubling the GAIN: %.2f (expected 20.00, 24.00)" % [gained.magic, moon.magic])
 	druid.bonus.magic = 0.0
 	player.unequip_ally_weapon(druid)
 	player.equip_ally_weapon(druid, "staff_fine_steel")
@@ -108,17 +114,23 @@ func _init() -> void:
 	var labels := []
 	for s in info.specials:
 		labels.append(s.label)
-	print("Her special list shows each cost in her own currency -- her three spells, then the Staff's: %s (expected [Restore (40 MP), Empower (30 MP), Vitalize (40 MP), I CAST FIREBALL (40 MP), Landfall (60 MP), I SUMMON THEE (46 MP), Stealth (20 MP) -- every member has Stealth])" % [labels])
-	print("The Special button is available, Attack reads plain: has_specials=%s attack_label=%s (expected true, Attack)" % [info.has_specials, info.attack_label])
+	print("Her special list shows each cost in her own currency -- her three spells, then the Staff's: %s (expected [Vitalize (25 MP), Empower (35 MP), Call the Wild (50 MP), Poison Bomb (35 MP), Landfall (34 MP), I SUMMON THEE (43 MP), Stealth (20 MP) -- every member has Stealth])" % [labels])
+	print("The Special button is available, and the Staff turns Attack into Pummel: has_specials=%s attack_label=%s (expected true, Pummel (15 MP))" % [info.has_specials, info.attack_label])
 	main._on_battle_ally_action("special")
 	print("Special opens the list: state=%s (expected ally_special)" % [main.battle_menu_state])
 	main._on_battle_ally_action("back")
 	print("Back returns to the main menu: state=%s (expected main)" % [main.battle_menu_state])
 
-	# the Staff's own regular attack: magic damage, reaches 3 tiles
+	# the Staff's regular attack is Pummel: it only reaches an enemy within one tile
 	var hp_before: int = g1.hp
+	var mana_before_pummel: int = u1.mana
 	main._on_battle_ally_action("attack")
-	print("A regular Staff attack hits from 3 tiles away for her MAGIC stat (18.4 -> 18): dealt=%d (expected 18)" % [hp_before - g1.hp])
+	print("Pummel refuses an enemy 3 tiles away: dealt=%d (expected 0), mana still %d (expected %d)" % [hp_before - g1.hp, u1.mana, mana_before_pummel])
+	var close_goblin := _make_goblin(main, Vector2i(2, 4))
+	main.battle_units = [g1, close_goblin]
+	main.battle_target_index = 1
+	main._on_battle_ally_action("attack")
+	print("...next to an enemy it hits for (0.85 x STR) + (0.25 x MAG) = 0.85 + 4.31 = 5: dealt=%d (expected 5), costs 15 mana: %d left (expected %d)" % [999 - close_goblin.hp, u1.mana, mana_before_pummel - 15])
 
 	# =========================================================
 	# Landfall
@@ -134,32 +146,37 @@ func _init() -> void:
 	main._on_battle_ally_action("special")
 	main._on_battle_ally_action("special_4")
 	print("Landfall refused without the mana: mana still %d (expected 10), nobody hurt=%s (expected true), still her turn=%s (expected true)" % [u2.mana, ga.hp == 999 and gb.hp == 999, main.battle_commanding_ally == u2])
-	u2.mana = 92
+	u2.mana = u2.max_mana
 	main._on_battle_ally_action("special_4")
-	print("Landfall costs 60 mana: %d left (expected 32)" % [u2.mana])
-	print("...and hits EVERY enemy anywhere for attack x3 + magic/2 = 3 + 9.2 = 12: dealt=%s (expected [12, 12, 12])" % [[999 - ga.hp, 999 - gb.hp, 999 - gc.hp]])
+	print("Landfall costs 40%% of her 86 mana = 34: %d left (expected 52)" % [u2.mana])
+	print("...and hits EVERY enemy anywhere for attack x3 + magic/2 = 3 + 8.6 = 12: dealt=%s (expected [12, 12, 12])" % [[999 - ga.hp, 999 - gb.hp, 999 - gc.hp]])
 
 	# =========================================================
-	# I CAST FIREBALL
+	# I CAST FIREBALL (the Wand's: a 5x5 blast)
 	# =========================================================
 	_reset(main, player)
+	player.unequip_ally_weapon(druid)
+	player.equip_ally_weapon(druid, "wand_fine_steel")
 	var u3: Dictionary = main._make_member_battle_unit(druid, Vector2i(1, 4), 1.0)
 	var center := _make_goblin(main, Vector2i(6, 4))
 	var adjacent := _make_goblin(main, Vector2i(6, 5))
 	var diagonal := _make_goblin(main, Vector2i(7, 5))
+	var two_away := _make_goblin(main, Vector2i(6, 6))
+	var corner := _make_goblin(main, Vector2i(8, 6))
 	var far := _make_goblin(main, Vector2i(6, 7))
-	main.battle_units = [center, adjacent, diagonal, far]
+	var foes := [center, adjacent, diagonal, two_away, corner, far]
+	main.battle_units = foes.duplicate()
 	main.battle_target_index = 0
 	_start(main, u3)
 	main._on_battle_ally_action("special")
-	main._on_battle_ally_action("special_3")
+	main._on_battle_ally_action("special_5")
 	var filler3 := _filler()
-	print("Turn 1: the fireball is only CHARGED: charging=%s, mana %d (expected true, 52), nobody hurt=%s (expected true)" % [not u3.charging.is_empty(), u3.mana, center.hp == 999 and adjacent.hp == 999])
+	print("Turn 1: the fireball is only CHARGED (80%% of her 80 mana = 64): charging=%s, mana %d (expected true, 16), nobody hurt=%s (expected true)" % [not u3.charging.is_empty(), u3.mana, center.hp == 999 and adjacent.hp == 999])
 	# the ally phase ended with a single ally; start a fresh ally phase for the release
 	main.battle_turn = "player"
 	main.battle_allies = [u3, filler3]
 	main.battle_target_index = 0
-	main.battle_units = [center, adjacent, diagonal, far]
+	main.battle_units = foes.duplicate()
 	main._start_ally_turn()
 	var charge_info: Dictionary = main._ally_menu_info()
 	print("While charging she can't move or attack: move_disabled=%s attack_disabled=%s (expected true, true)" % [charge_info.move_disabled, charge_info.attack_disabled])
@@ -168,10 +185,12 @@ func _init() -> void:
 	print("Trying to move while charging is refused: state=%s (expected main)" % [main.battle_menu_state])
 	main._on_battle_ally_action("special")
 	main._on_battle_ally_action("special_0")
-	print("Release: the target is lit, the blast hits the 3x3 only -- centre 22, next to it 17, diagonal 12, outside untouched: %s (expected [22, 17, 12, 0])" % [[999 - center.hp, 999 - adjacent.hp, 999 - diagonal.hp, 999 - far.hp]])
-	print("...the centre target is burning, the neighbours are not: %s / %s (expected true, false)" % [center.burning, adjacent.burning])
-	print("...and releasing cost nothing extra: mana %d (expected 52)" % [u3.mana])
+	print("Release: the blast hits the 5x5 -- magic 16 x 2.5 = 40 at the centre, 5 less per tile: centre 40, next to it 35, diagonal 30, two away 30, the far corner 20, outside untouched: %s (expected [40, 35, 30, 30, 20, 0])" % [[999 - center.hp, 999 - adjacent.hp, 999 - diagonal.hp, 999 - two_away.hp, 999 - corner.hp, 999 - far.hp]])
+	print("...everything left alive in the blast is set on fire, what is outside is not: %s / %s (expected true / false)" % [[center.burning, adjacent.burning, corner.burning].all(func(b): return b), far.burning])
+	print("...and releasing cost nothing extra: mana %d (expected 16)" % [u3.mana])
 	print("...the charge is spent: %s (expected {})" % [u3.charging])
+	player.unequip_ally_weapon(druid)
+	player.equip_ally_weapon(druid, "staff_fine_steel")
 
 	# a downed caster loses the charge
 	var u4: Dictionary = main._make_member_battle_unit(druid, Vector2i(1, 4), 1.0)
@@ -414,12 +433,12 @@ func _init() -> void:
 	print("A staggered ally is skipped, the next one commands: commanding=%s skip_turns_left=%d (expected Druid, 0)" % [main.battle_commanding_ally.name, tired.skip_turns])
 
 	# =========================================================
-	# Blindness from the Staff
+	# Fear from the Staff, blindness from the Wand
 	# =========================================================
 	_reset(main, player)
 	var archer: Dictionary = main._make_member_battle_unit(druid, Vector2i(1, 4), 1.0)
 	archer.weapon = archer.weapon.duplicate(true)
-	archer.weapon["passive_ranged_blind_chance"] = 1.0
+	archer.weapon["passive_ranged_fear_chance"] = 1.0
 	var near_target := _make_goblin(main, Vector2i(2, 4))
 	var far_target := _make_goblin(main, Vector2i(4, 4))
 	main.battle_units = [near_target, far_target]
@@ -430,14 +449,14 @@ func _init() -> void:
 	main.battle_actor = archer
 	main.battle_target_index = 0
 	await main._battle_perform_attack(plain.duplicate())
-	print("A point-blank Staff hit does not blind: blind_turns=%d (expected 0)" % [near_target.get("blind_turns", 0)])
+	print("A point-blank Staff hit does not frighten: fear_turns=%d (expected 0)" % [near_target.get("fear_turns", 0)])
 	main.battle_actor = archer
 	main.battle_commanding_ally = archer
 	main.battle_ally_queue = [archer_filler]
 	main.battle_allies = [archer, archer_filler]
 	main.battle_target_index = 1
 	await main._battle_perform_attack(plain.duplicate())
-	print("A RANGED one blinds (chance forced to 100%%): blind_turns=%d (expected %d)" % [far_target.get("blind_turns", 0), main.BLINDNESS_TURNS])
+	print("A RANGED one frightens (chance forced to 100%%): fear_turns=%d (expected %d)" % [far_target.get("fear_turns", 0), main.FEAR_TURNS])
 	main.battle_actor = {}
 	main.battle_units = [far_target]
 	far_target.tile = Vector2i(0, 3)
@@ -445,6 +464,33 @@ func _init() -> void:
 	main.battle_allies = []
 	player.health = 500
 	main._process_enemy_turn()
-	print("Blindness ticks down on the enemy's turn: %d (expected 1)" % [far_target.get("blind_turns", 0)])
+	print("A frightened enemy runs from the hero instead of attacking: fear_turns now %d (expected 1), hero untouched=%s (expected true), distance %d (expected 3 or more, it was 1)" % [far_target.get("fear_turns", 0), player.health == 500, abs(far_target.tile.x - 0) + abs(far_target.tile.y - 4)])
+	# The Wand: blinds on ANY landed hit, and has no close-quarters attack
+	_reset(main, player)
+	player.unequip_ally_weapon(druid)
+	player.equip_ally_weapon(druid, "wand_fine_steel")
+	var wander: Dictionary = main._make_member_battle_unit(druid, Vector2i(1, 4), 1.0)
+	wander.weapon = wander.weapon.duplicate(true)
+	wander.weapon["passive_blind_chance"] = 1.0
+	var wand_near := _make_goblin(main, Vector2i(2, 4))
+	var wand_far := _make_goblin(main, Vector2i(4, 4))
+	var wand_filler := _filler()
+	main.battle_units = [wand_near, wand_far]
+	main.battle_allies = [wander, wand_filler]
+	main.battle_ally_queue = [wand_filler]
+	main.battle_commanding_ally = wander
+	main.battle_actor = wander
+	main.battle_target_index = 0
+	await main._battle_perform_attack(plain.duplicate())
+	print("The Wand will not strike the enemy next to it, and picks the far one instead: near untouched=%s, far hit=%s (expected true, true)" % [wand_near.hp == 999, wand_far.hp < 999])
+	print("...every hit it lands can blind (chance forced to 100%%): blind_turns=%d (expected %d)" % [wand_far.get("blind_turns", 0), main.BLINDNESS_TURNS])
+	main.battle_units = [wand_near]
+	main.battle_actor = wander
+	var near_hp: int = wand_near.hp
+	await main._battle_perform_attack(plain.duplicate())
+	print("With only an adjacent enemy the Wand has no attack: dealt=%d (expected 0)" % [near_hp - wand_near.hp])
+	main.battle_actor = {}
+	player.unequip_ally_weapon(druid)
+	player.equip_ally_weapon(druid, "staff_fine_steel")
 
 	quit()

@@ -131,7 +131,7 @@ func _init() -> void:
 	# The bonus follows the armour that is actually WORN, not every owned piece.
 	player.owned_armor["armor_fortress"] = true
 	player.equipped_armor = armor.TIERS[3]
-	print("an un-upgraded Fortress Plate ignores Thornmail's levels: %.3f (expected 0.550)" % [player.armor_damage_reduction()])
+	print("an un-upgraded Fortplate ignores Spinemail's levels: %.3f (expected 0.550)" % [player.armor_damage_reduction()])
 	player.equipped_armor = armor.TIERS[2].duplicate()
 	player.equipped_armor["category"] = "armor"
 	print("a shop-tagged copy of Iron still gets its levels: %.3f (expected 0.375)" % [player.armor_damage_reduction()])
@@ -186,7 +186,7 @@ func _init() -> void:
 		panel.selected_kind = ""
 		panel.selected_id = ""
 		panel._refresh()
-		print("the list has your weapons (in hand first, then best tier) then your armour without the Rags: %s (expected spear, dagger, club, leather, iron)" % [panel.entry_buttons.keys()])
+		print("the list has your weapons (in hand first, then best tier) then your armour without the Jacket: %s (expected spear, dagger, club, leather, iron)" % [panel.entry_buttons.keys()])
 		print("the weapon in hand starts selected: %s %s (expected weapon spear_fine_steel)" % [panel.selected_kind, panel.selected_id])
 		var spear_variant: Dictionary = weapons.get_owned_variant("spear_fine_steel")
 		var texts: Array = _labels(panel.detail_box)

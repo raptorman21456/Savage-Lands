@@ -155,7 +155,7 @@ func _init() -> void:
 	await process_frame
 
 	# --- Staff ---
-	dm.run(AT.command_for("staff"), {"verb": "CAST", "spell_id": "staff_i_cast_fireball"})
+	dm.run(AT.command_for("staff"), {"verb": "CAST", "spell_id": "staff_poison_bomb"})
 	await _wait_ms(200)
 	var seq: Array = dm._cmd.sequence
 	dm._events.append([float(dm._now_ms()), true, str(seq[0])])

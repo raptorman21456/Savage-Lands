@@ -885,7 +885,7 @@ func make_icon_shield_round() -> Image:
 
 	return img
 
-# Phantom Guard -- pale, half-translucent blue, barely more than a bracer.
+# Phantom Kite -- pale, half-translucent blue, barely more than a bracer.
 func make_icon_shield_phantom() -> Image:
 	var img := Image.create(16, 16, false, Image.FORMAT_RGBA8)
 	img.fill(Color(0, 0, 0, 0))

@@ -80,7 +80,7 @@ func _init() -> void:
 	var player = main.player
 	main.enforce_special_loadouts = false  # these tests exercise individual specials, not the loadout
 	player.max_party_slots = 20
-	for id in ["staff_fine_steel", "greatsword_fine_steel", "knuckle_gloves_fine_steel", "club"]:
+	for id in ["staff_fine_steel", "wand_fine_steel", "greatsword_fine_steel", "knuckle_gloves_fine_steel", "club"]:
 		player.owned_weapons[id] = true
 	for e in main.get_tree().get_nodes_in_group("enemies"):
 		e.set_physics_process(false)
@@ -152,9 +152,9 @@ func _init() -> void:
 	player.unequip_ally_weapon(brawler)
 	var necro_unit: Dictionary = main._make_member_battle_unit(necro, Vector2i(1, 4), 1.0)
 	print("Necromancer pays in HP: pool=%s hp=%d (expected HP, 15); no staff -> kill heal %.0f (expected 0)" % [main._unit_pool_name(necro_unit), necro_unit.hp, necro_unit.mods.get("kill_heal", 0.0)])
-	player.equip_ally_weapon(necro, "staff_fine_steel")
+	player.equip_ally_weapon(necro, "wand_fine_steel")
 	var staff_necro: Dictionary = main._make_member_battle_unit(necro, Vector2i(1, 4), 1.0)
-	print("...with a staff: kill heal %.0f (expected 2) and range %d (expected 3)" % [staff_necro.mods.get("kill_heal", 0.0), staff_necro.attack_range])
+	print("...with a wand: kill heal %.0f (expected 2) and range %d (expected 4: 1 + the Wand's 3)" % [staff_necro.mods.get("kill_heal", 0.0), staff_necro.attack_range])
 	player.unequip_ally_weapon(necro)
 	var bare_shaman: Dictionary = main._make_member_battle_unit(shaman, Vector2i(1, 4), 1.0)
 	player.equip_ally_weapon(shaman, "staff_fine_steel")
@@ -370,7 +370,7 @@ func _init() -> void:
 	main.battle_actor = n2
 	await main._battle_perform_attack(main._ally_regular_action(n2))
 	main.battle_actor = {}
-	print("With a staff each kill also heals 2: HP %d (expected 5 + 1 + 2 = 8), max %d (expected 17)" % [n2.hp, n2.max_hp])
+	print("With a wand each kill also heals 2: HP %d (expected 5 + 1 + 2 = 8), max %d (expected 17)" % [n2.hp, n2.max_hp])
 	# somebody else's kill does not count
 	var other_before: int = int(n2.max_hp)
 	main._note_enemy_death({"name": "Goblin"}, {"kind": "guardian", "max_hp": 30, "hp": 20})

@@ -1,10 +1,10 @@
 extends SceneTree
 
 # Batch B worlds (World Progression feature): Caves, Tundra and Mountains -- same
-# end-to-end shape as test_batch_a_worlds.gd. Only Tundra's White Dragon is native; every
+# end-to-end shape as test_batch_a_worlds.gd. Only Tundra's White Drake is native; every
 # other enemy here is a PLACEHOLDER reuse of a surviving miniboss/boss until these worlds
-# get their own (Caves: Lava Construct / Elder Oak, Tundra: Black Dragonlet / White Dragon,
-# Mountains: Voidwing / White Dragon).
+# get their own (Caves: Magma Construct / Elder Oak, Tundra: Black Dragonlet / White Drake,
+# Mountains: Voidwing / White Drake).
 
 func _check_world(main, wave_mini: int, wave_boss: int, world_name: String, mini_name: String, boss_name: String) -> void:
 	main.wave = wave_mini
@@ -58,7 +58,7 @@ func _init() -> void:
 		e.set_physics_process(false)
 
 	# --- Data sanity ---
-	var names := ["Lava Construct", "Elder Oak", "Black Dragonlet", "White Dragon", "Voidwing"]
+	var names := ["Magma Construct", "Elder Oak", "Black Dragonlet", "White Drake", "Voidwing"]
 	var all_boss_tier := true
 	var all_have_icons := true
 	for n in names:
@@ -70,17 +70,17 @@ func _init() -> void:
 	print("All 5 Batch B enemies have HUD icons: %s (expected true)" % [all_have_icons])
 
 	# --- Distinguishing mechanics ---
-	print("Lava Construct lumbers: knockback_resist=%.2f armored=%s (expected 0.65, true)" % [
-		main.ENEMY_TRAITS["Lava Construct"].knockback_resist, main.ENEMY_TRAITS["Lava Construct"].armored
+	print("Magma Construct lumbers: knockback_resist=%.2f armored=%s (expected 0.65, true)" % [
+		main.ENEMY_TRAITS["Magma Construct"].knockback_resist, main.ENEMY_TRAITS["Magma Construct"].armored
 	])
-	print("White Dragon breathes a sweeping attack: sweeps=%s (expected true)" % [main.ENEMY_TRAITS["White Dragon"].sweeps])
+	print("White Drake breathes a sweeping attack: sweeps=%s (expected true)" % [main.ENEMY_TRAITS["White Drake"].sweeps])
 	print("Voidwing is fast, evasive and ranged: move_range=%d dodge_chance=%.1f attack_range=%d (expected 3, 0.3, 2)" % [
 		main.ENEMY_TRAITS["Voidwing"].move_range, main.ENEMY_TRAITS["Voidwing"].dodge_chance, main.ENEMY_TRAITS["Voidwing"].attack_range
 	])
 
 	# --- End-to-end per world ---
-	await _check_world(main, 55, 60, "Caves", "Lava Construct", "Elder Oak")
-	await _check_world(main, 65, 70, "Tundra", "Black Dragonlet", "White Dragon")
-	await _check_world(main, 75, 80, "Mountains", "Voidwing", "White Dragon")
+	await _check_world(main, 55, 60, "Caves", "Magma Construct", "Elder Oak")
+	await _check_world(main, 65, 70, "Tundra", "Black Dragonlet", "White Drake")
+	await _check_world(main, 75, 80, "Mountains", "Voidwing", "White Drake")
 
 	quit()

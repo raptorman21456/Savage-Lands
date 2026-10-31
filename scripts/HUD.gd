@@ -43,9 +43,9 @@ const ENEMY_ICONS := {
 	"Black Dragonlet": preload("res://assets/enemy_black_dragonlet.png"),
 	"Treant": preload("res://assets/enemy_treant.png"),
 	"Elder Oak": preload("res://assets/enemy_elder_oak.png"),
-	"Iron Construct": preload("res://assets/enemy_iron_golem.png"),
-	"White Dragon": preload("res://assets/enemy_white_dragon.png"),
-	"Lava Construct": preload("res://assets/enemy_lava_golem.png"),
+	"Steel Construct": preload("res://assets/enemy_iron_golem.png"),
+	"White Drake": preload("res://assets/enemy_white_dragon.png"),
+	"Magma Construct": preload("res://assets/enemy_lava_golem.png"),
 	"Red Wyrm": preload("res://assets/enemy_red_wyrm.png"),
 	"Voidwing": preload("res://assets/enemy_voidwing.png"),
 	"Archmage": preload("res://assets/enemy_supreme_warlock.png"),
@@ -1941,7 +1941,7 @@ func _build_battle_menus() -> void:
 		battle_ally_pick_grid.add_child(pick_button)
 		battle_ally_pick_buttons.append(pick_button)
 
-	# Phantom Guard's evasion dodge-roll: shown mid-"enemy" turn, while the attacker that just missed is paused waiting on the
+	# Phantom Kite's evasion dodge-roll: shown mid-"enemy" turn, while the attacker that just missed is paused waiting on the
 	# player to pick one of up to 3 directions relative to it. These two prompts stay a row of buttons along the bottom; their
 	# buttons are focusable (Z activates the focused one).
 	battle_evasion_submenu_box = HBoxContainer.new()
@@ -3652,7 +3652,7 @@ func update_battle_grid(grid_w: int, grid_h: int, terrain: Dictionary, player_ti
 			var a: Dictionary = allies[i]
 			var a_tile_origin: Vector2 = battle_grid_origin + Vector2(a.tile.x, a.tile.y) * battle_tile_size
 			var a_padding := 6.0
-			var is_wolf_ally: bool = a.get("kind", "") == "wolf"
+			var is_wolf_ally: bool = a.get("kind", "") == "wolf" or a.get("kind", "") == "summoned_wolf"
 			ally_icon.texture = ENEMY_ICONS.get("Wolf", null) if is_wolf_ally else BLADE_ALLY_ICON
 			# Roster members wear their kind's colour on the shared companion icon.
 			ally_icon.modulate = a.member.rules().get("tint", Color(1, 1, 1)) if (a.has("member") and not is_wolf_ally) else (Color(0.82, 0.88, 0.8) if a.get("kind", "") == "skeleton" else Color(1, 1, 1))

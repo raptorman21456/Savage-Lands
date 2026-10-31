@@ -540,6 +540,13 @@ static func try_mark_unlock_seen(key: String) -> bool:
 	mark_unlock_seen(key)
 	return true
 
+# Creatures the design doc renamed (new name -> the names older saves may still hold in beastiary_seen).
+const CREATURE_OLD_NAMES := {
+	"Steel Construct": ["Iron Construct"],
+	"Magma Construct": ["Lava Construct"],
+	"White Drake": ["White Dragon"],
+}
+
 # Beastiary: which creatures (ENEMY_TRAITS/HUD.ENEMY_ICONS display names)
 # the player has ever clicked as a battle target or defeated, on ANY save
 # slot -- device-wide and permanent, same shape as seen_unlocks above, just
@@ -547,7 +554,14 @@ static func try_mark_unlock_seen(key: String) -> bool:
 # mark_creature_seen from _on_enemy_target_selected (click) and
 # _on_enemy_died (defeat); the Beastiary screen itself only ever reads.
 static func is_creature_seen(name: String) -> bool:
-	return load_lifetime_data().get("beastiary_seen", {}).get(name, false)
+	var seen: Dictionary = load_lifetime_data().get("beastiary_seen", {})
+	if seen.get(name, false):
+		return true
+	# A creature the design doc renamed counts as seen under its old name too, so existing saves keep their entries.
+	for old_name in CREATURE_OLD_NAMES.get(name, []):
+		if seen.get(old_name, false):
+			return true
+	return false
 
 static func mark_creature_seen(name: String) -> void:
 	if name == "" or is_creature_seen(name):

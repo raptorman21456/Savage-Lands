@@ -162,7 +162,7 @@ class Player {
     this.equipped_talismans = (cfg.talismans || []).slice();
     this.real_miss = cfg.real_miss !== false;
     this._rebuild_talisman_cache();
-    // Max stamina counts talismans and the worn armour (Cinder Mail's heat), as the game's Sandbox does.
+    // Max stamina counts talismans and the worn armour (Cindermail's heat), as the game's Sandbox does.
     this.max_stamina = this._base_max_stamina + Math.trunc(this.talisman_bonus("max_stamina")) + this.armor_max_stamina_bonus();
 
     const wsel = cfg.weapon || { base: "club" };
@@ -346,7 +346,7 @@ class Player {
     return this.equipped_shield[key] ?? dflt;
   }
   shield_push_immune() {
-    if (this.armor_trait_value("push_immune", false)) return true;   // Fortress Plate
+    if (this.armor_trait_value("push_immune", false)) return true;   // Fortplate
     return this._shield_stat("push_immune", false);
   }
   shield_defend_threshold_bonus() { return this._shield_stat("defend_threshold_bonus", 0); }

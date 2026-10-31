@@ -500,7 +500,7 @@ func unequip_ally_talisman(member: RefCounted, talisman_id: String) -> bool:
 	member.gear.talismans.erase(talisman_id)
 	return true
 
-# --- Party armour and shields: the same one-holder rule. Rags (no armour at all) are never held, and the
+# --- Party armour and shields: the same one-holder rule. Jacket (no armour at all) are never held, and the
 # free Wooden Buckler -- like the Club -- is always on offer to everyone, so neither can run out.
 
 func armor_holder(armor_id: String) -> RefCounted:
@@ -1626,11 +1626,11 @@ func armor_trait() -> String:
 func armor_trait_value(key: String, default = 0.0):
 	return equipped_armor.get("trait_params", {}).get(key, default)
 
-# +n / -n max stamina from the worn armour (Cinder Mail's heat).
+# +n / -n max stamina from the worn armour (Cindermail's heat).
 func armor_max_stamina_bonus() -> int:
 	return int(armor_trait_value("max_stamina_bonus", 0))
 
-# Speed the worn armour adds (Windrunner's Jerkin); it will count for turn order.
+# Speed the worn armour adds (Sprinter's Jerkin); it will count for turn order.
 func armor_speed_bonus() -> int:
 	return int(armor_trait_value("speed_bonus", 0))
 
@@ -1639,7 +1639,7 @@ func fortitude_total() -> float:
 	return float(equipped_armor.get("fortitude", 0)) + shield_fortitude() + float(stat_fortitude) + talisman_bonus("fortitude")
 
 # Magical harm cut by Fortitude alone, on the Defense.gd curve (diminishing returns towards 80%); a
-# negative total (Thornmail) makes spells hurt more, towards +50%.
+# negative total (Spinemail) makes spells hurt more, towards +50%.
 func fortitude_reduction() -> float:
 	return DefenseScript.reduction(fortitude_total())
 
@@ -1653,7 +1653,7 @@ func bodily_defense_points() -> float:
 func bodily_reduction() -> float:
 	return DefenseScript.reduction(bodily_defense_points())
 
-# A shield's skew towards Fortitude (Phantom Guard); only while it is actually usable.
+# A shield's skew towards Fortitude (Phantom Kite); only while it is actually usable.
 func shield_fortitude() -> float:
 	if equipped_shield.is_empty() or not _shield_weapon_ok():
 		return 0.0
@@ -1785,7 +1785,7 @@ func shield_usable() -> bool:
 # Heavy Shield's passive: immune to forced repositioning (water push) while
 # raised. Same weapon-compat gating as shield_block_chance().
 func shield_push_immune() -> bool:
-	# Fortress Plate: nothing sweeps you off a water tile.
+	# Fortplate: nothing sweeps you off a water tile.
 	if bool(armor_trait_value("push_immune", false)):
 		return true
 	if equipped_shield.is_empty() or not _shield_weapon_ok():
@@ -1819,7 +1819,7 @@ func shield_damage_reduction_pct() -> float:
 		return 0.0
 	return equipped_shield.get("damage_reduction_pct", 0.0)
 
-# Phantom Guard's "evasive": true whenever a dodge should offer a dodge-roll
+# Phantom Kite's "evasive": true whenever a dodge should offer a dodge-roll
 # choice (Main.gd:_enemy_apply_damage), regardless of what actually caused
 # the dodge to succeed.
 func shield_evasion_active() -> bool:

@@ -1,7 +1,7 @@
 extends SceneTree
 
 # Beach (world 1): Leviathan is its full boss (wave 10); its wave-5 miniboss is a
-# PLACEHOLDER (Lava Construct) until Beach gets one of its own. Validates the
+# PLACEHOLDER (Magma Construct) until Beach gets one of its own. Validates the
 # WORLDS-driven boss lookup end to end through the real _spawn_boss_wave.
 
 func _init() -> void:
@@ -40,7 +40,7 @@ func _init() -> void:
 	main._spawn_boss_wave()
 	await physics_frame
 	var mini_enemies: Array = main.get_tree().get_nodes_in_group("enemies")
-	print("Beach's miniboss wave spawns a Lava Construct (placeholder): count=%d (expected 1), name=%s (expected Lava Construct)" % [
+	print("Beach's miniboss wave spawns a Magma Construct (placeholder): count=%d (expected 1), name=%s (expected Magma Construct)" % [
 		mini_enemies.size(), mini_enemies[0].get_display_name() if mini_enemies.size() == 1 else "none"
 	])
 	var mini_ref = mini_enemies[0] if mini_enemies.size() == 1 else null

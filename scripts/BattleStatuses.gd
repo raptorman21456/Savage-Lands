@@ -17,6 +17,7 @@ const TEXT := {
 	"blind": ["Blinded", "Attacks usually miss, but any hit that lands is a guaranteed crit.", false],
 	"vulnerable": ["Vulnerable", "Takes 25% more damage from every hit.", false],
 	"stunned": ["Stunned", "Skips its next turn.", false],
+	"fear": ["Feared", "Runs away from the party as far as it can, and attacks nobody.", false],
 	"winding_up": ["Winding up", "Is preparing a heavy attack that lands on its next turn.", false],
 	"disarmed": ["Disarmed", "Its weapon is on the ground: it fights bare-handed until it reaches the tile where the weapon landed.", false],
 	"rot": ["Rot", "Rots from within, losing a share of its max HP at the start of its turn. If it dies cursed, the kill belongs to the Necromancer.", false],
@@ -80,6 +81,8 @@ static func for_enemy(u: Dictionary) -> Array:
 		out.append(entry("vulnerable", _turns(int(u.vulnerable_turns))))
 	if u.get("stunned", false):
 		out.append(entry("stunned"))
+	if int(u.get("fear_turns", 0)) > 0:
+		out.append(entry("fear", _turns(int(u.fear_turns))))
 	if u.get("disarmed_tile", Vector2i(-1, -1)) != Vector2i(-1, -1):
 		out.append(entry("disarmed"))
 	if int(u.get("buffed_dmg_turns", 0)) > 0:

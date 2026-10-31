@@ -56,9 +56,6 @@ const DRUID_HEAL_MAGIC_DIV := 3.0         # ...plus magic / 3 (magic / 2 once up
 const DRUID_HEAL_MAGIC_DIV_UPGRADED := 2.0
 const DRUID_BUFF_MULT := 1.5              # buff: target deals 1.5x damage...
 const DRUID_BUFF_TURNS := 3               # ...for 3 turns
-const DRUID_SPRINT_MOVE_MULT := 2.0       # movement spell: doubles her move tiles...
-const DRUID_SPRINT_FLAT_BONUS := 5.0      # ...and her attack is flat (attack / 2) + 5 while it lasts
-const DRUID_SPRINT_ATTACK_DIV := 2.0
 
 # --- Guardian ---
 const BODY_SLAM_MULT := 1.3
@@ -126,13 +123,13 @@ const KITS := {
 			"description": "A quick nip at 80% damage with a 50% chance to halve the enemy's speed."},
 	],
 	"druid": [
-		# The doc's names and costs (2026-10-09): Restore 40 mana, Empower 30 mana, Vitalize 40 mana.
-		{"id": "druid_heal", "name": "Restore", "stamina_cost": 40, "dmg_mult": 0.0, "effect": "druid_heal",
+		# The doc's names and costs (2026-10-30): Vitalize 25 mana, Empower 35 mana, Call the Wild 50 mana.
+		{"id": "druid_heal", "name": "Vitalize", "stamina_cost": 25, "dmg_mult": 0.0, "effect": "druid_heal",
 			"description": "Heal an ally for 25% of their max HP plus a third of the Druid's magic. The Wizard's Tower can upgrade it twice."},
-		{"id": "druid_buff", "name": "Empower", "stamina_cost": 30, "dmg_mult": 0.0, "effect": "druid_buff",
+		{"id": "druid_buff", "name": "Empower", "stamina_cost": 35, "dmg_mult": 0.0, "effect": "druid_buff",
 			"description": "An ally deals 1.5x damage for 3 turns."},
-		{"id": "druid_sprint", "name": "Vitalize", "stamina_cost": 40, "dmg_mult": 0.0, "effect": "sprint", "keeps_turn": true,
-			"description": "Doesn't end the turn: double the Druid's movement, but her attack drops to a flat (attack / 2) + 5."},
+		{"id": "druid_call_the_wild", "name": "Call the Wild", "stamina_cost": 50, "dmg_mult": 0.0, "effect": "call_the_wild",
+			"description": "Summon a traitor wolf at the Druid's level, to fight beside the party for the rest of the battle."},
 	],
 	"guardian": [
 		{"id": "guardian_taunt", "name": "Taunt", "stamina_cost": 0, "dmg_mult": 0.0, "effect": "taunt", "keeps_turn": true,
@@ -166,7 +163,7 @@ const KITS := {
 
 # Effects that are not aimed at an enemy in reach: _battle_perform_attack does not refuse them for
 # "no enemy in range".
-const NO_ENEMY_NEEDED := ["rallying_cry", "charge", "stalwart", "summon_dead", "how_charming", "soothing_rain", "cleansing_chant", "summon_spectre", "revive", "taunt", "sprint", "druid_heal", "druid_buff", "ally_stealth"]
+const NO_ENEMY_NEEDED := ["rallying_cry", "charge", "stalwart", "summon_dead", "how_charming", "soothing_rain", "cleansing_chant", "summon_spectre", "revive", "taunt", "call_the_wild", "purifying_light", "druid_heal", "druid_buff", "ally_stealth"]
 
 static func specials_for(kind: String) -> Array:
 	return KITS.get(kind, [])

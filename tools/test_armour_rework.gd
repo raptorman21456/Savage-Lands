@@ -64,7 +64,7 @@ func _init() -> void:
 	for a in armor_script.TIERS:
 		if armor_script.is_crafted(a):
 			crafted.append(a.name)
-	print("The pelt armours are crafted, not bought: %s (expected Dragonskin, Bloodrage Hide, Shadowweave, Windrunner's Jerkin)" % [crafted])
+	print("The pelt armours are crafted, not bought: %s (expected Dragonskin, Bloodsplattered Hide, Shadowweave, Sprinter's Jerkin)" % [crafted])
 	print("The shop only rolls the other ten: %d (expected 10), crafted among them: %s (expected false)" % [armor_script.shop_pool().size(), armor_script.shop_pool().any(func(a): return a.has("recipe"))])
 	var pelt_fort := []
 	var plain_fort := []
@@ -96,7 +96,7 @@ func _init() -> void:
 	print("Fortitude bends towards 80%% and never reaches it: 5 + 9995 points = %.3f reduction, magical hit of 100 = %d (expected 0.795, 20)" % [player.fortitude_reduction(), main._apply_incoming_reductions(100, {"harm": "magical"})])
 	player.stat_fortitude = 0
 	_wear(player, "armor_thornmail")
-	print("Thornmail's -5 Fortitude makes spells hurt more: reduction %.2f, magical hit of 100 = %d (expected -0.04, 104); bodily = %d (expected 73, 30 points)" % [player.fortitude_reduction(), main._apply_incoming_reductions(100, {"harm": "magical"}), main._apply_incoming_reductions(100, {})])
+	print("Spinemail's -5 Fortitude makes spells hurt more: reduction %.2f, magical hit of 100 = %d (expected -0.04, 104); bodily = %d (expected 73, 30 points)" % [player.fortitude_reduction(), main._apply_incoming_reductions(100, {"harm": "magical"}), main._apply_incoming_reductions(100, {})])
 	print("A potion of resilience and Last Stand cut BOTH kinds: potion on, Gambeson magical: (set below)")
 	_wear(player, "armor_gambeson")
 	player.potion_resilience_turns = 2
@@ -105,9 +105,9 @@ func _init() -> void:
 	main.battle_player_defending = true
 	print("Defend halves either kind (when it's not small enough to negate): bodily=%d magical=%d (expected 42, 47)" % [main._apply_incoming_reductions(100, {}), main._apply_incoming_reductions(100, {"harm": "magical"})])
 	main.battle_player_defending = false
-	print("Enemies are tagged: Apprentice Mage=%s Archmage=%s Black Dragonlet=%s Lava Construct=%s Goblin=%s (expected magical magical both both bodily)" % [
+	print("Enemies are tagged: Apprentice Mage=%s Archmage=%s Black Dragonlet=%s Magma Construct=%s Goblin=%s (expected magical magical both both bodily)" % [
 		main.ENEMY_TRAITS["Apprentice Mage"].get("harm", "bodily"), main.ENEMY_TRAITS["Archmage"].get("harm", "bodily"),
-		main.ENEMY_TRAITS["Black Dragonlet"].get("harm", "bodily"), main.ENEMY_TRAITS["Lava Construct"].get("harm", "bodily"),
+		main.ENEMY_TRAITS["Black Dragonlet"].get("harm", "bodily"), main.ENEMY_TRAITS["Magma Construct"].get("harm", "bodily"),
 		main.ENEMY_TRAITS.get("Goblin", {}).get("harm", "bodily")])
 
 	# =========================================================
@@ -115,7 +115,7 @@ func _init() -> void:
 	# =========================================================
 	_reset(main, player)
 	_wear(player, "armor_stonehide")
-	print("Stonehide Mail: +10 Defense then -3 flat: a hit of 100 = %d (expected 86); a hit of 3 = %d (expected 1, never 0); magical 100 = %d (expected 94, flat cut is bodily only)" % [main._apply_incoming_reductions(100, {}), main._apply_incoming_reductions(3, {}), main._apply_incoming_reductions(100, {"harm": "magical"})])
+	print("Stonehide: +10 Defense then -3 flat: a hit of 100 = %d (expected 86); a hit of 3 = %d (expected 1, never 0); magical 100 = %d (expected 94, flat cut is bodily only)" % [main._apply_incoming_reductions(100, {}), main._apply_incoming_reductions(3, {}), main._apply_incoming_reductions(100, {"harm": "magical"})])
 
 	_wear(player, "armor_martyr")
 	player.max_health = 100
@@ -127,7 +127,7 @@ func _init() -> void:
 
 	_wear(player, "armor_bastion")
 	main.battle_player_defending = true
-	print("Bastion Mail: Defend negates hits up to 17 (usual threshold 10 + 8): 17 -> %d (expected 0), 18 -> %d (expected 7: Defend halves it to 9, then 25 points cut a bit more)" % [main._apply_incoming_reductions(17, {}), main._apply_incoming_reductions(18, {})])
+	print("Bastionmail: Defend negates hits up to 17 (usual threshold 10 + 8): 17 -> %d (expected 0), 18 -> %d (expected 7: Defend halves it to 9, then 25 points cut a bit more)" % [main._apply_incoming_reductions(17, {}), main._apply_incoming_reductions(18, {})])
 	main.battle_player_defending = false
 	player.stamina = 10
 	player.regen_stamina(main.STAMINA_REGEN_ON_DEFEND + int(player.armor_trait_value("defend_stamina_bonus", 0)))
@@ -139,17 +139,17 @@ func _init() -> void:
 	var move_bare: int = main._battle_player_move_range()
 	_wear(player, "armor_windrunner")
 	var move_with_wind: int = main._battle_player_move_range()
-	print("Fortress Plate costs a move tile, Windrunner's gives one: bare=%d fortress=%d windrunner=%d (expected %d, %d, %d)" % [move_bare, move_with_fortress, move_with_wind, move_bare, move_bare - 1, move_bare + 1])
+	print("Fortplate costs a move tile, Windrunner's gives one: bare=%d fortress=%d windrunner=%d (expected %d, %d, %d)" % [move_bare, move_with_fortress, move_with_wind, move_bare, move_bare - 1, move_bare + 1])
 	_wear(player, "armor_fortress")
-	print("Fortress Plate can't be swept off a water tile: %s (expected true); Gambeson: %s (expected false)" % [player.shield_push_immune(), (func(): _wear(player, "armor_gambeson"); return player.shield_push_immune()).call()])
-	print("Windrunner's Jerkin adds 2 Speed for turn order: %d (expected 2)" % [(func(): _wear(player, "armor_windrunner"); return player.armor_speed_bonus()).call()])
+	print("Fortplate can't be swept off a water tile: %s (expected true); Gambeson: %s (expected false)" % [player.shield_push_immune(), (func(): _wear(player, "armor_gambeson"); return player.shield_push_immune()).call()])
+	print("Sprinter's Jerkin adds 2 Speed for turn order: %d (expected 2)" % [(func(): _wear(player, "armor_windrunner"); return player.armor_speed_bonus()).call()])
 
-	# Thornmail / Cinder
+	# Spinemail / Cinder
 	_reset(main, player)
 	_wear(player, "armor_thornmail")
 	var melee_foe := _foe(Vector2i(3, 2))
 	main._land_enemy_hit_on_player(melee_foe, 10, {})
-	print("Thornmail throws back 30%% of a melee hit: foe 100 -> %d (expected 97)" % [melee_foe.hp])
+	print("Spinemail throws back 30%% of a melee hit: foe 100 -> %d (expected 97)" % [melee_foe.hp])
 	var archer := _foe(Vector2i(6, 2), 3)
 	main._land_enemy_hit_on_player(archer, 10, {})
 	var mage := _foe(Vector2i(3, 3))
@@ -160,7 +160,7 @@ func _init() -> void:
 	var archer2 := _foe(Vector2i(6, 2), 3)
 	main._land_enemy_hit_on_player(melee_foe2, 10, {})
 	main._land_enemy_hit_on_player(archer2, 10, {})
-	print("Cinder Mail sets a melee attacker alight (%s, expected true) but not an archer (%s, expected false)" % [melee_foe2.burning, archer2.burning])
+	print("Cindermail sets a melee attacker alight (%s, expected true) but not an archer (%s, expected false)" % [melee_foe2.burning, archer2.burning])
 	print("...and its heat costs 10 max stamina: %d (expected 90); taking it off restores it: %d (expected 100)" % [player.max_stamina, (func(): _wear(player, "armor_rags"); return player.max_stamina).call()])
 
 	# Bloodrage
@@ -169,7 +169,7 @@ func _init() -> void:
 	var rager := _foe(Vector2i(3, 2))
 	main._land_enemy_hit_on_player(rager, 5, {})
 	main._land_enemy_hit_on_player(rager, 5, {})
-	print("Bloodrage Hide: two hits taken = %d stacks (expected 2), lasting %d turns (expected 2)" % [main.battle_bloodrage_stacks, main.battle_bloodrage_turns])
+	print("Bloodsplattered Hide: two hits taken = %d stacks (expected 2), lasting %d turns (expected 2)" % [main.battle_bloodrage_stacks, main.battle_bloodrage_turns])
 	var target := _foe(Vector2i(3, 2))
 	target.hp = 999
 	target.max_hp = 999
@@ -251,7 +251,7 @@ func _init() -> void:
 	var shields = load("res://scripts/Shields.gd")
 	player.equipped_shield = shields.SHIELDS["shield_phantom"].duplicate(true)
 	player.current_weapon = load("res://scripts/Weapons.gd").CLUB
-	print("The Phantom Guard leans furthest towards Fortitude: +%d (expected +12); it blocks magic too (block chance %.2f for any hit, expected 0.18)" % [int(player.shield_fortitude()), player.shield_block_chance()])
+	print("The Phantom Kite leans furthest towards Fortitude: +%d (expected +12); it blocks magic too (block chance %.2f for any hit, expected 0.18)" % [int(player.shield_fortitude()), player.shield_block_chance()])
 	print("...so magical harm drops by it: %d (expected 87)" % [main._apply_incoming_reductions(100, {"harm": "magical"})])
 	player.equipped_shield = {}
 
@@ -273,7 +273,7 @@ func _init() -> void:
 	print("Can't be bought: %s (expected false); can't be crafted without scales: %s (expected false)" % [player.try_buy_armor(dragonskin), player.try_craft_armor(dragonskin)])
 	main.in_battle = false
 	main._on_enemy_died(5, "Black Dragonlet")
-	main._on_enemy_died(5, "White Dragon")
+	main._on_enemy_died(5, "White Drake")
 	print("Killing dragons drops scales for you: %d (expected 5-9)" % [player.material_count("dragon_scale")])
 	player.materials["dragon_scale"] = 8
 	var coins_before: int = player.coins
@@ -299,7 +299,7 @@ func _init() -> void:
 	var commissions: Array = smith.entry_buttons.keys().filter(func(k): return str(k).begins_with("recipe:"))
 	print("The smith lists the four pelt armours as commissions: %d (expected 4)" % [commissions.size()])
 	smith.select("recipe", "armor_windrunner")
-	print("...and with 5 Feathers and 50 coins he makes the Windrunner's Jerkin: %s (expected true), worn %s" % [smith.craft_armor("armor_windrunner"), player.equipped_armor.id])
+	print("...and with 5 Feathers and 50 coins he makes the Sprinter's Jerkin: %s (expected true), worn %s" % [smith.craft_armor("armor_windrunner"), player.equipped_armor.id])
 	smith.close()
 
 	# =========================================================

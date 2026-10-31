@@ -2,13 +2,13 @@ extends RefCounted
 class_name SpellUpgrades
 
 # Spell upgrades, bought from the Wizard's Tower (its "Spells" tab). EVERY spell can be upgraded twice -- to "+" and then to
-# "EX" ("Restore" -> "Restore+" -> "Restore EX"). They are paid for in ESSENCE, the banked Essence the Church spends: the
+# "EX" ("Vitalize" -> "Vitalize+" -> "Vitalize EX"). They are paid for in ESSENCE, the banked Essence the Church spends: the
 # upgrade lasts only the run (an upgrade belongs to the CASTER -- the party member it was bought for -- and goes with them from battle to battle of the run, whatever
 # they hold), but the Essence is gone for good. That is the risk and the reward -- die and you have paid
 # permanent currency for something you no longer have -- and it gives Essence a use once every Church upgrade is owned.
 # Level 0 is the plain spell; its numbers are the ones the design doc gives (PartyKits.gd / Main.gd).
 #
-# "Spells" here are the casters' own kits -- the Druid's, the Shaman's and the Necromancer's three -- and the Staff's three
+# "Spells" here are the casters' own kits -- the Druid's, the Shaman's and the Necromancer's three -- and the Staff's and the Wand's three
 # specials, twelve in all. A fighter's techniques (Rallying Cry, Haymaker...) are not spells.
 #
 # EVERY NUMBER BELOW IS A DRAFT: the user said only that all spells upgrade twice, to + and EX, for Essence. The prices are the
@@ -24,15 +24,16 @@ const PRICES := [{}, {"essence": 10}, {"essence": 40}]
 
 const SPELLS := [
 	# --- the Druid ---
-	{"id": "druid_heal", "owner": "Druid", "name": "Restore",
+	{"id": "druid_heal", "owner": "Druid", "name": "Vitalize",
 		"numbers": [{"pct": 0.25, "div": 3.0}, {"pct": 0.25, "div": 2.0}, {"pct": 0.35, "div": 1.5}],
 		"text": ["", "Heals 25% of max HP plus HALF the Druid's magic (a third before).", "Heals 35% of max HP plus two thirds of the Druid's magic."]},
 	{"id": "druid_buff", "owner": "Druid", "name": "Empower",
 		"numbers": [{"mult": 1.5, "turns": 3}, {"mult": 1.75, "turns": 3}, {"mult": 2.0, "turns": 4}],
 		"text": ["", "The ally deals 1.75x damage for 3 turns.", "The ally deals 2x damage for 4 turns."]},
-	{"id": "druid_sprint", "owner": "Druid", "name": "Vitalize",
-		"numbers": [{"attack_div": 2.0, "flat": 5.0, "move_mult": 2.0}, {"attack_div": 1.3333, "flat": 5.0, "move_mult": 2.0}, {"attack_div": 1.0, "flat": 5.0, "move_mult": 2.5}],
-		"text": ["", "Her attack while it lasts is three quarters of her attack plus 5 (half before).", "2.5x movement, and her attack is her full attack plus 5."]},
+	# Call the Wild: a traitor wolf at the Druid's own level for the rest of the battle (the wolf's stats are its kind's, scaled by `stat_mult`).
+	{"id": "druid_call_the_wild", "owner": "Druid", "name": "Call the Wild",
+		"numbers": [{"stat_mult": 1.0, "wolves": 1}, {"stat_mult": 1.25, "wolves": 1}, {"stat_mult": 1.25, "wolves": 2}],
+		"text": ["", "The wolf is 25% stronger and tougher.", "The wolf is 25% stronger and tougher, and TWO answer the call."]},
 	# --- the Shaman ---
 	{"id": "shaman_how_charming", "owner": "Shaman", "name": "How Charming",
 		"numbers": [{"radius": 4, "turns": 2}, {"radius": 4, "turns": 3}, {"radius": 5, "turns": 4}],
@@ -54,9 +55,10 @@ const SPELLS := [
 		"numbers": [{"hp": 1, "damage": 4.0, "hp_cost": 5}, {"hp": 2, "damage": 6.0, "hp_cost": 5}, {"hp": 3, "damage": 8.0, "hp_cost": 4}],
 		"text": ["", "Skeletons have 2 HP and hit for 6.", "Skeletons have 3 HP and hit for 8, and cost 4 HP each."]},
 	# --- the Staff ---
-	{"id": "staff_i_cast_fireball", "owner": "Staff", "name": "I CAST FIREBALL",
-		"numbers": [{"mult": 1.2, "falloff": 5.0}, {"mult": 1.5, "falloff": 5.0}, {"mult": 1.8, "falloff": 4.0}],
-		"text": ["", "Magic x 1.5 at the centre.", "Magic x 1.8 at the centre, and it fades only 4 per tile."]},
+	# Poison Bomb: the target takes (ftd x fortitude) + (mag x magic); the cloud lingers `turns` turns; a flame in it sets it off for (boom x magic).
+	{"id": "staff_poison_bomb", "owner": "Staff", "name": "Poison Bomb",
+		"numbers": [{"ftd": 2.0, "mag": 1.2, "boom": 1.5, "turns": 2}, {"ftd": 2.5, "mag": 1.5, "boom": 1.8, "turns": 2}, {"ftd": 3.0, "mag": 1.8, "boom": 2.2, "turns": 3}],
+		"text": ["", "Hits for (fortitude x 2.5) + (magic x 1.5), and the explosion is magic x 1.8.", "Hits for (fortitude x 3) + (magic x 1.8), the cloud lingers 3 turns, and the explosion is magic x 2.2."]},
 	{"id": "staff_landfall", "owner": "Staff", "name": "Landfall",
 		"numbers": [{"attack_mult": 3.0, "magic_mult": 0.5, "stun": 0.25}, {"attack_mult": 3.5, "magic_mult": 0.65, "stun": 0.35}, {"attack_mult": 4.0, "magic_mult": 0.8, "stun": 0.5}],
 		"text": ["", "(Attack x 3.5) + (magic x 0.65), 35% to stun.", "(Attack x 4) + (magic x 0.8), 50% to stun."]},
@@ -68,6 +70,19 @@ const SPELLS := [
 			{"str": 1.2, "mag": 1.2, "vgr": 0.8, "agi": 1.4, "dxt": 1.0, "dodge": 0.6, "cost_pct": 0.4}],
 		"text": ["", "The spectre is stronger: STR and MAG 100% of yours, VGR 65%, AGI 130%, DXT 85%.",
 			"STR and MAG 120%, VGR 80%, AGI 140%, DXT 100%, it dodges 60% of attacks, and the cast costs only 40% of your maximum."]},
+	# --- the Wand ---
+	# Purifying Light: every enemy in the 3x3 is blinded for `blind` turns, `cures` afflictions come off the caster, and undead take (undead x magic).
+	{"id": "wand_purifying_light", "owner": "Wand", "name": "Purifying Light",
+		"numbers": [{"undead": 0.5, "cures": 1, "blind": 2}, {"undead": 0.8, "cures": 1, "blind": 3}, {"undead": 1.2, "cures": 2, "blind": 3}],
+		"text": ["", "Undead take magic x 0.8, and the blindness lasts 3 turns.", "Undead take magic x 1.2, two afflictions come off you, and the blindness lasts 3 turns."]},
+	# Freeze Ray: (mag x magic) damage and a freeze of min..max turns (tundric creatures cannot be frozen).
+	{"id": "wand_freeze_ray", "owner": "Wand", "name": "FREEZE RAY",
+		"numbers": [{"mag": 0.8, "min": 1, "max": 3}, {"mag": 1.0, "min": 2, "max": 3}, {"mag": 1.3, "min": 2, "max": 4}],
+		"text": ["", "Magic x 1.0, frozen for 2-3 turns.", "Magic x 1.3, frozen for 2-4 turns."]},
+	# The fireball moved from the Staff to the Wand (the doc): a 5x5 blast, magic x `mult` at the centre.
+	{"id": "wand_i_cast_fireball", "owner": "Wand", "name": "I CAST FIREBALL",
+		"numbers": [{"mult": 2.5, "falloff": 5.0}, {"mult": 3.0, "falloff": 5.0}, {"mult": 3.6, "falloff": 4.0}],
+		"text": ["", "Magic x 3 at the centre.", "Magic x 3.6 at the centre, and it fades only 4 per tile."]},
 ]
 
 static func has(spell_id: String) -> bool:
@@ -79,7 +94,7 @@ static func spell(spell_id: String) -> Dictionary:
 			return s
 	return {}
 
-# "Restore", "Restore+", "Restore EX".
+# "Vitalize", "Vitalize+", "Vitalize EX".
 static func display_name(spell_id: String, level: int) -> String:
 	var s: Dictionary = spell(spell_id)
 	return "%s%s" % [s.name, SUFFIX[clampi(level, 0, MAX_LEVEL)]] if not s.is_empty() else spell_id

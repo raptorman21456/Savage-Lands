@@ -121,7 +121,7 @@ func _init() -> void:
 		player.owned_armor[id] = true
 	print("A wolf wears nothing: %s (expected false)" % [player.equip_ally_armor(wolf, "armor_gambeson")])
 	print("An armour you don't own is refused: %s -- %s (expected false, You don't own that armour.)" % [player.equip_ally_armor(knight, "armor_bastion"), player.ally_armor_block_reason(knight, "armor_bastion")])
-	print("Rags are 'no armour', never held: %s (expected false)" % [player.equip_ally_armor(knight, "armor_rags")])
+	print("Jacket are 'no armour', never held: %s (expected false)" % [player.equip_ally_armor(knight, "armor_rags")])
 	print("The Knight takes the Gambeson: %s, wearing %s (expected true, armor_gambeson)" % [player.equip_ally_armor(knight, "armor_gambeson"), knight.armor_id()])
 	print("The Brawler can't have it too: %s -- %s (expected false, Knight is wearing it.)" % [player.equip_ally_armor(brawler, "armor_gambeson"), player.ally_armor_block_reason(brawler, "armor_gambeson")])
 	print("...the holder lookup agrees: %s (expected Knight)" % [player.armor_holder("armor_gambeson").name])
@@ -188,9 +188,9 @@ func _init() -> void:
 	player.owned_armor["armor_windrunner"] = true
 	player.equip_ally_armor(brawler, "armor_windrunner")
 	var runner: Dictionary = main._make_member_battle_unit(brawler, Vector2i(1, 1), 1.0)
-	print("Windrunner's Jerkin: +1 move tile (%d -> %d, expected %d) and +2 speed for turn order (%d, expected 2)" % [plain_move, runner.move_range, plain_move + 1, runner.speed_bonus])
+	print("Sprinter's Jerkin: +1 move tile (%d -> %d, expected %d) and +2 speed for turn order (%d, expected 2)" % [plain_move, runner.move_range, plain_move + 1, runner.speed_bonus])
 	player.equip_ally_armor(brawler, "armor_fortress")
-	print("Fortress Plate: one tile less (%d, expected %d), never below 1" % [main._make_member_battle_unit(brawler, Vector2i(1, 1), 1.0).move_range, plain_move - 1])
+	print("Fortplate: one tile less (%d, expected %d), never below 1" % [main._make_member_battle_unit(brawler, Vector2i(1, 1), 1.0).move_range, plain_move - 1])
 	player.unequip_ally_armor(brawler)
 	player.equip_ally_armor(guardian, "armor_windrunner")
 	print("The Guardian's one-tile move is fixed -- no armour changes it: %d (expected 1)" % [main._make_member_battle_unit(guardian, Vector2i(1, 1), 1.0).move_range])
@@ -198,7 +198,7 @@ func _init() -> void:
 	player.owned_armor["armor_cinder"] = true
 	var stamina_bare: int = main._make_member_battle_unit(knight, Vector2i(1, 1), 1.0).max_stamina
 	player.equip_ally_armor(knight, "armor_cinder")
-	print("Cinder Mail's heat costs 10 stamina: %d -> %d (expected %d)" % [stamina_bare, main._make_member_battle_unit(knight, Vector2i(1, 1), 1.0).max_stamina, stamina_bare - 10])
+	print("Cindermail's heat costs 10 stamina: %d -> %d (expected %d)" % [stamina_bare, main._make_member_battle_unit(knight, Vector2i(1, 1), 1.0).max_stamina, stamina_bare - 10])
 	player.unequip_ally_armor(knight)
 	player.owned_armor["armor_shadowweave"] = true
 	player.equip_ally_armor(brawler, "armor_shadowweave")
@@ -209,7 +209,7 @@ func _init() -> void:
 	player.equip_ally_shield(brawler, "shield_phantom")
 	var phantom: Dictionary = main._make_member_battle_unit(brawler, Vector2i(1, 1), 1.0)
 	var no_shield: Dictionary = main._make_member_battle_unit(marksman, Vector2i(1, 1), 1.0)
-	print("A Phantom Guard (+5 Defense, +12 Fortitude, 18%% block) on a bare-handed Brawler: defense %.0f (expected 7), fortitude %.0f (expected 17), block %.2f (expected 0.18)" % [phantom.defense_pct, phantom.fortitude, phantom.shield_block])
+	print("A Phantom Kite (+5 Defense, +12 Fortitude, 18%% block) on a bare-handed Brawler: defense %.0f (expected 7), fortitude %.0f (expected 17), block %.2f (expected 0.18)" % [phantom.defense_pct, phantom.fortitude, phantom.shield_block])
 	print("...no shield, no block: %.2f (expected 0.00)" % [no_shield.shield_block])
 	player.equip_ally_weapon(brawler, "greatsword_fine_steel")
 	var inert: Dictionary = main._make_member_battle_unit(brawler, Vector2i(1, 1), 1.0)
@@ -231,7 +231,7 @@ func _init() -> void:
 	player.owned_armor["armor_stonehide"] = true
 	player.equip_ally_armor(knight, "armor_stonehide")
 	k = _unit(main, knight, tile)
-	print("Stonehide Mail on a member: 13 points then -3 flat -> %d (expected 83); a hit of 3 -> %d (expected 1); magical 100 -> %d (expected 84)" % [await _taken(main, k, foe, 100), await _taken(main, k, foe, 3), await _taken(main, k, foe, 100, {"harm": "magical"})])
+	print("Stonehide on a member: 13 points then -3 flat -> %d (expected 83); a hit of 3 -> %d (expected 1); magical 100 -> %d (expected 84)" % [await _taken(main, k, foe, 100), await _taken(main, k, foe, 3), await _taken(main, k, foe, 100, {"harm": "magical"})])
 	player.unequip_ally_armor(knight)
 
 	player.owned_armor["armor_martyr"] = true
@@ -250,7 +250,7 @@ func _init() -> void:
 	k = _unit(main, knight, tile)
 	foe.hp = 999
 	await _taken(main, k, foe, 100)
-	print("Thornmail on a member: a 72 hit throws back 30%% -> foe 999 -> %d (expected 977)" % [foe.hp])
+	print("Spinemail on a member: a 72 hit throws back 30%% -> foe 999 -> %d (expected 977)" % [foe.hp])
 	var archer := _foe(main, Vector2i(8, 4), 3)
 	await _taken(main, k, archer, 100)
 	print("...but not an archer's arrow: %d (expected 999)" % [archer.hp])
@@ -260,7 +260,7 @@ func _init() -> void:
 	k = _unit(main, knight, tile)
 	foe.burning = false
 	await _taken(main, k, foe, 50)
-	print("Cinder Mail on a member sets a melee attacker alight: %s (expected true)" % [foe.burning])
+	print("Cindermail on a member sets a melee attacker alight: %s (expected true)" % [foe.burning])
 	player.unequip_ally_armor(knight)
 
 	player.owned_armor["armor_bloodrage"] = true
@@ -268,7 +268,7 @@ func _init() -> void:
 	k = _unit(main, knight, tile)
 	await _taken(main, k, foe, 50)
 	await _taken(main, k, foe, 50)
-	print("Bloodrage Hide: two blows = %d stacks (expected 2) lasting %d turns (expected 2)" % [k.bloodrage_stacks, k.bloodrage_turns])
+	print("Bloodsplattered Hide: two blows = %d stacks (expected 2) lasting %d turns (expected 2)" % [k.bloodrage_stacks, k.bloodrage_turns])
 	var raged: int = _hit_for(main, k, foe)
 	k.bloodrage_stacks = 0
 	var calm: int = _hit_for(main, k, foe)
@@ -336,7 +336,7 @@ func _init() -> void:
 	main.battle_ally_queue = [{"tile": Vector2i(0, 0), "hp": 10, "max_hp": 10, "dmg_mult": 1.0, "name": "Filler", "move_range": 1, "attack_range": 1}]
 	main.battle_allies = [k] + main.battle_ally_queue
 	main._on_battle_ally_action("guard")
-	print("Bastion Mail on a member: Guard gives back 15 + 10 stamina: %d (expected 35)" % [k.stamina])
+	print("Bastionmail on a member: Guard gives back 15 + 10 stamina: %d (expected 35)" % [k.stamina])
 	main.battle_commanding_ally = null
 	main.battle_ally_queue = []
 	player.unequip_ally_armor(knight)

@@ -1,7 +1,7 @@
 extends SceneTree
 
 # Spell upgrades (SpellUpgrades.gd): every spell upgrades twice, to + and EX, at the Wizard's Tower. Checks the table, the
-# buying, the Tower's Spells tab, and that every one of the twelve spells really casts differently at each level.
+# buying, the Tower's Spells tab, and that every one of the fifteen spells really casts differently at each level.
 
 const SU := preload("res://scripts/SpellUpgrades.gd")
 const KITS := preload("res://scripts/PartyKits.gd")
@@ -75,18 +75,21 @@ func _init() -> void:
 	main.enforce_special_loadouts = false
 	player.max_party_slots = 20
 	player.owned_weapons["staff_fine_steel"] = true
+	player.owned_weapons["wand_fine_steel"] = true
 	for e in main.get_tree().get_nodes_in_group("enemies"):
 		e.set_physics_process(false)
 
 	# --- the table
-	print("Twelve spells, three levels each: %d spells (expected 12), all with numbers and text for 3 levels: %s (expected true)" % [SU.SPELLS.size(), SU.SPELLS.all(func(s): return s.numbers.size() == 3 and s.text.size() == 3)])
-	print("Names: %s / %s / %s (expected Restore / Restore+ / Restore EX)" % [SU.display_name("druid_heal", 0), SU.display_name("druid_heal", 1), SU.display_name("druid_heal", 2)])
+	print("Fifteen spells, three levels each: %d spells (expected 15), all with numbers and text for 3 levels: %s (expected true)" % [SU.SPELLS.size(), SU.SPELLS.all(func(s): return s.numbers.size() == 3 and s.text.size() == 3)])
+	print("Names: %s / %s / %s (expected Vitalize / Vitalize+ / Vitalize EX)" % [SU.display_name("druid_heal", 0), SU.display_name("druid_heal", 1), SU.display_name("druid_heal", 2)])
 	var all_real := true
 	var kit_ids := {}
 	for kind in ["druid", "shaman", "necromancer"]:
 		for sp in KITS.specials_for(kind):
 			kit_ids[sp.id] = true
 	for sp in WP.STAFF.specials:
+		kit_ids[sp.id] = true
+	for sp in WP.WAND.specials:
 		kit_ids[sp.id] = true
 	for s in SU.SPELLS:
 		if not kit_ids.has(s.id):
@@ -113,9 +116,9 @@ func _init() -> void:
 	SD.save_data({"essence": 1000, "upgrades": {"strength": 1}, "best_wave": 0})
 	var coins_before: int = player.coins
 	var shards_before: int = player.runic_shards
-	print("Restore -> Restore+: ok=%s (expected true), level %d (expected 1), Essence 1000 -> %d (expected 990, the doc says + costs 10)" % [player.try_upgrade_spell(druid, "druid_heal"), player.spell_level_of(druid, "druid_heal"), SD.banked_essence()])
+	print("Vitalize -> Vitalize+: ok=%s (expected true), level %d (expected 1), Essence 1000 -> %d (expected 990, the doc says + costs 10)" % [player.try_upgrade_spell(druid, "druid_heal"), player.spell_level_of(druid, "druid_heal"), SD.banked_essence()])
 	var second_ok: bool = player.try_upgrade_spell(druid, "druid_heal")
-	print("Restore+ -> Restore EX: ok=%s (expected true), level %d (expected 2), Essence now %d (expected 950, EX costs 40 more)" % [second_ok, player.spell_level_of(druid, "druid_heal"), SD.banked_essence()])
+	print("Vitalize+ -> Vitalize EX: ok=%s (expected true), level %d (expected 2), Essence now %d (expected 950, EX costs 40 more)" % [second_ok, player.spell_level_of(druid, "druid_heal"), SD.banked_essence()])
 	print("It cost no coins or shards: %s (expected true), and the Church upgrades in the slot are untouched: %s (expected {strength: 1})" % [player.coins == coins_before and player.runic_shards == shards_before, SD.load_data().upgrades])
 	print("There is nothing past EX: %s (expected false); and something that is not a spell cannot be bought: %s (expected false)" % [player.try_upgrade_spell(druid, "druid_heal"), player.try_upgrade_spell(druid, "knight_charge")])
 	print("The upgrade is the run's only: a fresh Player has none: %s (expected {})" % [load("res://scripts/Player.gd").new().spell_levels])
@@ -126,7 +129,7 @@ func _init() -> void:
 	main._open_shop("enchant")
 	print("The Tower shows both tabs: enchant %s, spells %s (expected true, true)" % [main.hud.shop_enchant_tab_button.visible, main.hud.shop_spells_tab_button.visible])
 	main.hud._select_shop_tab("spells")
-	print("...and the Spells tab lists every spell: %d rows (expected 12), visible=%s (expected true)" % [main.hud.shop_spells_row_nodes.size(), main.hud.shop_spells_scroll.visible])
+	print("...and the Spells tab lists every spell the party can cast: %d rows (expected 12: the Druid holds the Staff, so the Wand's three are not on offer), visible=%s (expected true)" % [main.hud.shop_spells_row_nodes.size(), main.hud.shop_spells_scroll.visible])
 	var rows0: Array = main.spell_upgrade_rows()
 	print("Prices read in Essence: '%s' (expected 10 Essence); with 45 banked every + is affordable but no EX yet: %s (expected true)" % [rows0[0].price_text, rows0.all(func(r): return r.can_buy)])
 	main._on_spell_upgrade_pressed(Player.spell_key(shaman, "shaman_soothing_rain"))
@@ -166,7 +169,7 @@ func _init() -> void:
 		heal_got.append(int(hurt.hp) - 1)
 		if named != SU.display_name("druid_heal", level):
 			heal_ok = false
-	print("Restore heals 25%% + magic/3, then 25%% + magic/2, then 35%% + magic/1.5 (magic 30, 100 max HP): %s (expected [35, 40, 55]), named right at every level: %s (expected true)" % [heal_got, heal_ok])
+	print("Vitalize heals 25%% + magic/3, then 25%% + magic/2, then 35%% + magic/1.5 (magic 30, 100 max HP): %s (expected [35, 40, 55]), named right at every level: %s (expected true)" % [heal_got, heal_ok])
 	player.spell_levels.clear()
 
 	var empower := []
@@ -187,20 +190,19 @@ func _init() -> void:
 	print("Empower: x1.5 for 3 turns, x1.75 for 3, x2 for 4: %s (expected [[1.5, 3], [1.75, 3], [2.0, 4]])" % [empower])
 	player.spell_levels.clear()
 
-	var vit := []
+	var wild := []
 	for level in 3:
-		player.set_spell_level_of(druid, "druid_sprint", level)
+		player.set_spell_level_of(druid, "druid_call_the_wild", level)
 		_reset(main, player)
 		var d3: Dictionary = main._make_member_battle_unit(druid, Vector2i(1, 4), 1.0)
 		d3.mods = {}
 		d3.weapon = {"damage_mult": 1.0}
-		d3.move_range = 4
 		main.battle_allies = [d3]
 		main.battle_units = [_make_goblin(main, Vector2i(7, 7))]
-		main.battle_ally_moves_left = 4
-		await _cast(main, d3, SU.display_name("druid_sprint", level))
-		vit.append([main.battle_ally_moves_left - 4, d3.get("sprint", false), snappedf(main._sn("druid_sprint", "attack_div"), 0.01)])
-	print("Vitalize doubles movement (+4 of 4), then the same, then x2.5 (+6): and her attack divisor goes 2 -> 1.33 -> 1: %s (expected [[4, true, 2.0], [4, true, 1.33], [6, true, 1.0]])" % [vit])
+		await _cast(main, d3, SU.display_name("druid_call_the_wild", level))
+		var wolves: Array = main.battle_allies.filter(func(a): return str(a.get("kind", "")) == "summoned_wolf")
+		wild.append([wolves.size(), int(wolves[0].max_hp) if not wolves.is_empty() else -1])
+	print("Call the Wild [wolves, wolf HP] at base, +, EX (a level 1 Druid: the Fickle Wolf's 18 HP, then 25%% tougher, then two of them): %s (expected [[1, 18], [1, 23], [2, 23]])" % [wild])
 	player.spell_levels.clear()
 
 	var charm := []
@@ -376,24 +378,23 @@ func _init() -> void:
 
 	# the Staff
 	player.equip_ally_weapon(druid, "staff_fine_steel")
-	var fire := []
+	var bombs := []
 	for level in 3:
-		player.set_spell_level_of(druid, "staff_i_cast_fireball", level)
+		player.set_spell_level_of(druid, "staff_poison_bomb", level)
 		_reset(main, player)
 		var d4: Dictionary = main._make_member_battle_unit(druid, Vector2i(1, 4), 1.0)
 		d4.mods = {}
 		d4.magic = 20.0
-		var centre := _make_goblin(main, Vector2i(5, 4), 9999)
-		var side := _make_goblin(main, Vector2i(6, 4), 9999)
+		d4.fortitude = 10.0
+		var bomb_target := _make_goblin(main, Vector2i(4, 4), 9999)
 		main.battle_allies = [d4]
-		main.battle_units = [centre, side]
+		main.battle_units = [bomb_target]
 		d4.mana = d4.max_mana
-		var charge: String = SU.display_name("staff_i_cast_fireball", level)
-		await _cast(main, d4, charge)
-		main.battle_target_index = 0
-		await _cast(main, d4, "Release: %s" % charge)
-		fire.append([9999 - int(centre.hp), (9999 - int(centre.hp)) - (9999 - int(side.hp))])
-	print("I CAST FIREBALL: the centre takes more at each level (%s, expected rising) and the blast fades 5 per tile, 5, then 4: %s (expected [5, 5, 4])" % [[fire[0][0], fire[1][0], fire[2][0]], [fire[0][1], fire[1][1], fire[2][1]]])
+		await _cast(main, d4, SU.display_name("staff_poison_bomb", level))
+		var cloud: Dictionary = main.battle_gas_clouds[0] if not main.battle_gas_clouds.is_empty() else {}
+		bombs.append([9999 - int(bomb_target.hp), int(cloud.get("turns", -1)), int(cloud.get("boom", -1)), int(bomb_target.get("poison_turns", 0))])
+		main._gas_clear_all()
+	print("Poison Bomb [damage, cloud turns, explosion, target poisoned turns] at base, +, EX (fortitude 10, magic 20): %s (expected [[44, 2, 30, 5], [55, 2, 36, 5], [66, 3, 44, 5]])" % [bombs])
 	player.spell_levels.clear()
 
 	var land := []
@@ -437,12 +438,77 @@ func _init() -> void:
 	print("I SUMMON THEE [attack, max HP, dodge, mana cost] at base, +, EX (caster: attack 10, magic 20, 40 HP, 100 mana): %s (expected [[24, 20, 0.5, 50], [30, 26, 0.5, 50], [36, 32, 0.6, 40]])" % [ghosts])
 	player.spell_levels.clear()
 
+	# the Wand
+	player.equip_ally_weapon(druid, "wand_fine_steel")
+	var fire := []
+	for level in 3:
+		player.set_spell_level_of(druid, "wand_i_cast_fireball", level)
+		_reset(main, player)
+		var d7: Dictionary = main._make_member_battle_unit(druid, Vector2i(1, 4), 1.0)
+		d7.mods = {}
+		d7.magic = 20.0
+		var centre := _make_goblin(main, Vector2i(5, 4), 9999)
+		var side := _make_goblin(main, Vector2i(6, 4), 9999)
+		main.battle_allies = [d7]
+		main.battle_units = [centre, side]
+		d7.mana = d7.max_mana
+		var charge: String = SU.display_name("wand_i_cast_fireball", level)
+		await _cast(main, d7, charge)
+		main.battle_target_index = 0
+		await _cast(main, d7, "Release: %s" % charge)
+		fire.append([9999 - int(centre.hp), (9999 - int(centre.hp)) - (9999 - int(side.hp))])
+	print("I CAST FIREBALL (the Wand's) [centre damage, fade per tile]: magic x 2.5, x 3, x 3.6 at the centre (magic 20) and the blast fades 5 per tile, 5, then 4: %s (expected [[50, 5], [60, 5], [72, 4]])" % [fire])
+	player.spell_levels.clear()
+
+	var rays := []
+	for level in 3:
+		player.set_spell_level_of(druid, "wand_freeze_ray", level)
+		var seen_min := 99
+		var seen_max := 0
+		var ray_damage := 0
+		for shot in 20:
+			_reset(main, player)
+			var d8: Dictionary = main._make_member_battle_unit(druid, Vector2i(1, 4), 1.0)
+			d8.mods = {}
+			d8.magic = 20.0
+			var ray_target := _make_goblin(main, Vector2i(5, 4), 9999)
+			main.battle_allies = [d8]
+			main.battle_units = [ray_target]
+			d8.mana = d8.max_mana
+			await _cast(main, d8, SU.display_name("wand_freeze_ray", level))
+			seen_min = mini(seen_min, int(ray_target.get("frozen_turns", 0)))
+			seen_max = maxi(seen_max, int(ray_target.get("frozen_turns", 0)))
+			ray_damage = 9999 - int(ray_target.hp)
+		rays.append([ray_damage, seen_min, seen_max])
+	print("FREEZE RAY [damage, shortest freeze, longest freeze] (magic 20, 20 shots): magic x 0.8 for 1-3 turns, x 1.0 for 2-3, x 1.3 for 2-4: %s (expected [[16, 1, 3], [20, 2, 3], [26, 2, 4]])" % [rays])
+	player.spell_levels.clear()
+
+	var lights := []
+	for level in 3:
+		player.set_spell_level_of(druid, "wand_purifying_light", level)
+		_reset(main, player)
+		var d9: Dictionary = main._make_member_battle_unit(druid, Vector2i(1, 4), 1.0)
+		d9.mods = {}
+		d9.magic = 20.0
+		var ghost_foe := _make_goblin(main, Vector2i(2, 4), 9999)
+		ghost_foe.name = "Shade"
+		var plain_foe := _make_goblin(main, Vector2i(1, 5), 9999)
+		var out_of_reach := _make_goblin(main, Vector2i(3, 4), 9999)
+		main.battle_allies = [d9]
+		main.battle_units = [ghost_foe, plain_foe, out_of_reach]
+		d9.mana = d9.max_mana
+		await _cast(main, d9, SU.display_name("wand_purifying_light", level))
+		lights.append([9999 - int(ghost_foe.hp), int(ghost_foe.get("blind_turns", 0)), int(plain_foe.get("blind_turns", 0)), 9999 - int(plain_foe.hp), int(out_of_reach.get("blind_turns", 0))])
+	print("PURIFYING LIGHT [undead damage, undead blind turns, living foe blind turns, living foe damage, foe 2 tiles away blind turns] (magic 20): magic x 0.5 / 0.8 / 1.2 to the undead, blind 2 / 3 / 3 turns, the living only blinded, nobody out of reach touched: %s (expected [[10, 2, 2, 0, 0], [16, 3, 3, 0, 0], [24, 3, 3, 0, 0]])" % [lights])
+	player.spell_levels.clear()
+	player.equip_ally_weapon(druid, "staff_fine_steel")
+
 	# the Party screen and the command menu show the upgraded names
 	player.set_spell_level_of(druid, "druid_heal", 2)
 	player.set_spell_level_of(druid, "staff_landfall", 1)
 	var du: Dictionary = main.member_preview(druid)
 	var names: Array = main._ally_special_pool(du).map(func(s): return s.name)
-	print("The command menu and Party screen use the upgraded names: Restore EX in %s (expected true), Landfall+ in %s (expected true)" % [names.has("Restore EX"), names.has("Landfall+")])
+	print("The command menu and Party screen use the upgraded names: Vitalize EX in %s (expected true), Landfall+ in %s (expected true)" % [names.has("Vitalize EX"), names.has("Landfall+")])
 
 	# an upgrade belongs to its CASTER: a Knight holding another Staff still casts the plain Landfall
 	var knight = player.recruit("knight")

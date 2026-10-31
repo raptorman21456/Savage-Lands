@@ -15,7 +15,7 @@ const COMPATIBLE_WEAPONS := ["club", "spear", "hammer", "dagger", "knuckle_glove
 
 # Every shield blocks MAGICAL attacks as well as bodily ones (the block roll does not care). `fortitude`
 # is how far a shield leans towards magic: points of Fortitude while it is usable (Player.shield_fortitude)
-# -- the Phantom Guard leans furthest. A DRAFT table, to be tuned.
+# -- the Phantom Kite leans furthest. A DRAFT table, to be tuned.
 
 # block_chance is flat -- identical with ANY compatible weapon equipped, not
 # just the shield's own synergy_weapon (a shield is fully usable off its
@@ -38,8 +38,8 @@ const COMPATIBLE_WEAPONS := ["club", "spear", "hammer", "dagger", "knuckle_glove
 # action itself (Main.gd:DEFEND_FULL_NEGATE_THRESHOLD) -- a sturdier shield
 # lets bracing behind it shrug off a bigger hit before Defend falls back to
 # just halving it (see Player.gd:shield_defend_threshold_bonus). Buckler and
-# Phantom Guard carry none -- Buckler for its usual "no trick" simplicity,
-# Phantom Guard because it's built around dodging a hit, not bracing for one.
+# Phantom Kite carry none -- Buckler for its usual "no trick" simplicity,
+# Phantom Kite because it's built around dodging a hit, not bracing for one.
 #
 # special: "" (Buckler has none), "knockback" (shoves the attacker back),
 # "thorns" (reflect damage), "evasive" (dodge-roll one tile on a dodge), or
@@ -56,7 +56,7 @@ const COMPATIBLE_WEAPONS := ["club", "spear", "hammer", "dagger", "knuckle_glove
 # synergy_weapon is the one COMPATIBLE_WEAPONS id each shield was designed
 # around -- equipping that exact weapon bumps special_pct up to
 # synergy_special_pct (see Player.gd's shield_special_pct()), on top of the
-# shield already working fully with any of the 5. Phantom Guard has no
+# shield already working fully with any of the 5. Phantom Kite has no
 # special_pct at all -- its dodge-roll is always exactly one tile, so there's
 # no magnitude for a synergy weapon to scale.
 static var SHIELDS := {
@@ -98,7 +98,7 @@ static var SHIELDS := {
 		"icon": "shield_bulwark",
 	},
 	"shield_phantom": {
-		"id": "shield_phantom", "name": "Phantom Guard", "price": 50,
+		"id": "shield_phantom", "name": "Phantom Kite", "price": 50,
 		"synergy_weapon": "dagger",
 		"block_chance": 0.18,
 		"fortitude": 12,

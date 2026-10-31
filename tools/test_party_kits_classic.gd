@@ -193,16 +193,16 @@ func _init() -> void:
 	var dl := []
 	for s in main._ally_specials(d1):
 		dl.append(s.name + main._ally_cost_text(d1, int(s.stamina_cost)))
-	print("Druid's spells: %s (expected Restore (40 MP), Empower (30 MP), Vitalize (40 MP), Stealth (20 MP) -- every member has it -- then no weapon specials when bare-handed)" % [dl])
+	print("Druid's spells: %s (expected Vitalize (25 MP), Empower (35 MP), Call the Wild (50 MP), Stealth (20 MP) -- every member has it -- then no weapon specials when bare-handed)" % [dl])
 	main.battle_units = [_make_goblin(main, Vector2i(6, 6), 999)]
-	await _cast(main, d1, "Restore", t1)
-	print("Restore = 25%% of 40 max HP + magic 12 / 3 = 14: HP 5 -> %d (expected 19); costs 40 mana: %d left (expected %d)" % [t1.hp, d1.mana, d1.max_mana - 40])
+	await _cast(main, d1, "Vitalize", t1)
+	print("Vitalize = 25%% of 40 max HP + magic 12 / 3 = 14: HP 5 -> %d (expected 19); costs 25 mana: %d left (expected %d)" % [t1.hp, d1.mana, d1.max_mana - 25])
 	player.health = 100
 	d1.mana = d1.max_mana
-	await _cast(main, d1, "Restore", "hero")
+	await _cast(main, d1, "Vitalize", "hero")
 	print("...on the hero: 25%% of 500 + 4 = 129: %d (expected 229)" % [player.health])
 	d1.upgraded_flag_probe = true
-	player.set_spell_level_of(druid, "druid_heal", 1)                      # Restore+ (the Wizard's Tower: SpellUpgrades.gd)
+	player.set_spell_level_of(druid, "druid_heal", 1)                      # Vitalize+ (the Wizard's Tower: SpellUpgrades.gd)
 	var d1b: Dictionary = main._make_member_battle_unit(druid, Vector2i(1, 4), 1.0)
 	d1b.magic = 12.0
 	t1.hp = 5
@@ -224,7 +224,7 @@ func _init() -> void:
 	main.battle_units = [dummy]
 	main.battle_allies = [d2, fighter]
 	await _cast(main, d2, "Empower", fighter)
-	print("Empower on an ally: buff_turns=%d (expected 3), mana %d (expected %d)" % [fighter.buff_turns, d2.mana, d2.max_mana - 30])
+	print("Empower on an ally: buff_turns=%d (expected 3), mana %d (expected %d)" % [fighter.buff_turns, d2.mana, d2.max_mana - 35])
 	dummy.hp = 999
 	await _attack(main, fighter)
 	print("...the buffed ally hits for x1.5: %d (expected 15)" % [999 - dummy.hp])
@@ -242,24 +242,34 @@ func _init() -> void:
 	main._apply_single_hit(0, 1.0, "", player.current_weapon)
 	print("...and the hero's own hit is x1.5: %d vs %d unbuffed (expected buffed ~= 1.5x)" % [buffed_hit, 999 - dummy.hp])
 
-	# Sprint
+	# Call the Wild
 	_reset(main, player)
+	druid.level = 4
 	var d3 := _plain(main, druid, Vector2i(1, 4), 8.0)
 	d3.mana = d3.max_mana
-	d3.move_range = 2
-	var target3 := _make_goblin(main, Vector2i(2, 4), 999)
+	var target3 := _make_goblin(main, Vector2i(6, 4), 999)
 	main.battle_units = [target3]
-	var sprint_filler := _filler()
-	main.battle_allies = [d3, sprint_filler]
-	main.battle_ally_queue = [sprint_filler]
-	main._start_ally_turn()
-	var moves_before: int = main.battle_ally_moves_left
-	main._on_battle_ally_action("special")
-	main._on_battle_ally_action("special_2")
-	print("The movement spell doesn't end her turn: still commanding=%s (expected true), moves %d -> %d (expected 2 -> 4), mana %d (expected %d)" % [main.battle_commanding_ally == d3, moves_before, main.battle_ally_moves_left, d3.mana, d3.max_mana - 40])
-	main.battle_menu_state = "main"
-	main._on_battle_ally_action("attack")
-	print("...but her attack is a flat (8 / 2) + 5 = 9: %d (expected 9)" % [999 - target3.hp])
+	await _cast(main, d3, "Call the Wild")
+	var wolves: Array = main.battle_allies.filter(func(a): return str(a.get("kind", "")) == "summoned_wolf")
+	print("Call the Wild raises a traitor wolf: %d (expected 1), costing 50 mana: %d left (expected %d)" % [wolves.size(), d3.mana, d3.max_mana - 50])
+	var level_four_wolf = PartyMember.create(-1, "wolf")
+	for i in 3:
+		level_four_wolf._level_up()
+	var wolf_unit: Dictionary = wolves[0] if not wolves.is_empty() else {}
+	print("...it is the Druid's level (4): its HP %s the Fickle Wolf's at level 4 (%d) -- expected true; it needs no orders (auto=%s, summoned=%s, expected true, true)" % [wolf_unit.get("max_hp", -1) == level_four_wolf.max_hp(), level_four_wolf.max_hp(), wolf_unit.get("auto", false), wolf_unit.get("summoned", false)])
+	var wolf_start_dist: int = abs(wolf_unit.tile.x - target3.tile.x) + abs(wolf_unit.tile.y - target3.tile.y)
+	main.battle_actor = {}
+	main._auto_ally_act(wolf_unit)
+	print("On its own turn it runs at the enemy: distance %d -> %d (expected smaller)" % [wolf_start_dist, abs(wolf_unit.tile.x - target3.tile.x) + abs(wolf_unit.tile.y - target3.tile.y)])
+	player.set_spell_level_of(druid, "druid_call_the_wild", 2)
+	_reset(main, player)
+	var d4 := _plain(main, druid, Vector2i(1, 4), 8.0)
+	d4.mana = d4.max_mana
+	main.battle_units = [target3]
+	await _cast(main, d4, "Call the Wild EX")
+	print("At EX TWO wolves answer: %d (expected 2)" % [main.battle_allies.filter(func(a): return str(a.get("kind", "")) == "summoned_wolf").size()])
+	player.spell_levels.clear()
+	druid.level = 1
 
 	# =========================================================
 	# Guardian

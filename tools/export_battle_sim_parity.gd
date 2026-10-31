@@ -172,7 +172,7 @@ func _apply_build(b: Dictionary) -> void:
 	p.equipped_shield = Shields.SHIELDS[b.shield].duplicate(true) if b.shield != "" else {}
 	p.equipped_talismans = b.talismans.duplicate()
 	p._rebuild_talisman_cache()
-	# Max stamina counts talismans and the worn armour (Cinder Mail's heat).
+	# Max stamina counts talismans and the worn armour (Cindermail's heat).
 	p.max_stamina = p._base_max_stamina + int(p.talisman_bonus("max_stamina")) + p.armor_max_stamina_bonus()
 	p._recalc_stats()
 	p.health = p.max_health
@@ -236,7 +236,7 @@ func _hit_case() -> Dictionary:
 			actions.append({"name": sp.name, "effect": sp.effect, "dmg_mult": sp.get("split_dmg_mult", sp.dmg_mult)})
 	var action: Dictionary = _pick(actions)
 	var hp_pool := [30, 120, 500, 4000]
-	var enemy_names := ["Goblin", "Orc", "Brute", "Wolf", "Gnome", "Treant", "Elder Oak", "Iron Construct", "Archmage"]
+	var enemy_names := ["Goblin", "Orc", "Brute", "Wolf", "Gnome", "Treant", "Elder Oak", "Steel Construct", "Archmage"]
 	var ename: String = _pick(enemy_names)
 	var enemy := {
 		"name": ename, "max_hp": _pick(hp_pool), "armored": rng.randf() < 0.4, "frozen": rng.randi() % 3 == 0, "vulnerable": rng.randi() % 4 == 0,
@@ -333,7 +333,7 @@ func _incoming_case() -> Dictionary:
 
 # ---------------------------------------------------------------- enemy turns (AI parity)
 const AI_ENEMIES := ["Goblin", "Brute", "Wolf", "Centaur Lancer", "Centaur Archer", "Gnome", "Leviathan",
-	"Black Dragonlet", "Treant", "Elder Oak", "White Dragon", "Lava Construct", "Red Wyrm",
+	"Black Dragonlet", "Treant", "Elder Oak", "White Drake", "Magma Construct", "Red Wyrm",
 	"Archmage"]
 const AI_TERRAIN := ["rock", "water", "ledge", "cliff", "ice", "embers", "poison_bog", "quicksand", "spring", "crumbling", "thicket", "caltrops", "rubble"]
 const CASES_ENEMY := 220
@@ -474,7 +474,7 @@ func _run_enemy_turn_case(c: Dictionary) -> Dictionary:
 # ---------------------------------------------------------------- player actions (whole round)
 const CASES_ACTION := 200
 const ACTION_SKIP_EFFECTS := ["low_sweep", "bonk", "wrist_strike", "knife_throw", "target_practice", "diamonds", "bleed_or_crit", "devastating_slash", "pichaku"]
-const ACTION_ENEMIES := ["Goblin", "Wolf", "Gnome", "Iron Construct", "Centaur Lancer", "Centaur Archer"]
+const ACTION_ENEMIES := ["Goblin", "Wolf", "Gnome", "Steel Construct", "Centaur Lancer", "Centaur Archer"]
 
 func _player_action_case() -> Dictionary:
 	var c := _enemy_turn_case()

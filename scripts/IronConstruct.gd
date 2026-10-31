@@ -7,7 +7,7 @@ signal died(xp_reward: int)
 
 # Desert's world-ending boss (World Progression feature) -- the original boss's
 # windup template, an immovable construct (see
-# Main.gd:ENEMY_TRAITS["Iron Construct"] -- total knockback immunity).
+# Main.gd:ENEMY_TRAITS["Steel Construct"] -- total knockback immunity).
 const SPEED := 28.0
 const WINDUP_SPEED_FRACTION := 0.3
 const MAX_HEALTH := 250
@@ -120,7 +120,7 @@ func get_contact_damage() -> int:
 	return ATTACK_DAMAGE
 
 func get_display_name() -> String:
-	return "Iron Construct"
+	return "Steel Construct"
 
 func set_battle_cooldown(t: float) -> void:
 	attack_cooldown = t

@@ -94,7 +94,7 @@ func _init() -> void:
 	cfg.ignore_slots = true
 	SandboxScript.apply_build(main, cfg)
 	print("...unless told to ignore it: %d (expected 5)" % player.equipped_talismans.size())
-	print("armor, shield, coins, arrows and items apply: %s +%d / %s / %d / %s / %d items (expected Thornmail +1 / Heavy Shield / 77 / {flame: 2, freeze: 1, bomb: 0} / 4)" % [player.equipped_armor.name, player.get_armor_upgrade_level("armor_thornmail"), player.equipped_shield.name, player.coins, player.owned_arrows, player.potion_queue.size()])
+	print("armor, shield, coins, arrows and items apply: %s +%d / %s / %d / %s / %d items (expected Spinemail +1 / Heavy Shield / 77 / {flame: 2, freeze: 1, bomb: 0} / 4)" % [player.equipped_armor.name, player.get_armor_upgrade_level("armor_thornmail"), player.equipped_shield.name, player.coins, player.owned_arrows, player.potion_queue.size()])
 	print("Adrenaline's passive reaches the player: %.2f (expected 0.16)" % player.meta_low_hp_damage_bonus_pct)
 	var first_hp: int = player.max_health
 	SandboxScript.apply_build(main, cfg)

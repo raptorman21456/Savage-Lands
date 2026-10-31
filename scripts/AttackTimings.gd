@@ -76,8 +76,8 @@ const TRACE_HIT_PRECISION := 0.55
 # How many arrow keys each spell asks for (draft): the bigger the spell, the longer the incantation. Anything else asks for 5.
 const ARROW_COUNTS := {
 	"druid_heal": 4, "druid_buff": 4, "shaman_how_charming": 4,
-	"druid_sprint": 5, "shaman_soothing_rain": 5, "shaman_cleansing_chant": 5, "necromancer_curse_of_rot": 5,
-	"necromancer_revival_blessing": 6, "necromancer_summon_the_dead": 6, "staff_i_cast_fireball": 6, "staff_landfall": 6,
+	"druid_call_the_wild": 6, "shaman_soothing_rain": 5, "shaman_cleansing_chant": 5, "necromancer_curse_of_rot": 5,
+	"necromancer_revival_blessing": 6, "necromancer_summon_the_dead": 6, "staff_poison_bomb": 6, "staff_landfall": 6,
 	"staff_i_summon_thee": 7,
 }
 const ARROW_DIRS := ["up", "down", "left", "right"]

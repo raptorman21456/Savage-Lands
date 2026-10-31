@@ -1,7 +1,7 @@
 extends SceneTree
 
 # Nothingness boss rush (World Progression feature): 6 sequential fights -- a rematch of
-# the 6 full bosses (Leviathan, Lizen Warband, Elder Oak, White Dragon, Red Wyrm, then the
+# the 6 full bosses (Leviathan, Lizen Warband, Elder Oak, White Drake, Red Wyrm, then the
 # Archmage at power_tier 2.5) -- the game's first-ever win condition, and the Worldwalker
 # skill-tree capstone it unlocks lifetime-wide.
 
@@ -29,7 +29,7 @@ func _init() -> void:
 		e.set_physics_process(false)
 
 	# --- Data sanity ---
-	var names := ["Leviathan", "Lizen Warband", "Elder Oak", "White Dragon", "Red Wyrm", "Archmage"]
+	var names := ["Leviathan", "Lizen Warband", "Elder Oak", "White Drake", "Red Wyrm", "Archmage"]
 	var all_full_bosses := true
 	for n in names:
 		if main.ENEMY_TRAITS.get(n, {}).get("is_miniboss", false):
@@ -49,7 +49,7 @@ func _init() -> void:
 
 	# --- wave 101-106 spawn the 6 fights in order, through the real
 	# _spawn_wave routing (not calling _spawn_nothingness_fight directly) ---
-	var expected_names := ["Leviathan", "Lizen Warband", "Elder Oak", "White Dragon", "Red Wyrm", "Archmage"]
+	var expected_names := ["Leviathan", "Lizen Warband", "Elder Oak", "White Drake", "Red Wyrm", "Archmage"]
 	var all_correct := true
 	for i in 6:
 		main.wave = 101 + i
@@ -71,7 +71,7 @@ func _init() -> void:
 
 	# --- power_tier actually reaches the enemy instance for a mid-rush
 	# fight too, not just the already-tested Archmage rematch ---
-	main.wave = 104  # fight_index 3 -> White Dragon, power_tier 1.45
+	main.wave = 104  # fight_index 3 -> White Drake, power_tier 1.45
 	main.current_world_index = main._world_index_for_wave(main.wave)
 	for e in main.get_tree().get_nodes_in_group("enemies"):
 		e.queue_free()
@@ -82,7 +82,7 @@ func _init() -> void:
 	var dragon_nodes: Array = main.get_tree().get_nodes_in_group("enemies")
 	var dragon_script = load("res://scripts/WhiteDragon.gd")
 	if dragon_nodes.size() == 1:
-		print("White Dragon (fight 4) carries power_tier=1.45: %.2f (expected 1.45)" % [dragon_nodes[0].power_tier])
+		print("White Drake (fight 4) carries power_tier=1.45: %.2f (expected 1.45)" % [dragon_nodes[0].power_tier])
 		main._setup_battle_grid([dragon_nodes[0]])
 		print("...and _setup_battle_grid scales its HP accordingly (player level 1, so no level scaling): hp=%d (expected %d)" % [
 			main.battle_units[0].hp, int(round(dragon_script.MAX_HEALTH * 1.45 * main.player.difficulty_mult))

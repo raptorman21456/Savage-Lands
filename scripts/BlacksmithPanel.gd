@@ -85,7 +85,7 @@ func _tier_rank(variant: Dictionary) -> int:
 			return tier.rank
 	return -1
 
-# Owned armour worth listing (not the free Rags), in tier order.
+# Owned armour worth listing (not the free Jacket), in tier order.
 func _owned_armor() -> Array:
 	var result: Array = []
 	for armor in ArmorScript.TIERS:

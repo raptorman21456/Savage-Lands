@@ -152,8 +152,8 @@ func _init() -> void:
 		var c: int = int(AT.ARROW_COUNTS[spell])
 		if c < 4 or c > 7:
 			counts_ok = false
-	print("Staff: every spell asks for 4 to 7 arrows: %s (expected true); Restore %d, Fireball %d, I SUMMON THEE %d, anything else %d (expected 4, 6, 7, 5)" % [
-		counts_ok, AT.roll(AT.command_for("staff"), {"spell_id": "druid_heal"}).sequence.size(), AT.roll(AT.command_for("staff"), {"spell_id": "staff_i_cast_fireball"}).sequence.size(),
+	print("Staff: every spell asks for 4 to 7 arrows: %s (expected true); Vitalize %d, Poison Bomb %d, I SUMMON THEE %d, anything else %d (expected 4, 6, 7, 5)" % [
+		counts_ok, AT.roll(AT.command_for("staff"), {"spell_id": "druid_heal"}).sequence.size(), AT.roll(AT.command_for("staff"), {"spell_id": "staff_poison_bomb"}).sequence.size(),
 		AT.roll(AT.command_for("staff"), {"spell_id": "staff_i_summon_thee"}).sequence.size(), AT.roll(AT.command_for("staff")).sequence.size()])
 	var seen_dirs := {}
 	for i in 30:

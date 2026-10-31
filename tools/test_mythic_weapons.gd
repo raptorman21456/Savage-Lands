@@ -42,7 +42,7 @@ func _init() -> void:
 	for base in weapons_script.UPGRADABLE_TYPES:
 		var mythic: Dictionary = weapons_script.MYTHIC_WEAPONS[base.id]
 		var variant: Dictionary = weapons_script.make_variant(base, mythic_rank)
-		var expected_dmg: float = base.damage_mult * 2.5
+		var expected_dmg: float = base.damage_mult * 2.25
 		var expected_price: int = int(round(base.price * 6.0))
 		print("%s -> %s: id=%s (expected %s_mythic), tier=%s, dmg=%.3f (expected %.3f), price=%d (expected %d)" % [
 			base.name, variant.name, variant.id, base.id, variant.tier_name, variant.damage_mult, expected_dmg, variant.price, expected_price
@@ -70,11 +70,23 @@ func _init() -> void:
 		main._battle_player_fight()
 		if player.health > 1:
 			heals += 1
-			if player.health != 6:
+			if player.health != 1 + 5 + int(round(player.max_health * 0.05)):
 				wrong_heal_amount = true
 		if is_instance_valid(g_tooth.ref):
 			g_tooth.ref.queue_free()
-	print("The Great Toothpicke's 25%% heal-chance over %d trials: %d (expected roughly 20-55, ~37 mean), always exactly 5 flat HP: wrong_amount=%s (expected false)" % [heal_trials, heals, wrong_heal_amount])
+	print("The Great Toothpicke's 25%% heal-chance over %d trials: %d (expected roughly 20-55, ~37 mean), always exactly 5 HP plus 5%% of max HP: wrong_amount=%s (expected false)" % [heal_trials, heals, wrong_heal_amount])
+
+	# The Great Toothpicke's other half: a 25% chance on a landed hit to poison the target.
+	var poisoned := 0
+	for i in heal_trials:
+		var g_venom := _make_unit(main, "Goblin", Vector2i(3, 2), 999999)
+		main.battle_units = [g_venom]
+		main._apply_single_hit(0, 1.0, "", player.current_weapon)
+		if int(g_venom.get("poison_turns", 0)) > 0:
+			poisoned += 1
+		if is_instance_valid(g_venom.ref):
+			g_venom.ref.queue_free()
+	print("The Great Toothpicke's 25%% poison chance over %d trials: %d (expected roughly 20-55, about 37 mean)" % [heal_trials, poisoned])
 
 	# The Looongblade: passive_extra_range adds a flat tile of reach on top of
 	# whatever the weapon normally gets -- turns Greatsword's usual melee-only
@@ -165,24 +177,25 @@ func _init() -> void:
 		implement_dmg, player.health, expected_implement_heal, 1 + expected_implement_heal
 	])
 
-	# Grunkle Gloves: passive_stun_chance is probabilistic (20%) -- called via
-	# _apply_single_hit directly rather than the full attack flow, same
-	# reasoning as Worldbreaker's knockback test below: going through
-	# _battle_player_fight would cascade into the enemy's own turn, which
-	# consumes and clears the stunned flag right after skipping its action,
-	# masking the effect before we can observe it.
+	# Grunkle Gloves: 1.2x crit damage. A stealth strike is a guaranteed crit, so the same weapon with the multiplier at 1.0 and at
+	# 1.2 shows the difference exactly (the ratio is the multiplier, up to rounding).
 	player.current_weapon = weapons_script.make_variant(weapons_script.KNUCKLE_GLOVES, mythic_rank)
-	var stuns := 0
-	var stun_trials := 150
-	for i in stun_trials:
-		var g_glove := _make_unit(main, "Goblin", Vector2i(3, 2), 999999)
-		main.battle_units = [g_glove]
-		main._apply_single_hit(0, 1.0, "", player.current_weapon)
-		if g_glove.stunned:
-			stuns += 1
-		if is_instance_valid(g_glove.ref):
-			g_glove.ref.queue_free()
-	print("Grunkle Gloves' 20%% stun chance over %d trials: %d (expected roughly 20-40, ~30 mean)" % [stun_trials, stuns])
+	var crit_totals := {}
+	for mult in [1.0, 1.2]:
+		var crit_weapon: Dictionary = player.current_weapon.duplicate(true)
+		crit_weapon["passive_crit_damage_mult"] = mult
+		var total := 0
+		for i in 40:
+			var g_crit := _make_unit(main, "Goblin", Vector2i(3, 2), 999999)
+			main.battle_units = [g_crit]
+			player.stealth_turns_remaining = 3
+			main._apply_single_hit(0, 1.0, "", crit_weapon)
+			total += 999999 - g_crit.hp
+			if is_instance_valid(g_crit.ref):
+				g_crit.ref.queue_free()
+		crit_totals[mult] = total
+	print("Grunkle Gloves' 1.2x crit damage: forced crits total %d at x1.0 and %d at x1.2 (ratio %.2f, expected about 1.20)" % [crit_totals[1.0], crit_totals[1.2], float(crit_totals[1.2]) / maxf(1.0, float(crit_totals[1.0]))])
+	print("Grunkle Gloves' crit chance multiplier is on the weapon: %s (expected 1.3)" % [player.current_weapon.get("passive_crit_chance_mult", 1.0)])
 
 	# Grunkle Gloves: passive_undead_boss_bonus deals 30% more against an
 	# undead or boss-tier enemy (Elder Oak is both) than a plain Goblin.
@@ -221,7 +234,7 @@ func _init() -> void:
 		plain_avg, plain_hits, strahd_avg, strahd_hits, plain_avg * 1.3
 	])
 
-	# Frying Pans: passive_free_special_chance is a probabilistic 10% chance
+	# Emerald Picks: passive_free_special_chance is a probabilistic 10% chance
 	# per use, not Gravedigger's guaranteed free ride -- pichaku (0 stamina
 	# regardless) is a clean special to repeat since it never actually needs
 	# the free roll to succeed, so stamina is drained back to 0 every trial
@@ -244,6 +257,22 @@ func _init() -> void:
 			frees += 1
 		if is_instance_valid(g_pan.ref):
 			g_pan.ref.queue_free()
-	print("Frying Pans' 10%% free-special-chance over %d trials at 0 stamina: %d (expected roughly 10-35, ~20 mean)" % [free_trials, frees])
+	print("Emerald Picks' 20%% free-special-chance over %d trials at 0 stamina: %d (expected roughly 25-60, about 40 mean)" % [free_trials, frees])
+
+	# Second Best: a 20% chance on every landed hit to concuss the target (BONK's three turns), instead of a stun.
+	player.current_weapon = weapons_script.make_variant(weapons_script.HAMMER, mythic_rank)
+	var concussed := 0
+	var stunned_instead := 0
+	for i in 150:
+		var g_hammer := _make_unit(main, "Goblin", Vector2i(3, 2), 999999)
+		main.battle_units = [g_hammer]
+		main._apply_single_hit(0, 1.0, "", player.current_weapon)
+		if int(g_hammer.get("concussed_turns", 0)) > 0:
+			concussed += 1
+		if g_hammer.stunned:
+			stunned_instead += 1
+		if is_instance_valid(g_hammer.ref):
+			g_hammer.ref.queue_free()
+	print("Second Best's 20%% concussion chance over 150 trials: %d (expected roughly 15-50, about 30 mean), turns %d (expected %d), and it no longer stuns: %d (expected 0)" % [concussed, main.BONK_CONCUSSED_TURNS, 3, stunned_instead])
 
 	quit()

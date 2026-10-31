@@ -74,7 +74,7 @@ func _init() -> void:
 		player.health, expected_dmg, player.max_health - expected_dmg
 	])
 
-	# Thornmail takes cliff falls as they come (the old Iron Plate's halving is gone).
+	# Spinemail takes cliff falls as they come (the old Iron Plate's halving is gone).
 	player.owned_armor["armor_thornmail"] = true
 	player.equipped_armor = armor_script.TIERS[2]
 	main.battle_terrain.clear()
@@ -102,7 +102,7 @@ func _init() -> void:
 		player.health, expected_steel_fall, player.max_health - expected_steel_fall
 	])
 
-	# Dragonskin Plating still negates cliff fall damage entirely.
+	# Dragonskin Plate still negates cliff fall damage entirely.
 	player.owned_armor["armor_dragonskin"] = true
 	player.equipped_armor = armor_script.TIERS[4]
 	main.battle_terrain.clear()

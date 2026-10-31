@@ -153,9 +153,9 @@ const KINDS := {
 		# Spells cost HP, not mana (1 HP per 5 mana of spell).
 		"hp_as_mana": true,
 		"move": {},
-		# +1 max HP (kept for good) for every enemy it kills, and a 2 HP heal per kill with a staff.
+		# +1 max HP (kept for good) for every enemy it kills, and a 2 HP heal per kill with a wand (the doc, 2026-10-30).
 		"kill_max_hp": 1.0,
-		"favour": {"weapon": "staff", "kill_heal": 2.0},
+		"favour": {"weapon": "wand", "kill_heal": 2.0},
 		"attack_range": 1, "tint": Color(0.6, 0.45, 0.75),
 	},
 	"brawler": {

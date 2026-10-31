@@ -433,7 +433,7 @@ func _section_items() -> void:
 	r = DA.give_weapon(main, "staff", "Fine", "wood", true)
 	print("a Staff is handed over but never wielded by you: owned=%s (expected true), wielding=%s (expected spear_masterwork_gold)" % [player.owned_weapons.has("staff_fine_wood"), player.current_weapon_base.get("id", "")])
 	var bases: Array = DA.weapon_bases().map(func(b): return str(b.id))
-	print("every base weapon is on offer: %s (expected club, spear, greatsword, hammer, battle_axe, dagger, bow, knuckle_gloves, hand_picks, staff)" % [", ".join(bases)])
+	print("every base weapon is on offer: %s (expected club, spear, greatsword, hammer, battle_axe, dagger, bow, knuckle_gloves, hand_picks, staff, wand)" % [", ".join(bases)])
 	var all_ok := true
 	for b in bases:
 		for tier in ["Broken", "Worn", "Fine", "Masterwork", "Legendary", "Mythic"]:
@@ -455,11 +455,11 @@ func _section_items() -> void:
 	DA.give_armor(main, "armor_gambeson", true)
 	print("give and wear armour: owned=%s worn=%s (expected true true)" % [player.owned_armor.has("armor_gambeson"), player.equipped_armor.get("id", "") == "armor_gambeson"])
 	DA.remove_armor(main, "armor_gambeson")
-	print("removing worn armour puts the Rags back: %s (expected armor_rags)" % player.equipped_armor.get("id", ""))
+	print("removing worn armour puts the Jacket back: %s (expected armor_rags)" % player.equipped_armor.get("id", ""))
 	DA.give_all(main, "armor")
 	print("give all armour: owns %d (expected %d)" % [player.owned_armor.size(), load("res://scripts/Armor.gd").TIERS.size()])
 	DA.remove_all(main, "armor")
-	print("remove all armour: owns %d (expected 1, the Rags)" % player.owned_armor.size())
+	print("remove all armour: owns %d (expected 1, the Jacket)" % player.owned_armor.size())
 	# shields, clothes, talismans
 	DA.give_shield(main, "shield_heavy", true)
 	print("give and raise a shield: %s (expected shield_heavy)" % player.equipped_shield.get("id", ""))

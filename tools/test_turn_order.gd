@@ -71,7 +71,7 @@ func _init() -> void:
 	print("...and each level's +5 agility is +1 speed: %.1f after 3 levels (expected 8.0)" % [main._hero_speed()])
 	player.stat_agility = load("res://scripts/Player.gd").AGILITY_START
 	player.equipped_armor = load("res://scripts/Armor.gd").find("armor_windrunner")
-	print("Windrunner's Jerkin adds its +2: %.1f (expected 7.0)" % [main._hero_speed()])
+	print("Sprinter's Jerkin adds its +2: %.1f (expected 7.0)" % [main._hero_speed()])
 	player.equipped_armor = load("res://scripts/Armor.gd").find("armor_rags")
 	var missing := []
 	for enemy_name in main.ENEMY_TRAITS:

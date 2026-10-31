@@ -33,7 +33,7 @@ func _init() -> void:
 
 	# Boss fights are solo -- no escorts get gathered even if enemies are
 	# standing right next to it.
-	# Iron Construct stands in for a generic boss-tier unit: windup, enrage, and fully immune to knockback.
+	# Steel Construct stands in for a generic boss-tier unit: windup, enrage, and fully immune to knockback.
 	var boss_script = load("res://scripts/IronConstruct.gd")
 	var goblin_script = load("res://scripts/Enemy.gd")
 	var boss = boss_script.new()
@@ -58,7 +58,7 @@ func _init() -> void:
 	main.battle_player_defending = false
 	main.battle_units = [{
 		"ref": boss, "tile": Vector2i(3, 2), "hp": 150, "max_hp": 150, "move_range": 1,
-		"damage": 6, "name": "Iron Construct", "winding_up": false, "stunned": false,
+		"damage": 6, "name": "Steel Construct", "winding_up": false, "stunned": false,
 	}]
 	# Boost HP well past what the boss's hits deal so the checks below
 	# compare relative damage instead of everything clamping to 0 health.
@@ -92,7 +92,7 @@ func _init() -> void:
 	main.battle_terrain.clear()
 	var u := {
 		"ref": boss, "tile": Vector2i(3, 2), "hp": 9999, "max_hp": 9999,
-		"move_range": 1, "damage": 1, "name": "Iron Construct", "winding_up": false, "stunned": false,
+		"move_range": 1, "damage": 1, "name": "Steel Construct", "winding_up": false, "stunned": false,
 	}
 	var resisted_all := true
 	for i in 10:
@@ -114,7 +114,7 @@ func _init() -> void:
 	main.enemies_alive += 1
 	main.battle_units = [{
 		"ref": weak_boss, "tile": Vector2i(3, 2), "hp": 1, "max_hp": 150, "move_range": 1,
-		"damage": 1, "name": "Iron Construct", "winding_up": false, "stunned": false,
+		"damage": 1, "name": "Steel Construct", "winding_up": false, "stunned": false,
 	}]
 	main.battle_target_index = 0
 	player.stat_strength = 5

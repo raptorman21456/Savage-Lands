@@ -47,10 +47,14 @@ func _init() -> void:
 	var druid = player.recruit("druid")
 	main._roll_shop_offering()
 	var staff_index := -1
+	var wand_offers := 0
 	for i in main.current_shop_offering.size():
 		if main.current_shop_offering[i].get("ally_only", false):
-			staff_index = i
-	print("With a Druid in the party, one Staff is on offer: %s (expected true)" % [staff_index >= 0])
+			if weapons.get_base_type(main.current_shop_offering[i]).get("id", "") == "wand":
+				wand_offers += 1
+			else:
+				staff_index = i
+	print("With a Druid in the party, one Staff is on offer: %s (expected true), and one Wand beside it: %d (expected 1)" % [staff_index >= 0, wand_offers])
 	var offer: Dictionary = main.current_shop_offering[staff_index]
 	print("...it is a real Staff variant: base=%s ally_only=%s (expected staff, true)" % [weapons.get_base_type(offer).get("id", ""), weapons.is_ally_only(offer)])
 	var coins_before: int = player.coins

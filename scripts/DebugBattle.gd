@@ -92,7 +92,7 @@ static func why_cannot_finish(main) -> String:
 
 # Plays one of the weapon attack popups (see ATTACK_STYLES) on its own, so you can feel it: the menu closes, the popup opens, and the
 # grade it earns comes up as a message. Nothing is attacked and nothing is spent.
-static func play_attack_style(main, command_id: String, spell_id: String = "staff_i_cast_fireball") -> Dictionary:
+static func play_attack_style(main, command_id: String, spell_id: String = "staff_poison_bomb") -> Dictionary:
 	var dm = main._get_attack_minigame()
 	if dm._running:
 		return fail("A popup is already open.")

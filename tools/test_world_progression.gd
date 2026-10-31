@@ -96,7 +96,7 @@ func _init() -> void:
 	# Boss-tier generalization: is_boss_tier trait (not a hardcoded name
 	# list) drives solo-fight/big-arena detection, and _spawn_boss_wave picks
 	# world-relative miniboss (wave 5-of-10) vs. boss (wave 10-of-10)
-	# generically off WORLDS -- Beach resolves to Lava Construct (a placeholder
+	# generically off WORLDS -- Beach resolves to Magma Construct (a placeholder
 	# miniboss) / Leviathan (its boss), see WORLDS.
 	# =========================================================
 	print("is_boss_tier drives solo-squad detection, not a name list: Leviathan=%s (expected true), Goblin=%s (expected false)" % [
@@ -112,7 +112,7 @@ func _init() -> void:
 	main._spawn_boss_wave()
 	await physics_frame
 	var mini_enemies: Array = main.get_tree().get_nodes_in_group("enemies")
-	print("wave 15 (Beach, world-relative wave 5) spawns that world's miniboss: count=%d (expected 1), name=%s (expected Lava Construct)" % [
+	print("wave 15 (Beach, world-relative wave 5) spawns that world's miniboss: count=%d (expected 1), name=%s (expected Magma Construct)" % [
 		mini_enemies.size(), mini_enemies[0].get_display_name() if mini_enemies.size() == 1 else "none"
 	])
 	for e in mini_enemies:

@@ -9,7 +9,7 @@ extends RefCounted
 # A "point" is what a 1% flat cut used to be, so existing armour / Resilience / Fortitude numbers
 # carry over unchanged -- only the way they add up changed. HALF_POINTS is the number of points that
 # earn half the ceiling (the single knob for tuning how fast it flattens out). A NEGATIVE total
-# (Thornmail's spikes, a Wolf's Fortitude) curves the same way towards NEGATIVE_FLOOR, so spells can
+# (Spinemail's spikes, a Wolf's Fortitude) curves the same way towards NEGATIVE_FLOOR, so spells can
 # hurt up to 50% more but no worse.
 #
 # The ceiling is BASE_CAP (80%) for everyone; the Guardian's own is GUARDIAN_CAP (90%). Tactical

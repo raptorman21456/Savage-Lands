@@ -1,7 +1,7 @@
 extends SceneTree
 
 # Batch A worlds (World Progression feature): Swamp (Black Dragonlet miniboss /
-# Lizen Warband boss), Forest (Treant / Elder Oak), Desert (Iron Construct miniboss /
+# Lizen Warband boss), Forest (Treant / Elder Oak), Desert (Steel Construct miniboss /
 # Leviathan boss -- a placeholder boss until the Desert gets its own) -- same
 # end-to-end shape as test_beach_world.gd, run for all 3 worlds in one file.
 
@@ -58,7 +58,7 @@ func _init() -> void:
 		e.set_physics_process(false)
 
 	# --- Data sanity: ENEMY_TRAITS + HUD icons for all 6 new enemies ---
-	var names := ["Lizen Warband", "Black Dragonlet", "Treant", "Elder Oak", "Iron Construct", "Leviathan"]
+	var names := ["Lizen Warband", "Black Dragonlet", "Treant", "Elder Oak", "Steel Construct", "Leviathan"]
 	var all_boss_tier := true
 	var all_have_icons := true
 	for n in names:
@@ -81,12 +81,12 @@ func _init() -> void:
 	print("Leviathan reaches with a psychic strike: attack_range=%d ignore_line=%s (expected 2, true)" % [
 		main.ENEMY_TRAITS["Leviathan"].attack_range, main.ENEMY_TRAITS["Leviathan"].ignore_line
 	])
-	print("is_miniboss flags (Lizen Warband, Black Dragonlet, Treant, Elder Oak, Iron Construct, Leviathan): %s (expected [false, true, true, false, true, false])" % [[main.ENEMY_TRAITS["Lizen Warband"].get("is_miniboss", false), main.ENEMY_TRAITS["Black Dragonlet"].get("is_miniboss", false), main.ENEMY_TRAITS["Treant"].get("is_miniboss", false), main.ENEMY_TRAITS["Elder Oak"].get("is_miniboss", false), main.ENEMY_TRAITS["Iron Construct"].get("is_miniboss", false), main.ENEMY_TRAITS["Leviathan"].get("is_miniboss", false)]])
-	print("Iron Construct is immovable: knockback_resist=%.1f (expected 1.0)" % [main.ENEMY_TRAITS["Iron Construct"].knockback_resist])
+	print("is_miniboss flags (Lizen Warband, Black Dragonlet, Treant, Elder Oak, Steel Construct, Leviathan): %s (expected [false, true, true, false, true, false])" % [[main.ENEMY_TRAITS["Lizen Warband"].get("is_miniboss", false), main.ENEMY_TRAITS["Black Dragonlet"].get("is_miniboss", false), main.ENEMY_TRAITS["Treant"].get("is_miniboss", false), main.ENEMY_TRAITS["Elder Oak"].get("is_miniboss", false), main.ENEMY_TRAITS["Steel Construct"].get("is_miniboss", false), main.ENEMY_TRAITS["Leviathan"].get("is_miniboss", false)]])
+	print("Steel Construct is immovable: knockback_resist=%.1f (expected 1.0)" % [main.ENEMY_TRAITS["Steel Construct"].knockback_resist])
 
 	# --- End-to-end per world ---
 	await _check_world(main, 25, 30, "Swamp", "Black Dragonlet", "Lizen Warband")
 	await _check_world(main, 35, 40, "Forest", "Treant", "Elder Oak")
-	await _check_world(main, 45, 50, "Desert", "Iron Construct", "Leviathan")
+	await _check_world(main, 45, 50, "Desert", "Steel Construct", "Leviathan")
 
 	quit()

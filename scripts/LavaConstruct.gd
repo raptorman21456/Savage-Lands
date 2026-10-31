@@ -6,8 +6,8 @@ const PickupScript := preload("res://scripts/Pickup.gd")
 signal died(xp_reward: int)
 
 # Volcano's miniboss (World Progression feature) -- Boss.gd's windup
-# template, a molten cousin of Iron Construct (see
-# Main.gd:ENEMY_TRAITS["Lava Construct"] -- lumbering rather than immovable).
+# template, a molten cousin of Steel Construct (see
+# Main.gd:ENEMY_TRAITS["Magma Construct"] -- lumbering rather than immovable).
 const SPEED := 30.0
 const WINDUP_SPEED_FRACTION := 0.3
 const MAX_HEALTH := 190
@@ -120,7 +120,7 @@ func get_contact_damage() -> int:
 	return ATTACK_DAMAGE
 
 func get_display_name() -> String:
-	return "Lava Construct"
+	return "Magma Construct"
 
 func set_battle_cooldown(t: float) -> void:
 	attack_cooldown = t
