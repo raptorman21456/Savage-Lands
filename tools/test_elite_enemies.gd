@@ -60,7 +60,8 @@ func _init() -> void:
 	elite_goblin.is_elite = true
 	main._setup_battle_grid([elite_goblin])
 	var elite_unit: Dictionary = main.battle_units[0]
-	var expected_hp: int = int(round(goblin_script.MAX_HEALTH * main.ELITE_HP_MULT))
+	var early: float = main._early_hp_factor(false, {})   # regular enemies also carry the fading early-game HP bonus
+	var expected_hp: int = int(round(goblin_script.MAX_HEALTH * main.ELITE_HP_MULT * early))
 	var expected_dmg: int = int(round(goblin_script.CONTACT_DAMAGE * main.ELITE_DAMAGE_MULT))
 	print("elite stat boost reaches the battle grid: hp=%d (expected %d), damage=%d (expected %d), is_elite flag=%s (expected true)" % [
 		elite_unit.hp, expected_hp, elite_unit.damage, expected_dmg, elite_unit.is_elite
@@ -71,7 +72,7 @@ func _init() -> void:
 	main._setup_battle_grid([normal_goblin])
 	var normal_unit: Dictionary = main.battle_units[0]
 	print("a non-elite goblin gets no boost: hp=%d (expected %d), damage=%d (expected %d)" % [
-		normal_unit.hp, goblin_script.MAX_HEALTH, normal_unit.damage, goblin_script.CONTACT_DAMAGE
+		normal_unit.hp, int(round(goblin_script.MAX_HEALTH * early)), normal_unit.damage, goblin_script.CONTACT_DAMAGE
 	])
 
 	# --- killing an elite guarantees a shard drop ---

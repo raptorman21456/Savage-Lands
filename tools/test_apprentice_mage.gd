@@ -43,8 +43,8 @@ func _init() -> void:
 	mage.died.connect(main._on_enemy_died)
 	main.enemies_alive += 1
 	main._setup_battle_grid([mage])
-	print("Apprentice Mage has 6 HP via the real battle-setup path: name=%s (expected Apprentice Mage), max_hp=%d (expected 6)" % [
-		main.battle_units[0].name, main.battle_units[0].max_hp
+	print("Apprentice Mage has 6 HP (times the early-game bonus for a fresh hero) via the real battle-setup path: name=%s (expected Apprentice Mage), max_hp=%d (expected %d)" % [
+		main.battle_units[0].name, main.battle_units[0].max_hp, int(round(6.0 * main._early_hp_factor(false, {})))
 	])
 
 	quit()

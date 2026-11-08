@@ -611,7 +611,7 @@ const ENEMY_TRAITS := {
 	# Fastest thing on the grid, but a single hit that actually lands is
 	# always lethal (1 HP) -- its only defense is a real chance to dodge
 	# entirely instead of soaking the hit.
-	"Shade": {"is_undead": true, "is_void": true, "harm": "magical", "move_range": 3, "big_squad": true, "dodge_chance": SHADE_DODGE_CHANCE, "inflicts_fear": true},
+	"Shade": {"frail": true, "is_undead": true, "is_void": true, "harm": "magical", "move_range": 3, "big_squad": true, "dodge_chance": SHADE_DODGE_CHANCE, "inflicts_fear": true},
 	# Fast mobility on the grid, same as Shade, but no dodge chance and no
 	# big-squad flag -- a Traitor Wolf is combat-identical, just a rarer
 	# named spawn (see Wolf.gd/_spawn_enemies) with a shot at recruitment on
@@ -708,6 +708,12 @@ const STAMINA_REGEN_ON_DEFEND := 15
 # only BOSS_LEVEL_SCALING_FACTOR of it. The user set these: "change depending on difficulty" and "bosses
 # scale more gently", then (2026-11-07) "5%, 10% and 17%" for Normal, Hard and Apocalyptic (Baby stays at 3%).
 # ENEMY_LEVEL_SCALING stays as the Normal rate other code and tests read.
+# The Club's flat +2 Strength (the doc) lets a fresh hero hit for 3 where it used to hit for 1, against regular enemies tuned for
+# the old figure. So they carry extra HP that fades as the hero's own Strength (about a point a level) makes those 2 matter less:
+# x(1 + 2 / level) -- 3x at level 1 (a Goblin takes its old three hits again), 2x at level 2, 1.2x at 10, 1.1x at 20. Bosses,
+# minibosses and the frail Shade are left alone; weapons' own Strength per tier is the reward for buying better ones, so it is
+# not compensated. DRAFT number: raise EARLY_GAME_HP_BONUS for a tougher start.
+const EARLY_GAME_HP_BONUS := 2.0
 const ENEMY_LEVEL_SCALING := 0.05
 const ENEMY_LEVEL_SCALING_BY_DIFFICULTY := {"baby": 0.03, "normal": ENEMY_LEVEL_SCALING, "hard": 0.10, "apocalyptic": 0.17}
 const BOSS_LEVEL_SCALING_FACTOR := 0.5
@@ -744,7 +750,6 @@ const MERCHANT_EVENT_DISCOUNT := 0.6
 # Tile movement (the design doc): 1 tile, plus 0.05 for every point of speed, rounded down -- so a new hero walks one tile and
 # gains another at speed 20. (Was 2, plus one per 4 speed.)
 const PLAYER_BASE_MOVE_RANGE := 1
-const TUTORIAL_ENEMY_MIN_HP := 20
 const MOVE_TILES_PER_SPEED := 0.05
 
 # The 10-world campaign (index 0-9) plus the Nothingness boss rush (index
@@ -4490,9 +4495,10 @@ func _setup_battle_grid(squad: Array) -> void:
 		# (elite bonuses, level scaling) -- not enemy counts or move ranges.
 		# The danger tier of the ground the enemy was spawned on (regional world; absent = 1.0).
 		var scale_mult: float = _enemy_level_scale(traits.get("is_boss_tier", false)) * float(e.get_meta("region_tier_power", 1.0))
-		var scaled_hp: int = max(1, int(round(e.MAX_HEALTH * scale_mult * elite_hp_mult * player.difficulty_mult * power_tier)))
+		var early_hp: float = _early_hp_factor(traits.get("is_boss_tier", false), traits)
+		var scaled_hp: int = max(1, int(round(e.MAX_HEALTH * scale_mult * elite_hp_mult * player.difficulty_mult * power_tier * early_hp)))
 		if display_name == "Gnome" and gnome_pack_size > 1:
-			scaled_hp += (gnome_pack_size - 1) * GNOME_HP_PER_PACKMATE
+			scaled_hp += int(round((gnome_pack_size - 1) * GNOME_HP_PER_PACKMATE * early_hp))
 		var scaled_damage: int = max(1, int(round(e.get_contact_damage() * scale_mult * elite_dmg_mult * player.difficulty_mult * power_tier)))
 		battle_units.append({
 			"ref": e,
@@ -4529,10 +4535,6 @@ func _setup_battle_grid(squad: Array) -> void:
 		used_tiles.erase(battle_units[0].tile)
 		battle_units[0].tile = tut_tile
 		used_tiles[tut_tile] = true
-		# A lesson that ends on the first swing teaches nothing: with the Club adding Strength a fresh hero hits for 3, which would
-		# fell a 3 HP Goblin before the Defend step. The tutorial foe is sturdy enough to survive the opening Attack.
-		battle_units[0].hp = maxi(int(battle_units[0].hp), TUTORIAL_ENEMY_MIN_HP)
-		battle_units[0].max_hp = maxi(int(battle_units[0].max_hp), TUTORIAL_ENEMY_MIN_HP)
 
 	_place_ally_units(used_tiles)
 
@@ -9475,6 +9477,11 @@ func _pick_confused_target_tile(u: Dictionary) -> Vector2i:
 # of the enemy's attack patterns plays (AttackPatterns.pick).
 # The HP/damage multiplier a battle unit gets from the player's level: the difficulty's
 # per-level rate (bosses and minibosses at BOSS_LEVEL_SCALING_FACTOR of it).
+func _early_hp_factor(is_boss_tier: bool, traits: Dictionary) -> float:
+	if is_boss_tier or bool(traits.get("frail", false)):
+		return 1.0
+	return 1.0 + EARLY_GAME_HP_BONUS / float(maxi(1, player.level))
+
 func _enemy_level_scale(is_boss_tier: bool) -> float:
 	var rate: float = ENEMY_LEVEL_SCALING_BY_DIFFICULTY.get(player.difficulty_id, ENEMY_LEVEL_SCALING)
 	if is_boss_tier:
@@ -10237,8 +10244,9 @@ func _finish_enemy_actions(fae_spawns_needed: Array) -> bool:
 		add_child(fae)
 		enemies_alive += 1
 		var fae_traits: Dictionary = ENEMY_TRAITS.get("Fae", {})
+		var fae_hp: int = maxi(1, int(round(fae.MAX_HEALTH * _early_hp_factor(false, fae_traits))))
 		battle_units.append({
-			"ref": fae, "tile": spawn_tile, "hp": fae.MAX_HEALTH, "max_hp": fae.MAX_HEALTH,
+			"ref": fae, "tile": spawn_tile, "hp": fae_hp, "max_hp": fae_hp,
 			"move_range": fae_traits.get("move_range", 2), "damage": fae.get_contact_damage(),
 			"name": "Fae", "winding_up": false, "stunned": false, "size": 1,
 			"attack_range": fae_traits.get("attack_range", 1), "is_elite": false,

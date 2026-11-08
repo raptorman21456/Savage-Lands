@@ -563,7 +563,7 @@ const SIM_DATA = {
 			"xp_reward": 715
 		}
 	],
-	"exported": "2026-11-07T21:07:47",
+	"exported": "2026-11-08T15:49:29",
 	"foods": [
 		{
 			"description": "Heals 5 HP and restores 15 stamina.",
@@ -781,6 +781,7 @@ const SIM_DATA = {
 			-420.0
 		],
 		"DRUID_TOUCH_RADIUS": 150.0,
+		"EARLY_GAME_HP_BONUS": 2.0,
 		"ELITE_CHANCE": 0.15,
 		"ELITE_DAMAGE_MULT": 1.3,
 		"ELITE_HP_MULT": 1.6,
@@ -957,6 +958,7 @@ const SIM_DATA = {
 			"Shade": {
 				"big_squad": true,
 				"dodge_chance": 0.4,
+				"frail": true,
 				"harm": "magical",
 				"inflicts_fear": true,
 				"is_undead": true,
@@ -3477,6 +3479,7 @@ const SIM_DATA = {
 		"Shade": {
 			"big_squad": true,
 			"dodge_chance": 0.4,
+			"frail": true,
 			"harm": "magical",
 			"inflicts_fear": true,
 			"is_undead": true,
@@ -6352,6 +6355,8 @@ class Sim {
       if (is_boss_tier) rate *= MC.BOSS_LEVEL_SCALING_FACTOR;
       return 1.0 + (p.level - 1) * rate;
     };
+    // The Club's +2 Strength makes a fresh hero hit for 3: regular enemies carry x(1 + 2/level) HP, fading with the level (Main._early_hp_factor).
+    const early_hp_factor = (traits) => (traits.is_boss_tier || traits.frail) ? 1.0 : 1.0 + MC.EARLY_GAME_HP_BONUS / Math.max(1, p.level);
     const gnome_pack_size = squad.filter((s) => s.name === "Gnome").length;
 
     squad.forEach((e, i) => {
@@ -6371,8 +6376,9 @@ class Sim {
       const elite_dmg = e.elite ? MC.ELITE_DAMAGE_MULT : 1.0;
       const power_tier = e.power_tier ?? 1.0;
       const scale_mult = enemy_scale(!!traits.is_boss_tier);
-      let scaled_hp = Math.max(1, round(edata.max_health * scale_mult * elite_hp * p.difficulty_mult * power_tier));
-      if (e.name === "Gnome" && gnome_pack_size > 1) scaled_hp += (gnome_pack_size - 1) * MC.GNOME_HP_PER_PACKMATE;
+      const early_hp = early_hp_factor(traits);
+      let scaled_hp = Math.max(1, round(edata.max_health * scale_mult * elite_hp * p.difficulty_mult * power_tier * early_hp));
+      if (e.name === "Gnome" && gnome_pack_size > 1) scaled_hp += round((gnome_pack_size - 1) * MC.GNOME_HP_PER_PACKMATE * early_hp);
       const scaled_damage = Math.max(1, round(edata.contact_damage * scale_mult * elite_dmg * p.difficulty_mult * power_tier));
       this.battle_units.push({
         ref: ++this.ref_counter, tile, hp: scaled_hp, max_hp: scaled_hp,
@@ -8676,7 +8682,7 @@ async function main() {
     const s = createSim({ level, difficulty: diff, weapon: { base: "club" }, armor: "armor_gambeson", talismans: [], upgrades: {}, enemies: [{ name: enemy }], world: "plains", seed: 1, consumables: [] }, 1);
     return JSON.stringify([s.battle_units[0].hp, s.battle_units[0].damage]);
   };
-  P(`scaling Hard L10 Goblin [hp,dmg]: ${scaleCase("hard", 10, "Goblin")} (expected [10,3])`);
+  P(`scaling Hard L10 Goblin [hp,dmg]: ${scaleCase("hard", 10, "Goblin")} (expected [12,3])`);
   P(`scaling Normal L10 Treant (miniboss, half rate) [hp,dmg]: ${scaleCase("normal", 10, "Treant")} (expected [214,7])`);
   P(`scaling Baby L20 Goblin [hp,dmg]: ${scaleCase("baby", 20, "Goblin")} (expected [4,1])`);
 

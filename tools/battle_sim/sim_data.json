@@ -559,7 +559,7 @@
 			"xp_reward": 715
 		}
 	],
-	"exported": "2026-11-07T21:07:47",
+	"exported": "2026-11-08T15:49:29",
 	"foods": [
 		{
 			"description": "Heals 5 HP and restores 15 stamina.",
@@ -777,6 +777,7 @@
 			-420.0
 		],
 		"DRUID_TOUCH_RADIUS": 150.0,
+		"EARLY_GAME_HP_BONUS": 2.0,
 		"ELITE_CHANCE": 0.15,
 		"ELITE_DAMAGE_MULT": 1.3,
 		"ELITE_HP_MULT": 1.6,
@@ -953,6 +954,7 @@
 			"Shade": {
 				"big_squad": true,
 				"dodge_chance": 0.4,
+				"frail": true,
 				"harm": "magical",
 				"inflicts_fear": true,
 				"is_undead": true,
@@ -3473,6 +3475,7 @@
 		"Shade": {
 			"big_squad": true,
 			"dodge_chance": 0.4,
+			"frail": true,
 			"harm": "magical",
 			"inflicts_fear": true,
 			"is_undead": true,

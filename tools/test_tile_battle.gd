@@ -133,7 +133,7 @@ func _init() -> void:
 			scaled_orc = u
 			break
 	var expected_scale: float = 1.0 + (11 - 1) * main.ENEMY_LEVEL_SCALING
-	var expected_hp: int = int(round(orc_script.MAX_HEALTH * expected_scale))
+	var expected_hp: int = int(round(orc_script.MAX_HEALTH * expected_scale * (1.0 + main.EARLY_GAME_HP_BONUS / 11.0)))
 	print("enemy stats scale with player level: orc hp at lvl 11=%d (expected %d, base %d)" % [
 		scaled_orc.max_hp, expected_hp, orc_script.MAX_HEALTH
 	])

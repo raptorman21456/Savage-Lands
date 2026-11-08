@@ -343,6 +343,8 @@ class Sim {
       if (is_boss_tier) rate *= MC.BOSS_LEVEL_SCALING_FACTOR;
       return 1.0 + (p.level - 1) * rate;
     };
+    // The Club's +2 Strength makes a fresh hero hit for 3: regular enemies carry x(1 + 2/level) HP, fading with the level (Main._early_hp_factor).
+    const early_hp_factor = (traits) => (traits.is_boss_tier || traits.frail) ? 1.0 : 1.0 + MC.EARLY_GAME_HP_BONUS / Math.max(1, p.level);
     const gnome_pack_size = squad.filter((s) => s.name === "Gnome").length;
 
     squad.forEach((e, i) => {
@@ -362,8 +364,9 @@ class Sim {
       const elite_dmg = e.elite ? MC.ELITE_DAMAGE_MULT : 1.0;
       const power_tier = e.power_tier ?? 1.0;
       const scale_mult = enemy_scale(!!traits.is_boss_tier);
-      let scaled_hp = Math.max(1, round(edata.max_health * scale_mult * elite_hp * p.difficulty_mult * power_tier));
-      if (e.name === "Gnome" && gnome_pack_size > 1) scaled_hp += (gnome_pack_size - 1) * MC.GNOME_HP_PER_PACKMATE;
+      const early_hp = early_hp_factor(traits);
+      let scaled_hp = Math.max(1, round(edata.max_health * scale_mult * elite_hp * p.difficulty_mult * power_tier * early_hp));
+      if (e.name === "Gnome" && gnome_pack_size > 1) scaled_hp += round((gnome_pack_size - 1) * MC.GNOME_HP_PER_PACKMATE * early_hp);
       const scaled_damage = Math.max(1, round(edata.contact_damage * scale_mult * elite_dmg * p.difficulty_mult * power_tier));
       this.battle_units.push({
         ref: ++this.ref_counter, tile, hp: scaled_hp, max_hp: scaled_hp,

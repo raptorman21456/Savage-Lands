@@ -128,8 +128,9 @@ func _init() -> void:
 	print("a sandbox battle starts for real: in_battle=%s units=%d (expected true, 3)" % [main.in_battle, main.battle_units.size()])
 	var scale: float = 1.0 + (player.level - 1) * main.ENEMY_LEVEL_SCALING
 	var orc_base: int = 20
-	print("enemy stats scale off the player's level, elite and power tier: Brute hp=%d (expected %d), Orc hp=%d (expected %d)" % [
-		main.battle_units[1].max_hp, int(round(35 * scale * 1.6)), main.battle_units[2].max_hp, int(round(orc_base * scale * 2.0))
+	var early: float = main._early_hp_factor(false, {})   # regular enemies also carry the fading early-game HP bonus
+	print("enemy stats scale off the player's level, elite, power tier and the early-game bonus: Brute hp=%d (expected %d), Orc hp=%d (expected %d)" % [
+		main.battle_units[1].max_hp, int(round(35 * scale * 1.6 * early)), main.battle_units[2].max_hp, int(round(orc_base * scale * 2.0 * early))
 	])
 	main._battle_flee()
 	await process_frame

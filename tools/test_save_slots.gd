@@ -125,7 +125,7 @@ func _init() -> void:
 		var orc = orc_script.new()
 		main.add_child(orc)
 		main._setup_battle_grid([orc])
-		var expected_hp: int = max(1, int(round(orc.MAX_HEALTH * entry.mult)))
+		var expected_hp: int = max(1, int(round(orc.MAX_HEALTH * entry.mult * main._early_hp_factor(false, {}))))   # a fresh hero: x3 early-game HP
 		var expected_dmg: int = max(1, int(round(orc.get_contact_damage() * entry.mult)))
 		print("%s: scaled orc hp=%d (expected %d), dmg=%d (expected %d)" % [
 			entry.name, main.battle_units[0].hp, expected_hp, main.battle_units[0].damage, expected_dmg

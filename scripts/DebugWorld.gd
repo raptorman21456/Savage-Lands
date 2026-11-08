@@ -294,6 +294,7 @@ static func enemy_entry(main, enemy_name: String) -> Dictionary:
 
 # What an enemy's HP and damage are multiplied by to be as strong as one meeting a hero of `enemy_level` (the game scales every
 # enemy by the HERO's level, at the difficulty's rate; this gives the extra factor over how the game will already scale it).
+# (Regular enemies' early-game HP bonus, Main._early_hp_factor, is not part of this: it keeps following the hero's real level.)
 static func level_power(main, enemy_level: int, boss_tier: bool) -> float:
 	if enemy_level <= 0:
 		return 1.0

@@ -151,7 +151,7 @@ func _init() -> void:
 		if u.name == "Fae":
 			spawned_fae = u
 	print("...and the new unit really is a Fae, with its own stats: found=%s hp=%d (expected true, %d)" % [
-		spawned_fae != null, spawned_fae.hp if spawned_fae != null else -1, spawned_fae.ref.MAX_HEALTH if spawned_fae != null else -1
+		spawned_fae != null, spawned_fae.hp if spawned_fae != null else -1, int(round(spawned_fae.ref.MAX_HEALTH * main._early_hp_factor(false, {}))) if spawned_fae != null else -1
 	])
 	print("...placed adjacent to the hut, not on top of it: %s (expected true)" % [
 		spawned_fae != null and (spawned_fae.tile - hut.tile).length() == 1.0
@@ -170,7 +170,8 @@ func _init() -> void:
 		main.enemies_alive += 1
 		gnome_squad.append(g)
 	main._setup_battle_grid(gnome_squad)
-	var expected_gnome_hp: int = gnome_script.MAX_HEALTH + (3 - 1) * main.GNOME_HP_PER_PACKMATE
+	var gnome_early: float = main._early_hp_factor(false, {})
+	var expected_gnome_hp: int = int(round(gnome_script.MAX_HEALTH * gnome_early)) + int(round((3 - 1) * main.GNOME_HP_PER_PACKMATE * gnome_early))
 	var all_hp_boosted := true
 	for u in main.battle_units:
 		if u.name == "Gnome" and u.max_hp != expected_gnome_hp:

@@ -144,7 +144,7 @@ async function main() {
     const s = createSim({ level, difficulty: diff, weapon: { base: "club" }, armor: "armor_gambeson", talismans: [], upgrades: {}, enemies: [{ name: enemy }], world: "plains", seed: 1, consumables: [] }, 1);
     return JSON.stringify([s.battle_units[0].hp, s.battle_units[0].damage]);
   };
-  P(`scaling Hard L10 Goblin [hp,dmg]: ${scaleCase("hard", 10, "Goblin")} (expected [10,3])`);
+  P(`scaling Hard L10 Goblin [hp,dmg]: ${scaleCase("hard", 10, "Goblin")} (expected [12,3])`);
   P(`scaling Normal L10 Treant (miniboss, half rate) [hp,dmg]: ${scaleCase("normal", 10, "Treant")} (expected [214,7])`);
   P(`scaling Baby L20 Goblin [hp,dmg]: ${scaleCase("baby", 20, "Goblin")} (expected [4,1])`);
 

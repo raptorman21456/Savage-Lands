@@ -820,19 +820,24 @@ func _section_battle() -> void:
 	await _frames(2)
 	await _clear_pending()
 	# enemy level: as strong as for a hero of that level, whatever yours is
+	# (the level scale follows the enemy level asked for; the early-game HP bonus still follows the hero's real level at the time)
+	var hero_lv_a: int = player.level
 	r = DB.start_battle(main, [{"name": "Orc", "count": 1}], 1, false, 1.0, 11)
 	var orc_l11: int = int(main.battle_units[0].max_hp)
 	await _wait_for_hero()
 	DB.win_now(main)
 	await _frames(2)
 	await _clear_pending()
+	var hero_lv_b: int = player.level
 	r = DB.start_battle(main, [{"name": "Orc", "count": 1}], 1, false, 1.0, 1)
 	var orc_l1: int = int(main.battle_units[0].max_hp)
 	await _wait_for_hero()
 	DB.win_now(main)
 	await _frames(2)
 	await _clear_pending()
-	print("enemy level 11 and 1 make an Orc (20 HP) %d and %d HP (expected 30 and 20, whatever your own level is: you are level %d)" % [orc_l11, orc_l1, player.level])
+	var want_l11: int = int(round(20.0 * 1.5 * (1.0 + main.EARLY_GAME_HP_BONUS / float(hero_lv_a))))
+	var want_l1: int = int(round(20.0 * 1.0 * (1.0 + main.EARLY_GAME_HP_BONUS / float(hero_lv_b))))
+	print("enemy level 11 and 1 make an Orc (20 HP) %d and %d HP (expected %d and %d: 30 and 20 at the level scale, times the early-game bonus for your own level %d then %d)" % [orc_l11, orc_l1, want_l11, want_l1, hero_lv_a, hero_lv_b])
 	# allies in the battle
 	DA.recruit(main, "knight", true)
 	DA.recruit(main, "druid", true)

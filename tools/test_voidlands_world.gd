@@ -110,7 +110,7 @@ func _init() -> void:
 	main.add_child(goblin)
 	main._setup_battle_grid([goblin])
 	print("A Goblin (no power_tier field) is unaffected -- defaults to 1.0 cleanly: hp=%d (expected %d)" % [
-		main.battle_units[0].hp, int(round(goblin_script.MAX_HEALTH))
+		main.battle_units[0].hp, int(round(goblin_script.MAX_HEALTH * main._early_hp_factor(false, {})))   # only the early-game bonus applies
 	])
 	goblin.set_physics_process(false)
 

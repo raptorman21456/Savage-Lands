@@ -49,12 +49,25 @@ func _init() -> void:
 
 	# --- through the real _setup_battle_grid (HP and damage) ---
 	var goblin_hard: Array = _stats_for(main, player, 10, "hard", "res://scripts/Enemy.gd")
-	print("Hard, level 10 Goblin (base 3 HP / 1 dmg, x1.90 level x1.75 difficulty): hp=%d dmg=%d (expected 10, 3)" % [goblin_hard[0], goblin_hard[1]])
+	print("Hard, level 10 Goblin (base 3 HP / 1 dmg, x1.90 level x1.75 difficulty x1.2 early-game): hp=%d dmg=%d (expected 12, 3)" % [goblin_hard[0], goblin_hard[1]])
 	var treant_normal: Array = _stats_for(main, player, 10, "normal", "res://scripts/Treant.gd")
 	print("Normal, level 10 Treant (miniboss, base 175 HP / 6 dmg, x1.225): hp=%d dmg=%d (expected 214, 7)" % [treant_normal[0], treant_normal[1]])
 	var goblin_baby: Array = _stats_for(main, player, 20, "baby", "res://scripts/Enemy.gd")
-	print("Baby, level 20 Goblin (x1.57 level x0.75 difficulty): hp=%d dmg=%d (expected 4, 1)" % [goblin_baby[0], goblin_baby[1]])
+	print("Baby, level 20 Goblin (x1.57 level x0.75 difficulty x1.1 early-game): hp=%d dmg=%d (expected 4, 1)" % [goblin_baby[0], goblin_baby[1]])
 	var oak_normal: Array = _stats_for(main, player, 10, "normal", "res://scripts/ElderOak.gd")
 	print("a full boss scales at the same gentle rate as a miniboss (Elder Oak, base 245 HP, x1.225): hp=%d (expected 300)" % [oak_normal[0]])
 
+	# --- the early-game HP bonus: the Club's +2 Strength is paid for by regular enemies, fading with level ---
+	player.difficulty_id = "normal"
+	var factors := []
+	for lvl in [1, 2, 10, 20]:
+		player.level = lvl
+		factors.append("%.2f" % main._early_hp_factor(false, {}))
+	print("regular enemies carry x(1 + 2/level) HP at levels 1, 2, 10, 20: %s (expected [3.00, 2.00, 1.20, 1.10])" % [factors])
+	player.level = 1
+	print("bosses and the frail Shade do not: boss x%.2f, Shade x%.2f (expected 1.00, 1.00)" % [main._early_hp_factor(true, {}), main._early_hp_factor(false, main.ENEMY_TRAITS["Shade"])])
+	var g1: Array = _stats_for(main, player, 1, "normal", "res://scripts/Enemy.gd")
+	print("a level-1 Goblin has 9 HP, so the Club (3 a hit) takes the old three swings: hp=%d (expected 9)" % [g1[0]])
+	var shade1: Array = _stats_for(main, player, 1, "normal", "res://scripts/Shade.gd")
+	print("a Shade stays a one-hit foe: hp=%d (expected 1)" % [shade1[0]])
 	quit()
