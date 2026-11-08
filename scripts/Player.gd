@@ -48,6 +48,8 @@ const BASE_SPRITE_SCALE := Vector2(2, 2)
 # anything in the overworld. This is the base value before the permanent
 # Endurance meta-upgrade; the actual ceiling for a given run is max_stamina.
 const MAX_STAMINA := 100
+# Stamina = 100 + 3 for every point of Might (the design doc).
+const STAMINA_PER_MIGHT := 3
 
 # Exhausted: self-inflicted the instant stamina hits 0 (spend_stamina below)
 # -- halves every regen_stamina gain until stamina recovers to
@@ -153,7 +155,7 @@ var learned_specials := {}
 var owned_talismans := {}
 var equipped_talismans: Array = []
 var _talisman_cache := {}
-# Pathfinder's Compass (talisman): a town/outskirts venue (keyed the same as
+# Compass (talisman): a town/outskirts venue (keyed the same as
 # town_building_positions in Main.gd) only shows on the Map tab once you've
 # actually reached it -- see Main.gd:_try_open_panel and
 # InventoryPanel.gd:_on_map_draw. Per-run, like everything else here (a fresh
@@ -517,7 +519,8 @@ func shield_holder(shield_id: String) -> RefCounted:
 
 # A shield with no price is a free fallback anyone may carry.
 func _shield_is_free(shield_id: String) -> bool:
-	return int(ShieldsScript.SHIELDS.get(shield_id, {}).get("price", 1)) == 0
+	var shield: Dictionary = ShieldsScript.SHIELDS.get(shield_id, {})
+	return int(shield.get("price", 1)) == 0 or bool(shield.get("free_for_party", false))
 
 func ally_armor_block_reason(member: RefCounted, armor_id: String) -> String:
 	if member == null or not member.can_carry_gear():
@@ -650,7 +653,7 @@ var berserk_kills := 0
 # ally or wanders. The player's own next attack breaks stealth immediately
 # for a guaranteed crit (Main.gd:_apply_single_hit's stealth_forced_crit).
 var stealth_turns_remaining := 0
-# Bloodmoon Fang (talisman): hit-driven Bloodlust stacks, owned here but
+# Bloodthirsty Idol (talisman): hit-driven Bloodlust stacks, owned here but
 # driven entirely by Main.gd (_apply_single_hit increments it on every landed hit,
 # _setup_battle_grid/the crash-debuff reset it to 0). bloodmoon_debuffed is
 # the -50%-all-combat-stats crash from 3 quiet turns -- read directly in
@@ -860,7 +863,7 @@ func apply_meta_purchase(id: String) -> void:
 		"stamina":
 			_base_max_stamina = MAX_STAMINA + int(bonuses.get("stamina", 0))
 			var old_max_stamina := max_stamina
-			max_stamina = _base_max_stamina + int(talisman_bonus("max_stamina")) + armor_max_stamina_bonus()
+			max_stamina = stamina_cap()
 			stamina = clampi(stamina + (max_stamina - old_max_stamina), 0, max_stamina)
 			stamina_changed.emit(stamina, max_stamina)
 		"potions":
@@ -959,7 +962,7 @@ func _apply_weapon_hit(body: Node) -> void:
 		if main.has_method("spawn_damage_number_world"):
 			main.spawn_damage_number_world(hit_pos, 99999)
 		return
-	var dmg: int = int(round(attack_damage * current_weapon.get("damage_mult", 1.0)))
+	var dmg: int = int(round(effective_strength() * current_weapon.get("damage_mult", 1.0)))
 	body.take_damage(dmg)
 	if main.has_method("spawn_damage_number_world"):
 		main.spawn_damage_number_world(hit_pos, dmg)
@@ -1090,7 +1093,7 @@ func weapon_damage_preview(weapon: Dictionary, upgrade_level: int = -1) -> int:
 func weapon_damage_exact(weapon: Dictionary, upgrade_level: int = -1) -> float:
 	var prepared: Dictionary = _apply_enchantment_to_weapon(weapon)
 	var level: int = get_weapon_upgrade_level(weapon.get("id", "")) if upgrade_level < 0 else upgrade_level
-	return attack_damage * prepared.get("damage_mult", 1.0) * BlacksmithScript.weapon_damage_factor(level)
+	return (attack_damage + float(weapon.get("str_bonus", 0.0))) * prepared.get("damage_mult", 1.0) * BlacksmithScript.weapon_damage_factor(level)
 
 func _apply_upgrade_to_weapon(weapon: Dictionary) -> Dictionary:
 	var level: int = weapon_upgrade_levels.get(weapon.get("id", ""), 0)
@@ -1286,9 +1289,14 @@ func _rebuild_talisman_cache() -> void:
 		var effects: Dictionary = TalismansScript.get_talisman(id).get("effects", {})
 		for key in effects:
 			_talisman_cache[key] = _talisman_cache.get(key, 0.0) + float(effects[key])
+	# Clothes that carry an effect (Cliffwalker's Boots, Yodler's Cap) add it in the same vocabulary.
+	for slot in ClothingScript.SLOTS:
+		var worn_effects: Dictionary = ClothingScript.get_piece(str(equipped_clothing.get(slot, ""))).get("effects", {})
+		for key in worn_effects:
+			_talisman_cache[key] = _talisman_cache.get(key, 0.0) + float(worn_effects[key])
 
 func get_talisman_price(talisman: Dictionary) -> int:
-	return maxi(1, int(round(talisman.price * (1.0 - _shop_discount()))))
+	return maxi(1, int(round(_less_charisma(talisman.price) * (1.0 - _shop_discount()))))
 
 # Buying puts the talisman in your collection and wears it if a slot is free.
 # One of each only.
@@ -1299,13 +1307,16 @@ func try_buy_talisman(talisman_id: String) -> bool:
 	if not try_spend_coins(get_talisman_price(talisman)):
 		return false
 	owned_talismans[talisman_id] = true
-	if equipped_talismans.size() < talisman_slots():
+	# An allies-only talisman (the BFF Bracelet) goes into the collection and waits for a member to wear it.
+	if equipped_talismans.size() < talisman_slots() and not talisman.get("allies_only", false):
 		equipped_talismans.append(talisman_id)
 		_on_talismans_changed()
 	return true
 
 func equip_talisman(talisman_id: String) -> bool:
 	if not owned_talismans.has(talisman_id) or equipped_talismans.has(talisman_id):
+		return false
+	if TalismansScript.get_talisman(talisman_id).get("allies_only", false):
 		return false
 	if equipped_talismans.size() >= talisman_slots():
 		return false
@@ -1327,12 +1338,24 @@ func unequip_talisman(talisman_id: String) -> bool:
 func _on_talismans_changed() -> void:
 	_rebuild_talisman_cache()
 	_recalc_stats()
-	var old_max_stamina := max_stamina
-	max_stamina = _base_max_stamina + int(talisman_bonus("max_stamina")) + armor_max_stamina_bonus()
-	stamina = clampi(stamina + (max_stamina - old_max_stamina), 0, max_stamina)
-	stamina_changed.emit(stamina, max_stamina)
+	_refresh_max_stamina()
 	if not current_weapon_base.is_empty():
 		_equip_weapon(current_weapon_base)
+
+# Your Strength plus the flat Strength the weapon in hand carries (the doc's "+4 STR per quality tier"): what a swing is built on.
+func effective_strength() -> float:
+	return float(attack_damage) + float(current_weapon.get("str_bonus", 0.0))
+
+# The whole stamina pool: 100 and the Church's bonus, +3 per Might, then talismans and armour.
+func stamina_cap() -> int:
+	return _base_max_stamina + STAMINA_PER_MIGHT * stat_might + int(talisman_bonus("max_stamina")) + armor_max_stamina_bonus()
+
+# Re-works the pool after anything it depends on changed; what you have keeps its place (a bigger pool is a bigger tank).
+func _refresh_max_stamina() -> void:
+	var old_max_stamina := max_stamina
+	max_stamina = stamina_cap()
+	stamina = clampi(stamina + (max_stamina - old_max_stamina), 0, max_stamina)
+	stamina_changed.emit(stamina, max_stamina)
 
 # Skill-tree value + talisman value for every stat both can touch -- combat
 # and shop code reads these rather than the meta_* field directly, so a
@@ -1355,7 +1378,7 @@ func crit_chance_total() -> float:
 func stamina_regen_per_turn() -> int:
 	return int(meta_stamina_regen_per_turn) + int(talisman_bonus("stamina_regen"))
 
-# Moss Charm (talisman): a flat amount every turn, plus (its own scaling half)
+# Mossy Rock (talisman): a flat amount every turn, plus (its own scaling half)
 # +1 more for every 20 max HP currently owned -- the tankier the build, the
 # bigger the tick.
 func secondary_chance_mult() -> float:
@@ -1376,7 +1399,7 @@ func low_hp_damage_bonus_total() -> float:
 	return meta_low_hp_damage_bonus_pct + talisman_bonus("low_hp_damage_pct")
 
 # The fraction of max HP the low-HP damage bonus above needs you at or under to
-# apply -- 30% by default (the skill-tree node's own gate); Berserker's Knot
+# apply -- 30% by default (the skill-tree node's own gate); Berserk Brace
 # tightens it to a riskier 20% in exchange for a much bigger bonus.
 func low_hp_threshold() -> float:
 	var t: float = talisman_bonus("low_hp_threshold")
@@ -1388,8 +1411,10 @@ func fall_damage_factor() -> float:
 
 # 2.0 (double damage) by default; Duelist's Coin raises it further in exchange
 # for a flat damage_pct penalty on everything else.
+# A critical hit deals 250% (the design doc), and leaves the target vulnerable.
+const CRIT_BASE_MULT := 2.5
 func crit_damage_mult() -> float:
-	return 2.0 + talisman_bonus("crit_damage_mult_bonus")
+	return CRIT_BASE_MULT + talisman_bonus("crit_damage_mult_bonus")
 
 func has_unlimited_arrows() -> bool:
 	return talisman_bonus("arrow_unlimited") > 0.0
@@ -1448,6 +1473,20 @@ func war_profiteer_discount() -> float:
 func aegis_discount() -> float:
 	return float(int(stamina) / STAMINA_BAR) * meta_aegis_discount_per_bar
 
+# Charisma: the party's average (people only -- a Wolf has none), taken off a price in coins before the Intimidation discount.
+func _charisma_cut() -> float:
+	var total := 0.0
+	var count := 0
+	for m in party:
+		if m.levels():
+			total += m.charisma()
+			count += 1
+	return total / float(count) if count > 0 else 0.0
+
+# A base price less the party's charisma (never below 1 coin, and a free item stays free).
+func _less_charisma(price: float) -> float:
+	return price if price <= 0.0 else maxf(1.0, price - _charisma_cut())
+
 func _shop_discount() -> float:
 	return min(0.75, stat_intimidation * 0.01 + talisman_bonus("shop_discount") + war_profiteer_discount() + aegis_discount())
 
@@ -1456,7 +1495,7 @@ func get_weapon_price(weapon: Dictionary) -> int:
 	var markup := 1.0
 	if str(WeaponsScript.get_base_type(weapon).get("id", "")) != "bow":
 		markup = _party_price_mult("weapon_price_mult")
-	return int(round(weapon.price * (1.0 - _shop_discount()) * markup))
+	return int(round(_less_charisma(weapon.price) * (1.0 - _shop_discount()) * markup))
 
 # The product of a price multiplier (PartyRules key) across the party -- a Marksman: arrows x0.4, weapons x1.25.
 func _party_price_mult(key: String) -> float:
@@ -1557,7 +1596,7 @@ func try_buy_weapon_for_party(weapon: Dictionary) -> bool:
 	return true
 
 func get_armor_price(armor: Dictionary) -> int:
-	return int(round(armor.price * (1.0 - _shop_discount())))
+	return int(round(_less_charisma(armor.price) * (1.0 - _shop_discount())))
 
 func try_buy_armor(armor: Dictionary) -> bool:
 	var id: String = armor.id
@@ -1585,10 +1624,10 @@ func try_buy_armor(armor: Dictionary) -> bool:
 # "damage_reduction" directly goes through here now (Main.gd's incoming-damage
 # sum, the Inventory's armour card) so clothes count everywhere at once.
 func armor_damage_reduction() -> float:
-	var total: float = armor_tier_damage_reduction() + clothing_damage_reduction() + talisman_bonus("damage_reduction") + coin_scaled_defense_bonus()
-	# Ironclad Ward (talisman): your whole defense multiplied by 2.5x, the
+	var total: float = armor_tier_damage_reduction() + clothing_damage_reduction() + talisman_bonus("damage_reduction")
+	# Steelclad Band (talisman): your whole defense multiplied by 2.5x, the
 	# trade for never being able to Move (Main.gd:_on_battle_main_action).
-	# Bloodmoon Fang's crash-debuff instead halves it, on top of that.
+	# Bloodthirsty Idol's crash-debuff instead halves it, on top of that.
 	if talisman_bonus("ironclad_ward") > 0.0:
 		total *= 2.5
 	if bloodmoon_debuffed:
@@ -1600,11 +1639,12 @@ func armor_damage_reduction() -> float:
 # stat bonuses -- coins change far more often mid-run than gear or level does.
 # The overall 90% damage-reduction cap (Main.gd:_apply_incoming_reductions)
 # already keeps the defense side from ever reaching true immunity.
-func coin_scaled_attack_bonus() -> float:
-	return talisman_bonus("attack_per_coin") * coins
+func coin_damage_mult() -> float:
+	return 1.0 + talisman_bonus("damage_pct_per_coin") * coins
 
-func coin_scaled_defense_bonus() -> float:
-	return talisman_bonus("defense_per_coin") * coins
+# The share of every incoming blow the coins you hold turn aside (Main.gd:_apply_incoming_reductions caps it at half).
+func coin_reduction() -> float:
+	return talisman_bonus("reduction_per_coin") * coins
 
 # The worn armour alone: its tier's own reduction plus any Blacksmith levels
 # (metal armour only). Keyed by the armour's id, not the exact dict --
@@ -1706,11 +1746,11 @@ func clothing_damage_reduction() -> float:
 	return total
 
 func get_clothing_price(piece: Dictionary) -> int:
-	return int(round(piece.price * (1.0 - _shop_discount())))
+	return int(round(_less_charisma(piece.price) * (1.0 - _shop_discount())))
 
 # Town-vendor food gets the same Intimidation discount as every shop price.
 func get_food_price(food: Dictionary) -> int:
-	return maxi(1, int(round(food.price * (1.0 - _shop_discount()))))
+	return maxi(1, int(round(_less_charisma(food.price) * (1.0 - _shop_discount()))))
 
 # Buying auto-wears the piece when it beats what's in its slot (an empty slot
 # is always beaten), so a cheap, weaker piece bought later is only owned and
@@ -1732,6 +1772,7 @@ func try_buy_clothing(piece_id: String) -> bool:
 	var worn: Dictionary = ClothingScript.get_piece(equipped_clothing.get(piece.slot, ""))
 	if worn.is_empty() or piece.damage_reduction > worn.damage_reduction:
 		equipped_clothing[piece.slot] = piece_id
+		_rebuild_talisman_cache()
 	return true
 
 # Wears an already-owned piece in its slot (explicit choice, so it may well be
@@ -1741,10 +1782,11 @@ func equip_clothing(piece_id: String) -> bool:
 	if piece.is_empty() or not owned_clothing.has(piece_id):
 		return false
 	equipped_clothing[piece.slot] = piece_id
+	_rebuild_talisman_cache()
 	return true
 
 func get_shield_price(shield: Dictionary) -> int:
-	return int(round(shield.price * (1.0 - _shop_discount())))
+	return int(round(_less_charisma(shield.price) * (1.0 - _shop_discount())))
 
 func try_buy_shield(shield: Dictionary) -> bool:
 	var id: String = shield.id
@@ -1838,7 +1880,7 @@ func shield_special_pct() -> float:
 	return equipped_shield.get("special_pct", 0.0)
 
 func get_potion_price(potion: Dictionary) -> int:
-	return int(round(potion.price * (1.0 - _shop_discount()) * (1.0 - meta_field_surgeon_discount_pct)))
+	return int(round(_less_charisma(potion.price) * (1.0 - _shop_discount()) * (1.0 - meta_field_surgeon_discount_pct)))
 
 func try_buy_potion(potion: Dictionary) -> bool:
 	var price := get_potion_price(potion)
@@ -1858,7 +1900,7 @@ func get_arrow_price(kind: String) -> int:
 	var scaled: float = base_price * pow(WeaponsScript.ARROW_PRICE_GROWTH, held)
 	scaled *= 1.0 + talisman_bonus("arrow_price_pct")
 	scaled *= _party_price_mult("arrow_price_mult")
-	return int(round(scaled * (1.0 - _shop_discount()) * (1.0 - meta_arrow_discount_pct)))
+	return int(round(_less_charisma(scaled) * (1.0 - _shop_discount()) * (1.0 - meta_arrow_discount_pct)))
 
 func try_buy_arrow(kind: String) -> bool:
 	if not owned_arrows.has(kind):
@@ -1976,7 +2018,10 @@ func try_spend_runic_shards(amount: int) -> bool:
 	runic_shards_changed.emit(runic_shards)
 	return true
 
-func heal(amount: int) -> void:
+# from_hit: healing that comes out of a blow you land (lifesteal, a weapon that drinks) -- the one kind Bat Fang leaves alone.
+func heal(amount: int, from_hit: bool = false) -> void:
+	if not from_hit and talisman_bonus("disable_healing_items") > 0.0:
+		return
 	health = clampi(health + amount, 0, max_health)
 	health_changed.emit(health, max_health)
 
@@ -2034,7 +2079,7 @@ func add_healing_item(count: int = 1) -> void:
 # "effect" ("" / "cleanse" / "guaranteed_crit") is Main.gd's cue for what
 # else to do -- see _battle_player_item.
 func use_healing_item() -> Dictionary:
-	# Vampire's Pact (talisman): potions/food no longer do anything -- checked
+	# Bat Fang (talisman): potions/food no longer do anything -- checked
 	# before touching the queue at all, so nothing is wasted.
 	if potion_queue.is_empty() or talisman_bonus("disable_healing_items") > 0.0:
 		return {}
@@ -2063,7 +2108,7 @@ static func get_consumable(id: String) -> Dictionary:
 
 func _consume_potion(potion_id: String) -> Dictionary:
 	var tier: Dictionary = get_consumable(potion_id)
-	var heal_amount: int = tier.get("heal_amount", ITEM_HEAL_AMOUNT)
+	var heal_amount: int = tier.get("heal_amount", ITEM_HEAL_AMOUNT) + int(round(float(max_health) * float(tier.get("heal_max_hp_pct", 0.0))))
 	var heal_bonus_pct: float = meta_healing_bonus_pct + talisman_bonus("heal_pct")
 	if heal_bonus_pct > 0.0:
 		heal_amount = int(round(heal_amount * (1.0 + heal_bonus_pct)))
@@ -2105,21 +2150,30 @@ func take_damage(amount: int) -> void:
 	else:
 		health_changed.emit(health, max_health)
 
-# Phoenix Ash: once per run, a killing blow (overworld or battle) leaves you
-# on 1 HP instead. True if it fired.
+# Phoenix Ash: a killing blow (overworld or battle) leaves you on full HP and stamina instead -- and the
+# ash is spent: it leaves your collection and your slot, and the Seer sells it again. True if it fired.
 func _try_phoenix() -> bool:
-	if phoenix_used or talisman_bonus("phoenix") <= 0.0:
+	if talisman_bonus("phoenix") <= 0.0:
 		return false
 	phoenix_used = true
-	health = 1
+	for id in equipped_talismans.duplicate():
+		if TalismansScript.get_talisman(str(id)).get("effects", {}).has("phoenix"):
+			equipped_talismans.erase(id)
+			owned_talismans.erase(id)
+	_on_talismans_changed()
+	health = max_health
+	stamina = max_stamina
 	health_changed.emit(health, max_health)
 	return true
 
 # Turn-based battle damage (enemy hits, cliff falls) is not subject to the
 # overworld's real-time invincibility frames -- each turn is a discrete
 # decision, not a rapid repeated collision, so i-frames don't apply here.
-func take_battle_damage(amount: int) -> void:
+func take_battle_damage(amount: int, indirect: bool = false) -> void:
 	if debug_god_mode:
+		return
+	# Honour (talisman): only a direct attack hurts you -- statuses, blasts, falls and your own stumbles are spared.
+	if indirect and talisman_bonus("direct_only") > 0.0:
 		return
 	health -= amount
 	if health <= 0:
@@ -2127,7 +2181,7 @@ func take_battle_damage(amount: int) -> void:
 		# hit would drop you to 0 HP each battle, to survive with 1 HP
 		# instead -- consumed here, reset by Main.gd:_setup_battle_grid at
 		# the start of every fight.
-		# Iron Will Band (talisman) adds to the same once-per-battle chance.
+		# Iron Will Ring (talisman) adds to the same once-per-battle chance.
 		var survive_chance: float = meta_favour_chance + talisman_bonus("survive_lethal")
 		if survive_chance > 0.0 and randf() < survive_chance and not second_chance_used_this_battle:
 			second_chance_used_this_battle = true
@@ -2165,6 +2219,7 @@ func _level_up() -> void:
 	stat_vigor += 1
 	stat_agility += 1
 	stat_might += 1
+	_refresh_max_stamina()
 	# Resilience/Reflexes/Dexterity only join the auto-+1 once their
 	# skill-tree unlock node is owned -- before that they stay at 0 and
 	# never appear on the level-up choice screen (see HUD.gd:
@@ -2222,6 +2277,7 @@ func apply_bonus_stat(stat_name: String) -> void:
 				stat_rage += 1
 	awaiting_bonus = false
 	_recalc_stats()
+	_refresh_max_stamina()
 
 # Hardened: grows the run's permanent max HP (and heals by the same amount, since
 # _recalc_stats carries the difference over to current health).
@@ -2235,7 +2291,7 @@ func _recalc_stats() -> void:
 	# Talismans (max HP, move speed) are folded in here, not applied once and
 	# forgotten, so every level-up's recalculation keeps them.
 	max_health += int(talisman_bonus("max_hp")) + hardened_hp_bonus
-	# Glass Cannon Charm (talisman): a multiplicative +/-% on top of the flat
+	# Glass Cannon (talisman): a multiplicative +/-% on top of the flat
 	# bonus above.
 	var max_hp_pct: float = talisman_bonus("max_hp_pct")
 	if max_hp_pct != 0.0:
@@ -2248,7 +2304,7 @@ func _recalc_stats() -> void:
 		max_health = 1
 		health = min(health, 1)
 	attack_damage = int(round(stat_strength * (1.0 + WORLDWALKER_DAMAGE_BONUS_PCT))) if meta_worldwalker else stat_strength
-	# Bloodmoon Fang (talisman): battle-transient Bloodlust stacks add to move
+	# Bloodthirsty Idol (talisman): battle-transient Bloodlust stacks add to move
 	# speed the same way a talisman's own move_speed_pct would (Main.gd drives
 	# bloodmoon_stacks directly -- see _apply_single_hit/_on_enemy_died).
 	move_speed = stat_agility * (1.0 + talisman_bonus("move_speed_pct") + bloodmoon_stacks * BLOODMOON_SPEED_PCT_PER_STACK)

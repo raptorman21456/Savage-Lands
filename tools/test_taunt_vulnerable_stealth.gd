@@ -27,6 +27,17 @@ func _make_unit(main, name: String, tile: Vector2i, hp: int = 999999, move_range
 	}
 
 func _init() -> void:
+	# Magic from a Staff or Wand used to be a flat +5 / +6; the doc's per-quality-tier version (test_weapon_stat_bonuses.gd) gives a Fine one
+	# (the second rung) the same figures at 2.5 / 3.0 a tier, so these checks keep the numbers they were written against.
+	var _magic_weapons = load("res://scripts/Weapons.gd")
+	_magic_weapons.STAFF["magic_per_tier"] = 2.5
+	_magic_weapons.WAND["magic_per_tier"] = 3.0
+	# These checks predate the doc's flat weapon Strength (Club +2, Spear +4 per quality tier...), which has its own test
+	# (test_weapon_stat_bonuses.gd): here weapons add nothing, so every damage figure below stays as it was.
+	var _stat_weapons = load("res://scripts/Weapons.gd")
+	_stat_weapons.CLUB["str_bonus"] = 0
+	for _stat_base in _stat_weapons.UPGRADABLE_TYPES:
+		_stat_base["str_per_tier"] = 0
 	# Fixed seed: every random roll below repeats run to run, so a changed result
 	# is a real change, not luck.
 	seed(20260926)
@@ -124,14 +135,14 @@ func _init() -> void:
 	main.battle_units = [g_vuln_applied]
 	main._apply_single_hit(0, 1.0, "", weapons_script.CLUB)
 	var dmg_vulnerable: int = 999999 - g_vuln_applied.hp
-	print("Vulnerable adds +25%% damage taken from the player: normal=%d vulnerable=%d (expected vulnerable == round(normal*1.25)=%d)" % [dmg_normal, dmg_vulnerable, int(round(dmg_normal * 1.25))])
+	print("Vulnerable adds +20%% damage taken from the player: normal=%d vulnerable=%d (expected vulnerable == round(normal*1.2)=%d)" % [dmg_normal, dmg_vulnerable, int(round(dmg_normal * 1.2))])
 
 	var g_vuln_ally := _make_unit(main, "Goblin", Vector2i(9, 9))
 	g_vuln_ally.vulnerable_turns = 1
 	main.battle_units = [g_vuln_ally]
 	main._apply_single_hit(0, 1.0, "", weapons_script.CLUB, "Wolf")
 	var dmg_vulnerable_ally: int = 999999 - g_vuln_ally.hp
-	print("...and the same multiplier applies to an ALLY's hit through the same function: dmg=%d (expected == round(normal*1.25)=%d)" % [dmg_vulnerable_ally, int(round(dmg_normal * 1.25))])
+	print("...and the same multiplier applies to an ALLY's hit through the same function: dmg=%d (expected == round(normal*1.2)=%d)" % [dmg_vulnerable_ally, int(round(dmg_normal * 1.2))])
 
 	var g_vuln_tick := _make_unit(main, "Goblin", Vector2i(10, 10))
 	g_vuln_tick.vulnerable_turns = 2
@@ -236,7 +247,7 @@ func _init() -> void:
 	main.battle_units = [g_sneak]
 	main._apply_single_hit(0, 1.0, "", weapons_script.DAGGER)
 	var sneak_dmg: int = 999999 - g_sneak.hp
-	var expected_sneak_dmg: int = base_dagger_dmg * 2 + main.KNIFE_STEALTH_CRIT_BONUS
+	var expected_sneak_dmg: int = int(round(base_dagger_dmg * 2.5)) + main.KNIFE_STEALTH_CRIT_BONUS
 	print("A crit landed on a default-unaware enemy with a Dagger equipped adds the flat sneak bonus (no Stealth needed): dmg=%d (expected %d, base*2 + %d)" % [sneak_dmg, expected_sneak_dmg, main.KNIFE_STEALTH_CRIT_BONUS])
 
 	var g_sneak_club := _make_unit(main, "Goblin", Vector2i(0, 0))
@@ -245,7 +256,7 @@ func _init() -> void:
 	main._apply_single_hit(0, 1.0, "", weapons_script.CLUB)
 	var club_sneak_dmg: int = 999999 - g_sneak_club.hp
 	var base_club_dmg: int = int(round(40.0 * weapons_script.CLUB.get("damage_mult", 1.0)))
-	print("...but the bonus is Dagger-specific -- the same crit with a Club gets no +%d: dmg=%d (expected == base*2 = %d, no bonus)" % [main.KNIFE_STEALTH_CRIT_BONUS, club_sneak_dmg, base_club_dmg * 2])
+	print("...but the bonus is Dagger-specific -- the same crit with a Club gets no +%d: dmg=%d (expected == base*2.5 = %d, no bonus)" % [main.KNIFE_STEALTH_CRIT_BONUS, club_sneak_dmg, int(round(base_club_dmg * 2.5))])
 	player.current_weapon = weapons_script.DAGGER
 
 	var g_sneak_aware := _make_unit(main, "Goblin", Vector2i(0, 0))
@@ -253,7 +264,7 @@ func _init() -> void:
 	main.battle_units = [g_sneak_aware]
 	main._apply_single_hit(0, 1.0, "", weapons_script.DAGGER)
 	var aware_sneak_dmg: int = 999999 - g_sneak_aware.hp
-	print("...and requires the target to actually be unaware -- a crit on an already-aware enemy gets no bonus: dmg=%d (expected == base*2 = %d)" % [aware_sneak_dmg, base_dagger_dmg * 2])
+	print("...and requires the target to actually be unaware -- a crit on an already-aware enemy gets no bonus: dmg=%d (expected == base*2.5 = %d)" % [aware_sneak_dmg, int(round(base_dagger_dmg * 2.5))])
 	player.meta_crit_chance = 0.0
 
 	# Stealth's OWN guaranteed-crit mechanism: consumed by the FIRST hit

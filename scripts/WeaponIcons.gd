@@ -48,7 +48,7 @@ static func tier_label(weapon: Dictionary) -> String:
 # The weapon's name without its tier, since the card shows the tier as a coloured
 # tag: "Wooden Spear", "Battle Axe", "Club". A Mythic keeps its own artifact name.
 static func display_name(weapon: Dictionary) -> String:
-	if weapon.get("tier_name", "") == "Mythic" or weapon.get("id", "") == "club":
+	if weapon.get("tier_name", "") == "Mythic" or weapon.get("id", "") == "club" or bool(weapon.get("unique", false)):
 		return weapon.get("name", "")
 	var base: Dictionary = WeaponsScript.get_base_type(weapon)
 	var base_name: String = base.get("name", weapon.get("name", ""))

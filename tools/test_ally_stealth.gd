@@ -200,7 +200,7 @@ func _init() -> void:
 	var sneaky: Dictionary = _unit(main, members.knight, Vector2i(2, 2))
 	sneaky.stealth_turns = 3
 	var d_sneak: int = await _swing(main, sneaky)
-	print("A hiding member's attack is a guaranteed crit (double) and ends the stealth: %d vs %d (expected double), stealth_turns=%d (expected 0)" % [d_sneak, d_plain, sneaky.stealth_turns])
+	print("A hiding member's attack is a guaranteed crit (x2.5) and ends the stealth: %d vs %d (expected 2.5x), stealth_turns=%d (expected 0)" % [d_sneak, d_plain, sneaky.stealth_turns])
 	print("...and the enemy it hit has spotted him: %s (expected true)" % [main._enemy_sees_ally(_last_goblin, sneaky)])
 	var rogue: Dictionary = _unit(main, members.rogue, Vector2i(2, 2))
 	var d_rogue_plain: int = await _swing(main, rogue)

@@ -182,7 +182,7 @@ func _init() -> void:
 	player.unequip_ally_armor(knight)
 	player.equip_ally_armor(marksman, "armor_gambeson")
 	var sharp: Dictionary = main._make_member_battle_unit(marksman, Vector2i(1, 1), 1.0)
-	print("A Marksman's Defense stays 0 whatever it wears, but the Fortitude still counts: defense %.0f fortitude %.0f (expected 0, 5)" % [sharp.defense_pct, sharp.fortitude])
+	print("A Marksman's armour protects 60%% less (40%% of its 15 Defense), and the Fortitude still counts in full: defense %.0f fortitude %.0f (expected 6, 5)" % [sharp.defense_pct, sharp.fortitude])
 	player.unequip_ally_armor(marksman)
 	var plain_move: int = main._make_member_battle_unit(brawler, Vector2i(1, 1), 1.0).move_range
 	player.owned_armor["armor_windrunner"] = true
@@ -322,7 +322,7 @@ func _init() -> void:
 	print("A dodged blow does nothing (%d, expected 0) and sets up a crit: %s (expected true)" % [slipped, slip.shadow_crit])
 	var crit: int = _hit_for(main, slip, foe)
 	var after: int = _hit_for(main, slip, foe)
-	print("...the next swing crits once: %d then %d (expected 200 then 100)" % [crit, after])
+	print("...the next swing crits once: %d then %d (expected 250 then 100)" % [crit, after])
 	player.unequip_ally_armor(brawler)
 
 	# Bastion: bracing steadies the stamina

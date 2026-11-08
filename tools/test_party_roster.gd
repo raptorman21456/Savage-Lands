@@ -51,6 +51,9 @@ func _init() -> void:
 	print("two ordinary members, no Wolf Fang: a wolf has no room: %s (expected false)" % [player.can_recruit("wolf")])
 	player.owned_talismans["wolf_fang"] = true
 	print("Wolf Fang is worn: %s (expected true)" % [player.equip_talisman("wolf_fang")])
+	# The doc's Wolf Fang no longer carries the extra slot or the loyalty bonus; the mechanism is still in the game (an Astral node or a later item may use it), so it is exercised with the effect set by hand.
+	player._talisman_cache["wolf_slot"] = 1.0
+	player._talisman_cache["wolf_stay_bonus"] = 5.0
 	print("...it adds a slot, capacity 3: %d (expected 3)" % [player.party_capacity()])
 	print("...that a wolf can take: %s (expected true)" % [player.can_recruit("wolf")])
 	print("...but no other kind can, since the ordinary slots are full: rogue=%s druid=%s (expected false, false)" % [player.can_recruit("rogue"), player.can_recruit("druid")])
@@ -86,6 +89,7 @@ func _init() -> void:
 	print("everyone fits, so everyone takes the field: %d (expected 2)" % [player.fielded_party().size()])
 	player.owned_talismans["wolf_fang"] = true
 	player.equip_talisman("wolf_fang")
+	player._talisman_cache["wolf_slot"] = 1.0
 	player.recruit("wolf")
 	print("the wolf in the extra slot fields too: %d (expected 3)" % [player.fielded_party().size()])
 	player.unequip_talisman("wolf_fang")
@@ -109,7 +113,7 @@ func _init() -> void:
 		by_kind[a.kind] = a
 	print("each roster member is seated as a unit: %s (expected guardian, marksman, wolf)" % [main.battle_allies.map(func(a): return a.kind)])
 	print("HP is the member's own, not a share of the hero's 100: guardian=%d marksman=%d wolf=%d (expected 25, 10, 18)" % [by_kind.guardian.max_hp, by_kind.marksman.max_hp, by_kind.wolf.max_hp])
-	print("defense and movement come from the member: guardian=%.1f%%/%d tiles marksman=%.1f%%/%d tiles wolf=%.1f%%/%d tiles (expected 5.0/1, 0.0/1, 0.0/3)" % [
+	print("defense and movement come from the member: guardian=%.1f%%/%d tiles marksman=%.1f%%/%d tiles wolf=%.1f%%/%d tiles (expected 5.0/1, 0.0/2, 0.0/2: the Marksman and the Wolf round their steps up)" % [
 		by_kind.guardian.defense_pct, by_kind.guardian.move_range, by_kind.marksman.defense_pct, by_kind.marksman.move_range, by_kind.wolf.defense_pct, by_kind.wolf.move_range
 	])
 	print("pools: wolf stamina=%d (expected 150), guardian=%d (expected 100), no mana anywhere: %d/%d/%d (expected 0/0/0)" % [

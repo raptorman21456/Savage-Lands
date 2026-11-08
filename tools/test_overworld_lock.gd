@@ -6,6 +6,9 @@ func _press_key(keycode: int, pressed: bool) -> void:
 	event.pressed = pressed
 	Input.parse_input_event(event)
 
+# A sturdy stand-in for the Goblin: the Club now adds 2 Strength, so a swing from a fresh hero (3 damage) would kill a 3 HP enemy outright.
+const TANK := 100
+
 func _init() -> void:
 	# Fixed seed: every random roll below repeats run to run, so a changed result
 	# is a real change, not luck.
@@ -24,7 +27,7 @@ func _init() -> void:
 
 	var enemy = enemies[0]
 	player.facing = Vector2(0, 1)
-	enemy.health = enemy.MAX_HEALTH
+	enemy.health = TANK
 	enemy.global_position = player.global_position + Vector2(0, 30)
 
 	print("locked by default: %s (expected true)" % player.overworld_attack_locked)
@@ -34,7 +37,7 @@ func _init() -> void:
 	await physics_frame
 	await physics_frame
 	print("WASD attack blocked while locked: attack_timer=%.2f enemy_health=%d (expected 0.00, %d unchanged)" % [
-		player.attack_timer, enemy.health, enemy.MAX_HEALTH
+		player.attack_timer, enemy.health, TANK
 	])
 	_press_key(KEY_S, false)
 	await physics_frame
@@ -45,7 +48,7 @@ func _init() -> void:
 	await physics_frame
 	for i in 10:
 		await physics_frame
-	print("WASD attack works once unlocked: enemy_health=%d (expected < %d)" % [enemy.health, enemy.MAX_HEALTH])
+	print("WASD attack works once unlocked: enemy_health=%d (expected < %d)" % [enemy.health, TANK])
 	_press_key(KEY_S, false)
 	await physics_frame
 

@@ -582,6 +582,13 @@ func _member_stats(member) -> void:
 		extras.append(["Pool", "%d mana" % int(u.max_mana), ""])
 	elif int(u.max_stamina) > 0:
 		extras.append(["Pool", "%d stamina" % int(u.max_stamina), ""])
+	# The five stats beyond the six above (the doc's DXT, MGT, ITL, CHA, RFL), and what each one is doing for it.
+	if member.levels():
+		extras.append(["DXT", "%.0f" % member.dexterity(), "crit chance +%.1f%%" % (member.crit_from_dexterity() * 100.0)])
+		extras.append(["MGT", "%.0f" % member.might(), "+%d stamina" % int(round(member.might() * PartyRulesScript.STAMINA_PER_MIGHT))])
+		extras.append(["ITL", "%.0f" % member.intelligence(), "mana 20 + 5 a point"])
+		extras.append(["CHA", "%.0f" % member.charisma(), "shop prices, by the party's average"])
+		extras.append(["RFL", "%.0f" % member.reflexes(), "dodge +%.1f%%" % (member.dodge_from_reflexes() * 100.0)])
 	if float(u.get("dodge_chance", 0.0)) > 0.0:
 		extras.append(["Dodge", "%d%%" % int(round(float(u.dodge_chance) * 100.0)), ""])
 	if float(u.get("shield_block", 0.0)) > 0.0:

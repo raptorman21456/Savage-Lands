@@ -30,13 +30,14 @@ func _init() -> void:
 	# The battle move-range threshold now needs far less investment for the
 	# same payoff: reaching +1 extra tile used to take 40 agility (8 picks
 	# at the old +1/pick rate); it now takes AGILITY_PER_EXTRA_MOVE (20)
-	# agility, or just 4 picks at +5 each.
+	# agility, or just 4 picks at +5 each. (Since the doc's rule -- 1 tile + 0.05 per speed point -- it takes a speed rating of 20,
+	# which is 15 picks above the starting 5.)
 	player.stat_agility = player.AGILITY_START
 	print("move range at baseline: %d (expected %d)" % [main._battle_player_move_range(), main.PLAYER_BASE_MOVE_RANGE])
-	for i in 4:
+	for i in 15:
 		player.apply_bonus_stat("agility")
-	print("4 agility picks (+%d total) grant +1 battle move tile: agility=%d, move_range=%d (expected %d)" % [
-		4 * player.AGILITY_BONUS_PER_LEVEL, player.stat_agility, main._battle_player_move_range(), main.PLAYER_BASE_MOVE_RANGE + 1
+	print("15 agility picks (+%d total, speed rating 20) grant +1 battle move tile: agility=%d, move_range=%d (expected %d)" % [
+		15 * player.AGILITY_BONUS_PER_LEVEL, player.stat_agility, main._battle_player_move_range(), main.PLAYER_BASE_MOVE_RANGE + 1
 	])
 
 	quit()

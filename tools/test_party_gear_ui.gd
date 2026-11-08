@@ -26,6 +26,11 @@ func _gather_texts(node: Node, out: Array) -> void:
 		_gather_texts(c, out)
 
 func _init() -> void:
+	# Magic from a Staff or Wand used to be a flat +5 / +6; the doc's per-quality-tier version (test_weapon_stat_bonuses.gd) gives a Fine one
+	# (the second rung) the same figures at 2.5 / 3.0 a tier, so these checks keep the numbers they were written against.
+	var _magic_weapons = load("res://scripts/Weapons.gd")
+	_magic_weapons.STAFF["magic_per_tier"] = 2.5
+	_magic_weapons.WAND["magic_per_tier"] = 3.0
 	seed(20261006)
 	var weapons = load("res://scripts/Weapons.gd")
 	var main = load("res://Main.tscn").instantiate()
@@ -97,7 +102,7 @@ func _init() -> void:
 	panel.open_talisman_popup(druid)
 	await process_frame
 	var popup_texts: Array = _texts(panel.popup_view)
-	print("...her talisman popup shows it with a Take off button: name=%s take_off=%s (expected true, true)" % [popup_texts.has("Moss Charm"), popup_texts.has("Take off")])
+	print("...her talisman popup shows it with a Take off button: name=%s take_off=%s (expected true, true)" % [popup_texts.has("Mossy Rock"), popup_texts.has("Take off")])
 	panel.close_popup()
 	panel._on_member_talisman_removed(druid, "moss_charm")
 	panel._on_member_weapon_picked(druid, "")

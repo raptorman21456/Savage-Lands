@@ -15,7 +15,7 @@ const TEXT := {
 	"frozen": ["Frozen", "Cannot act, and takes 20% more damage.", false],
 	"concussed": ["Concussed", "Dazed: each turn it may strike itself instead of acting.", false],
 	"blind": ["Blinded", "Attacks usually miss, but any hit that lands is a guaranteed crit.", false],
-	"vulnerable": ["Vulnerable", "Takes 25% more damage from every hit.", false],
+	"vulnerable": ["Vulnerable", "Takes 20% more damage from every hit.", false],
 	"stunned": ["Stunned", "Skips its next turn.", false],
 	"fear": ["Feared", "Runs away from the party as far as it can, and attacks nobody.", false],
 	"winding_up": ["Winding up", "Is preparing a heavy attack that lands on its next turn.", false],
@@ -35,9 +35,9 @@ const TEXT := {
 	"bloodcrash": ["Bloodcrash", "The Bloodboost crashed: every combat stat is halved for the rest of the battle.", false],
 	"potion_attack": ["Attack Potion", "Deals 25% more damage.", true],
 	"potion_resilience": ["Resilience Potion", "Takes 20% less damage.", true],
-	"potion_energy": ["Energy Potion", "Moves one tile farther.", true],
+	"potion_energy": ["Energy Potion", "Moves two tiles farther.", true],
 	"skip": ["Reeling", "Loses its next turn.", false],
-	"downed": ["Downed", "Knocked out of the fight. A Revival Blessing can stand them back up.", false],
+	"downed": ["Downed", "Knocked out of the fight. A Energy Transfer can stand them back up.", false],
 }
 
 static func entry(id: String, detail: String = "") -> Dictionary:

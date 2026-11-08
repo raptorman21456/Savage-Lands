@@ -33,7 +33,7 @@ func _init() -> void:
 	for t in potions_script.TIERS:
 		if foods_script.is_food(t.id):
 			leaked_into_potions = true
-	print("food ids never collide with Potions.TIERS (the gear shop's roll pool): %s (expected false); tiers still %d (expected 6)" % [
+	print("food ids never collide with Potions.TIERS (the gear shop's roll pool): %s (expected false); tiers still %d (expected 7, with the Mana Potion)" % [
 		leaked_into_potions, potions_script.TIERS.size()
 	])
 

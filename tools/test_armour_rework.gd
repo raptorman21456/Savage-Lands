@@ -100,7 +100,7 @@ func _init() -> void:
 	print("A potion of resilience and Last Stand cut BOTH kinds: potion on, Gambeson magical: (set below)")
 	_wear(player, "armor_gambeson")
 	player.potion_resilience_turns = 2
-	print("...a Resilience Potion (+20 Defense and Fortitude): bodily=%d magical=%d (expected 71, 76)" % [main._apply_incoming_reductions(100, {}), main._apply_incoming_reductions(100, {"harm": "magical"})])
+	print("...a Resilience Potion (a fifth off the blow, after the curve): bodily=%d magical=%d (expected 67, 75)" % [main._apply_incoming_reductions(100, {}), main._apply_incoming_reductions(100, {"harm": "magical"})])
 	player.potion_resilience_turns = 0
 	main.battle_player_defending = true
 	print("Defend halves either kind (when it's not small enough to negate): bodily=%d magical=%d (expected 42, 47)" % [main._apply_incoming_reductions(100, {}), main._apply_incoming_reductions(100, {"harm": "magical"})])
@@ -139,7 +139,7 @@ func _init() -> void:
 	var move_bare: int = main._battle_player_move_range()
 	_wear(player, "armor_windrunner")
 	var move_with_wind: int = main._battle_player_move_range()
-	print("Fortplate costs a move tile, Windrunner's gives one: bare=%d fortress=%d windrunner=%d (expected %d, %d, %d)" % [move_bare, move_with_fortress, move_with_wind, move_bare, move_bare - 1, move_bare + 1])
+	print("Fortplate costs a move tile, Windrunner's gives one: bare=%d fortress=%d windrunner=%d (expected %d, %d, %d: Fortplate cannot take the last tile)" % [move_bare, move_with_fortress, move_with_wind, move_bare, maxi(1, move_bare - 1), move_bare + 1])
 	_wear(player, "armor_fortress")
 	print("Fortplate can't be swept off a water tile: %s (expected true); Gambeson: %s (expected false)" % [player.shield_push_immune(), (func(): _wear(player, "armor_gambeson"); return player.shield_push_immune()).call()])
 	print("Sprinter's Jerkin adds 2 Speed for turn order: %d (expected 2)" % [(func(): _wear(player, "armor_windrunner"); return player.armor_speed_bonus()).call()])
@@ -203,7 +203,7 @@ func _init() -> void:
 	sw_target.hp = 999
 	sw_target["vulnerable_turns"] = 0
 	main._apply_single_hit(0, 1.0, "", {"damage_mult": 1.0})
-	print("...a dodge makes the NEXT attack a crit, once: %d then %d (expected 20 then 10)" % [crit_dmg, 999 - sw_target.hp])
+	print("...a dodge makes the NEXT attack a crit, once: %d then %d (expected 25 then 10)" % [crit_dmg, 999 - sw_target.hp])
 
 	# Spellward
 	_reset(main, player)

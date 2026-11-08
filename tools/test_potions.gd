@@ -17,6 +17,12 @@ func _make_goblin(main, tile: Vector2i, hp: int = 999999) -> Dictionary:
 	}
 
 func _init() -> void:
+	# These checks predate the doc's flat weapon Strength (Club +2, Spear +4 per quality tier...), which has its own test
+	# (test_weapon_stat_bonuses.gd): here weapons add nothing, so every damage figure below stays as it was.
+	var _stat_weapons = load("res://scripts/Weapons.gd")
+	_stat_weapons.CLUB["str_bonus"] = 0
+	for _stat_base in _stat_weapons.UPGRADABLE_TYPES:
+		_stat_base["str_per_tier"] = 0
 	# Fixed seed: every random roll below repeats run to run, so a changed result
 	# is a real change, not luck.
 	seed(20260926)
@@ -28,7 +34,7 @@ func _init() -> void:
 	await physics_frame
 	var player = main.player
 
-	print("catalog has 6 tiers: %d (expected 6)" % potions_script.TIERS.size())
+	print("catalog has 7 tiers (the Mana Potion joined the six): %d (expected 7)" % potions_script.TIERS.size())
 	print("Health Potion has no secondary effect: '%s' (expected empty)" % [potions_script.get_tier("potion_health").effect])
 	print("Attack Potion's effect is 'attack_buff', no healing: %s heal=%d (expected true, 0)" % [
 		potions_script.get_tier("potion_attack").effect == "attack_buff", potions_script.get_tier("potion_attack").heal_amount
@@ -60,9 +66,9 @@ func _init() -> void:
 	# --- Health Potion: plain heal, no other effect. ---
 	player.potion_queue = ["potion_health"]
 	player.healing_items = 1
-	player.health = 50
+	player.health = 30
 	main._battle_player_item()
-	print("Health Potion heals 20 HP: health=%d (expected 70)" % [player.health])
+	print("Health Potion heals 20 HP plus a third of max HP (33 of 100): health=%d (expected 83)" % [player.health])
 
 	# --- Cleansing Potion: heals 12 AND strips every negative status. ---
 	main.player_poison_turns = 3
@@ -127,7 +133,7 @@ func _init() -> void:
 	print("...and once it runs out, incoming damage is unreduced: dmg=%d (expected 100)" % [main._apply_incoming_reductions(100, {})])
 
 	# --- Energy Potion: no healing, but +1 battle move range for a few
-	# turns. ---
+	# turns (two tiles now). ---
 	var base_move_range: int = main._battle_player_move_range()
 	player.potion_queue = ["potion_energy"]
 	player.healing_items = 1
@@ -137,7 +143,7 @@ func _init() -> void:
 	print("Energy Potion heals nothing and arms the buff: health=%d (expected unchanged 50), potion_energy_turns=%d (expected 3)" % [
 		player.health, player.potion_energy_turns
 	])
-	print("...+1 move range actually applies while active: range=%d (expected %d)" % [main._battle_player_move_range(), base_move_range + 1])
+	print("...+2 move range actually applies while active: range=%d (expected %d)" % [main._battle_player_move_range(), base_move_range + 2])
 	player.potion_energy_turns = 0
 	print("...and once it runs out, move range is back to normal: range=%d (expected %d)" % [main._battle_player_move_range(), base_move_range])
 

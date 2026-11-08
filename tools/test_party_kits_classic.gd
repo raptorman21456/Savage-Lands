@@ -85,6 +85,17 @@ func _attack(main, u: Dictionary) -> void:
 	main.battle_actor = {}
 
 func _init() -> void:
+	# Magic from a Staff or Wand used to be a flat +5 / +6; the doc's per-quality-tier version (test_weapon_stat_bonuses.gd) gives a Fine one
+	# (the second rung) the same figures at 2.5 / 3.0 a tier, so these checks keep the numbers they were written against.
+	var _magic_weapons = load("res://scripts/Weapons.gd")
+	_magic_weapons.STAFF["magic_per_tier"] = 2.5
+	_magic_weapons.WAND["magic_per_tier"] = 3.0
+	# These checks predate the doc's flat weapon Strength (Club +2, Spear +4 per quality tier...), which has its own test
+	# (test_weapon_stat_bonuses.gd): here weapons add nothing, so every damage figure below stays as it was.
+	var _stat_weapons = load("res://scripts/Weapons.gd")
+	_stat_weapons.CLUB["str_bonus"] = 0
+	for _stat_base in _stat_weapons.UPGRADABLE_TYPES:
+		_stat_base["str_per_tier"] = 0
 	seed(20261009)
 	var rules = load("res://scripts/PartyRules.gd")
 	var main = load("res://Main.tscn").instantiate()
@@ -107,10 +118,10 @@ func _init() -> void:
 	for i in 2:
 		knight.gain_xp(knight.xp_to_next())
 	knight.spend_pick("fortitude")
-	print("Fortitude levels: Knight 10 + (2 passive + 1 chosen) x 0.9 = %.1f (expected 12.7), two level-ups gave %d picks (expected 2, one spent)" % [knight.fortitude(), knight.picks + 1])
+	print("Fortitude levels: Knight 10 + (2 passive + 1 chosen) x 1.2 = %.1f (expected 13.6), two level-ups gave %d picks (expected 2, one spent)" % [knight.fortitude(), knight.picks + 1])
 	var guardian_probe = player.recruit("guardian")
 	print("Every levelling kind can pick it, the wolf cannot: guardian=%s wolf=%s (expected true, false)" % [guardian_probe.pickable_stats().has("fortitude"), player.recruit("wolf").pickable_stats().has("fortitude")])
-	print("Talisman slots at level 1: druid=%d shaman=%d rogue=%d wolf=%d (expected 2, 4, 2, 0)" % [player.recruit("druid").talisman_slot_count(), player.recruit("shaman").talisman_slot_count(), player.recruit("rogue").talisman_slot_count(), 0 if not player.party.filter(func(m): return m.is_wolf()).is_empty() and player.party.filter(func(m): return m.is_wolf())[0].talisman_slot_count() == 0 else -1])
+	print("Talisman slots at level 1: druid=%d shaman=%d rogue=%d wolf=%d (expected 2, 5, 2, 0)" % [player.recruit("druid").talisman_slot_count(), player.recruit("shaman").talisman_slot_count(), player.recruit("rogue").talisman_slot_count(), 0 if not player.party.filter(func(m): return m.is_wolf()).is_empty() and player.party.filter(func(m): return m.is_wolf())[0].talisman_slot_count() == 0 else -1])
 	var late = rules.talisman_slots("druid", 12)
 	print("...and they don't grow with level: a level-12 Druid still has %d (expected 2)" % [late])
 
@@ -126,7 +137,7 @@ func _init() -> void:
 	var wl := []
 	for s in main._ally_specials(w1):
 		wl.append(s.name + main._ally_cost_text(w1, int(s.stamina_cost)))
-	print("Wolf's specials: %s (expected [Drive-By (35 STA), Feed (25 STA), Nipper (10 STA)])" % [wl])
+	print("Wolf's specials: %s (expected [Drive-By (80 STA), Feed (70 STA), Nipper (40 STA)]: 35 + 30%%, 25 + 30%%, 10 + 20%% of its 150)" % [wl])
 	await _cast(main, w1, "Drive-By")
 	print("Drive-By hits at 1.4x: %d (expected 14), dashes past to %s (expected (4, 4)), and the command stays open: %s (expected true)" % [100 - prey.hp, w1.tile, main.battle_commanding_ally == w1])
 	main.battle_commanding_ally = w1
@@ -155,13 +166,13 @@ func _init() -> void:
 	var healthy := _make_goblin(main, Vector2i(3, 4), 100)
 	main.battle_units = [healthy]
 	await _cast(main, w3, "Feed")
-	print("Feed on a healthy enemy is a plain hit: %d (expected 10), stamina %d (expected 75)" % [100 - healthy.hp, w3.stamina])
+	print("Feed on a healthy enemy is a plain hit: %d (expected 10), stamina %d (expected 30: 70 spent)" % [100 - healthy.hp, w3.stamina])
 	var weak := _make_goblin(main, Vector2i(3, 4), 100)
 	weak.hp = 15
 	main.battle_units = [weak]
 	w3.stamina = 100
 	await _cast(main, w3, "Feed")
-	print("...under 20%% HP it bites 1.5x: %d (expected 15), and as that was the kill: HP 5 -> %d (expected 10), stamina %d (expected 95: 25 spent, 20 back)" % [15 - weak.hp, w3.hp, w3.stamina])
+	print("...under 20%% HP it bites 1.5x: %d (expected 15), and as that was the kill: HP 5 -> %d (expected 17: 5 + a third of its 20 max), stamina %d (expected 50: 70 spent, 20 back)" % [15 - weak.hp, w3.hp, w3.stamina])
 	# Nipper
 	var slowed := 0
 	var untouched := 0
@@ -284,7 +295,7 @@ func _init() -> void:
 	var gl := []
 	for s in main._ally_specials(g1):
 		gl.append(s.name + main._ally_cost_text(g1, int(s.stamina_cost)))
-	print("Guardian's specials: %s (expected [Taunt, Body Slam (35 STA), Haymaker (50 STA), Earbursting Bellow (60 STA), Stealth (20 STA)])" % [gl])
+	print("Guardian's specials: %s (expected [Taunt, CRUSH (35 STA), Haymaker (50 STA), Earbursting Bellow (60 STA), Stealth (20 STA)])" % [gl])
 	main.battle_units = [gt]
 	var g_filler := _filler()
 	main.battle_allies = [g1, g_filler]
@@ -296,8 +307,8 @@ func _init() -> void:
 	main.battle_ally_queue = [g1]
 	main._advance_ally_queue()
 	print("It wears off when the Guardian next commands: taunting=%s (expected false)" % [g1.taunting])
-	await _cast(main, g1, "Body Slam")
-	print("Body Slam uses DEFENSE (10) x 1.3 instead of attack (2): %d (expected 13)" % [999 - gt.hp])
+	await _cast(main, g1, "CRUSH")
+	print("CRUSH uses 1.3 x (Resilience 10 + Fortitude 0) instead of attack (2): %d (expected 13)" % [999 - gt.hp])
 	var stunned := 0
 	for i in 40:
 		gt.stunned = false
@@ -363,7 +374,9 @@ func _init() -> void:
 	main.battle_units = [far]
 	await _cast(main, m1, "Bomb Arrow")
 	print("Bomb Arrow uses the last bomb: %d (expected 0), 20 more damage: %d (expected 27 in all)" % [player.owned_arrows.bomb, 999 - far.hp])
-	# prices
+	# prices (charisma, which also moves prices, has its own test)
+	for m in player.party:
+		m.extra["charisma"] = 0.0
 	var spear_price: int = player.get_weapon_price(load("res://scripts/Weapons.gd").get_owned_variant("spear_fine_steel"))
 	var bow_price: int = player.get_weapon_price(load("res://scripts/Weapons.gd").get_owned_variant("bow_fine_steel"))
 	var arrow_price: int = player.get_arrow_price("flame")
@@ -389,7 +402,7 @@ func _init() -> void:
 	main.battle_units = [rt]
 	var coins_before: int = player.coins
 	await _attack(main, r1)
-	print("A regular attack can steal 1 gold INSTEAD of striking (forced here): coins +%d (expected 1), damage %d (expected 0)" % [player.coins - coins_before, 999 - rt.hp])
+	print("A regular attack can steal 1 gold AND strike at 0.75x (forced here): coins +%d (expected 1), damage %d (expected 8: 10 x 0.75)" % [player.coins - coins_before, 999 - rt.hp])
 	r1.steal_chance = 0.0
 	r1.attacked = false
 	var r_filler := _filler()
@@ -404,10 +417,11 @@ func _init() -> void:
 	_reset(main, player)
 	var r2 := _plain(main, rogue, Vector2i(2, 4), 10.0)
 	var pt := _make_goblin(main, Vector2i(3, 4), 999)
+	pt.damage = 4
 	main.battle_units = [pt]
 	coins_before = player.coins
 	await _cast(main, r2, "Pickpocket")
-	print("Pickpocket steals 3 coins (%d), deals no damage (%d), costs no stamina (%d, expected 100) and ends the turn (%s)" % [player.coins - coins_before, 999 - pt.hp, r2.stamina, main.battle_commanding_ally != r2])
+	print("Pickpocket steals 1 coin per point of the foe's attack, 4 here (%d), deals no damage (%d), costs no stamina (%d, expected 100) and ends the turn (%s)" % [player.coins - coins_before, 999 - pt.hp, r2.stamina, main.battle_commanding_ally != r2])
 	main.battle_ally_queue = [r2]
 	main.battle_allies = [r2]
 	main._advance_ally_queue()

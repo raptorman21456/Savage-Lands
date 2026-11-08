@@ -101,7 +101,7 @@ func _right_column() -> void:
 	here.add_child(k.button("Unstick me", func(): act(DebugWorldScript.unstick(main)), false, "", "Moves you to the nearest open ground if you are wedged in a wall or a tree."))
 	k.section(col, "Map")
 	var map_row := k.flow(col)
-	map_row.add_child(k.button("Reveal the whole map", func(): act(DebugWorldScript.reveal_map(main)), false, "", "The Pathfinder's Compass without the talisman: every room counts as visited, every place as found."))
+	map_row.add_child(k.button("Reveal the whole map", func(): act(DebugWorldScript.reveal_map(main)), false, "", "The Compass without the talisman: every room counts as visited, every place as found."))
 	map_row.add_child(k.button("Hide it again", func(): act(DebugWorldScript.hide_map(main))))
 	readout(col, "Rooms visited", "%d of %d" % [main.visited_rooms.size(), RoomsScript.rooms.size()], PixelKit.DIM)
 	k.section(col, "Difficulty")

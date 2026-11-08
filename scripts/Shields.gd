@@ -61,13 +61,13 @@ const COMPATIBLE_WEAPONS := ["club", "spear", "hammer", "dagger", "knuckle_glove
 # no magnitude for a synergy weapon to scale.
 static var SHIELDS := {
 	"shield_buckler": {
-		"id": "shield_buckler", "name": "Wooden Buckler", "price": 0,
+		"id": "shield_buckler", "name": "Wooden Buckler", "price": 35, "free_for_party": true,
 		"synergy_weapon": "club",
 		"block_chance": 0.33,
 		"fortitude": 3,
 		"special": "", "special_pct": 0.0, "synergy_special_pct": 0.0,
-		"description": "A simple wooden shield -- steady, reliable, free. No special trick, just a full third of incoming hits bouncing right off. Pairs naturally with a Club: neither needs finesse.",
-		"shop_description": "Every adventurer's first shield. Simple, honest, doesn't cost you a thing.",
+		"description": "A simple wooden shield -- steady and reliable. No special trick, just a full third of incoming hits bouncing right off. Pairs naturally with a Club: neither needs finesse.",
+		"shop_description": "Every adventurer's first shield. Simple and honest.",
 		"icon": "shield_buckler",
 	},
 	"shield_heavy": {

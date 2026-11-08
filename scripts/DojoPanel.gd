@@ -209,7 +209,7 @@ func _make_move_card(base: Dictionary, index: int) -> PanelContainer:
 	move_name.add_theme_color_override("font_color", TownUIScript.GOLD if highlight else Color(0.94, 0.93, 0.88))
 	title_row.add_child(move_name)
 	var sta := Label.new()
-	sta.text = "%d STA" % special.stamina_cost
+	sta.text = "%s STA" % WeaponsScript.cost_text(special)
 	PixelKit.fit(sta, 12)
 	sta.add_theme_color_override("font_color", TownUIScript.STAMINA_BLUE)
 	title_row.add_child(sta)

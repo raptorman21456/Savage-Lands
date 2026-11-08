@@ -103,7 +103,7 @@ func _draw() -> void:
 				pts.append(to_map.call(p))
 			if pts.size() >= 3 and not Geometry2D.triangulate_polygon(pts).is_empty():
 				draw_colored_polygon(pts, MiniMapScript.region_color(r))
-		# The rooms: the ones you have not been in dimmed (Pathfinder's Compass shows them all), the one you stand in outlined.
+		# The rooms: the ones you have not been in dimmed (Compass shows them all), the one you stand in outlined.
 		for rm in RoomsScript.rooms:
 			var rect := Rect2(to_map.call(rm.rect.position), rm.rect.size * scale_factor)
 			if not all_seen and not main.visited_rooms.has(rm.id):

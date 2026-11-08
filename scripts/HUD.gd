@@ -1921,7 +1921,7 @@ func _build_battle_menus() -> void:
 		special_button.focus_exited.connect(func(): action_preview_cleared.emit())
 		battle_ally_special_buttons.append(special_button)
 
-	# The friendly-target picker (Channel: who gets the mana; Revival Blessing: who stands up; Summon the Dead: how many). A
+	# The friendly-target picker (Channel: who gets the mana; Energy Transfer: who stands up; Summon the Dead: how many). A
 	# long list wraps into more columns.
 	var pick := _make_menu_list(240.0, func(): battle_ally_action.emit("back"))
 	battle_menus["ally_pick"] = pick
@@ -3890,8 +3890,9 @@ func update_battle_grid(grid_w: int, grid_h: int, terrain: Dictionary, player_ti
 			# training there would unlock) but can't be picked. A special with no
 			# "learned" key at all counts as learned.
 			if special.get("learned", true):
-				button.text = "%s (%d STA)" % [special.name, special.stamina_cost]
-				button.disabled = stamina < special.stamina_cost
+				var special_cost: int = WeaponsScript.special_cost(special, max_stamina)
+				button.text = "%s (%d STA)" % [special.name, special_cost]
+				button.disabled = stamina < special_cost
 				button.set_meta("description", special.description)
 			else:
 				button.text = "%s (Unlearned - Dojo)" % special.name

@@ -581,6 +581,31 @@ const SIM_DATA = {
 			"name": "Trail Boots",
 			"price": 36,
 			"slot": "feet"
+		},
+		{
+			"damage_reduction": 0.0,
+			"description": "No damage from cliff or ledge falls, and you can attack up a cliff with any weapon.",
+			"effects": {
+				"fall_reduction": 1.0,
+				"ignore_ledge_attack": 1
+			},
+			"icon": "cloth_feet",
+			"id": "cloth_cliffwalker_boots",
+			"name": "Cliffwalker's Boots",
+			"price": 60,
+			"slot": "feet"
+		},
+		{
+			"damage_reduction": 0.0,
+			"description": "Your Taunt enrages enemies: each attacks whoever is nearest, even each other (a tie is picked at random).",
+			"effects": {
+				"taunt_confusion": 1
+			},
+			"icon": "cloth_head",
+			"id": "cloth_yodler_cap",
+			"name": "Yodler's Cap",
+			"price": 60,
+			"slot": "head"
 		}
 	],
 	"clothing_slots": [
@@ -757,7 +782,7 @@ const SIM_DATA = {
 			"xp_reward": 715
 		}
 	],
-	"exported": "2026-10-31T13:09:55",
+	"exported": "2026-11-07T21:07:47",
 	"foods": [
 		{
 			"description": "Heals 5 HP and restores 15 stamina.",
@@ -859,7 +884,6 @@ const SIM_DATA = {
 		}
 	],
 	"main_consts": {
-		"AGILITY_PER_EXTRA_MOVE": 20,
 		"ALLY_ATTACK_RANGE": 1,
 		"ALLY_GUARD_MANA": 15,
 		"ALLY_MAX_HP_PCT": 0.7,
@@ -890,7 +914,7 @@ const SIM_DATA = {
 		"BERSERK_TURNS": 2,
 		"BLEED_BASE_TURNS": 2,
 		"BLEED_DAMAGE_PCT": 0.1,
-		"BLINDNESS_MISS_CHANCE": 0.75,
+		"BLINDNESS_MISS_CHANCE": 0.6,
 		"BLINDNESS_TURNS": 2,
 		"BLOODMOON_QUIET_TURNS_LIMIT": 3,
 		"BONE_DREAD_CHANCE": 0.1,
@@ -927,8 +951,8 @@ const SIM_DATA = {
 		"CENTAUR_ARCHER_ATTACK_RANGE": 3,
 		"CENTAUR_PACK_SIZE": 3,
 		"CENTAUR_WAVE_START": 7,
-		"CHAOS_SHARD_MAX_MULT": 1.6,
-		"CHAOS_SHARD_MIN_MULT": 0.5,
+		"CHAOS_SHARD_MAX_MULT": 1.25,
+		"CHAOS_SHARD_MIN_MULT": 0.9,
 		"CHEST_CONTENTS": {
 			"crater": {
 				"id": "wildfire_core",
@@ -985,9 +1009,9 @@ const SIM_DATA = {
 		"ENEMY_COUNT": 6,
 		"ENEMY_LEVEL_SCALING": 0.05,
 		"ENEMY_LEVEL_SCALING_BY_DIFFICULTY": {
-			"apocalyptic": 0.12,
+			"apocalyptic": 0.17,
 			"baby": 0.03,
-			"hard": 0.08,
+			"hard": 0.1,
 			"normal": 0.05
 		},
 		"ENEMY_SIGHT_RANGE": 4,
@@ -1034,6 +1058,7 @@ const SIM_DATA = {
 				"harm": "magical",
 				"ignore_line": true,
 				"is_boss_tier": true,
+				"is_void": true,
 				"knockback_resist": 0.4,
 				"mage": true,
 				"move_range": 1,
@@ -1154,6 +1179,7 @@ const SIM_DATA = {
 				"harm": "magical",
 				"inflicts_fear": true,
 				"is_undead": true,
+				"is_void": true,
 				"move_range": 3
 			},
 			"Steel Construct": {
@@ -1190,6 +1216,7 @@ const SIM_DATA = {
 				"inflicts_bleed": true,
 				"is_boss_tier": true,
 				"is_miniboss": true,
+				"is_void": true,
 				"move_range": 3,
 				"windup": true
 			},
@@ -1209,7 +1236,7 @@ const SIM_DATA = {
 				"move_range": 3
 			}
 		},
-		"ENERGY_POTION_MOVE_BONUS": 1,
+		"ENERGY_POTION_MOVE_BONUS": 2,
 		"EVENT_CHANCE": 0.35,
 		"FAE_HUT_SPAWN_INTERVAL": 3,
 		"FAE_HUT_WAVE_START": 3,
@@ -1273,6 +1300,7 @@ const SIM_DATA = {
 		"MINIGAME_PARRY_BONUS_MS_PER_CHANCE": 60.0,
 		"MIN_BATTLE_SPEED": 0.5,
 		"MOMENTUM_CHAIN_PCT_PER_STACK": 0.08,
+		"MOVE_TILES_PER_SPEED": 0.05,
 		"NOTHINGNESS_BOSSES": [
 			null,
 			null,
@@ -1297,7 +1325,7 @@ const SIM_DATA = {
 		"OVERWORLD_ENEMY_SCALE": 1.5,
 		"PICHAKU_DAMAGE_MULT": 0.8,
 		"PICHAKU_DOUBLE_HIT_CHANCE": 0.333333333333333,
-		"PLAYER_BASE_MOVE_RANGE": 2,
+		"PLAYER_BASE_MOVE_RANGE": 1,
 		"PLAYER_CONCUSSION_CHANCE": 0.5,
 		"PLAYER_CONCUSSION_TURNS": 2,
 		"PLAYER_SPAWN_POSITION": [
@@ -1397,6 +1425,8 @@ const SIM_DATA = {
 			"hp_regen_per_20_max_hp",
 			"stamina_regen",
 			"double_secondary_chance",
+			"poison_chance",
+			"random_status_chance",
 			"spell_potency_pct",
 			"spell_echo_chance",
 			"spell_clapback_chance",
@@ -1675,7 +1705,7 @@ const SIM_DATA = {
 		"TRAITOR_WOLF_RECRUIT_CHANCE": 0.25,
 		"TURN_ORDER_ROWS": 8,
 		"TURN_TIME_BASE": 100.0,
-		"VULNERABLE_DAMAGE_TAKEN_BONUS_PCT": 0.25,
+		"VULNERABLE_DAMAGE_TAKEN_BONUS_PCT": 0.2,
 		"VULNERABLE_TURNS": 2,
 		"WANDER_DIRS": [
 			[
@@ -1711,7 +1741,19 @@ const SIM_DATA = {
 	},
 	"party": {
 		"consts": {
-			"BASE_MOVE_TILES": 2,
+			"BASE_MOVE_TILES": 1,
+			"CRIT_FROM_DEXTERITY_CAP": 0.1,
+			"CRIT_PER_DEXTERITY": 0.005,
+			"DODGE_FROM_REFLEXES_CAP": 0.15,
+			"DODGE_PER_REFLEXES": 0.005,
+			"EXTRA_GAIN": 1.0,
+			"EXTRA_STATS": [
+				"dexterity",
+				"might",
+				"intelligence",
+				"charisma",
+				"reflexes"
+			],
 			"KINDS": {
 				"brawler": {
 					"attack_range": 1,
@@ -1724,7 +1766,14 @@ const SIM_DATA = {
 						"speed": 4.0
 					},
 					"caster": false,
-					"description": "A bare-knuckle fighter whose fists land twice as often as anyone expects. Fists and knuckle gloves reach one tile further in these hands.",
+					"description": "A bare-knuckle fighter whose crits land 50% harder. Fists and knuckle gloves reach one tile further in these hands.",
+					"extra_growth": {
+						"charisma": 1.3,
+						"dexterity": 1.8,
+						"intelligence": 0.5,
+						"might": 1.6,
+						"reflexes": 1.4
+					},
 					"favour": {
 						"range_bonus": 1.0,
 						"weapons": [
@@ -1733,11 +1782,11 @@ const SIM_DATA = {
 						]
 					},
 					"growth": {
-						"attack": 1.4,
-						"defense": 1.3,
-						"fortitude": 1.3,
+						"attack": 1.8,
+						"defense": 1.6,
+						"fortitude": 0.9,
 						"hp": 1.5,
-						"magic": 1.0,
+						"magic": 0.5,
 						"speed": 0.6
 					},
 					"levels": true,
@@ -1746,8 +1795,7 @@ const SIM_DATA = {
 					},
 					"name": "Brawler",
 					"perks": {
-						"crit_chance": 0.1,
-						"double_hit_chance": 0.1
+						"crit_damage_pct": 0.5
 					},
 					"stamina": 100,
 					"stats": [
@@ -1776,16 +1824,26 @@ const SIM_DATA = {
 					},
 					"caster": true,
 					"description": "A wild-woods healer who would rather mend than maim. Her spells restore and embolden her friends, and when she must move, she moves twice as far. Fragile, and worth protecting.",
+					"extra_base": {
+						"intelligence": 6.0
+					},
+					"extra_growth": {
+						"charisma": 0.8,
+						"dexterity": 1.2,
+						"intelligence": 1.5,
+						"might": 0.9,
+						"reflexes": 1.2
+					},
 					"favour": {
 						"magic_mult": 1.15,
 						"weapon": "staff"
 					},
 					"growth": {
 						"attack": 0.5,
-						"defense": 0.66,
-						"fortitude": 1.2,
-						"hp": 1.2,
-						"magic": 1.0,
+						"defense": 0.7,
+						"fortitude": 1.7,
+						"hp": 1.4,
+						"magic": 1.5,
 						"speed": 1.0
 					},
 					"levels": true,
@@ -1819,14 +1877,25 @@ const SIM_DATA = {
 					},
 					"caster": false,
 					"defense_cap": 0.9,
-					"description": "A wall that walks. It only ever takes one step, hits twice as hard with a shield in hand, and shouts loud enough to rattle every enemy on the field.",
+					"description": "A wall that walks. It only ever takes one step, hits twice as hard with a shield in hand, knocks foes a tile further with a hammer, and shouts loud enough to rattle every enemy on the field.",
+					"extra_growth": {
+						"charisma": 1.5,
+						"dexterity": 0.9,
+						"intelligence": 1.1,
+						"might": 1.4,
+						"reflexes": 0.5
+					},
+					"favour": {
+						"knockback_bonus": 1.0,
+						"weapon": "hammer"
+					},
 					"growth": {
-						"attack": 1.0,
-						"defense": 2.0,
-						"fortitude": 1.3,
-						"hp": 1.25,
-						"magic": 1.0,
-						"speed": 1.0
+						"attack": 1.3,
+						"defense": 2.5,
+						"fortitude": 1.8,
+						"hp": 1.5,
+						"magic": 0.8,
+						"speed": 0.1
 					},
 					"levels": true,
 					"move": {
@@ -1861,17 +1930,24 @@ const SIM_DATA = {
 					"cannot_dodge": true,
 					"caster": false,
 					"description": "A veteran who holds the line. Strongest with a greatsword, able to keep a shield up even behind a two-handed weapon, and far too proud to dodge.",
+					"extra_growth": {
+						"charisma": 1.4,
+						"dexterity": 1.0,
+						"intelligence": 0.9,
+						"might": 1.1,
+						"reflexes": 0.7
+					},
 					"favour": {
 						"special_stamina_discount": 0.2,
 						"weapon": "greatsword"
 					},
 					"growth": {
-						"attack": 1.3,
-						"defense": 1.5,
-						"fortitude": 0.9,
-						"hp": 1.0,
-						"magic": 1.0,
-						"speed": 0.75
+						"attack": 1.6,
+						"defense": 1.3,
+						"fortitude": 1.2,
+						"hp": 1.2,
+						"magic": 0.6,
+						"speed": 1.4
 					},
 					"levels": true,
 					"move": {
@@ -1896,7 +1972,8 @@ const SIM_DATA = {
 					]
 				},
 				"marksman": {
-					"arrow_price_mult": 0.4,
+					"armor_defense_mult": 0.4,
+					"arrow_price_mult": 0.5,
 					"attack_range": 1,
 					"base": {
 						"attack": 1.0,
@@ -1907,25 +1984,32 @@ const SIM_DATA = {
 						"speed": 5.0
 					},
 					"caster": false,
-					"defense_fixed": 0.0,
 					"description": "A sharpshooter who ignores range and cover, but will only ever fight with a bow. Arrows are cheap while the Marksman is around, and every other weapon costs more.",
+					"extra_growth": {
+						"charisma": 2.0,
+						"dexterity": 1.5,
+						"intelligence": 1.2,
+						"might": 1.1,
+						"reflexes": 2.0
+					},
 					"favour": {
 						"crit_chance_mult": 1.5,
 						"weapon": "bow"
 					},
 					"growth": {
-						"attack": 1.0,
-						"defense": 1.0,
-						"fortitude": 1.0,
-						"hp": 0.25,
+						"attack": 2.0,
+						"defense": 0.1,
+						"fortitude": 0.2,
+						"hp": 0.7,
 						"magic": 1.0,
-						"speed": 1.0
+						"speed": 1.6
 					},
 					"ignore_cover": true,
 					"levels": true,
 					"move": {
 						"base": 1.0,
-						"per_speed": 0.07
+						"per_speed": 0.075,
+						"round": "up"
 					},
 					"name": "Marksman",
 					"stamina": 100,
@@ -1957,6 +2041,16 @@ const SIM_DATA = {
 					},
 					"caster": true,
 					"description": "Pays for every spell in blood and grows a little stronger with each kill. Rots enemies from within and raises the fallen to fight again.",
+					"extra_base": {
+						"intelligence": 6.0
+					},
+					"extra_growth": {
+						"charisma": 1.4,
+						"dexterity": 0.7,
+						"intelligence": 1.2,
+						"might": 0.7,
+						"reflexes": 0.8
+					},
 					"favour": {
 						"kill_heal": 2.0,
 						"weapon": "wand"
@@ -1965,8 +2059,8 @@ const SIM_DATA = {
 						"attack": 0.4,
 						"defense": 0.7,
 						"fortitude": 1.4,
-						"hp": 1.8,
-						"magic": 3.0,
+						"hp": 2.4,
+						"magic": 1.8,
 						"speed": 0.9
 					},
 					"hp_as_mana": true,
@@ -2002,17 +2096,24 @@ const SIM_DATA = {
 					},
 					"caster": false,
 					"description": "Quick hands, quicker feet. Would rather lift an enemy's coin purse than its life, right up until the moment it decides otherwise. Always half in shadow: foes only notice the Rogue from close by, and its Stealth lasts longer, costs less and bites harder.",
+					"extra_growth": {
+						"charisma": 1.3,
+						"dexterity": 1.6,
+						"intelligence": 1.0,
+						"might": 1.4,
+						"reflexes": 1.6
+					},
 					"favour": {
 						"damage_pct": 0.25,
 						"weapon": "dagger"
 					},
 					"growth": {
-						"attack": 1.3,
+						"attack": 1.5,
 						"defense": 0.7,
-						"fortitude": 1.0,
-						"hp": 1.0,
+						"fortitude": 0.9,
+						"hp": 0.7,
 						"magic": 1.0,
-						"speed": 1.4
+						"speed": 1.9
 					},
 					"levels": true,
 					"move": {
@@ -2032,7 +2133,7 @@ const SIM_DATA = {
 					"steal_chance": 0.25,
 					"stealth": {
 						"cost": 10,
-						"crit_bonus": 1.0,
+						"crit_bonus": 0.5,
 						"passive_sight": 3,
 						"turns": 5
 					},
@@ -2055,17 +2156,27 @@ const SIM_DATA = {
 					},
 					"caster": true,
 					"charm_range": 4,
-					"description": "Carries four talismans and shares their power with everyone nearby. Heals, cleanses, and keeps the whole party in tune.",
+					"description": "Carries five talismans and shares their power with everyone nearby. Heals, cleanses, and keeps the whole party in tune.",
+					"extra_base": {
+						"intelligence": 6.0
+					},
+					"extra_growth": {
+						"charisma": 1.2,
+						"dexterity": 1.0,
+						"intelligence": 1.7,
+						"might": 1.0,
+						"reflexes": 0.7
+					},
 					"favour": {
 						"talisman_share": 0.5,
 						"weapon": "staff"
 					},
 					"growth": {
-						"attack": 0.0,
-						"defense": 0.7,
-						"fortitude": 1.5,
-						"hp": 1.2,
-						"magic": 1.7,
+						"attack": 0.4,
+						"defense": 1.2,
+						"fortitude": 1.6,
+						"hp": 1.4,
+						"magic": 2.1,
 						"speed": 1.1
 					},
 					"levels": true,
@@ -2080,7 +2191,7 @@ const SIM_DATA = {
 						"magic",
 						"fortitude"
 					],
-					"talisman_slots": 4,
+					"talisman_slots": 5,
 					"tint": [
 						0.5,
 						0.899999976158142,
@@ -2101,15 +2212,16 @@ const SIM_DATA = {
 					"caster": false,
 					"description": "A traitor wolf that turned on its pack. The old magic that made wolves so savage still runs through it, so it fights harder than any hound should. It cannot level, wear gear or carry a weapon, and three faints will be its last.",
 					"final_mult": {
-						"attack": 1.25,
-						"defense": 0.75,
-						"fortitude": 0.8,
+						"attack": 1.4,
+						"defense": 0.7,
+						"fortitude": 0.7,
 						"hp": 0.9,
-						"magic": 1.0,
+						"magic": 0.5,
 						"speed": 1.5
 					},
 					"levels": false,
 					"move": {
+						"round": "up",
 						"tile_mult": 1.5
 					},
 					"name": "Fickle Wolf",
@@ -2124,9 +2236,12 @@ const SIM_DATA = {
 					"wolf": true
 				}
 			},
+			"MANA_BASE": 20,
+			"MANA_PER_INTELLIGENCE": 5,
 			"MANA_PER_MAGIC": 5,
 			"MAX_LEVEL": 99,
 			"MEMBER_TALISMAN_SLOTS": 2,
+			"MOVE_TILES_PER_SPEED": 0.05,
 			"PASSIVE_GAIN": {
 				"attack": 1.0,
 				"defense": 1.0,
@@ -2144,8 +2259,7 @@ const SIM_DATA = {
 				"speed": 1.0
 			},
 			"SPECIAL_SLOTS": 3,
-			"SPEED_PER_EXTRA_TILE": 4.0,
-			"SPEED_START": 5.0,
+			"STAMINA_PER_MIGHT": 3,
 			"STAT_NAMES": [
 				"hp",
 				"attack",
@@ -2171,7 +2285,14 @@ const SIM_DATA = {
 					"speed": 4.0
 				},
 				"caster": false,
-				"description": "A bare-knuckle fighter whose fists land twice as often as anyone expects. Fists and knuckle gloves reach one tile further in these hands.",
+				"description": "A bare-knuckle fighter whose crits land 50% harder. Fists and knuckle gloves reach one tile further in these hands.",
+				"extra_growth": {
+					"charisma": 1.3,
+					"dexterity": 1.8,
+					"intelligence": 0.5,
+					"might": 1.6,
+					"reflexes": 1.4
+				},
 				"favour": {
 					"range_bonus": 1.0,
 					"weapons": [
@@ -2180,11 +2301,11 @@ const SIM_DATA = {
 					]
 				},
 				"growth": {
-					"attack": 1.4,
-					"defense": 1.3,
-					"fortitude": 1.3,
+					"attack": 1.8,
+					"defense": 1.6,
+					"fortitude": 0.9,
 					"hp": 1.5,
-					"magic": 1.0,
+					"magic": 0.5,
 					"speed": 0.6
 				},
 				"levels": true,
@@ -2193,8 +2314,7 @@ const SIM_DATA = {
 				},
 				"name": "Brawler",
 				"perks": {
-					"crit_chance": 0.1,
-					"double_hit_chance": 0.1
+					"crit_damage_pct": 0.5
 				},
 				"stamina": 100,
 				"stats": [
@@ -2223,16 +2343,26 @@ const SIM_DATA = {
 				},
 				"caster": true,
 				"description": "A wild-woods healer who would rather mend than maim. Her spells restore and embolden her friends, and when she must move, she moves twice as far. Fragile, and worth protecting.",
+				"extra_base": {
+					"intelligence": 6.0
+				},
+				"extra_growth": {
+					"charisma": 0.8,
+					"dexterity": 1.2,
+					"intelligence": 1.5,
+					"might": 0.9,
+					"reflexes": 1.2
+				},
 				"favour": {
 					"magic_mult": 1.15,
 					"weapon": "staff"
 				},
 				"growth": {
 					"attack": 0.5,
-					"defense": 0.66,
-					"fortitude": 1.2,
-					"hp": 1.2,
-					"magic": 1.0,
+					"defense": 0.7,
+					"fortitude": 1.7,
+					"hp": 1.4,
+					"magic": 1.5,
 					"speed": 1.0
 				},
 				"levels": true,
@@ -2266,14 +2396,25 @@ const SIM_DATA = {
 				},
 				"caster": false,
 				"defense_cap": 0.9,
-				"description": "A wall that walks. It only ever takes one step, hits twice as hard with a shield in hand, and shouts loud enough to rattle every enemy on the field.",
+				"description": "A wall that walks. It only ever takes one step, hits twice as hard with a shield in hand, knocks foes a tile further with a hammer, and shouts loud enough to rattle every enemy on the field.",
+				"extra_growth": {
+					"charisma": 1.5,
+					"dexterity": 0.9,
+					"intelligence": 1.1,
+					"might": 1.4,
+					"reflexes": 0.5
+				},
+				"favour": {
+					"knockback_bonus": 1.0,
+					"weapon": "hammer"
+				},
 				"growth": {
-					"attack": 1.0,
-					"defense": 2.0,
-					"fortitude": 1.3,
-					"hp": 1.25,
-					"magic": 1.0,
-					"speed": 1.0
+					"attack": 1.3,
+					"defense": 2.5,
+					"fortitude": 1.8,
+					"hp": 1.5,
+					"magic": 0.8,
+					"speed": 0.1
 				},
 				"levels": true,
 				"move": {
@@ -2308,17 +2449,24 @@ const SIM_DATA = {
 				"cannot_dodge": true,
 				"caster": false,
 				"description": "A veteran who holds the line. Strongest with a greatsword, able to keep a shield up even behind a two-handed weapon, and far too proud to dodge.",
+				"extra_growth": {
+					"charisma": 1.4,
+					"dexterity": 1.0,
+					"intelligence": 0.9,
+					"might": 1.1,
+					"reflexes": 0.7
+				},
 				"favour": {
 					"special_stamina_discount": 0.2,
 					"weapon": "greatsword"
 				},
 				"growth": {
-					"attack": 1.3,
-					"defense": 1.5,
-					"fortitude": 0.9,
-					"hp": 1.0,
-					"magic": 1.0,
-					"speed": 0.75
+					"attack": 1.6,
+					"defense": 1.3,
+					"fortitude": 1.2,
+					"hp": 1.2,
+					"magic": 0.6,
+					"speed": 1.4
 				},
 				"levels": true,
 				"move": {
@@ -2343,7 +2491,8 @@ const SIM_DATA = {
 				]
 			},
 			"marksman": {
-				"arrow_price_mult": 0.4,
+				"armor_defense_mult": 0.4,
+				"arrow_price_mult": 0.5,
 				"attack_range": 1,
 				"base": {
 					"attack": 1.0,
@@ -2354,25 +2503,32 @@ const SIM_DATA = {
 					"speed": 5.0
 				},
 				"caster": false,
-				"defense_fixed": 0.0,
 				"description": "A sharpshooter who ignores range and cover, but will only ever fight with a bow. Arrows are cheap while the Marksman is around, and every other weapon costs more.",
+				"extra_growth": {
+					"charisma": 2.0,
+					"dexterity": 1.5,
+					"intelligence": 1.2,
+					"might": 1.1,
+					"reflexes": 2.0
+				},
 				"favour": {
 					"crit_chance_mult": 1.5,
 					"weapon": "bow"
 				},
 				"growth": {
-					"attack": 1.0,
-					"defense": 1.0,
-					"fortitude": 1.0,
-					"hp": 0.25,
+					"attack": 2.0,
+					"defense": 0.1,
+					"fortitude": 0.2,
+					"hp": 0.7,
 					"magic": 1.0,
-					"speed": 1.0
+					"speed": 1.6
 				},
 				"ignore_cover": true,
 				"levels": true,
 				"move": {
 					"base": 1.0,
-					"per_speed": 0.07
+					"per_speed": 0.075,
+					"round": "up"
 				},
 				"name": "Marksman",
 				"stamina": 100,
@@ -2404,6 +2560,16 @@ const SIM_DATA = {
 				},
 				"caster": true,
 				"description": "Pays for every spell in blood and grows a little stronger with each kill. Rots enemies from within and raises the fallen to fight again.",
+				"extra_base": {
+					"intelligence": 6.0
+				},
+				"extra_growth": {
+					"charisma": 1.4,
+					"dexterity": 0.7,
+					"intelligence": 1.2,
+					"might": 0.7,
+					"reflexes": 0.8
+				},
 				"favour": {
 					"kill_heal": 2.0,
 					"weapon": "wand"
@@ -2412,8 +2578,8 @@ const SIM_DATA = {
 					"attack": 0.4,
 					"defense": 0.7,
 					"fortitude": 1.4,
-					"hp": 1.8,
-					"magic": 3.0,
+					"hp": 2.4,
+					"magic": 1.8,
 					"speed": 0.9
 				},
 				"hp_as_mana": true,
@@ -2449,17 +2615,24 @@ const SIM_DATA = {
 				},
 				"caster": false,
 				"description": "Quick hands, quicker feet. Would rather lift an enemy's coin purse than its life, right up until the moment it decides otherwise. Always half in shadow: foes only notice the Rogue from close by, and its Stealth lasts longer, costs less and bites harder.",
+				"extra_growth": {
+					"charisma": 1.3,
+					"dexterity": 1.6,
+					"intelligence": 1.0,
+					"might": 1.4,
+					"reflexes": 1.6
+				},
 				"favour": {
 					"damage_pct": 0.25,
 					"weapon": "dagger"
 				},
 				"growth": {
-					"attack": 1.3,
+					"attack": 1.5,
 					"defense": 0.7,
-					"fortitude": 1.0,
-					"hp": 1.0,
+					"fortitude": 0.9,
+					"hp": 0.7,
 					"magic": 1.0,
-					"speed": 1.4
+					"speed": 1.9
 				},
 				"levels": true,
 				"move": {
@@ -2479,7 +2652,7 @@ const SIM_DATA = {
 				"steal_chance": 0.25,
 				"stealth": {
 					"cost": 10,
-					"crit_bonus": 1.0,
+					"crit_bonus": 0.5,
 					"passive_sight": 3,
 					"turns": 5
 				},
@@ -2502,17 +2675,27 @@ const SIM_DATA = {
 				},
 				"caster": true,
 				"charm_range": 4,
-				"description": "Carries four talismans and shares their power with everyone nearby. Heals, cleanses, and keeps the whole party in tune.",
+				"description": "Carries five talismans and shares their power with everyone nearby. Heals, cleanses, and keeps the whole party in tune.",
+				"extra_base": {
+					"intelligence": 6.0
+				},
+				"extra_growth": {
+					"charisma": 1.2,
+					"dexterity": 1.0,
+					"intelligence": 1.7,
+					"might": 1.0,
+					"reflexes": 0.7
+				},
 				"favour": {
 					"talisman_share": 0.5,
 					"weapon": "staff"
 				},
 				"growth": {
-					"attack": 0.0,
-					"defense": 0.7,
-					"fortitude": 1.5,
-					"hp": 1.2,
-					"magic": 1.7,
+					"attack": 0.4,
+					"defense": 1.2,
+					"fortitude": 1.6,
+					"hp": 1.4,
+					"magic": 2.1,
 					"speed": 1.1
 				},
 				"levels": true,
@@ -2527,7 +2710,7 @@ const SIM_DATA = {
 					"magic",
 					"fortitude"
 				],
-				"talisman_slots": 4,
+				"talisman_slots": 5,
 				"tint": [
 					0.5,
 					0.899999976158142,
@@ -2548,15 +2731,16 @@ const SIM_DATA = {
 				"caster": false,
 				"description": "A traitor wolf that turned on its pack. The old magic that made wolves so savage still runs through it, so it fights harder than any hound should. It cannot level, wear gear or carry a weapon, and three faints will be its last.",
 				"final_mult": {
-					"attack": 1.25,
-					"defense": 0.75,
-					"fortitude": 0.8,
+					"attack": 1.4,
+					"defense": 0.7,
+					"fortitude": 0.7,
 					"hp": 0.9,
-					"magic": 1.0,
+					"magic": 0.5,
 					"speed": 1.5
 				},
 				"levels": false,
 				"move": {
+					"round": "up",
 					"tile_mult": 1.5
 				},
 				"name": "Fickle Wolf",
@@ -2590,6 +2774,7 @@ const SIM_DATA = {
 		"BLOODMOON_SPEED_PCT_PER_STACK": 0.075,
 		"BODY_RADIUS": 16.0,
 		"COOLDOWN_REDUCTION_PER_AGILITY": 0.003,
+		"CRIT_BASE_MULT": 2.5,
 		"DEXTERITY_CRIT_CAP": 0.1,
 		"DEXTERITY_PCT_PER_POINT": 0.005,
 		"EXHAUSTED_CLEAR_STAMINA_PCT": 0.5,
@@ -2607,6 +2792,7 @@ const SIM_DATA = {
 		"REFLEXES_PCT_PER_POINT": 0.005,
 		"RESILIENCE_PCT_PER_POINT": 0.01,
 		"STAMINA_BAR": 100,
+		"STAMINA_PER_MIGHT": 3,
 		"WORLDWALKER_DAMAGE_BONUS_PCT": 0.1,
 		"WORLDWALKER_HP_BONUS_PCT": 0.15,
 		"XP_BASE": 20,
@@ -2614,9 +2800,10 @@ const SIM_DATA = {
 	},
 	"potions": [
 		{
-			"description": "Heals 20 HP.",
+			"description": "Heals 20 HP plus a third of your max HP.",
 			"effect": "",
 			"heal_amount": 20,
+			"heal_max_hp_pct": 0.33,
 			"icon": "potion",
 			"id": "potion_health",
 			"name": "Health Potion",
@@ -2634,7 +2821,7 @@ const SIM_DATA = {
 			"shop_description": "Feel that? That's your arm asking permission to hit harder. Say yes."
 		},
 		{
-			"description": "No healing, but adds +20 Defense and Fortitude for your next 3 turns.",
+			"description": "No healing, but you take 20% less damage for your next 3 turns.",
 			"effect": "resilience_buff",
 			"heal_amount": 0,
 			"icon": "potion",
@@ -2644,7 +2831,7 @@ const SIM_DATA = {
 			"shop_description": "Won't stop a blade. Just stops it from mattering quite so much."
 		},
 		{
-			"description": "No healing, but grants an extra tile of movement in battle for your next 3 turns.",
+			"description": "No healing, but grants two extra tiles of movement in battle for your next 3 turns.",
 			"effect": "energy_buff",
 			"heal_amount": 0,
 			"icon": "potion",
@@ -2662,6 +2849,16 @@ const SIM_DATA = {
 			"name": "Stamina Potion",
 			"price": 12,
 			"shop_description": "For when your arms give out before your enemies do."
+		},
+		{
+			"description": "No healing, but every spellcaster in your party gets its mana back in full.",
+			"effect": "restore_mana",
+			"heal_amount": 0,
+			"icon": "potion",
+			"id": "potion_mana",
+			"name": "Mana Potion",
+			"price": 12,
+			"shop_description": "For the ones who do the magic, since you won't."
 		},
 		{
 			"description": "Heals 12 HP, and washes away poison, burning, bleeding, concussion, and blindness.",
@@ -2752,13 +2949,14 @@ const SIM_DATA = {
 		},
 		"shield_buckler": {
 			"block_chance": 0.33,
-			"description": "A simple wooden shield -- steady, reliable, free. No special trick, just a full third of incoming hits bouncing right off. Pairs naturally with a Club: neither needs finesse.",
+			"description": "A simple wooden shield -- steady and reliable. No special trick, just a full third of incoming hits bouncing right off. Pairs naturally with a Club: neither needs finesse.",
 			"fortitude": 3,
+			"free_for_party": true,
 			"icon": "shield_buckler",
 			"id": "shield_buckler",
 			"name": "Wooden Buckler",
-			"price": 0,
-			"shop_description": "Every adventurer's first shield. Simple, honest, doesn't cost you a thing.",
+			"price": 35,
+			"shop_description": "Every adventurer's first shield. Simple and honest.",
 			"special": "",
 			"special_pct": 0.0,
 			"synergy_special_pct": 0.0,
@@ -2817,25 +3015,21 @@ const SIM_DATA = {
 	"talismans": {
 		"items": [
 			{
-				"description": "10% chance for any attack to set the target on fire (2% per hit on multi-hit moves). The fire deals (5 + your attack / 5) damage, then 70% of that again each turn after, rounded up, until it burns out.",
+				"description": "Fire damage you set is now (5 + your attack / 5), then 70% of that again every turn after, rounded up, until it burns out.",
 				"effects": {
-					"burn_chance": 0.1,
-					"burn_chance_multihit": 0.02,
 					"ember_burn": 1
 				},
 				"found": true,
 				"id": "ember_charm",
-				"name": "Ember Charm",
+				"name": "Pyrogenesis Organ",
 				"price": 70,
 				"rarity": "common"
 			},
 			{
-				"description": "Traitor Wolves replace ordinary wolves 25% more often and are at least 30% likely to join when they fall. Adds a party slot only a Fickle Wolf can fill, and wolves stay 5 battles longer.",
+				"description": "Traitor Wolves replace ordinary wolves 25% more often, and are at least 30% likely to join your pack when they fall.",
 				"effects": {
 					"traitor_wolf_chance_pct": 0.25,
-					"wolf_recruit_chance_min": 0.3,
-					"wolf_slot": 1,
-					"wolf_stay_bonus": 5
+					"wolf_recruit_chance_min": 0.3
 				},
 				"id": "wolf_fang",
 				"name": "Wolf Fang",
@@ -2849,7 +3043,7 @@ const SIM_DATA = {
 					"low_hp_threshold": 0.2
 				},
 				"id": "berserkers_knot",
-				"name": "Berserker's Knot",
+				"name": "Berserk Brace",
 				"price": 110,
 				"rarity": "uncommon"
 			},
@@ -2857,7 +3051,7 @@ const SIM_DATA = {
 				"description": "-15% damage on every hit, but critical hits deal 300% damage and are 5% more likely to land.",
 				"effects": {
 					"crit_chance": 0.05,
-					"crit_damage_mult_bonus": 1.0,
+					"crit_damage_mult_bonus": 0.5,
 					"damage_pct": -0.15
 				},
 				"id": "duelists_coin",
@@ -2866,14 +3060,55 @@ const SIM_DATA = {
 				"rarity": "uncommon"
 			},
 			{
-				"description": "Whoever lands the first hit each battle -- you or an ally -- deals 50% more damage with it.",
+				"description": "A 10% chance for any hit you land to poison the enemy.",
+				"effects": {
+					"poison_chance": 0.1
+				},
+				"id": "rusted_edge",
+				"name": "Rusted Edge",
+				"price": 80,
+				"rarity": "uncommon"
+			},
+			{
+				"description": "The first hit its wearer lands each battle deals 50% more damage.",
 				"effects": {
 					"first_attack_damage_pct": 0.5
 				},
 				"id": "whetstone_pendant",
-				"name": "Whetstone Pendant",
+				"name": "Whetstone",
 				"price": 60,
 				"rarity": "common"
+			},
+			{
+				"description": "A 10% chance for a hit to inflict a random negative status on the enemy.",
+				"effects": {
+					"random_status_chance": 0.1
+				},
+				"id": "fake_phd",
+				"name": "Fake PHD",
+				"price": 90,
+				"rarity": "rare"
+			},
+			{
+				"description": "You take damage only from direct attacks: no burning, poison, bleeding, blasts, falls or hazards.",
+				"effects": {
+					"direct_only": 1
+				},
+				"id": "honour",
+				"name": "Honour",
+				"price": 70,
+				"rarity": "uncommon"
+			},
+			{
+				"description": "All damage you give and take is doubled.",
+				"effects": {
+					"damage_pct": 1.0,
+					"damage_taken_pct": 1.0
+				},
+				"id": "thorny_ring",
+				"name": "Thorny Ring",
+				"price": 120,
+				"rarity": "epic"
 			},
 			{
 				"description": "No limit on carried special arrows, but they cost 10% more.",
@@ -2918,23 +3153,44 @@ const SIM_DATA = {
 				"rarity": "uncommon"
 			},
 			{
-				"description": "Your allies gain +40 Defense and Fortitude.",
+				"allies_only": true,
+				"description": "Can only be worn by your allies, who then take 33% less damage.",
 				"effects": {
-					"ally_defense_pct": 0.4
+					"damage_taken_pct": -0.33
 				},
 				"id": "guardian_knot",
-				"name": "Guardian Knot",
+				"name": "BFF Bracelet",
 				"price": 70,
 				"rarity": "common"
 			},
 			{
-				"description": "10% chance to survive a killing blow with 1 HP (once a battle).",
+				"description": "25% chance to survive a killing blow with 1 HP (once a battle).",
 				"effects": {
-					"survive_lethal": 0.1
+					"survive_lethal": 0.25
 				},
 				"id": "iron_will_band",
-				"name": "Iron Will Band",
+				"name": "Iron Will Ring",
 				"price": 90,
+				"rarity": "rare"
+			},
+			{
+				"description": "Negative statuses inflicted on you last one turn less.",
+				"effects": {
+					"status_turns_cut": 1
+				},
+				"id": "rebound",
+				"name": "Rebound",
+				"price": 65,
+				"rarity": "uncommon"
+			},
+			{
+				"description": "Poison, burning and bleeding heal you instead of hurting you.",
+				"effects": {
+					"dot_heals": 1
+				},
+				"id": "masochist",
+				"name": "Masochist",
+				"price": 85,
 				"rarity": "rare"
 			},
 			{
@@ -2944,7 +3200,7 @@ const SIM_DATA = {
 					"ignore_ledge_attack": 1
 				},
 				"id": "cliffwalkers_bead",
-				"name": "Cliffwalker's Bead",
+				"name": "Cliffwalker's Beadstring",
 				"price": 50,
 				"rarity": "common"
 			},
@@ -3036,7 +3292,7 @@ const SIM_DATA = {
 					"hp_regen_turn": 1
 				},
 				"id": "moss_charm",
-				"name": "Moss Charm",
+				"name": "Mossy Rock",
 				"price": 55,
 				"rarity": "uncommon"
 			},
@@ -3046,7 +3302,7 @@ const SIM_DATA = {
 					"heal_pct": 0.25
 				},
 				"id": "healers_knot",
-				"name": "Healer's Knot",
+				"name": "Little Sprout",
 				"price": 35,
 				"rarity": "common"
 			},
@@ -3061,12 +3317,12 @@ const SIM_DATA = {
 				"rarity": "uncommon"
 			},
 			{
-				"description": "Regain 5 extra stamina each battle turn.",
+				"description": "Heal 1 HP for every tile you move.",
 				"effects": {
-					"stamina_regen": 5
+					"heal_per_tile": 1
 				},
 				"id": "second_wind_whistle",
-				"name": "Second Wind Whistle",
+				"name": "Fitbit",
 				"price": 40,
 				"rarity": "common"
 			},
@@ -3076,7 +3332,7 @@ const SIM_DATA = {
 					"special_stamina_flat_reduction": 5
 				},
 				"id": "deep_lung_charm",
-				"name": "Deep Lung Charm",
+				"name": "Protein Bars",
 				"price": 70,
 				"rarity": "common"
 			},
@@ -3097,7 +3353,7 @@ const SIM_DATA = {
 					"coin_pct": 0.1
 				},
 				"id": "merchants_coin",
-				"name": "Merchant's Coin",
+				"name": "Metal Detector",
 				"price": 40,
 				"rarity": "common"
 			},
@@ -3112,10 +3368,10 @@ const SIM_DATA = {
 				"rarity": "uncommon"
 			},
 			{
-				"description": "+0.125 attack power and +0.1 damage reduction for every coin you're currently holding -- the more you hoard, the stronger you get.",
+				"description": "+0.03% damage and +0.01% damage reduction for every coin you're holding -- the more you hoard, the stronger you get.",
 				"effects": {
-					"attack_per_coin": 0.125,
-					"defense_per_coin": 0.1
+					"damage_pct_per_coin": 0.0003,
+					"reduction_per_coin": 0.0001
 				},
 				"id": "gilded_scarab",
 				"name": "Gilded Scarab",
@@ -3133,9 +3389,9 @@ const SIM_DATA = {
 				"rarity": "rare"
 			},
 			{
-				"description": "+30% experience gained.",
+				"description": "+50% experience gained.",
 				"effects": {
-					"xp_pct": 0.3
+					"xp_pct": 0.5
 				},
 				"id": "scholars_quill",
 				"name": "Scholar's Quill",
@@ -3148,7 +3404,7 @@ const SIM_DATA = {
 					"move_speed_pct": 0.35
 				},
 				"id": "swift_feather",
-				"name": "Swift Feather",
+				"name": "Scroll of the Swift",
 				"price": 60,
 				"rarity": "common"
 			},
@@ -3158,7 +3414,7 @@ const SIM_DATA = {
 					"reveal_all_locations": 1
 				},
 				"id": "pathfinders_compass",
-				"name": "Pathfinder's Compass",
+				"name": "Compass",
 				"price": 100,
 				"rarity": "rare"
 			},
@@ -3183,7 +3439,7 @@ const SIM_DATA = {
 				"rarity": "rare"
 			},
 			{
-				"description": "Once per run, survive a killing blow with 1 HP.",
+				"description": "Survive a killing blow and rise with full HP and stamina. The ash is spent: it has to be bought again.",
 				"effects": {
 					"phoenix": 1
 				},
@@ -3199,18 +3455,18 @@ const SIM_DATA = {
 					"max_hp_pct": -0.5
 				},
 				"id": "glass_cannon_charm",
-				"name": "Glass Cannon Charm",
+				"name": "Glass Cannon",
 				"price": 150,
 				"rarity": "epic"
 			},
 			{
-				"description": "Heal 25% of all damage you deal -- but potions and food no longer work on you at all.",
+				"description": "Heal 25% of all damage you deal, but healing from anywhere else stops working on you.",
 				"effects": {
 					"disable_healing_items": 1,
 					"lifesteal_pct": 0.25
 				},
 				"id": "vampires_pact",
-				"name": "Vampire's Pact",
+				"name": "Bat Fang",
 				"price": 150,
 				"rarity": "epic"
 			},
@@ -3231,7 +3487,7 @@ const SIM_DATA = {
 					"whirlwind_double_melee": 1
 				},
 				"id": "whirlwind_charm",
-				"name": "Whirlwind Charm",
+				"name": "Double-Blade Technique",
 				"price": 130,
 				"rarity": "epic"
 			},
@@ -3247,7 +3503,7 @@ const SIM_DATA = {
 				"rarity": "epic"
 			},
 			{
-				"description": "Every hit deals somewhere between 50% and 160% of its normal damage, rerolled each time.",
+				"description": "Every hit deals somewhere between 90% and 125% of its normal damage, rerolled each time.",
 				"effects": {
 					"chaos_shard": 1
 				},
@@ -3268,12 +3524,12 @@ const SIM_DATA = {
 				"rarity": "epic"
 			},
 			{
-				"description": "Each hit you land on anything stacks Bloodlust: +5% damage and +7.5% move speed per stack. But 3 turns with no hit landed by anyone crashes it, halving all your stats.",
+				"description": "Each hit on anything (an enemy striking an ally, an ally striking an enemy, anyone at all) stacks +5% damage and +7.5% move speed. Three turns with no hit landed by anyone crashes it and halves your stats.",
 				"effects": {
 					"bloodmoon_fang": 1
 				},
 				"id": "bloodmoon_fang",
-				"name": "Bloodmoon Fang",
+				"name": "Bloodthirsty Idol",
 				"price": 140,
 				"rarity": "epic"
 			},
@@ -3283,7 +3539,7 @@ const SIM_DATA = {
 					"ironclad_ward": 1
 				},
 				"id": "ironclad_ward",
-				"name": "Ironclad Ward",
+				"name": "Steelclad Band",
 				"price": 130,
 				"rarity": "epic"
 			},
@@ -3322,6 +3578,7 @@ const SIM_DATA = {
 			"harm": "magical",
 			"ignore_line": true,
 			"is_boss_tier": true,
+			"is_void": true,
 			"knockback_resist": 0.4,
 			"mage": true,
 			"move_range": 1,
@@ -3442,6 +3699,7 @@ const SIM_DATA = {
 			"harm": "magical",
 			"inflicts_fear": true,
 			"is_undead": true,
+			"is_void": true,
 			"move_range": 3
 		},
 		"Steel Construct": {
@@ -3478,6 +3736,7 @@ const SIM_DATA = {
 			"inflicts_bleed": true,
 			"is_boss_tier": true,
 			"is_miniboss": true,
+			"is_void": true,
 			"move_range": 3,
 			"windup": true
 		},
@@ -4526,6 +4785,7 @@ const SIM_DATA = {
 						"stamina_cost": 60
 					}
 				],
+				"str_per_tier": 4,
 				"width": 18.0
 			},
 			{
@@ -4568,6 +4828,7 @@ const SIM_DATA = {
 						"stamina_cost": 35
 					}
 				],
+				"str_per_tier": 6,
 				"width": 70.0
 			},
 			{
@@ -4608,7 +4869,8 @@ const SIM_DATA = {
 						"name": "BONK",
 						"stamina_cost": 30
 					}
-				]
+				],
+				"str_per_tier": 7
 			},
 			{
 				"active_duration": 0.35,
@@ -4649,6 +4911,7 @@ const SIM_DATA = {
 						"stamina_cost": 15
 					}
 				],
+				"str_per_tier": 5,
 				"sweep_angle_deg": 120.0,
 				"width": 24.0
 			},
@@ -4692,6 +4955,7 @@ const SIM_DATA = {
 						"stamina_cost": 25
 					}
 				],
+				"str_per_tier": 4,
 				"width": 20.0
 			},
 			{
@@ -4710,6 +4974,7 @@ const SIM_DATA = {
 				"shape": "rect",
 				"shop_description": "Keep your distance and let them do all the walking.",
 				"specials": [],
+				"str_per_tier": 5,
 				"width": 14.0
 			},
 			{
@@ -4752,6 +5017,7 @@ const SIM_DATA = {
 						"stamina_cost": 55
 					}
 				],
+				"str_per_tier": 4,
 				"width": 30.0
 			},
 			{
@@ -4795,6 +5061,7 @@ const SIM_DATA = {
 						"stamina_cost": 55
 					}
 				],
+				"str_per_tier": 4,
 				"width": 26.0
 			}
 		],
@@ -4812,6 +5079,7 @@ const SIM_DATA = {
 			"shop_description": "Everyone starts somewhere. Won't win you any medals, but it won't cost you a copper either.",
 			"specials": [
 				{
+					"cost_pct_max": 0.2,
 					"description": "120% damage that ignores rock cover, and permanently slows the target by 1 tile of movement (down to a minimum of 1).",
 					"dmg_mult": 1.2,
 					"effect": "leg_blow",
@@ -4820,15 +5088,17 @@ const SIM_DATA = {
 					"stamina_cost": 30
 				},
 				{
+					"cost_pct_max": 0.4,
 					"description": "60% damage, and heals you for ~10% of your max HP.",
 					"dmg_mult": 0.6,
 					"effect": "self_heal",
 					"id": "club_second_wind",
 					"name": "Second Wind",
-					"stamina_cost": 35
+					"stamina_cost": 10
 				},
 				{
-					"description": "130% damage, plus 50% more against a target still at full HP.",
+					"cost_pct_max": 0.5,
+					"description": "130% damage, plus 50% more against a target still at full HP. A kill sets off Berserk.",
 					"dmg_mult": 1.3,
 					"effect": "full_hp_bonus",
 					"id": "club_heavy_swing",
@@ -4836,6 +5106,7 @@ const SIM_DATA = {
 					"stamina_cost": 30
 				}
 			],
+			"str_bonus": 2,
 			"width": 36.0
 		},
 		"consts": {
@@ -4895,7 +5166,8 @@ const SIM_DATA = {
 					"tier_name": "Mythic",
 					"weight": 0.5
 				}
-			]
+			],
+			"UNIQUE_DROP_CHANCE": 0.005
 		},
 		"materials": [
 			{
@@ -5249,6 +5521,11 @@ const WANDER_DIRS = MC.WANDER_DIRS.map((d) => V(d[0], d[1]));
 
 // ---------------------------------------------------------------- data lookups
 const clone = (o) => JSON.parse(JSON.stringify(o));
+// What a special costs: its flat stamina_cost plus cost_pct_max of the user's whole pool ("30 + 20% of max stamina").
+function special_cost(sp, max_pool) {
+  const flat = sp.stamina_cost || 0, pct = sp.cost_pct_max || 0;
+  return pct > 0 ? Math.max(1, flat + round(max_pool * pct)) : flat;
+}
 const W = D.weapons;
 function weaponBases() { return [W.club, ...W.bases]; }
 function baseById(id) { return weaponBases().find((b) => b.id === id) || null; }
@@ -5270,8 +5547,15 @@ function slotsForLevel(level) {
 
 // ---------------------------------------------------------------- weapon variants (Weapons.gd)
 // Mirrors Weapons._build_tiered_variant / _build_mythic_variant exactly.
+// The flat Strength / Magic a weapon carries (the doc: "+4 STR per quality tier"): a set amount per rung of the quality ladder.
+function stampStatBonuses(v, base, tier) {
+  if (base.str_per_tier !== undefined) v.str_bonus = Math.trunc(base.str_per_tier) * Math.trunc(tier.rank || 0);
+  if (base.magic_per_tier !== undefined) v.magic_bonus = Math.trunc(base.magic_per_tier) * Math.trunc(tier.rank || 0);
+}
+
 function buildTieredVariant(base, tier, material) {
   const v = clone(base);
+  stampStatBonuses(v, base, tier);
   v.tier_name = tier.tier_name;
   v.required_might = tier.required_might;
   if (tier.required_intimidation !== undefined) v.required_intimidation = tier.required_intimidation;
@@ -5293,6 +5577,7 @@ function buildTieredVariant(base, tier, material) {
 function buildMythicVariant(base, tier) {
   const myth = W.mythics[base.id];
   const v = clone(base);
+  stampStatBonuses(v, base, tier);
   v.tier_name = tier.tier_name;
   v.required_might = tier.required_might;
   if (tier.required_intimidation !== undefined) v.required_intimidation = tier.required_intimidation;
@@ -5497,7 +5782,7 @@ class Player {
     this.real_miss = cfg.real_miss !== false;
     this._rebuild_talisman_cache();
     // Max stamina counts talismans and the worn armour (Cindermail's heat), as the game's Sandbox does.
-    this.max_stamina = this._base_max_stamina + Math.trunc(this.talisman_bonus("max_stamina")) + this.armor_max_stamina_bonus();
+    this.max_stamina = this.stamina_cap();
 
     const wsel = cfg.weapon || { base: "club" };
     const weapon = buildWeapon(wsel);
@@ -5526,7 +5811,7 @@ class Player {
         case "strength": this.stat_strength += 1 + this.meta_levelup_bonus_strength; break;
         case "vigor": this.stat_vigor += 1 + this.meta_levelup_bonus_vigor; break;
         case "agility": this.stat_agility += PC.AGILITY_BONUS_PER_LEVEL + this.meta_levelup_bonus_agility; break;
-        case "might": this.stat_might += 1 + this.meta_levelup_bonus_might; break;
+        case "might": this.stat_might += 1 + this.meta_levelup_bonus_might; this.max_stamina = this.stamina_cap(); break;
         case "resilience": this.stat_resilience += 1; break;
         case "reflexes": this.stat_reflexes += 1; break;
         case "dexterity": this.stat_dexterity += 1; break;
@@ -5626,9 +5911,13 @@ class Player {
   low_hp_damage_bonus_total() { return this.meta_low_hp_damage_bonus_pct + this.talisman_bonus("low_hp_damage_pct"); }
   low_hp_threshold() { const t = this.talisman_bonus("low_hp_threshold"); return t > 0 ? t : 0.3; }
   fall_damage_factor() { return Math.max(0.0, 1.0 - this.talisman_bonus("fall_reduction")); }
-  crit_damage_mult() { return 2.0 + this.talisman_bonus("crit_damage_mult_bonus"); }
-  coin_scaled_attack_bonus() { return this.talisman_bonus("attack_per_coin") * this.coins; }
-  coin_scaled_defense_bonus() { return this.talisman_bonus("defense_per_coin") * this.coins; }
+  crit_damage_mult() { return PC.CRIT_BASE_MULT + this.talisman_bonus("crit_damage_mult_bonus"); }
+  // The whole stamina pool: 100 and the Church's bonus, +3 per Might, then talismans and armour.
+  stamina_cap() { return this._base_max_stamina + PC.STAMINA_PER_MIGHT * this.stat_might + Math.trunc(this.talisman_bonus("max_stamina")) + this.armor_max_stamina_bonus(); }
+  // Your Strength plus the flat Strength the weapon in hand carries.
+  effective_strength() { return this.attack_damage + ((this.current_weapon || {}).str_bonus || 0); }
+  coin_damage_mult() { return 1.0 + this.talisman_bonus("damage_pct_per_coin") * this.coins; }
+  coin_reduction() { return this.talisman_bonus("reduction_per_coin") * this.coins; }
   get_weapon_upgrade_level(id) { return this.weapon_upgrade_levels[id] || 0; }
   get_armor_upgrade_level(id) { return this.armor_upgrade_levels[id] || 0; }
 
@@ -5660,7 +5949,7 @@ class Player {
     return total;
   }
   armor_damage_reduction() {
-    let total = this.armor_tier_damage_reduction() + this.clothing_damage_reduction() + this.talisman_bonus("damage_reduction") + this.coin_scaled_defense_bonus();
+    let total = this.armor_tier_damage_reduction() + this.clothing_damage_reduction() + this.talisman_bonus("damage_reduction");
     if (this.talisman_bonus("ironclad_ward") > 0) total *= 2.5;
     if (this.bloodmoon_debuffed) total *= 0.5;
     return total;
@@ -5796,7 +6085,11 @@ class Player {
   }
 
   // ------------------------------------------------------------ health / stamina
-  heal(amount) { this.health = clamp(this.health + amount, 0, this.max_health); }
+  // from_hit: healing out of a blow you land (lifesteal) -- the one kind Bat Fang leaves alone.
+  heal(amount, from_hit = false) {
+    if (!from_hit && this.talisman_bonus("disable_healing_items") > 0) return;
+    this.health = clamp(this.health + amount, 0, this.max_health);
+  }
   restore_health(amount) { this.health = clamp(amount, 0, this.max_health); }
   reset_stamina() { this.stamina = this.max_stamina; this.exhausted = false; }
   reset_stamina_for_battle() { this.stamina = round(this.max_stamina * PC.BATTLE_START_STAMINA_PCT); this.exhausted = false; }
@@ -5833,7 +6126,7 @@ class Player {
   }
   _consume_potion(id) {
     const tier = consumableById(id);
-    let heal_amount = tier.heal_amount !== undefined ? tier.heal_amount : PC.ITEM_HEAL_AMOUNT;
+    let heal_amount = (tier.heal_amount !== undefined ? tier.heal_amount : PC.ITEM_HEAL_AMOUNT) + round(this.max_health * (tier.heal_max_hp_pct || 0));
     const heal_bonus_pct = this.meta_healing_bonus_pct + this.talisman_bonus("heal_pct");
     if (heal_bonus_pct > 0) heal_amount = round(heal_amount * (1.0 + heal_bonus_pct));
     this.heal(heal_amount);
@@ -5848,10 +6141,16 @@ class Player {
 
   // ------------------------------------------------------------ damage
   _try_phoenix() {
-    if (this.phoenix_used || this.talisman_bonus("phoenix") <= 0) return false;
-    this.phoenix_used = true; this.health = 1; return true;
+    if (this.talisman_bonus("phoenix") <= 0) return false;
+    this.phoenix_used = true;
+    // The ash is spent: it leaves the slot, and the fighter rises on full HP and stamina.
+    this.equipped_talismans = this.equipped_talismans.filter((id) => !((talismanById(id) || {}).effects || {}).phoenix);
+    this._rebuild_talisman_cache();
+    this.health = this.max_health; this.stamina = this.max_stamina; return true;
   }
-  take_battle_damage(amount) {
+  take_battle_damage(amount, indirect = false) {
+    // Honour: only a direct attack hurts you.
+    if (indirect && this.talisman_bonus("direct_only") > 0) return;
     this.health -= amount;
     if (this.health <= 0) {
       const survive = this.meta_favour_chance + this.talisman_bonus("survive_lethal");
@@ -5880,7 +6179,7 @@ class Player {
   }
   _level_up() {
     this.level += 1;
-    this.stat_intimidation += 1; this.stat_strength += 1; this.stat_vigor += 1; this.stat_agility += 1; this.stat_might += 1;
+    this.stat_intimidation += 1; this.stat_strength += 1; this.stat_vigor += 1; this.stat_agility += 1; this.stat_might += 1; this.max_stamina = this.stamina_cap();
     if (this.meta_resilience_unlocked) this.stat_resilience += 1;
     if (this.meta_reflexes_unlocked) this.stat_reflexes += 1;
     if (this.meta_dexterity_unlocked) this.stat_dexterity += 1;
@@ -6002,7 +6301,8 @@ class Sim {
 
   // ---------------------------------------------------------------- player setup helpers
   _battle_player_move_range() {
-    let bonus = Math.max(0, Math.trunc((this.player.stat_agility - PC.AGILITY_START) / MC.AGILITY_PER_EXTRA_MOVE));
+    const speed_rating = 5 + Math.trunc((this.player.stat_agility - PC.AGILITY_START) / PC.AGILITY_BONUS_PER_LEVEL);
+    let bonus = Math.max(0, Math.floor(MC.MOVE_TILES_PER_SPEED * speed_rating + 0.0001));
     // Berserk: an extra tile of reach for as long as it lasts.
     if (this.player.berserk_turns_remaining > 0) bonus += this._berserk_move_bonus();
     if (this.player.potion_energy_turns > 0) bonus += MC.ENERGY_POTION_MOVE_BONUS;
@@ -6131,7 +6431,7 @@ class Sim {
     return { tile: nt, moved: true };
   }
 
-  // Water: extinguishes burning (and Ember Charm's fire) and pushes along its current.
+  // Water: extinguishes burning (and Pyrogenesis Organ's fire) and pushes along its current.
   _apply_water_push(tile, unit = null) {
     const terrain = this.terrainAt(tile);
     if (!terrain || terrain.type !== "water") return tile;
@@ -6509,11 +6809,11 @@ Object.assign(Sim.prototype, {
     // Shadowweave: the hit after a dodge is a guaranteed crit.
     const shadow_forced_crit = you && this.battle_shadow_crit;
     if (shadow_forced_crit) this.battle_shadow_crit = false;
-    const base_attack = attack_stat >= 0 ? attack_stat : p.attack_damage;
+    const base_attack = attack_stat >= 0 ? attack_stat : p.attack_damage + (weapon.str_bonus || 0);
     let dmg = round(base_attack * (weapon.damage_mult ?? 1.0) * dmg_mult);
     if (attack_stat >= 0) dmg = Math.max(1, dmg);
     if (flat_dmg >= 0) dmg = flat_dmg;
-    else if (you) dmg += round(p.coin_scaled_attack_bonus());
+    else if (you) dmg = round(dmg * p.coin_damage_mult());
     if (p.pichaku_active && effect === "") dmg = round(dmg * MC.PICHAKU_DAMAGE_MULT);
     if (you && p.shield_damage_penalty_pct() > 0) dmg = round(dmg * (1.0 - p.shield_damage_penalty_pct()));
     if (p.temp_damage_bonus_pct !== 0) dmg = round(dmg * (1.0 + p.temp_damage_bonus_pct));
@@ -6547,9 +6847,12 @@ Object.assign(Sim.prototype, {
       const ut = TRAITS[u.name] || {};
       if (ut.is_undead || ut.is_boss_tier) dmg = round(dmg * (1.0 + undead_boss_bonus));
     }
+    // Retribution: a mage-slayer -- more damage to mages, less to everything else.
+    const vs_mage = weapon.passive_damage_vs_mage_mult ?? 1.0, vs_other = weapon.passive_damage_vs_nonmage_mult ?? 1.0;
+    if (vs_mage !== 1.0 || vs_other !== 1.0) dmg = round(dmg * ((TRAITS[u.name] || {}).mage ? vs_mage : vs_other));
     let is_crit = blind_forced_crit || stealth_forced_crit || bleeding_cut_forced_crit || shadow_forced_crit;
     // Grunkle Gloves: 1.3x the wielder's crit chance and 1.2x crit damage.
-    const crit_chance = p.crit_chance_total() * (weapon.passive_crit_chance_mult || 1.0);
+    const crit_chance = p.crit_chance_total() * (weapon.passive_crit_chance_mult || 1.0) + (you ? (weapon.passive_crit_chance_bonus || 0) : 0);
     if (you && !is_crit && crit_chance > 0 && rng.randf() < crit_chance) is_crit = true;
     if (is_crit) dmg = round(dmg * p.crit_damage_mult() * (weapon.passive_crit_damage_mult || 1.0));
     if (you && p.potion_attack_turns > 0) dmg = round(dmg * (1.0 + MC.ATTACK_POTION_DAMAGE_BONUS_PCT));
@@ -6588,7 +6891,7 @@ Object.assign(Sim.prototype, {
     this.battle_had_combat_action_this_cycle = true;
     if (you) {
       const ls = p.talisman_bonus("lifesteal_pct");
-      if (ls > 0 && dmg > 0) p.heal(Math.max(1, round(dmg * ls)));
+      if (ls > 0 && dmg > 0) p.heal(Math.max(1, round(dmg * ls)), true);
       if (p.talisman_bonus("momentum_chain") > 0) this.battle_momentum_chain_stacks += 1;
       if (p.talisman_bonus("bloodmoon_fang") > 0 && p.bloodmoon_stacks < PC.BLOODMOON_MAX_STACKS && !p.bloodmoon_debuffed) { p.bloodmoon_stacks += 1; p._recalc_stats(); }
     }
@@ -6606,18 +6909,28 @@ Object.assign(Sim.prototype, {
       delete p.weapon_enchantments[broken_id];
       p._equip_weapon(clone(W.club));
     }
-    if (effect === "lifesteal") { const h = Math.max(1, round(dmg * MC.LIFESTEAL_PCT)); p.heal(h); this.log(`You drain ${h} HP from the wound.`); }
+    if (effect === "lifesteal") { const h = Math.max(1, round(dmg * MC.LIFESTEAL_PCT)); p.heal(h, true); this.log(`You drain ${h} HP from the wound.`); }
     if (effect === "leg_blow" && u.hp > 0) { u.move_range = Math.max(1, Math.trunc(u.move_range) - 1); this.log(`The ${u.name} is hobbled, slowing it down!`); }
     if (effect === "low_sweep" && u.hp > 0 && rng.randf() < this._proc(MC.LOW_SWEEP_CHANCE)) { u.move_range = Math.max(1, Math.trunc(u.move_range / 2)); this.log(`The ${u.name} is swept off its feet, slowed dramatically!`); }
     if (effect === "crushing_collision" && u.hp > 0 && u.armored) { u.armored = false; this.log(`The ${u.name}'s armor is shattered!`); }
     if (effect === "bonk" && u.hp > 0) { u.concussed_turns = MC.BONK_CONCUSSED_TURNS; this.log(`The ${u.name} is left dazed and concussed!`); }
     if (effect === "wrist_strike" && u.hp > 0) { u.disarmed_tile = this._pick_disarm_tile(); this.log(`The ${u.name}'s weapon is knocked loose!`); }
     if (effect === "arrow_flame" && u.hp > 0) { u.burning = true; this.log(`The ${u.name} catches fire!`); }
-    // Ember Charm (talisman)
+    // Pyrogenesis Organ (talisman)
     if (you && u.hp > 0 && !u.burning) {
       let burn_chance = is_multihit ? p.talisman_bonus("burn_chance_multihit") : p.talisman_bonus("burn_chance");
       burn_chance = this._proc(burn_chance);
       if (burn_chance > 0 && rng.randf() < burn_chance) { this._ignite_with_ember(u); this.log(`The ${u.name} catches fire!`); }
+    }
+    // Rusted Edge (talisman): a chance for any landed hit to poison the target.
+    if (you && u.hp > 0 && !(u.poison_turns > 0)) {
+      const rust = this._proc(p.talisman_bonus("poison_chance"));
+      if (rust > 0 && rng.randf() < rust) { u.poison_turns = MC.POISON_TURNS; u.poison_dmg = Math.max(1, round(u.max_hp * MC.POISON_DAMAGE_PCT)); this.log(`The ${u.name} is poisoned!`); }
+    }
+    // Fake PHD (talisman): a chance for a hit to leave a random negative status.
+    if (you && u.hp > 0) {
+      const phd = this._proc(p.talisman_bonus("random_status_chance"));
+      if (phd > 0 && rng.randf() < phd) this._inflict_random_status(u);
     }
     if (you && u.hp > 0 && (weapon.material_id || "") === "bone") {
       let dread = MC.BONE_DREAD_CHANCE;
@@ -6643,9 +6956,9 @@ Object.assign(Sim.prototype, {
       if (this._in_battle_bounds(behind_tile) && !this._battle_tile_occupied(behind_tile, u.ref)) { u.tile = behind_tile; this.log(`The ${u.name} is hurled behind you!`); }
     }
     const passive_ls = weapon.passive_lifesteal_pct || 0;
-    if (passive_ls > 0 && dmg > 0) { const h = Math.max(1, round(dmg * passive_ls)); p.heal(h); this.log(`Your weapon drains ${h} HP from the wound.`); }
+    if (passive_ls > 0 && dmg > 0) { const h = Math.max(1, round(dmg * passive_ls)); p.heal(h, true); this.log(`Your weapon drains ${h} HP from the wound.`); }
     const heal_chance = weapon.passive_heal_chance || 0;
-    if (heal_chance > 0 && rng.randf() < this._proc(heal_chance)) { const hf = Math.trunc(weapon.passive_heal_flat || 0) + round(p.max_health * (weapon.passive_heal_max_hp_pct || 0)); p.heal(hf); this.log(`Your spear drinks deep -- you feel ${hf} HP return.`); }
+    if (heal_chance > 0 && rng.randf() < this._proc(heal_chance)) { const hf = Math.trunc(weapon.passive_heal_flat || 0) + round(p.max_health * (weapon.passive_heal_max_hp_pct || 0)); p.heal(hf, true); this.log(`Your spear drinks deep -- you feel ${hf} HP return.`); }
     // The Great Toothpicke's poison chance, and Second Best's concussion chance.
     const poison_chance = weapon.passive_poison_chance || 0;
     if (poison_chance > 0 && u.hp > 0 && rng.randf() < this._proc(poison_chance)) { u.poison_turns = MC.POISON_TURNS; u.poison_dmg = Math.max(1, round(u.max_hp * MC.POISON_DAMAGE_PCT)); this.log(`The ${u.name} is poisoned!`); }
@@ -6654,7 +6967,7 @@ Object.assign(Sim.prototype, {
     const self_damage_pct = weapon.passive_self_damage_pct || 0;
     if (self_damage_pct > 0 && dmg > 0 && you) {
       const recoil = Math.max(1, round(dmg * self_damage_pct));
-      p.take_battle_damage(recoil);
+      p.take_battle_damage(recoil, true);
       this.log(`The recoil sears you for ${recoil} damage.`, "bad");
       this._check_player_dead();
     }
@@ -6718,7 +7031,7 @@ Object.assign(Sim.prototype, {
   },
   _ignite_with_ember(u) {
     u.burning = true;
-    if (this.player.talisman_bonus("ember_burn") > 0) u.burn_value = MC.EMBER_BURN_BASE + this.player.attack_damage / MC.EMBER_BURN_ATTACK_DIV;
+    if (this.player.talisman_bonus("ember_burn") > 0) u.burn_value = MC.EMBER_BURN_BASE + this.player.effective_strength() / MC.EMBER_BURN_ATTACK_DIV;
   },
   _proc(chance) { return Math.min(1.0, chance * this.player.secondary_chance_mult()); },
 
@@ -6729,7 +7042,7 @@ Object.assign(Sim.prototype, {
     const blast = Math.max(1, fire_tick_dmg * MC.WILDFIRE_EXPLOSION_FIRE_MULT);
     this.log("The blaze erupts outward!", "bad");
     if (this._in_blast_radius(this.battle_player_tile, center, MC.WILDFIRE_EXPLOSION_RADIUS)) {
-      p.take_battle_damage(blast); this.player_burning = true;
+      p.take_battle_damage(blast, true); this.player_burning = true;
       this.log(`You're caught in the blast for ${blast} damage and catch fire!`, "bad");
       this._check_player_dead();
     }
@@ -6885,7 +7198,7 @@ Object.assign(Sim.prototype, {
     const target_tile = vclone(this.battle_units[idx].tile);
     if (this.rng.randf() < MC.DIAMONDS_MISS_CHANCE) {
       const self_dmg = Math.max(1, round(this.player.max_health * MC.DIAMONDS_MISS_SELF_DAMAGE_PCT));
-      this.player.take_battle_damage(self_dmg);
+      this.player.take_battle_damage(self_dmg, true);
       this.log(`You misjudge the jump and crash down hard, taking ${self_dmg} damage!`, "bad");
       this._check_player_dead();
       return;
@@ -6911,11 +7224,30 @@ Object.assign(Sim.prototype, {
     const cost = Math.trunc(this.player.current_weapon.heavy_stamina_cost_override ?? W.consts.HEAVY_STAMINA_COST);
     await this._battle_perform_attack({ stamina_cost: cost, dmg_mult: W.consts.HEAVY_DAMAGE_MULT, effect: "", name: "Heavy Attack" });
   },
+  // Fake PHD: one of the enemy's negative statuses, picked at random and given its usual length.
+  _inflict_random_status(u) {
+    const kinds = ["poison", "burn", "bleed", "freeze", "concuss", "blind", "vulnerable", "stun", "fear"];
+    const k = kinds[Math.floor(this.rng.randf() * kinds.length) % kinds.length];
+    const nm = u.name;
+    switch (k) {
+      case "poison": u.poison_turns = MC.POISON_TURNS; u.poison_dmg = Math.max(1, round(u.max_hp * MC.POISON_DAMAGE_PCT)); this.log(`The ${nm} is poisoned!`); break;
+      case "burn": u.burning = true; this.log(`The ${nm} catches fire!`); break;
+      case "bleed": u.bleed_turns = MC.BLEED_BASE_TURNS; this.log(`The ${nm} starts to bleed!`); break;
+      case "freeze": u.frozen_turns = MC.ARROW_FREEZE_MIN_TURNS + Math.floor(this.rng.randf() * (MC.ARROW_FREEZE_MAX_TURNS - MC.ARROW_FREEZE_MIN_TURNS + 1)); this.log(`The ${nm} freezes solid!`); break;
+      case "concuss": u.concussed_turns = MC.BONK_CONCUSSED_TURNS; this.log(`The ${nm} is concussed!`); break;
+      case "blind": u.blind_turns = MC.BLINDNESS_TURNS; this.log(`The ${nm} is blinded!`); break;
+      case "vulnerable": u.vulnerable_turns = MC.VULNERABLE_TURNS; this.log(`The ${nm} is left vulnerable!`); break;
+      case "stun": u.stunned = true; this.log(`The ${nm} is stunned!`); break;
+      default: u.feared = true; this.log(`The ${nm} cowers in dread!`);
+    }
+  },
   async _battle_player_special(index) {
     const specials = this.player.current_weapon.specials || [];
     if (index < 0 || index >= specials.length) return;
     let action = specials[index];
     if (action.learned === false) { this.log(`You haven't learned ${action.name} yet.`); return; }
+    // A share-of-the-pool price (the Club's "30 + 20% of max stamina") is worked out against today's maximum.
+    if ((action.cost_pct_max || 0) > 0) { action = clone(action); action.stamina_cost = special_cost(action, this.player.max_stamina); delete action.cost_pct_max; }
     if (this.player.current_weapon.passive_free_specials) { action = clone(action); action.stamina_cost = 0; }
     const free_chance = this.player.current_weapon.passive_free_special_chance || 0;
     if (action.stamina_cost > 0 && free_chance > 0 && this.rng.randf() < this._proc(free_chance)) {
@@ -6932,7 +7264,7 @@ Object.assign(Sim.prototype, {
     this.stat_action(kind + " arrow");
     if (kind === "bomb") this._resolve_bomb_arrow(vclone(this.battle_units[idx].tile));
     else if (kind === "flame") {
-      const flame_dmg = MC.ARROW_FLAME_FLAT_DMG + round(p.attack_damage * MC.ARROW_FLAME_DMG_STAT_PCT);
+      const flame_dmg = MC.ARROW_FLAME_FLAT_DMG + round(p.effective_strength() * MC.ARROW_FLAME_DMG_STAT_PCT);
       this._apply_single_hit(idx, 1.0, "arrow_flame", p.current_weapon, "You", null, flame_dmg);
     } else this._apply_single_hit(idx, 1.0, "arrow_freeze", p.current_weapon, "You", null, MC.ARROW_FREEZE_FLAT_DMG);
     p.owned_arrows[kind] -= 1;
@@ -6953,7 +7285,7 @@ Object.assign(Sim.prototype, {
     for (const idx of targets) this._apply_single_hit(idx, 1.0, "arrow_bomb", p.current_weapon, "You", null, MC.ARROW_BOMB_FLAT_DMG);
     for (const a of this.battle_allies) if (a.hp > 0 && this._in_blast_radius(a.tile, center, MC.ARROW_BOMB_RADIUS)) { a.hp -= MC.ARROW_BOMB_FLAT_DMG; this.log(`Your ${a.name} is caught in the blast!`); }
     if (this._in_blast_radius(this.battle_player_tile, center, MC.ARROW_BOMB_RADIUS)) {
-      p.take_battle_damage(MC.ARROW_BOMB_FLAT_DMG);
+      p.take_battle_damage(MC.ARROW_BOMB_FLAT_DMG, true);
       this.log(`You're caught in your own blast for ${MC.ARROW_BOMB_FLAT_DMG} damage!`, "bad");
       this._check_player_dead();
     }
@@ -6987,6 +7319,7 @@ Object.assign(Sim.prototype, {
       case "resilience_buff": p.potion_resilience_turns = MC.POTION_BUFF_TURNS; this.log("Your skin hardens against incoming blows!"); break;
       case "energy_buff": p.potion_energy_turns = MC.POTION_BUFF_TURNS; this.log("Your legs feel lighter -- extra reach on your next turns of movement!"); break;
       case "restore_stamina": p.reset_stamina(); this.log("Stamina rushes back into you!"); break;
+      case "restore_mana": this.log("Mana floods back into your casters (the simulator fields none)."); break;
     }
     // Battle Medic: a healing item used in battle lashes every enemy for a little damage.
     if (p.meta_battle_medic_damage > 0) {
@@ -7076,7 +7409,7 @@ Object.assign(Sim.prototype, {
       this.battle_bloodmoon_quiet_turns += 1;
       if (this.battle_bloodmoon_quiet_turns >= MC.BLOODMOON_QUIET_TURNS_LIMIT && !p.bloodmoon_debuffed) {
         p.bloodmoon_debuffed = true; p.bloodmoon_stacks = 0; p._recalc_stats();
-        this.log("Bloodmoon Fang crashes -- your stats are halved!", "bad");
+        this.log("Bloodthirsty Idol crashes -- your stats are halved!", "bad");
       }
     }
     this.battle_had_combat_action_this_cycle = false;
@@ -7194,7 +7527,7 @@ Object.assign(Sim.prototype, {
       this.battle_move_trail = [];
       return true;
     }
-    if (p.talisman_bonus("ironclad_ward") > 0 && !this.battle_ironclad_move_allowed) { this.log("Ironclad Ward roots you to the spot this turn."); return false; }
+    if (p.talisman_bonus("ironclad_ward") > 0 && !this.battle_ironclad_move_allowed) { this.log("Steelclad Band roots you to the spot this turn."); return false; }
     if (this.battle_player_moves_left <= 0) { this.log("No moves left this turn."); return false; }
     this.battle_menu_state = "move";
     this.battle_move_undo = {
@@ -7227,11 +7560,12 @@ Object.assign(Sim.prototype, {
       if (fall_mult <= 0) this.log(`Your ${p.equipped_armor.name} lets you shrug off the fall.`);
       else {
         const dmg = round(p.max_health * MC.CLIFF_FALL_DAMAGE_PCT * fall_mult);
-        p.take_battle_damage(dmg);
+        p.take_battle_damage(dmg, true);
         this.log(`You fall! Took ${dmg} damage.`, "bad");
         this._check_player_dead();
       }
     }
+    this._fitbit_heal();
   },
 
   _try_battle_ally_move(dir) {
@@ -7291,13 +7625,24 @@ Object.assign(Sim.prototype, {
     if (magical_part > 0) total += this._reduce_magical(magical_part);
     // Berserk: the whole hit is cut, after every other reduction.
     if (p.berserk_turns_remaining > 0 && total > 0) total = Math.max(1, round(total * (1.0 - this._berserk_taken_cut())));
+    // Retribution in hand: mages hurt a little less, everything else a little more.
+    const held = p.current_weapon;
+    if (held.passive_taken_from_mage_mult !== undefined && total > 0) total = Math.max(1, round(total * (traits.mage ? held.passive_taken_from_mage_mult : (held.passive_taken_from_nonmage_mult ?? 1.0))));
+    // Resilience Potion: the blow is a fifth smaller (-20% damage taken, not points of Defense).
+    if (p.potion_resilience_turns > 0 && total > 0) total = Math.max(1, round(total * (1.0 - MC.RESILIENCE_POTION_DAMAGE_REDUCTION_PCT)));
+    // Gilded Scarab: a little more cut for every coin held (never more than half the blow).
+    const coin_cut = Math.min(0.5, p.coin_reduction());
+    if (coin_cut > 0 && total > 0) total = Math.max(1, round(total * (1.0 - coin_cut)));
+    // Thorny Ring doubles what lands on you.
+    const taken_pct = p.talisman_bonus("damage_taken_pct");
+    if (taken_pct !== 0 && total > 0) total = Math.max(1, round(total * Math.max(0.0, 1.0 + taken_pct)));
     return total;
   },
 
   // The cuts that apply to either kind of harm: a Resilience Potion and Last Stand.
   _generic_reduction() {
     const p = this.player;
-    let generic = p.potion_resilience_turns > 0 ? MC.RESILIENCE_POTION_DAMAGE_REDUCTION_PCT : 0.0;
+    let generic = 0.0;
     if (p.meta_last_stand_pct_per_10 > 0) {
       const missing = 1.0 - p.health / p.max_health;
       generic += p.meta_last_stand_pct_per_10 * Math.floor(missing * 10.0);
@@ -7420,7 +7765,7 @@ Object.assign(Sim.prototype, {
     if (r.fell) {
       const fall_mult = (p.equipped_armor.fall_damage_mult ?? 1.0) * p.fall_damage_factor();
       if (fall_mult <= 0) this.log(`Your ${p.equipped_armor.name} lets you shrug off the fall.`);
-      else { const dmg = round(p.max_health * MC.CLIFF_FALL_DAMAGE_PCT * fall_mult); p.take_battle_damage(dmg); this.log(`You fall! Took ${dmg} damage.`, "bad"); this._check_player_dead(); }
+      else { const dmg = round(p.max_health * MC.CLIFF_FALL_DAMAGE_PCT * fall_mult); p.take_battle_damage(dmg, true); this.log(`You fall! Took ${dmg} damage.`, "bad"); this._check_player_dead(); }
     }
   },
 
@@ -7502,9 +7847,9 @@ Object.assign(Sim.prototype, {
         this.battle_momentum_chain_stacks = 0; this.battle_player_turns_to_skip += 1;
         this.log("The chain breaks -- you're staggered!", "bad");
       }
-      if (traits.inflicts_concussion && rng.randf() < MC.CONCUSSION_INFLICT_CHANCE) { this.player_concussed_turns = MC.PLAYER_CONCUSSION_TURNS; this.log("The blow leaves you dazed!", "bad"); }
-      if (traits.inflicts_bleed && this.player_bleed_turns <= 0) { this.player_bleed_turns = MC.BLEED_BASE_TURNS; this.log("The wound leaves you bleeding!", "bad"); }
-      if (traits.inflicts_blind) { this.player_blind_turns = MC.BLINDNESS_TURNS; this.log("Your vision swims -- you're blinded!", "bad"); }
+      if (traits.inflicts_concussion && rng.randf() < MC.CONCUSSION_INFLICT_CHANCE) { this.player_concussed_turns = this._status_len(MC.PLAYER_CONCUSSION_TURNS); this.log("The blow leaves you dazed!", "bad"); }
+      if (traits.inflicts_bleed && this.player_bleed_turns <= 0) { this.player_bleed_turns = this._status_len(MC.BLEED_BASE_TURNS); this.log("The wound leaves you bleeding!", "bad"); }
+      if (traits.inflicts_blind) { this.player_blind_turns = this._status_len(MC.BLINDNESS_TURNS); this.log("Your vision swims -- you're blinded!", "bad"); }
       this._check_player_dead();
       return { dmg, is_player: true, target_name: "", dodged: false };
     }
@@ -7517,7 +7862,7 @@ Object.assign(Sim.prototype, {
     let target_ally = null;
     for (const a of this.battle_allies) if (veq(a.tile, target_tile)) { target_ally = a; break; }
     if (target_ally) {
-      // Defense and Fortitude bend on the Defense.gd curve (80% ceiling, the Guardian's 90%); Guardian Knot and
+      // Defense and Fortitude bend on the Defense.gd curve (80% ceiling, the Guardian's 90%); BFF Bracelet and
       // Last Stand are extra points pooled into both. Bodily harm uses Defense, magical harm Fortitude (both: half and half).
       let ally_extra = p.talisman_bonus("ally_defense_pct") * 100.0;
       if (p.meta_last_stand_pct_per_10 > 0) {
@@ -7793,25 +8138,24 @@ Object.assign(Sim.prototype, {
     const rng = this.rng;
     // end-of-round statuses on the player
     if (this.player_poison_turns > 0) {
-      this.player_poison_turns -= 1; p.take_battle_damage(this.player_poison_dmg);
-      this.log(`You're poisoned for ${this.player_poison_dmg} damage!`, "bad");
+      this.player_poison_turns -= 1; this._hero_dot_damage(this.player_poison_dmg, `You're poisoned for ${this.player_poison_dmg} damage!`, "poison");
       if (p.health <= 0) { this._check_player_dead(); return; }
     }
     if (this.player_bleed_turns > 0) {
       this.player_bleed_turns -= 1;
       const bd = Math.max(1, round(p.max_health * MC.BLEED_DAMAGE_PCT));
-      p.take_battle_damage(bd); this.log(`You're bleeding for ${bd} damage!`, "bad");
+      this._hero_dot_damage(bd, `You're bleeding for ${bd} damage!`, "bleeding");
       if (p.health <= 0) { this._check_player_dead(); return; }
     }
     if (this.player_burning) {
       const bd = Math.max(1, round(p.max_health / MC.BURN_DAMAGE_DIVISOR));
-      p.take_battle_damage(bd); this.log(`You burn for ${bd} damage!`, "bad");
+      this._hero_dot_damage(bd, `You burn for ${bd} damage!`, "fire");
       if (p.health <= 0) { this._check_player_dead(); return; }
     }
     if (this.player_concussed_turns > 0) {
       this.player_concussed_turns -= 1;
       if (rng.randf() < MC.PLAYER_CONCUSSION_CHANCE) {
-        const cd = p.stat_might; p.take_battle_damage(cd);
+        const cd = p.stat_might; p.take_battle_damage(cd, true);
         this.log(`You're concussed and stumble, taking ${cd} damage!`, "bad");
         if (p.health <= 0) { this._check_player_dead(); return; }
       }
@@ -7871,6 +8215,18 @@ Object.assign(Sim.prototype, {
   _start_berserk(message) { this.player.berserk_turns_remaining = MC.BERSERK_TURNS; this.log(message, "good"); },
   _rage_scale() { return 1.0 + this.player.stat_rage * MC.RAGE_SCALE_PER_POINT; },
   _berserk_damage_mult() { return 1.0 + MC.BERSERK_DAMAGE_BONUS_PCT * this._rage_scale() + this.player.meta_rage_bonus_pct; },
+  // One tick of poison, bleeding or burning on the hero: Masochist turns it into healing and Honour spares you it.
+  _hero_dot_damage(amount, message, what) {
+    const p = this.player;
+    if (p.talisman_bonus("dot_heals") > 0) { p.heal(amount); this.log(`Your ${what} mends you for ${amount} instead!`, "good"); return; }
+    if (p.talisman_bonus("direct_only") > 0) { this.log(`Honour spares you the ${what}.`); return; }
+    p.take_battle_damage(amount);
+    this.log(message, "bad");
+  },
+  // How long a status the hero is given lasts: Rebound takes a turn off it (never below one).
+  _status_len(base) { return Math.max(1, base - Math.trunc(this.player.talisman_bonus("status_turns_cut"))); },
+  // Fitbit: HP for every tile moved.
+  _fitbit_heal() { const per = Math.trunc(this.player.talisman_bonus("heal_per_tile")); if (per > 0) this.player.heal(per); },
   _berserk_taken_cut() { return Math.min(MC.BERSERK_TAKEN_CUT_CAP, MC.BERSERK_DAMAGE_TAKEN_CUT * this._rage_scale()); },
   _berserk_move_bonus() { return Math.floor(MC.BERSERK_MOVE_BONUS * this._rage_scale() + 0.0001); },
   _berserk_speed_mult() { return 1.0 + (this._rage_scale() - 1.0) * MC.RAGE_SPEED_SHARE; },
@@ -8112,7 +8468,7 @@ Object.assign(Sim.prototype, {
     const hv = Math.trunc(w.heavy_stamina_cost_override ?? W.consts.HEAVY_STAMINA_COST);
     a.attack = a.fight && p.stamina >= reg && this._targetable_indices().length > 0;
     a.heavy = a.fight && p.stamina >= hv && this._targetable_indices().length > 0;
-    a.specials = (w.specials || []).map((sp) => a.fight && sp.learned !== false && p.stamina >= (w.passive_free_specials ? 0 : sp.stamina_cost) && (sp.effect === "diamonds" ? this.battle_units.length > 0 : this._targetable_indices().length > 0));
+    a.specials = (w.specials || []).map((sp) => a.fight && sp.learned !== false && p.stamina >= (w.passive_free_specials ? 0 : special_cost(sp, p.max_stamina)) && (sp.effect === "diamonds" ? this.battle_units.length > 0 : this._targetable_indices().length > 0));
     a.mine = a.fight && this._player_has_hand_picks() && this._targetable_rock_tiles().length > 0;
     a.item = live && p.potion_queue.length > 0 && !feared && p.talisman_bonus("disable_healing_items") <= 0;
     a.defend = live;
@@ -8276,7 +8632,7 @@ async function autoPlayerTurn(sim, policy) {
       let bestI = -1, bestV = 0;
       (w.specials || []).forEach((sp, i) => {
         if (!av.specials[i]) return;
-        const cost = w.passive_free_specials ? 0 : sp.stamina_cost;
+        const cost = w.passive_free_specials ? 0 : special_cost(sp, p.max_stamina);
         if (p.stamina - cost < reserve) return;
         const hits = sp.hit_count_max ? (sp.hit_count_min + sp.hit_count_max) / 2 : sp.pass_count_max ? (sp.pass_count_min + sp.pass_count_max) / 2 : 1;
         const value = Math.max(sp.dmg_mult || 0, 0.01) * hits;
@@ -8287,7 +8643,7 @@ async function autoPlayerTurn(sim, policy) {
         if (["devastating_slash", "knife_throw", "target_practice", "diamonds"].includes(sp.effect)) return;   // risky self-penalty moves: left to manual play
         if (v > bestV) { bestV = v; bestI = i; }
       });
-      if (bestI >= 0 && p.stamina >= (w.specials[bestI].stamina_cost || 0) + reserve && p.stamina > p.max_stamina * 0.5) { await sim.do_action("special", bestI); return; }
+      if (bestI >= 0 && p.stamina >= special_cost(w.specials[bestI], p.max_stamina) + reserve && p.stamina > p.max_stamina * 0.5) { await sim.do_action("special", bestI); return; }
     }
     if (policy.use_heavy && av.heavy && p.stamina - (w.heavy_stamina_cost_override ?? W.consts.HEAVY_STAMINA_COST) >= reserve && p.stamina > p.max_stamina * 0.6) { await sim.do_action("heavy"); return; }
     if (av.attack) { await sim.do_action("attack"); return; }
@@ -8499,7 +8855,7 @@ function secCharacter(p) {
       <button data-act="fillpicks" data-s="strength">All Str</button><button data-act="fillpicks" data-s="vigor">All Vig</button><button data-act="fillpicks" data-s="balanced">Balanced</button><button data-act="fillpicks" data-s="reset">Reset</button></div>
     <table class="kv">
       <tr><td>Max HP</td><td>${p.max_health}</td></tr><tr><td>Attack (base damage)</td><td>${p.attack_damage}</td></tr>
-      <tr><td>Move range (battle)</td><td>${MC.PLAYER_BASE_MOVE_RANGE + Math.max(0, Math.trunc((p.stat_agility - PC.AGILITY_START) / MC.AGILITY_PER_EXTRA_MOVE)) + Math.trunc(p.talisman_bonus("move_range")) + Math.trunc(p.armor_trait_value("move_bonus", 0))} tiles</td></tr>
+      <tr><td>Move range (battle)</td><td>${MC.PLAYER_BASE_MOVE_RANGE + Math.max(0, Math.floor(MC.MOVE_TILES_PER_SPEED * (5 + Math.trunc((p.stat_agility - PC.AGILITY_START) / PC.AGILITY_BONUS_PER_LEVEL)) + 0.0001)) + Math.trunc(p.talisman_bonus("move_range")) + Math.trunc(p.armor_trait_value("move_bonus", 0))} tiles</td></tr>
       <tr><td>Stamina (max / start)</td><td>${p.max_stamina} / ${round(p.max_stamina * PC.BATTLE_START_STAMINA_PCT)}</td></tr>
       <tr><td>Crit / Dodge</td><td>${pct(p.crit_chance_total(), 1)} / ${pct(p.dodge_chance_total(), 1)}</td></tr>
       <tr><td>Damage reduction (Defense ${Math.round(p.bodily_defense_points())}: armor+clothes+shield+res.)</td><td>${pct(p.bodily_reduction(), 1)}</td></tr>
@@ -8536,8 +8892,8 @@ function secWeapon(p) {
     <h2 style="margin-top:8px">${esc(w.name)}</h2>
     <table class="kv">
       <tr><td>Damage multiplier</td><td>${w.damage_mult.toFixed(3)}</td></tr>
-      <tr><td>Plain hit (your Attack ${p.attack_damage})</td><td>${round(p.attack_damage * w.damage_mult)} dmg</td></tr>
-      <tr><td>Heavy attack (x${W.consts.HEAVY_DAMAGE_MULT}, ${w.heavy_stamina_cost_override ?? W.consts.HEAVY_STAMINA_COST} stam)</td><td>${round(p.attack_damage * w.damage_mult * W.consts.HEAVY_DAMAGE_MULT)} dmg</td></tr>
+      <tr><td>Plain hit (your Attack ${p.attack_damage}${w.str_bonus ? " + " + w.str_bonus + " from the weapon" : ""})</td><td>${round(p.effective_strength() * w.damage_mult)} dmg</td></tr>
+      <tr><td>Heavy attack (x${W.consts.HEAVY_DAMAGE_MULT}, ${w.heavy_stamina_cost_override ?? W.consts.HEAVY_STAMINA_COST} stam)</td><td>${round(p.effective_strength() * w.damage_mult * W.consts.HEAVY_DAMAGE_MULT)} dmg</td></tr>
       <tr><td>Range / long-range</td><td>${w.passive_unlimited_range ? "whole grid" : (w.long_range ? 2 : 1) + (w.passive_extra_range || 0)} tiles</td></tr>
       <tr><td>Break chance per hit</td><td>${pct(w.break_chance || 0, 1)}</td></tr>
       <tr><td>Miss chance</td><td>${pct(p.miss_chance_for(w), 1)}</td></tr>
@@ -8869,7 +9225,7 @@ function renderSide() {
   const w = p.current_weapon;
   const players = `<div class="panel"><h2>You — level ${p.level}</h2>${hpBar(p.health, p.max_health, "hp")}${hpBar(p.stamina, p.max_stamina, "st", `${p.stamina}/${p.max_stamina} stamina${p.exhausted ? " (exhausted)" : ""}`)}
     <div class="chips">${chips.map(([c, t]) => `<span class="chip ${c}">${esc(t)}</span>`).join("") || '<span class="dim">no status effects</span>'}</div>
-    <table class="kv" style="margin-top:6px"><tr><td>Weapon</td><td>${esc(w.name)}</td></tr><tr><td>Attack × weapon</td><td>${p.attack_damage} × ${w.damage_mult.toFixed(2)}</td></tr>
+    <table class="kv" style="margin-top:6px"><tr><td>Weapon</td><td>${esc(w.name)}</td></tr><tr><td>Attack × weapon</td><td>${p.effective_strength()} × ${w.damage_mult.toFixed(2)}</td></tr>
     <tr><td>Items left</td><td>${p.potion_queue.length}${p.potion_queue.length ? " (next: " + esc(consumableById(p.potion_queue[0]).name) + ")" : ""}</td></tr>
     <tr><td>Arrows F/Z/B</td><td>${p.owned_arrows.flame}/${p.owned_arrows.freeze}/${p.owned_arrows.bomb}</td></tr><tr><td>Coins</td><td>${p.coins}</td></tr>
     <tr><td>XP</td><td>${p.xp}/${p.xp_to_next || "max"}</td></tr></table></div>`;
@@ -8939,8 +9295,8 @@ function renderMenu() {
     html += btn("Tactics", "menu", "tactics", av.tactics, "", "Taunt or Stealth.") + btn("Flee", "flee", "", av.flee, "", "Leave the battle.");
     html += `<button data-bact="autoturn">Auto turn</button>`;
   } else if (uiMenu === "fight") {
-    html = btn("Attack", "attack", "", av.attack, reg ? reg + " st" : "free", `Plain attack: ${round(p.attack_damage * w.damage_mult)} dmg (+${MC.STAMINA_REGEN_ON_ATTACK} stamina).`) + btn("Heavy", "heavy", "", av.heavy, hv + " st", `Heavy attack x${W.consts.HEAVY_DAMAGE_MULT}: ~${round(p.attack_damage * w.damage_mult * W.consts.HEAVY_DAMAGE_MULT)} dmg.`);
-    (w.specials || []).forEach((sp, i) => { html += btn(sp.name, "special", i, av.specials[i], (w.passive_free_specials ? 0 : sp.stamina_cost) + " st", `${sp.description || ""}${sp.learned === false ? " (not learned)" : ""}`); });
+    html = btn("Attack", "attack", "", av.attack, reg ? reg + " st" : "free", `Plain attack: ${round(p.effective_strength() * w.damage_mult)} dmg (+${MC.STAMINA_REGEN_ON_ATTACK} stamina).`) + btn("Heavy", "heavy", "", av.heavy, hv + " st", `Heavy attack x${W.consts.HEAVY_DAMAGE_MULT}: ~${round(p.effective_strength() * w.damage_mult * W.consts.HEAVY_DAMAGE_MULT)} dmg.`);
+    (w.specials || []).forEach((sp, i) => { html += btn(sp.name, "special", i, av.specials[i], (w.passive_free_specials ? 0 : special_cost(sp, p.max_stamina)) + " st", `${sp.description || ""}${sp.learned === false ? " (not learned)" : ""}`); });
     if (sim._player_has_hand_picks() && sim._targetable_rock_tiles().length) html += btn("Mine rock", "mine", "", av.mine, "", "Break an adjacent rock (costs the turn).");
     html += `<button data-bact="menu" data-arg="main">« Back</button>`;
   } else if (uiMenu === "arrow") {

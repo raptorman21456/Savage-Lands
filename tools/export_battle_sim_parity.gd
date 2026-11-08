@@ -14,7 +14,7 @@ const CASES_HIT := 420
 const CASES_INCOMING := 160
 
 # Talismans whose effect on a single hit is random (can't be compared exactly).
-const RANDOM_HIT_TALISMANS := ["chaos_shard", "duelists_coin", "iron_will_band"]
+const RANDOM_HIT_TALISMANS := ["chaos_shard", "duelists_coin", "iron_will_band", "rusted_edge", "fake_phd"]
 
 var rng := RandomNumberGenerator.new()
 var main
@@ -173,7 +173,7 @@ func _apply_build(b: Dictionary) -> void:
 	p.equipped_talismans = b.talismans.duplicate()
 	p._rebuild_talisman_cache()
 	# Max stamina counts talismans and the worn armour (Cindermail's heat).
-	p.max_stamina = p._base_max_stamina + int(p.talisman_bonus("max_stamina")) + p.armor_max_stamina_bonus()
+	p.max_stamina = p.stamina_cap()
 	p._recalc_stats()
 	p.health = p.max_health
 	p.learn_all_specials()

@@ -280,7 +280,7 @@ const DEFEND_FULL_NEGATE_THRESHOLD := 10
 const POTION_BUFF_TURNS := 3
 const ATTACK_POTION_DAMAGE_BONUS_PCT := 0.25
 const RESILIENCE_POTION_DAMAGE_REDUCTION_PCT := 0.20
-const ENERGY_POTION_MOVE_BONUS := 1
+const ENERGY_POTION_MOVE_BONUS := 2
 # Might: +0.5% ally (recruited party member/wolf) damage per point owned,
 # see _place_ally_units.
 const MIGHT_ALLY_DAMAGE_PCT_PER_POINT := 0.005
@@ -327,14 +327,14 @@ const WOOD_DOUBLE_HIT_CHANCE := 0.10
 # "--- Wildcard ---" section). Each constant here belongs to exactly one of
 # them; search the talisman's name in Main.gd/Player.gd for every read site.
 const MOMENTUM_CHAIN_PCT_PER_STACK := 0.08
-const CHAOS_SHARD_MIN_MULT := 0.5
-const CHAOS_SHARD_MAX_MULT := 1.6
+const CHAOS_SHARD_MIN_MULT := 0.9
+const CHAOS_SHARD_MAX_MULT := 1.25
 const BLOODMOON_QUIET_TURNS_LIMIT := 3
 const WILDFIRE_EXPLOSION_RADIUS := 1
 # Wildfire Core: the blast is this many times the dying enemy's fire damage
 # per turn (see _burn_tick_damage).
 const WILDFIRE_EXPLOSION_FIRE_MULT := 3
-# Ember Charm's burn: (EMBER_BURN_BASE + attack / EMBER_BURN_ATTACK_DIV) on the
+# Pyrogenesis Organ's burn: (EMBER_BURN_BASE + attack / EMBER_BURN_ATTACK_DIV) on the
 # first tick, then x EMBER_BURN_DECAY each turn after (rounded up on the way
 # out), ending once what's left would be under 1.
 const EMBER_BURN_BASE := 5.0
@@ -375,7 +375,7 @@ const BLEED_BASE_TURNS := 2
 # player's own attacks have a high miss chance, but anything that lands is
 # an automatic crit (reuses the Dexterity crit path from Part 1).
 const BLINDNESS_TURNS := 2
-const BLINDNESS_MISS_CHANCE := 0.75
+const BLINDNESS_MISS_CHANCE := 0.60
 # Exhausted lives entirely in Player.gd (EXHAUSTED_STAMINA_REGEN_MULT/
 # EXHAUSTED_CLEAR_STAMINA_PCT there) -- self-inflicted the instant stamina
 # hits 0, no enemy source or battle-state tracking needed here.
@@ -433,7 +433,7 @@ const FIREBALL_FALLOFF_PER_TILE := 5.0
 # all funnel through the same function -- for a few turns. "Focus this
 # target down" once you've found the opening.
 const VULNERABLE_TURNS := 2
-const VULNERABLE_DAMAGE_TAKEN_BONUS_PCT := 0.25
+const VULNERABLE_DAMAGE_TAKEN_BONUS_PCT := 0.20
 # Detection is always on, every battle: a non-boss enemy starts every fight
 # UNAWARE and only targets the player once it's actually spotted them --
 # close enough (see ENEMY_SIGHT_RANGE/STEALTH_SIGHT_RANGE below) with clear
@@ -611,7 +611,7 @@ const ENEMY_TRAITS := {
 	# Fastest thing on the grid, but a single hit that actually lands is
 	# always lethal (1 HP) -- its only defense is a real chance to dodge
 	# entirely instead of soaking the hit.
-	"Shade": {"is_undead": true, "harm": "magical", "move_range": 3, "big_squad": true, "dodge_chance": SHADE_DODGE_CHANCE, "inflicts_fear": true},
+	"Shade": {"is_undead": true, "is_void": true, "harm": "magical", "move_range": 3, "big_squad": true, "dodge_chance": SHADE_DODGE_CHANCE, "inflicts_fear": true},
 	# Fast mobility on the grid, same as Shade, but no dodge chance and no
 	# big-squad flag -- a Traitor Wolf is combat-identical, just a rarer
 	# named spawn (see Wolf.gd/_spawn_enemies) with a shot at recruitment on
@@ -661,13 +661,13 @@ const ENEMY_TRAITS := {
 	"Red Wyrm": {"harm": "both", "windup": true, "sweeps": true, "attack_range": 2, "armored": true, "knockback_resist": 0.8, "move_range": 1, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true, "inflicts_bleed": true},
 	# A miniboss -- fast, evasive, and genuinely ranged (void bolts
 	# that ignore obstacles).
-	"Voidwing": {"harm": "magical", "windup": true, "move_range": 3, "dodge_chance": 0.3, "ignore_line": true, "attack_range": 2, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true, "is_miniboss": true, "inflicts_bleed": true},
+	"Voidwing": {"is_void": true, "harm": "magical", "windup": true, "move_range": 3, "dodge_chance": 0.3, "ignore_line": true, "attack_range": 2, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true, "is_miniboss": true, "inflicts_bleed": true},
 	# Voidlands' world-ending boss -- the last "normal" world boss before
 	# Nothingness, and the one that gets rematched there (see
 	# scripts/Archmage.gd's power_tier). A wide multi-target spell
 	# that ignores obstacles entirely, unarmored (a glass-cannon caster,
 	# not a brute).
-	"Archmage": {"harm": "magical", "mage": true, "windup": true, "sweeps": true, "ignore_line": true, "attack_range": 2, "knockback_resist": 0.4, "move_range": 1, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true},
+	"Archmage": {"is_void": true, "harm": "magical", "mage": true, "windup": true, "sweeps": true, "ignore_line": true, "attack_range": 2, "knockback_resist": 0.4, "move_range": 1, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true},
 }
 
 # How fast each enemy acts, in the same rating you see for yourself on the Stats screen (you start at 5
@@ -705,11 +705,11 @@ const STAMINA_REGEN_ON_DEFEND := 15
 # Enemy HP/damage in battle scale up with the player's level, so growing
 # stronger doesn't make the same enemies trivial forever. The per-level rate
 # depends on the save's difficulty, and bosses/minibosses (is_boss_tier) scale at
-# only BOSS_LEVEL_SCALING_FACTOR of it. DRAFT numbers -- the user hasn't set these
-# yet (they asked for "change depending on difficulty" and "bosses scale more
-# gently"); ENEMY_LEVEL_SCALING stays as the Normal rate other code and tests read.
+# only BOSS_LEVEL_SCALING_FACTOR of it. The user set these: "change depending on difficulty" and "bosses
+# scale more gently", then (2026-11-07) "5%, 10% and 17%" for Normal, Hard and Apocalyptic (Baby stays at 3%).
+# ENEMY_LEVEL_SCALING stays as the Normal rate other code and tests read.
 const ENEMY_LEVEL_SCALING := 0.05
-const ENEMY_LEVEL_SCALING_BY_DIFFICULTY := {"baby": 0.03, "normal": ENEMY_LEVEL_SCALING, "hard": 0.08, "apocalyptic": 0.12}
+const ENEMY_LEVEL_SCALING_BY_DIFFICULTY := {"baby": 0.03, "normal": ENEMY_LEVEL_SCALING, "hard": 0.10, "apocalyptic": 0.17}
 const BOSS_LEVEL_SCALING_FACTOR := 0.5
 
 # Any non-Boss spawn has a flat chance to roll Elite -- a tougher fight that
@@ -741,8 +741,11 @@ const MERCHANT_EVENT_DISCOUNT := 0.6
 # take -- 2 tiles at baseline agility, +1 more tile per this much agility
 # gained above the baseline. At +5 agility per level-up pick, that's an
 # extra tile roughly every 4 levels invested, instead of every 40.
-const PLAYER_BASE_MOVE_RANGE := 2
-const AGILITY_PER_EXTRA_MOVE := 20
+# Tile movement (the design doc): 1 tile, plus 0.05 for every point of speed, rounded down -- so a new hero walks one tile and
+# gains another at speed 20. (Was 2, plus one per 4 speed.)
+const PLAYER_BASE_MOVE_RANGE := 1
+const TUTORIAL_ENEMY_MIN_HP := 20
+const MOVE_TILES_PER_SPEED := 0.05
 
 # The 10-world campaign (index 0-9) plus the Nothingness boss rush (index
 # 10). "terrain" is the RESERVED_TERRAIN_TYPES subset rolled into that
@@ -988,7 +991,7 @@ var battle_units := []
 # every _setup_battle_grid call -- see the ALLY_* consts above for why.
 var battle_allies := []
 # Allies at 0 HP: knocked out of the fight (no collision, enemies ignore them) but still on the
-# field and still targetable by your own side -- the Necromancer's Revival Blessing stands them
+# field and still targetable by your own side -- the Necromancer's Energy Transfer stands them
 # back up. Moved here from battle_allies by _remove_fallen_allies.
 var battle_downed_allies: Array = []
 # The friendly-target picker: the special waiting for its target, the candidates offered
@@ -1056,7 +1059,7 @@ var battle_player_defending := false
 # picking freely, protecting allies. See _process_enemy_turn's target_tile
 # line.
 var battle_player_taunting := false
-# Ironclad Ward (talisman): Move is only usable on alternating player turns --
+# Steelclad Band (talisman): Move is only usable on alternating player turns --
 # true on the turn it's allowed, flipped at the start of every player turn
 # (see _setup_battle_grid for turn 1 and _process_enemy_turn's tail for every
 # turn after). Harmless bookkeeping when the talisman isn't equipped.
@@ -1120,17 +1123,19 @@ var battle_momentum_stacks := 0
 # landed in a row without the player taking damage, reset (and briefly stuns
 # the player) the instant they're hit. See _apply_single_hit/_enemy_apply_damage.
 var battle_momentum_chain_stacks := 0
-# Bloodmoon Fang (talisman): ticks up once per full turn cycle with no damage
+# Bloodthirsty Idol (talisman): ticks up once per full turn cycle with no damage
 # dealt or taken by anyone (_advance_bloodmoon_quiet_turn), reset by any of
 # it; hitting BLOODMOON_QUIET_TURNS_LIMIT crashes the buff (Player.bloodmoon_
 # debuffed) and wipes Player.bloodmoon_stacks.
 var battle_bloodmoon_quiet_turns := 0
 var battle_had_combat_action_this_cycle := false
-# Whetstone Pendant (talisman): whichever hit lands first THIS battle --
+# Whetstone (talisman): whichever hit lands first THIS battle --
 # player's or an ally's -- gets a damage bonus. Reset in _setup_battle_grid,
 # consumed in _apply_single_hit (which is only ever called for damage dealt TO
 # an enemy, so an enemy's own attack on the player can never consume it).
 var battle_first_attack_used := false
+# The same, for each party member (by name): the Whetstone is per wearer now, so every unit has its own first hit.
+var battle_first_hit_allies := {}
 var battle_turn := "player"
 # "main" shows Move/Fight/Item/Defend/Flee; "fight" shows the attack submenu
 # (Attack/Heavy/3 Specials/Back); "move" shows Confirm/Cancel while arrows
@@ -3227,6 +3232,23 @@ func _on_game_over_return_pressed() -> void:
 	get_tree().paused = false
 	get_tree().change_scene_to_file("res://TitleScreen.tscn")
 
+# The unique dagger Retribution: 0.5% (Weapons.UNIQUE_DROP_CHANCE) whenever a void enemy falls, until you own it. `roll` < 0 means
+# roll for real; tests pass a number. True if it dropped.
+func _roll_unique_drop(enemy_name: String, roll: float = -1.0) -> bool:
+	var unique_weapon_id: String = WeaponsScript.unique_id("dagger")
+	if player.owned_weapons.has(unique_weapon_id):
+		return false
+	if (randf() if roll < 0.0 else roll) >= WeaponsScript.UNIQUE_DROP_CHANCE:
+		return false
+	player.grant_weapon(unique_weapon_id)
+	var weapon: Dictionary = WeaponsScript.get_owned_variant(unique_weapon_id)
+	var text := "The %s drops %s!" % [enemy_name, str(weapon.get("name", "a weapon"))]
+	if in_battle:
+		hud.battle_log(text)
+	else:
+		hud.show_message(text)
+	return true
+
 func _on_enemy_died(xp_reward: int, enemy_name: String = "") -> void:
 	play_sfx("death")
 	enemies_alive -= 1
@@ -3243,6 +3265,9 @@ func _on_enemy_died(xp_reward: int, enemy_name: String = "") -> void:
 		if ENEMY_TRAITS.get(enemy_name, {}).get("is_boss_tier", false):
 			run_bosses_defeated += 1
 			was_boss = true
+		# A void creature may leave Retribution behind (a unique weapon: 0.5% a kill, once you have it, never again).
+		if ENEMY_TRAITS.get(enemy_name, {}).get("is_void", false):
+			_roll_unique_drop(enemy_name)
 	# Every enemy that falls (whoever landed the blow) is worth Essence.
 	run_essence += SaveDataScript.essence_for_kill(was_boss)
 	# War Profiteer counts every enemy defeated this run (Player.war_profiteer_discount).
@@ -4315,7 +4340,8 @@ func _berserk_speed_mult() -> float:
 	return 1.0 + (_rage_scale() - 1.0) * RAGE_SPEED_SHARE
 
 func _battle_player_move_range() -> int:
-	var bonus: int = max(0, int(player.stat_agility - PlayerScript.AGILITY_START) / AGILITY_PER_EXTRA_MOVE)
+	var speed_rating: int = 5 + int(player.stat_agility - PlayerScript.AGILITY_START) / PlayerScript.AGILITY_BONUS_PER_LEVEL
+	var bonus: int = maxi(0, int(floorf(MOVE_TILES_PER_SPEED * float(speed_rating) + 0.0001)))
 	# Berserk: an extra tile of reach for as long as it lasts.
 	if player.berserk_turns_remaining > 0:
 		bonus += _berserk_move_bonus()
@@ -4323,7 +4349,7 @@ func _battle_player_move_range() -> int:
 	# player's own turns.
 	if player.potion_energy_turns > 0:
 		bonus += ENERGY_POTION_MOVE_BONUS
-	# Pathfinder's Compass (talisman).
+	# Compass (talisman).
 	bonus += int(player.talisman_bonus("move_range"))
 	# Armour: Sprinter's Jerkin +1, Fortplate -1.
 	bonus += int(player.armor_trait_value("move_bonus", 0))
@@ -4371,6 +4397,7 @@ func _setup_battle_grid(squad: Array) -> void:
 	player.bloodmoon_stacks = 0
 	player.bloodmoon_debuffed = false
 	battle_first_attack_used = false
+	battle_first_hit_allies = {}
 	player.disarmed_tile = Vector2i(-1, -1)
 	player.pichaku_active = false
 	player.second_chance_used_this_battle = false
@@ -4502,6 +4529,10 @@ func _setup_battle_grid(squad: Array) -> void:
 		used_tiles.erase(battle_units[0].tile)
 		battle_units[0].tile = tut_tile
 		used_tiles[tut_tile] = true
+		# A lesson that ends on the first swing teaches nothing: with the Club adding Strength a fresh hero hits for 3, which would
+		# fell a 3 HP Goblin before the Defend step. The tutorial foe is sturdy enough to survive the opening Attack.
+		battle_units[0].hp = maxi(int(battle_units[0].hp), TUTORIAL_ENEMY_MIN_HP)
+		battle_units[0].max_hp = maxi(int(battle_units[0].max_hp), TUTORIAL_ENEMY_MIN_HP)
 
 	_place_ally_units(used_tiles)
 
@@ -4607,7 +4638,7 @@ func _make_member_battle_unit(member, tile: Vector2i, might_mult: float) -> Dict
 	var arcane_gain: float = float(maxi(0, member.level - 1)) * player.meta_member_magic_per_level if member.levels() else 0.0
 	var magic_value: float = float(rules.get("base", {}).get("magic", 0.0)) + (float(member.bonus.get("magic", 0.0)) + arcane_gain) * magic_gain_mult
 	magic_value = (magic_value + float(weapon.get("magic_bonus", 0.0))) * float(favour.get("magic_mult", 1.0))
-	var mana_pool: int = int(round(magic_value * PartyRulesScript.MANA_PER_MAGIC)) if member.is_caster() else 0
+	var mana_pool: int = member.max_mana()
 	# Deep Well (+flat mana from the Church) -- a Necromancer's mana is her HP, handled just below.
 	if mana_pool > 0:
 		mana_pool += player.meta_max_mana_flat
@@ -4632,7 +4663,7 @@ func _make_member_battle_unit(member, tile: Vector2i, might_mult: float) -> Dict
 	var armor_params: Dictionary = armor.get("trait_params", {})
 	var defense_points: float = member.defense_pct() + float(mods.get("damage_reduction", 0.0)) * 100.0
 	if not rules.has("defense_fixed"):
-		defense_points += player.armor_defense_fraction(armor) * 100.0 if not armor.is_empty() else 0.0
+		defense_points += (player.armor_defense_fraction(armor) * 100.0 if not armor.is_empty() else 0.0) * float(rules.get("armor_defense_mult", 1.0))
 		defense_points += float(shield.get("damage_reduction_pct", 0.0)) * 100.0
 	var fortitude_points: float = member.fortitude() + float(armor.get("fortitude", 0)) + float(shield.get("fortitude", 0))
 	# Heavy Cloak: +1 Resilience and Fortitude for every 3 Magic (a Marksman's Defense stays what it is).
@@ -4662,7 +4693,7 @@ func _make_member_battle_unit(member, tile: Vector2i, might_mult: float) -> Dict
 		"member": member,
 		# attack is the member's own attack stat; dmg_mult is only the ally-wide
 		# multiplier (Might), so the two are never confused with the hero's.
-		"attack": member.attack(),
+		"attack": member.attack() + (0.0 if bool(weapon.get("uses_magic", false)) else float(weapon.get("str_bonus", 0.0))),
 		"magic": magic_value,
 		"dmg_mult": might_mult,
 		"defense_pct": defense_points,
@@ -4698,7 +4729,7 @@ func _make_member_battle_unit(member, tile: Vector2i, might_mult: float) -> Dict
 		"shield_special_pct": member.shield_special_pct() if not shield.is_empty() else 0.0,
 		"shield_penalty": float(shield.get("damage_penalty_pct", 0.0)),
 		"shield_damage_mult": float(rules.get("shield_damage_mult", 1.0)) if not shield.is_empty() else 1.0,
-		"dodge_chance": 0.0 if cannot_dodge else float(armor_params.get("dodge_bonus", 0.0)),
+		"dodge_chance": 0.0 if cannot_dodge else float(armor_params.get("dodge_bonus", 0.0)) + (member.dodge_from_reflexes() if member.levels() else 0.0),
 		"speed_bonus": int(armor_params.get("speed_bonus", 0)),
 		"bloodrage_stacks": 0, "bloodrage_turns": 0,
 		"shadow_crit": false, "vengeance": false, "spellward_used": false,
@@ -5044,7 +5075,7 @@ func _apply_terrain_tick(tile: Vector2i, unit: Dictionary = {}) -> void:
 			hud.battle_log("The embers set %s alight!" % who)
 		"poison_bog":
 			if is_player:
-				player_poison_turns = POISON_TURNS
+				player_poison_turns = _status_len(POISON_TURNS)
 				player_poison_dmg = max(1, int(round(player.max_health * POISON_DAMAGE_PCT)))
 			else:
 				unit.poison_turns = POISON_TURNS
@@ -5289,7 +5320,7 @@ func _on_battle_main_action(action: String) -> void:
 			_refresh_battle_display()
 		"move":
 			if player.talisman_bonus("ironclad_ward") > 0.0 and not battle_ironclad_move_allowed:
-				hud.battle_log("Ironclad Ward roots you to the spot this turn.")
+				hud.battle_log("Steelclad Band roots you to the spot this turn.")
 				return
 			if battle_player_moves_left <= 0:
 				hud.battle_log("No moves left this turn.")
@@ -5471,8 +5502,9 @@ func _try_battle_player_move(dir: Vector2i) -> void:
 			hud.battle_log("Your %s lets you shrug off the fall." % player.equipped_armor.name)
 		else:
 			var dmg := int(round(player.max_health * CLIFF_FALL_DAMAGE_PCT * fall_mult))
-			player.take_battle_damage(dmg)
+			player.take_battle_damage(dmg, true)
 			hud.battle_log("You fall! Took %d damage." % dmg)
+	_fitbit_heal()
 
 # Bleeding: every tile moved lengthens the status by another turn, rather
 # than dealing damage on the spot -- shared by every way the player can move
@@ -5497,7 +5529,7 @@ func _targetable_indices() -> Array:
 	# of whatever the weapon normally gets, stacking with long_range.
 	max_range += int(player.current_weapon.get("passive_extra_range", 0))
 	var ignore_line: bool = _player_has_spear()
-	# Cliffwalker's Bead (talisman): sturdy footing lets you swing up a ledge
+	# Cliffwalker's Beadstring (talisman): sturdy footing lets you swing up a ledge
 	# or cliff drop with any weapon, not just something long_range. Only ever
 	# matters for a size-1 target (see _can_battle_attack) -- a multi-tile
 	# unit's own reach check below never consulted ledges to begin with.
@@ -5742,7 +5774,7 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 		battle_actor["shadow_crit"] = false
 	# attack_stat >= 0 is a PartyMember ally swinging on its OWN attack stat (see
 	# _make_member_battle_unit); everyone else builds on the hero's attack_damage.
-	var base_attack: float = attack_stat if attack_stat >= 0.0 else float(player.attack_damage)
+	var base_attack: float = attack_stat if attack_stat >= 0.0 else float(player.attack_damage) + float(weapon.get("str_bonus", 0.0))
 	var dmg: int = int(round(base_attack * weapon.get("damage_mult", 1.0) * dmg_mult))
 	# A connecting ally hit always does at least 1 -- their attack stats start below 1 x
 	# a weapon multiplier, and a swing that rounds to nothing would just feel broken.
@@ -5761,7 +5793,7 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 		# other player-only modifier here, so an ally's attack (which funnels
 		# through this same function) never picks up the player's coin hoard.
 		# Skipped for a flat_dmg hit (arrows) above, same as Pichaku below.
-		dmg += int(round(player.coin_scaled_attack_bonus()))
+		dmg = int(round(float(dmg) * player.coin_damage_mult()))
 	# Pichaku (Hand Picks): only touches the plain Attack/Heavy Attack
 	# (effect == "" is what distinguishes those two from every named
 	# special) -- doesn't stack onto a special's own already-tuned numbers.
@@ -5790,7 +5822,7 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 	if _actor_tb("damage_pct") != 0.0:
 		dmg = int(round(dmg * (1.0 + _actor_tb("damage_pct"))))
 	# Adrenaline (repurposed): extra damage DEALT while at or below the low-HP
-	# threshold (30% by default; Berserker's Knot tightens it, see
+	# threshold (30% by default; Berserk Brace tightens it, see
 	# Player.low_hp_threshold) -- a berserker's edge, not a defensive cushion. A party member
 	# gets the Astral half of it at face value plus its own talismans, measured on ITS own HP.
 	if _actor_is_ally():
@@ -5800,15 +5832,19 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 			dmg = int(round(dmg * (1.0 + ally_low_bonus)))
 	elif player.low_hp_damage_bonus_total() > 0.0 and float(player.health) < float(player.max_health) * player.low_hp_threshold():
 		dmg = int(round(dmg * (1.0 + player.low_hp_damage_bonus_total())))
-	# Whetstone Pendant (talisman): whichever hit lands first this battle --
+	# Whetstone (talisman): whichever hit lands first this battle --
 	# player's or an ally's -- hits harder. Consumed regardless of whether the
 	# talisman is actually equipped, so there's only ever one "first hit" per
 	# battle to track.
-	if not battle_first_attack_used:
-		var first_hit_bonus: float = player.talisman_bonus("first_attack_damage_pct") + (_actor_tb("first_attack_damage_pct") if _actor_is_ally() else 0.0)
+	var first_hit_done: bool = bool(battle_first_hit_allies.get(str(battle_actor.get("name", "")), false)) if _actor_is_ally() else battle_first_attack_used
+	if not first_hit_done and (attacker_label == "You" or _actor_is_ally()):
+		var first_hit_bonus: float = _actor_tb("first_attack_damage_pct")
 		if first_hit_bonus > 0.0:
 			dmg = int(round(dmg * (1.0 + first_hit_bonus)))
-		battle_first_attack_used = true
+		if _actor_is_ally():
+			battle_first_hit_allies[str(battle_actor.get("name", ""))] = true
+		else:
+			battle_first_attack_used = true
 	# Momentum: stacks per enemy defeated THIS battle (battle_momentum_stacks,
 	# reset in _setup_battle_grid, incremented in _on_enemy_died).
 	if player.meta_momentum_pct_per_kill > 0.0 and battle_momentum_stacks > 0:
@@ -5818,11 +5854,11 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 	# the player) the instant a hit lands on them, see _enemy_apply_damage.
 	if attacker_label == "You" and player.talisman_bonus("momentum_chain") > 0.0 and battle_momentum_chain_stacks > 0:
 		dmg = int(round(dmg * (1.0 + MOMENTUM_CHAIN_PCT_PER_STACK * battle_momentum_chain_stacks)))
-	# Bloodmoon Fang (talisman): Bloodlust stacks (Player.bloodmoon_stacks,
+	# Bloodthirsty Idol (talisman): Bloodlust stacks (Player.bloodmoon_stacks,
 	# incremented on a kill below) add flat damage on top of everything else.
 	if attacker_label == "You" and player.bloodmoon_stacks > 0:
 		dmg = int(round(dmg * (1.0 + player.BLOODMOON_DAMAGE_PCT_PER_STACK * player.bloodmoon_stacks)))
-	# Bloodmoon Fang's crash: 3 quiet turns (see _advance_bloodmoon_quiet_turn)
+	# Bloodthirsty Idol's crash: 3 quiet turns (see _advance_bloodmoon_quiet_turn)
 	# halves everything, including the damage you deal.
 	if attacker_label == "You" and player.bloodmoon_debuffed:
 		dmg = int(round(dmg * 0.5))
@@ -5880,6 +5916,11 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 		var u_traits: Dictionary = ENEMY_TRAITS.get(u.name, {})
 		if u_traits.get("is_undead", false) or u_traits.get("is_boss_tier", false):
 			dmg = int(round(dmg * (1.0 + undead_boss_bonus)))
+	# Retribution: a mage-slayer -- more damage to mages, less to everything else.
+	var vs_mage: float = float(weapon.get("passive_damage_vs_mage_mult", 1.0))
+	var vs_other: float = float(weapon.get("passive_damage_vs_nonmage_mult", 1.0))
+	if vs_mage != 1.0 or vs_other != 1.0:
+		dmg = int(round(dmg * (vs_mage if ENEMY_TRAITS.get(u.name, {}).get("mage", false) else vs_other)))
 	# Any weapon's passive_ignore_cover (e.g. Starfall) skips the reduction
 	# the same way the dedicated ignore_cover special already does. Club's
 	# Leg Blow and Spear's Piercing Thrust also ignore cover, on top of their
@@ -5898,11 +5939,16 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 		actor_crit_chance *= _actor_tb("crit_chance_mult")
 	# Grunkle Gloves: 1.3x the wielder's crit chance.
 	actor_crit_chance *= float(weapon.get("passive_crit_chance_mult", 1.0))
+	# Retribution: a flat bonus to the wielder's crit chance.
+	if attacker_label == "You" or _actor_is_ally():
+		actor_crit_chance += float(weapon.get("passive_crit_chance_bonus", 0.0))
 	if not is_crit and actor_crit_chance > 0.0 and randf() < actor_crit_chance:
 		is_crit = true
 	if is_crit:
 		# 2.0 by default; Duelist's Coin raises this (see Player.crit_damage_mult).
-		var crit_mult: float = (2.0 + _actor_tb("crit_damage_mult_bonus")) if _actor_is_ally() else player.crit_damage_mult()
+		var crit_mult: float = (PlayerScript.CRIT_BASE_MULT + _actor_tb("crit_damage_mult_bonus")) if _actor_is_ally() else player.crit_damage_mult()
+		# The Brawler's crits land 50% harder (a perk, in the doc's words).
+		crit_mult *= 1.0 + _actor_tb("crit_damage_pct")
 		if ally_stealth_crit:
 			crit_mult += float(battle_actor.get("stealth_cfg", {}).get("crit_bonus", 0.0))
 		# Grunkle Gloves: 1.2x crit damage.
@@ -5946,7 +5992,7 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 	# own burn.
 	if attacker_label == "You" and player_burning:
 		dmg = int(round(dmg * (1.0 - BURN_DAMAGE_DEALT_REDUCTION)))
-	# Vulnerable: +25% damage taken while active, from ANY attacker (player
+	# Vulnerable: +20% damage taken while active, from ANY attacker (player
 	# or ally, since both funnel through this same function) -- "focus this
 	# target down" once you've found the opening. Checked before a landed
 	# crit below (re)sets it, so the triggering hit itself doesn't
@@ -6003,20 +6049,20 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 		_mark_ally_spotted(u, battle_actor)      # a member that hits an enemy is seen by it, stealth or not
 	u.hp -= dmg
 	run_damage_dealt += dmg
-	# Bloodmoon Fang (talisman): ANY landed hit -- player's or an ally's --
+	# Bloodthirsty Idol (talisman): ANY landed hit -- player's or an ally's --
 	# keeps the combat-action clock alive (_advance_bloodmoon_quiet_turn).
 	battle_had_combat_action_this_cycle = true
-	# Vampire's Pact (talisman): heals the ACTING unit back a cut of the damage just dealt.
+	# Bat Fang (talisman): heals the ACTING unit back a cut of the damage just dealt.
 	if attacker_label == "You" or _actor_is_ally():
 		var lifesteal_pct: float = _actor_tb("lifesteal_pct")
 		if lifesteal_pct > 0.0 and dmg > 0:
-			_actor_heal(max(1, int(round(dmg * lifesteal_pct))))
+			_actor_heal(max(1, int(round(dmg * lifesteal_pct))), true)
 	if attacker_label == "You":
 		# Momentum Chain (talisman): consecutive hits landed without taking
 		# damage first.
 		if player.talisman_bonus("momentum_chain") > 0.0:
 			battle_momentum_chain_stacks += 1
-		# Bloodmoon Fang (talisman): every hit you land stacks Bloodlust, up to
+		# Bloodthirsty Idol (talisman): every hit you land stacks Bloodlust, up to
 		# BLOODMOON_MAX_STACKS.
 		if player.talisman_bonus("bloodmoon_fang") > 0.0 and player.bloodmoon_stacks < player.BLOODMOON_MAX_STACKS and not player.bloodmoon_debuffed:
 			player.bloodmoon_stacks += 1
@@ -6052,11 +6098,11 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 		hud.battle_log("Your %s shatters! You're back to bare fists." % broken_name)
 	if effect == "drain_punch" and dmg > 0:
 		var drained: int = max(1, int(round(dmg * PartyKitsScript.DRAIN_PUNCH_HEAL_PCT)))
-		_actor_heal(drained)
+		_actor_heal(drained, true)
 		hud.battle_log("%s drains %d HP from the blow." % [_actor_label(), drained])
 	if effect == "lifesteal":
 		var heal_amt: int = max(1, int(round(dmg * LIFESTEAL_PCT)))
-		_actor_heal(heal_amt)
+		_actor_heal(heal_amt, true)
 		hud.battle_log("%s %d HP from the wound." % ["You drain" if attacker_label == "You" else attacker_label + " drains", heal_amt])
 	if effect == "leg_blow" and u.hp > 0:
 		u.move_range = max(1, int(u.move_range) - 1)
@@ -6088,7 +6134,7 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 	if effect == "arrow_flame" and u.hp > 0:
 		u.burning = true
 		hud.battle_log("The %s catches fire!" % u.name)
-	# Ember Charm (talisman): a chance for any of the player's own landed hits
+	# Pyrogenesis Organ (talisman): a chance for any of the player's own landed hits
 	# to set the target alight too. Multi-hit actions (Wombo Combo, Whirlwind
 	# Strike, double_strike, a piercing second target, etc. -- see is_multihit
 	# at every _battle_perform_attack call site) use a much smaller per-hit
@@ -6100,6 +6146,16 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 		if burn_chance > 0.0 and randf() < burn_chance:
 			_ignite_with_ember(u)
 			hud.battle_log("The %s catches fire!" % u.name)
+	# Rusted Edge (talisman): a chance for any landed hit to poison the target.
+	if (attacker_label == "You" or _actor_is_ally()) and u.hp > 0 and int(u.get("poison_turns", 0)) <= 0:
+		var rust_chance: float = _proc(_actor_tb("poison_chance"))
+		if rust_chance > 0.0 and randf() < rust_chance:
+			_poison_enemy(u)
+	# Fake PHD (talisman): a chance for a hit to leave a random negative status on the target.
+	if (attacker_label == "You" or _actor_is_ally()) and u.hp > 0:
+		var phd_chance: float = _proc(_actor_tb("random_status_chance"))
+		if phd_chance > 0.0 and randf() < phd_chance:
+			_inflict_random_status(u)
 	# Bone's Dreadful Strike (material passive): a flat chance to leave the
 	# target too scared to act next turn. Stone Amulet (talisman) raises it.
 	if (attacker_label == "You" or _actor_is_ally()) and u.hp > 0 and weapon.get("material_id", "") == "bone":
@@ -6155,7 +6211,7 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 	var passive_lifesteal_pct: float = weapon.get("passive_lifesteal_pct", 0.0)
 	if passive_lifesteal_pct > 0.0 and dmg > 0:
 		var passive_heal: int = max(1, int(round(dmg * passive_lifesteal_pct)))
-		_actor_heal(passive_heal)
+		_actor_heal(passive_heal, true)
 		hud.battle_log("%s weapon drains %d HP from the wound." % ["Your" if attacker_label == "You" else attacker_label + "'s", passive_heal])
 	# The Great Toothpicke's passive_heal_chance/passive_heal_flat: an
 	# independent per-hit chance at a flat sip of HP back, regardless of how
@@ -6163,7 +6219,7 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 	var heal_chance: float = weapon.get("passive_heal_chance", 0.0)
 	if heal_chance > 0.0 and randf() < _proc(heal_chance):
 		var heal_flat: int = int(weapon.get("passive_heal_flat", 0)) + int(round(float(_actor_max_hp()) * float(weapon.get("passive_heal_max_hp_pct", 0.0))))
-		_actor_heal(heal_flat)
+		_actor_heal(heal_flat, true)
 		hud.battle_log("The spear drinks deep -- %d HP returns." % heal_flat)
 	# The Great Toothpicke's passive_poison_chance: the wound may fester.
 	var poison_chance: float = weapon.get("passive_poison_chance", 0.0)
@@ -6218,7 +6274,7 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 			# push-away knockback would immediately override that. Arrows are
 			# ammunition, not a physical shove -- no weapon special reads as
 			# a knockback here either.
-			_apply_knockback(u, dir)
+			_apply_knockback(u, dir, false, _actor_is_ally() and _actor_tb("knockback_bonus") > 0.0)
 		if effect == "stun_bypass" and u.hp > 0 and is_instance_valid(u.ref):
 			u["stunned"] = true
 			hud.battle_log("The %s is stunned!" % u.name)
@@ -6342,7 +6398,7 @@ func _hero_shared_effect(key: String) -> float:
 	return _shared_effect_at(battle_player_tile, key, null)
 
 # The combat effects a Shaman can share: only ones that are read live during a fight.
-const SHARED_TALISMAN_KEYS := ["damage_pct", "crit_chance", "crit_damage_mult_bonus", "low_hp_damage_pct", "burn_chance", "burn_chance_multihit", "first_attack_damage_pct", "lifesteal_pct", "heal_on_kill", "hp_regen_turn", "hp_regen_per_20_max_hp", "stamina_regen", "double_secondary_chance",
+const SHARED_TALISMAN_KEYS := ["damage_pct", "crit_chance", "crit_damage_mult_bonus", "low_hp_damage_pct", "burn_chance", "burn_chance_multihit", "first_attack_damage_pct", "lifesteal_pct", "heal_on_kill", "hp_regen_turn", "hp_regen_per_20_max_hp", "stamina_regen", "double_secondary_chance", "poison_chance", "random_status_chance",
 	"spell_potency_pct", "spell_echo_chance", "spell_clapback_chance", "spell_clapback_mage_pct", "mana_regen_pct", "spell_cost_pct"]
 
 func _shared_effect_at(tile: Vector2i, key: String, exclude) -> float:
@@ -6367,17 +6423,17 @@ func _actor_luck() -> float:
 func _actor_max_hp() -> int:
 	return int(battle_actor.max_hp) if _actor_is_ally() else player.max_health
 
-func _actor_heal(amount: int) -> void:
+func _actor_heal(amount: int, from_hit: bool = false) -> void:
 	if _actor_is_ally():
 		battle_actor.hp = mini(int(battle_actor.max_hp), int(battle_actor.hp) + amount)
 	else:
-		player.heal(amount)
+		player.heal(amount, from_hit)
 
 func _actor_take_damage(amount: int) -> void:
 	if _actor_is_ally():
 		battle_actor.hp -= amount
 	else:
-		player.take_battle_damage(amount)
+		player.take_battle_damage(amount, true)
 
 func _actor_pichaku() -> bool:
 	return bool(battle_actor.get("pichaku_active", false)) if _actor_is_ally() else player.pichaku_active
@@ -6557,13 +6613,12 @@ func _battle_perform_attack(action: Dictionary) -> void:
 	if action.get("is_regular_attack", false) and _actor_is_ally() and float(battle_actor.get("steal_chance", 0.0)) > 0.0 and randf() < float(battle_actor.get("steal_chance", 0.0)):
 		stole = true
 		player.add_coins(1)
-		hud.battle_log("%s lifts a coin instead of striking!" % _actor_label())
+		dmg_mult *= PartyKitsScript.ROGUE_STEAL_DAMAGE_MULT
+		hud.battle_log("%s lifts a coin as it strikes -- a weaker blow!" % _actor_label())
 	# Spear's Target Practice is a coin-flip instakill, not a normal
 	# damage-dealing hit -- resolved entirely separately from the dmg_mult
 	# pipeline every other special/attack below goes through.
-	if stole:
-		pass
-	elif effect == "target_practice":
+	if effect == "target_practice":
 		_resolve_target_practice()
 	# Greatsword's (new) Wide Cleave -- an area hit on 3 tiles in a line
 	# toward the current target, not the targetable-enemies list at all, so
@@ -6626,7 +6681,7 @@ func _battle_perform_attack(action: Dictionary) -> void:
 		_resolve_drive_by(dmg_mult, weapon)
 	elif effect == "body_slam":
 		var slam_idx: int = _actor_effective_target()
-		battle_stat_override = float(battle_actor.get("defense_pct", 0.0)) if _actor_is_ally() else -1.0
+		battle_stat_override = (float(battle_actor.get("defense_pct", 0.0)) + float(battle_actor.get("fortitude", 0.0))) if _actor_is_ally() else -1.0
 		_hit(slam_idx, dmg_mult, effect, weapon, -1, false)
 		battle_stat_override = -1.0
 	elif effect == "bellow":
@@ -6730,7 +6785,7 @@ func _battle_perform_attack(action: Dictionary) -> void:
 			primary_tile = battle_units[idx].tile
 		var still_primary_target := func() -> bool:
 			return idx < battle_units.size() and battle_units[idx].ref == primary_ref
-		# Ember Charm (talisman): true whenever this action is CAPABLE of
+		# Pyrogenesis Organ (talisman): true whenever this action is CAPABLE of
 		# landing more than one hit, whether or not the chance-based procs
 		# below actually fire this time -- so every hit from a kit that CAN
 		# flurry uses the smaller multi-hit burn chance, not just the ones
@@ -6760,7 +6815,7 @@ func _battle_perform_attack(action: Dictionary) -> void:
 				_hit(idx, dmg_mult, effect, weapon, -1, multihit_capable)
 		# The Wolf's Feed: a kill heals it and gives most of the stamina back.
 		if effect == "feed" and not still_primary_target.call():
-			_actor_heal(PartyKitsScript.FEED_KILL_HEAL)
+			_actor_heal(PartyKitsScript.FEED_KILL_HEAL + int(round(float(_actor_max_hp()) * PartyKitsScript.FEED_KILL_HEAL_PCT)))
 			_actor_refund(PartyKitsScript.FEED_KILL_STAMINA)
 			hud.battle_log("%s feeds on the kill!" % _actor_label())
 		# Knife Throw only leaves you disarmed if it actually kills the target
@@ -6776,7 +6831,7 @@ func _battle_perform_attack(action: Dictionary) -> void:
 		# Knuckle Gloves' innate double_strike (plain Attack only, not
 		# specials -- those already carry their own explicit effect), any
 		# weapon's passive_double_hit_chance (Nightwhisper/Thunderclap), and
-		# Whirlwind Charm's talisman-driven double hit on any melee weapon.
+		# Double-Blade Technique's talisman-driven double hit on any melee weapon.
 		if action.get("is_regular_attack", false) and still_primary_target.call():
 			if weapon.get("double_strike", false) or whirlwind_melee:
 				_hit(idx, dmg_mult, effect, weapon, -1, multihit_capable)
@@ -6974,6 +7029,11 @@ func _battle_player_special(index: int) -> void:
 	if not action.get("learned", true):
 		hud.battle_log("You haven't learned %s yet -- train at the Dojo in town." % action.name)
 		return
+	# A share-of-the-pool price (the Club's "30 + 20% of max stamina") is worked out here, against today's maximum.
+	if float(action.get("cost_pct_max", 0.0)) > 0.0:
+		action = action.duplicate()
+		action.stamina_cost = WeaponsScript.special_cost(action, player.max_stamina)
+		action.erase("cost_pct_max")
 	# Gravedigger's passive_free_specials -- every special costs 0 stamina.
 	if player.current_weapon.get("passive_free_specials", false):
 		action = action.duplicate()
@@ -7010,7 +7070,7 @@ func _battle_player_arrow(kind: String) -> void:
 			hud.battle_log("No enemy in range.")
 			return
 		if kind == "flame":
-			var flame_dmg: int = ARROW_FLAME_FLAT_DMG + int(round(player.attack_damage * ARROW_FLAME_DMG_STAT_PCT))
+			var flame_dmg: int = ARROW_FLAME_FLAT_DMG + int(round(player.effective_strength() * ARROW_FLAME_DMG_STAT_PCT))
 			_apply_single_hit(idx, 1.0, "arrow_flame", player.current_weapon, "You", Vector2i(-1, -1), flame_dmg)
 		else:
 			_apply_single_hit(idx, 1.0, "arrow_freeze", player.current_weapon, "You", Vector2i(-1, -1), ARROW_FREEZE_FLAT_DMG)
@@ -7053,7 +7113,7 @@ func _resolve_bomb_arrow(center_tile: Vector2i) -> void:
 			_spawn_battle_damage_number(a.tile, ARROW_BOMB_FLAT_DMG)
 
 	if _in_blast_radius(battle_player_tile, center_tile, ARROW_BOMB_RADIUS):
-		player.take_battle_damage(ARROW_BOMB_FLAT_DMG)
+		player.take_battle_damage(ARROW_BOMB_FLAT_DMG, true)
 		hud.battle_log("You're caught in your own blast for %d damage!" % ARROW_BOMB_FLAT_DMG)
 		_spawn_battle_damage_number(battle_player_tile, ARROW_BOMB_FLAT_DMG)
 		_shake_battle(6.0, 0.2)
@@ -7064,7 +7124,7 @@ func _resolve_bomb_arrow(center_tile: Vector2i) -> void:
 # (see battle_allies' shape), so they take the blast damage without igniting.
 # Dealt directly rather than through _apply_single_hit, so the explosion
 # itself never re-triggers Last Stand Idol/Momentum Chain/etc.
-# What one burn tick deals to this unit right now: Ember Charm's own formula
+# What one burn tick deals to this unit right now: Pyrogenesis Organ's own formula
 # while it still has fire left (burn_value), otherwise the old share of max HP
 # every other burn source (Flame Arrow, Embers terrain, Wildfire) uses.
 func _burn_tick_damage(u: Dictionary) -> int:
@@ -7073,7 +7133,7 @@ func _burn_tick_damage(u: Dictionary) -> int:
 		return max(1, int(ceil(ember_value)))
 	return max(1, int(round(float(u.max_hp) / BURN_DAMAGE_DIVISOR)))
 
-# Called right after an Ember Charm burn deals a tick: shrinks what's left by
+# Called right after an Pyrogenesis Organ burn deals a tick: shrinks what's left by
 # EMBER_BURN_DECAY and puts the fire out once it's under 1 ("until no more
 # damage"). A no-op for a legacy burn, which only water ever clears.
 func _decay_ember_burn(u: Dictionary) -> void:
@@ -7084,12 +7144,12 @@ func _decay_ember_burn(u: Dictionary) -> void:
 		u.burn_value = 0.0
 		u.burning = false
 
-# Sets a unit alight; with Ember Charm equipped the fire uses its own damage
+# Sets a unit alight; with Pyrogenesis Organ equipped the fire uses its own damage
 # formula instead of a share of max HP.
 func _ignite_with_ember(u: Dictionary) -> void:
 	u.burning = true
 	if player.talisman_bonus("ember_burn") > 0.0:
-		u.burn_value = EMBER_BURN_BASE + float(player.attack_damage) / EMBER_BURN_ATTACK_DIV
+		u.burn_value = EMBER_BURN_BASE + player.effective_strength() / EMBER_BURN_ATTACK_DIV
 
 # Lucky Clover (talisman): doubles an on-hit proc chance, capped at 100%.
 func _proc(chance: float) -> float:
@@ -7102,7 +7162,7 @@ func _trigger_wildfire_explosion(center_tile: Vector2i, fire_tick_dmg: int) -> v
 	var blast_dmg: int = max(1, fire_tick_dmg * WILDFIRE_EXPLOSION_FIRE_MULT)
 	hud.battle_log("The blaze erupts outward!")
 	if _in_blast_radius(battle_player_tile, center_tile, WILDFIRE_EXPLOSION_RADIUS):
-		player.take_battle_damage(blast_dmg)
+		player.take_battle_damage(blast_dmg, true)
 		player_burning = true
 		_spawn_battle_damage_number(battle_player_tile, blast_dmg)
 		hud.battle_log("You're caught in the blast for %d damage and catch fire!" % blast_dmg)
@@ -7158,6 +7218,14 @@ func _battle_player_item() -> void:
 		"restore_stamina":
 			player.reset_stamina()
 			hud.battle_log("Stamina rushes back into you!")
+		"restore_mana":
+			# The hero has no mana of his own; the potion is for the casters fighting beside him.
+			var refilled := 0
+			for ally_unit in battle_allies:
+				if int(ally_unit.get("max_mana", 0)) > 0 and int(ally_unit.get("mana", 0)) < int(ally_unit.max_mana):
+					ally_unit["mana"] = int(ally_unit.max_mana)
+					refilled += 1
+			hud.battle_log("Mana floods back into %s." % ("your casters" if refilled > 0 else "no one -- nobody needed it"))
 	# Battle Medic (Church): using a healing item shocks every enemy for a little damage.
 	if player.meta_battle_medic_damage > 0:
 		hud.battle_log("Battle Medic! The healing item lashes every enemy for %d damage." % player.meta_battle_medic_damage)
@@ -7255,7 +7323,7 @@ func _end_player_turn() -> void:
 	else:
 		_start_ally_turn()
 
-# Bloodmoon Fang (talisman): once per player turn, checks whether anyone --
+# Bloodthirsty Idol (talisman): once per player turn, checks whether anyone --
 # player, ally, or enemy -- landed a hit this cycle
 # (battle_had_combat_action_this_cycle, set by _apply_single_hit/
 # _enemy_apply_damage). BLOODMOON_QUIET_TURNS_LIMIT quiet turns in a row
@@ -7272,7 +7340,7 @@ func _advance_bloodmoon_quiet_turn() -> void:
 			player.bloodmoon_debuffed = true
 			player.bloodmoon_stacks = 0
 			player._recalc_stats()
-			hud.battle_log("Bloodmoon Fang crashes -- your stats are halved!")
+			hud.battle_log("Bloodthirsty Idol crashes -- your stats are halved!")
 	battle_had_combat_action_this_cycle = false
 
 # Turtle Shell (talisman): the water wants to carry the player off this tile
@@ -7376,7 +7444,7 @@ func _focus_battle_ally_menu() -> void:
 	hud.battle_ally_buttons["attack"].grab_focus()
 
 # What a member regains at the start of its own command: stamina per turn (the Astral Full Breath
-# plus its talismans) and HP from regeneration talismans (Moss Charm).
+# plus its talismans) and HP from regeneration talismans (Mossy Rock).
 func _ally_start_of_turn(u: Dictionary) -> void:
 	var mods: Dictionary = u.get("mods", {})
 	# With turn order live a member's timers (charm, empower) count down on its own turns.
@@ -7607,7 +7675,7 @@ func member_special_pool(member) -> Array:
 
 # A kit special as this unit would use it right now: its talismans' / favour's cost changes (the
 # Knight's greatsword discount) applied, and the two costs that depend on the moment worked out --
-# Revival Blessing takes every HP but one; Summon the Dead costs 5 HP a skeleton, one per enemy
+# Energy Transfer takes every HP but one; Summon the Dead costs 5 HP a skeleton, one per enemy
 # slain in the last battle. Marked "kit" so being disarmed does not lock it.
 func _kit_special_for(u: Dictionary, kit: Dictionary) -> Dictionary:
 	var s: Dictionary = kit.duplicate(true)
@@ -7650,6 +7718,9 @@ func _kit_special_for(u: Dictionary, kit: Dictionary) -> Dictionary:
 		if markup > 0.0:
 			cost = int(round(cost * (1.0 + markup)))
 		cost = maxi(1, cost)
+	# A share of the whole pool on top (the Wolf's Drive-By: 35 + 30% of its max stamina).
+	if float(s.get("cost_pct_max", 0.0)) > 0.0 and not s.get("cost_all", false):
+		cost += int(round(float(u.get("max_stamina", 0)) * float(s.cost_pct_max)))
 	# The Marksman's arrow specials draw on the shared quiver.
 	if str(s.get("effect", "")).begins_with("ally_arrow_"):
 		var arrow_kind: String = str(s.effect).substr(11)
@@ -8311,7 +8382,7 @@ func _spectre_step(from: Vector2i, dir: Vector2i) -> Dictionary:
 		return {"tile": from, "moved": false, "fell": false}
 	return {"tile": target, "moved": true, "fell": false}
 
-# Revival (the Necromancer's Revival Blessing): stands a downed ally back up at full HP.
+# Revival (the Necromancer's Energy Transfer): stands a downed ally back up at full HP.
 func _resolve_revive() -> void:
 	var target = battle_ally_target
 	if target == null or typeof(target) == TYPE_STRING or not battle_downed_allies.has(target):
@@ -8789,9 +8860,11 @@ func _resolve_druid_buff() -> void:
 
 # Pickpocket: no damage, 3 coins, and a tile of extra movement next turn.
 func _resolve_pickpocket() -> void:
-	player.add_coins(PartyKitsScript.PICKPOCKET_COINS)
+	var idx: int = _actor_effective_target()
+	var coins: int = maxi(1, int(round(float(battle_units[idx].get("damage", 1))))) if idx >= 0 else PartyKitsScript.PICKPOCKET_COINS
+	player.add_coins(coins)
 	battle_actor["bonus_move_next"] = 1
-	hud.battle_log("%s picks the enemy's pocket: +%d coins." % [_actor_label(), PartyKitsScript.PICKPOCKET_COINS])
+	hud.battle_log("%s picks the enemy's pocket: +%d coins." % [_actor_label(), coins])
 
 # London's Welcome: 3-7 slashes at 60% -- one roll decides whether the whole flurry lands or misses.
 func _resolve_londons_welcome(dmg_mult: float, weapon: Dictionary) -> void:
@@ -8866,7 +8939,7 @@ func _ally_targetable_indices(u: Dictionary) -> Array:
 		for i in battle_units.size():
 			result.append(i)
 		return result
-	# A spear thrusts along diagonals too; Cliffwalker's Bead lets any weapon swing up a ledge.
+	# A spear thrusts along diagonals too; Cliffwalker's Beadstring lets any weapon swing up a ledge.
 	var ignore_line: bool = str(WeaponsScript.get_base_type(weapon).get("id", "")) == "spear"
 	var ignore_ledge: bool = float(u.get("mods", {}).get("ignore_ledge_attack", 0.0)) > 0.0
 	for i in battle_units.size():
@@ -8907,6 +8980,7 @@ func _try_battle_ally_move(dir: Vector2i) -> void:
 	_check_ally_disarm_reclaimed(u)
 	battle_ally_moves_left -= 2 if result.get("extra_cost", false) else 1
 	battle_move_trail.append({"tile": u.tile, "dir": dir})
+	_fitbit_heal(u)
 	if result.fell:
 		var dmg := int(round(float(u.max_hp) * CLIFF_FALL_DAMAGE_PCT))
 		u.hp -= dmg
@@ -9027,13 +9101,29 @@ func _apply_incoming_reductions(dmg: int, traits: Dictionary) -> int:
 	# Berserk: the whole hit is cut, after every other reduction.
 	if player.berserk_turns_remaining > 0 and total > 0:
 		total = maxi(1, int(round(total * (1.0 - _berserk_taken_cut()))))
+	# Retribution in hand: mages hurt a little less, everything else a little more.
+	var held: Dictionary = player.current_weapon
+	if held.has("passive_taken_from_mage_mult") and total > 0:
+		var taken_mult: float = float(held.passive_taken_from_mage_mult) if traits.get("mage", false) else float(held.get("passive_taken_from_nonmage_mult", 1.0))
+		total = maxi(1, int(round(total * taken_mult)))
+	# Resilience Potion: the blow is a fifth smaller (the doc says -20% damage taken, not points of Defense).
+	if player.potion_resilience_turns > 0 and total > 0:
+		total = maxi(1, int(round(total * (1.0 - RESILIENCE_POTION_DAMAGE_REDUCTION_PCT))))
+	# Gilded Scarab: a little more cut for every coin you hold (never more than half the blow).
+	var coin_cut: float = minf(0.5, player.coin_reduction())
+	if coin_cut > 0.0 and total > 0:
+		total = maxi(1, int(round(total * (1.0 - coin_cut))))
+	# Thorny Ring doubles what lands on you (a BFF Bracelet, allies only, would trim it).
+	var taken_pct: float = player.talisman_bonus("damage_taken_pct")
+	if taken_pct != 0.0 and total > 0:
+		total = maxi(1, int(round(total * maxf(0.0, 1.0 + taken_pct))))
 	return total
 
 # The cuts that apply to either kind of harm: a Resilience Potion, and Last Stand (which scales
 # continuously with how hurt you are -- every 10% HP missing adds another step). Returned as a
 # fraction (x100 = points of Defense); they pool with the gear's points and bend on the same curve.
 func _generic_reduction() -> float:
-	var generic: float = RESILIENCE_POTION_DAMAGE_REDUCTION_PCT if player.potion_resilience_turns > 0 else 0.0
+	var generic: float = 0.0
 	if player.meta_last_stand_pct_per_10 > 0.0:
 		var missing_pct: float = 1.0 - float(player.health) / float(player.max_health)
 		generic += player.meta_last_stand_pct_per_10 * floor(missing_pct * 10.0)
@@ -9257,7 +9347,7 @@ func _apply_evasion_step(dir: Vector2i) -> void:
 			hud.battle_log("Your %s lets you shrug off the fall." % player.equipped_armor.name)
 		else:
 			var dmg := int(round(player.max_health * CLIFF_FALL_DAMAGE_PCT * fall_mult))
-			player.take_battle_damage(dmg)
+			player.take_battle_damage(dmg, true)
 			hud.battle_log("You fall! Took %d damage." % dmg)
 
 # Whichever of {the player, a living ally} sits closest to this enemy right
@@ -9475,7 +9565,7 @@ func _enemy_apply_damage(u: Dictionary, target_tile: Vector2i, raw_dmg: int, tra
 		# A PartyMember's own Defense and Fortitude (points, gear included) bend into a cut on the
 		# Defense.gd curve -- an 80% ceiling, 90% for the Guardian -- and never below 1 damage. Bodily
 		# harm is cut by its Defense, magical harm by its Fortitude (an attack that is both, by each
-		# in turn, half and half). Guardian Knot (talisman) and Last Stand (Astral: the more of its HP an
+		# in turn, half and half). BFF Bracelet (talisman) and Last Stand (Astral: the more of its HP an
 		# ally has lost, the less damage it takes) are extra points pooled into both.
 		var ally_extra: float = player.talisman_bonus("ally_defense_pct") * 100.0
 		if player.meta_last_stand_pct_per_10 > 0.0:
@@ -9516,6 +9606,10 @@ func _enemy_apply_damage(u: Dictionary, target_tile: Vector2i, raw_dmg: int, tra
 			var stone_cut: int = int(round(float(target_ally.armor.trait_params.get("flat_reduction", 0)) * ally_share))
 			if stone_cut > 0:
 				dmg = maxi(1, dmg - stone_cut)
+		# BFF Bracelet (and a Thorny Ring): the wearer takes less (or more) of every blow that lands.
+		var ally_taken: float = _unit_effect(target_ally, "damage_taken_pct")
+		if ally_taken != 0.0 and dmg > 0:
+			dmg = maxi(1, int(round(dmg * maxf(0.0, 1.0 + ally_taken))))
 		target_ally.hp -= dmg
 		target_name = target_ally.name
 		battle_had_combat_action_this_cycle = true
@@ -9607,18 +9701,18 @@ func _land_enemy_hit_on_player(u: Dictionary, dmg: int, traits: Dictionary) -> v
 	# any landed hit, same shape as BONK's own self-hit roll but rolled
 	# against the player's timer (player_concussed_turns) instead.
 	if traits.get("inflicts_concussion", false) and randf() < CONCUSSION_INFLICT_CHANCE:
-		player_concussed_turns = PLAYER_CONCUSSION_TURNS
+		player_concussed_turns = _status_len(PLAYER_CONCUSSION_TURNS)
 		hud.battle_log("The blow leaves you dazed!")
 	# Bleeding (sharp-wielding enemies): guaranteed on a landed hit, no
 	# roll -- BLEED_BASE_TURNS turns, ticking BLEED_DAMAGE_PCT at the end of
 	# each one, lengthened by any tile the player moves while it's active.
 	if traits.get("inflicts_bleed", false) and player_bleed_turns <= 0:
-		player_bleed_turns = BLEED_BASE_TURNS
+		player_bleed_turns = _status_len(BLEED_BASE_TURNS)
 		hud.battle_log("The wound leaves you bleeding!")
 	# Blindness (mage-type enemies): guaranteed on a landed hit, refreshes
 	# the full duration even if already active.
 	if traits.get("inflicts_blind", false):
-		player_blind_turns = BLINDNESS_TURNS
+		player_blind_turns = _status_len(BLINDNESS_TURNS)
 		hud.battle_log("Your vision swims -- you're blinded!")
 
 # ---------------------------------------------------------------------------
@@ -10216,8 +10310,7 @@ func _begin_hero_turn() -> void:
 	# turn on its own" shape as the enemy-side burning/poison ticks.
 	if player_poison_turns > 0:
 		player_poison_turns -= 1
-		player.take_battle_damage(player_poison_dmg)
-		hud.battle_log("You're poisoned for %d damage!" % player_poison_dmg)
+		_hero_dot_damage(player_poison_dmg, "You're poisoned for %d damage!", "poison")
 		if player.health <= 0:
 			return
 
@@ -10227,8 +10320,7 @@ func _begin_hero_turn() -> void:
 	if player_bleed_turns > 0:
 		player_bleed_turns -= 1
 		var bleed_dmg: int = max(1, int(round(player.max_health * BLEED_DAMAGE_PCT)))
-		player.take_battle_damage(bleed_dmg)
-		hud.battle_log("You're bleeding for %d damage!" % bleed_dmg)
+		_hero_dot_damage(bleed_dmg, "You're bleeding for %d damage!", "bleeding")
 		if player.health <= 0:
 			return
 
@@ -10236,8 +10328,7 @@ func _begin_hero_turn() -> void:
 	# steps onto a water tile (cleared in _apply_water_push).
 	if player_burning:
 		var player_burn_dmg: int = max(1, int(round(float(player.max_health) / BURN_DAMAGE_DIVISOR)))
-		player.take_battle_damage(player_burn_dmg)
-		hud.battle_log("You burn for %d damage!" % player_burn_dmg)
+		_hero_dot_damage(player_burn_dmg, "You burn for %d damage!", "fire")
 		if player.health <= 0:
 			return
 
@@ -10249,7 +10340,7 @@ func _begin_hero_turn() -> void:
 		player_concussed_turns -= 1
 		if randf() < PLAYER_CONCUSSION_CHANCE:
 			var concussion_dmg: int = player.stat_might
-			player.take_battle_damage(concussion_dmg)
+			player.take_battle_damage(concussion_dmg, true)
 			hud.battle_log("You're concussed and stumble, taking %d damage!" % concussion_dmg)
 			if player.health <= 0:
 				return
@@ -10309,7 +10400,7 @@ func _begin_hero_turn() -> void:
 	# turn, regardless of what the previous turn's action was.
 	if player.stamina_regen_per_turn() > 0:
 		player.regen_stamina(player.stamina_regen_per_turn())
-	# Moss Charm (talisman): a little HP back at the start of every turn,
+	# Mossy Rock (talisman): a little HP back at the start of every turn,
 	# scaling up with how much max HP the player has.
 	if player.hp_regen_per_turn() > 0:
 		player.heal(player.hp_regen_per_turn())
@@ -10666,7 +10757,7 @@ func _estimate_hit(target: Dictionary, move_mult: float, ally = null) -> Vector2
 	var weapon: Dictionary = player.current_weapon if is_hero else ally.get("weapon", {})
 	var base_attack: float
 	if is_hero:
-		base_attack = float(player.attack_damage)
+		base_attack = float(player.attack_damage) + float(weapon.get("str_bonus", 0.0))
 	elif bool(weapon.get("uses_magic", false)):
 		base_attack = float(ally.get("magic", 0.0))
 	else:
@@ -10675,7 +10766,7 @@ func _estimate_hit(target: Dictionary, move_mult: float, ally = null) -> Vector2
 	if not is_hero:
 		dmg = maxf(1.0, dmg)
 	else:
-		dmg += float(int(round(player.coin_scaled_attack_bonus())))
+		dmg = float(int(round(dmg * player.coin_damage_mult())))
 	if is_hero and player.shield_damage_penalty_pct() > 0.0:
 		dmg = float(int(round(dmg * (1.0 - player.shield_damage_penalty_pct()))))
 	elif not is_hero:
@@ -10697,7 +10788,7 @@ func _estimate_hit(target: Dictionary, move_mult: float, ally = null) -> Vector2
 			dmg *= battle_hero_buff_mult
 	elif int(ally.get("buff_turns", 0)) > 0:
 		dmg *= float(ally.get("buff_mult", PartyKitsScript.DRUID_BUFF_MULT))
-	var crit_mult: float = player.crit_damage_mult() if is_hero else 2.0 + _unit_effect(ally, "crit_damage_mult_bonus")
+	var crit_mult: float = player.crit_damage_mult() if is_hero else (PlayerScript.CRIT_BASE_MULT + _unit_effect(ally, "crit_damage_mult_bonus")) * (1.0 + _unit_effect(ally, "crit_damage_pct"))
 	var low: float = dmg
 	var high: float = dmg * crit_mult
 	# What the target does to it: cover blunts a plain hit (a crit ignores it), frost and a mark make it worse, a rally worse still.
@@ -11010,6 +11101,69 @@ func _move_big_unit(u: Dictionary, movement_target: Vector2i, attack_check_targe
 # Fear (the Staff's ranged hits, a Bone weapon's Dreadful Strike): the enemy runs from the party as far as it can for the next
 # FEAR_TURNS of its turns, attacking nobody, then clears (the design doc's Status Conditions).
 const FEAR_TURNS := 2
+
+# Poison on an enemy (Rusted Edge): the same sting the Great Toothpicke leaves.
+func _poison_enemy(u: Dictionary) -> void:
+	if u.hp <= 0:
+		return
+	u["poison_turns"] = POISON_TURNS
+	u["poison_dmg"] = maxi(1, int(round(float(u.max_hp) * POISON_DAMAGE_PCT)))
+	hud.battle_log("The %s is poisoned!" % u.name)
+
+# Fake PHD: one of the enemy's negative statuses, picked at random and given its usual length.
+func _inflict_random_status(u: Dictionary) -> void:
+	if u.hp <= 0:
+		return
+	match ["poison", "burn", "bleed", "freeze", "concuss", "blind", "vulnerable", "stun", "fear"].pick_random():
+		"poison": _poison_enemy(u)
+		"burn":
+			u["burning"] = true
+			hud.battle_log("The %s catches fire!" % u.name)
+		"bleed":
+			u["bleed_turns"] = BLEED_BASE_TURNS
+			hud.battle_log("The %s starts to bleed!" % u.name)
+		"freeze":
+			u["frozen_turns"] = randi_range(ARROW_FREEZE_MIN_TURNS, ARROW_FREEZE_MAX_TURNS)
+			hud.battle_log("The %s freezes solid!" % u.name)
+		"concuss":
+			u["concussed_turns"] = BONK_CONCUSSED_TURNS
+			hud.battle_log("The %s is concussed!" % u.name)
+		"blind":
+			u["blind_turns"] = BLINDNESS_TURNS
+			hud.battle_log("The %s is blinded!" % u.name)
+		"vulnerable":
+			u["vulnerable_turns"] = VULNERABLE_TURNS
+			hud.battle_log("The %s is left vulnerable!" % u.name)
+		"stun":
+			u["stunned"] = true
+			hud.battle_log("The %s is stunned!" % u.name)
+		"fear": _fear_enemy(u)
+
+# One tick of poison, bleeding or burning on the hero: Masochist turns it into healing and Honour spares you it.
+func _hero_dot_damage(amount: int, message: String, what: String) -> void:
+	if player.talisman_bonus("dot_heals") > 0.0:
+		player.heal(amount)
+		hud.battle_log("Your %s mends you for %d instead!" % [what, amount])
+		return
+	if player.talisman_bonus("direct_only") > 0.0:
+		hud.battle_log("Honour spares you the %s." % what)
+		return
+	player.take_battle_damage(amount)
+	hud.battle_log(message % amount)
+
+# How long a status the hero is given lasts: Rebound takes a turn off it (never below one).
+func _status_len(base: int) -> int:
+	return maxi(1, base - int(player.talisman_bonus("status_turns_cut")))
+
+# Fitbit: HP for every tile moved. The hero's own, or the unit's when a member wears it.
+func _fitbit_heal(u: Dictionary = {}) -> void:
+	var per_tile: int = int(player.talisman_bonus("heal_per_tile")) if u.is_empty() else int(_unit_effect(u, "heal_per_tile"))
+	if per_tile <= 0:
+		return
+	if u.is_empty():
+		player.heal(per_tile)
+	else:
+		u["hp"] = mini(int(u.max_hp), int(u.hp) + per_tile)
 
 func _fear_enemy(u: Dictionary) -> void:
 	if u.hp <= 0:

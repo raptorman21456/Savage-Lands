@@ -12,6 +12,10 @@ class_name Clothing
 # a cheap, modest top-up, not a second armour system. The best piece in every
 # slot is +18% in total; the combined cap Main.gd already enforces (0.9) still
 # applies on top of armour and everything else.
+#
+# Two pieces from the design doc carry an effect instead: "effects" uses the talisman key vocabulary
+# (Talismans.gd), and Player._rebuild_talisman_cache sums it in beside the worn talismans, so the
+# battle code that reads those keys needs no changes at all.
 const SLOTS := ["head", "body", "feet"]
 const SLOT_LABELS := {"head": "Head", "body": "Body", "feet": "Feet"}
 
@@ -60,6 +64,19 @@ static var PIECES := [
 		"id": "cloth_trail_boots", "name": "Trail Boots", "slot": "feet", "price": 36,
 		"damage_reduction": 0.05, "icon": "cloth_feet",
 		"description": "+5 Defense.",
+	},
+	# The doc gives only the effects, so their prices are my drafts.
+	{
+		"id": "cloth_cliffwalker_boots", "name": "Cliffwalker's Boots", "slot": "feet", "price": 60,
+		"damage_reduction": 0.0, "icon": "cloth_feet",
+		"effects": {"fall_reduction": 1.0, "ignore_ledge_attack": 1},
+		"description": "No damage from cliff or ledge falls, and you can attack up a cliff with any weapon.",
+	},
+	{
+		"id": "cloth_yodler_cap", "name": "Yodler's Cap", "slot": "head", "price": 60,
+		"damage_reduction": 0.0, "icon": "cloth_head",
+		"effects": {"taunt_confusion": 1},
+		"description": "Your Taunt enrages enemies: each attacks whoever is nearest, even each other (a tie is picked at random).",
 	},
 ]
 

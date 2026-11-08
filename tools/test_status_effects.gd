@@ -22,6 +22,12 @@ func _make_goblin(main, tile: Vector2i, hp: int = 999) -> Dictionary:
 	}
 
 func _init() -> void:
+	# These checks predate the doc's flat weapon Strength (Club +2, Spear +4 per quality tier...), which has its own test
+	# (test_weapon_stat_bonuses.gd): here weapons add nothing, so every damage figure below stays as it was.
+	var _stat_weapons = load("res://scripts/Weapons.gd")
+	_stat_weapons.CLUB["str_bonus"] = 0
+	for _stat_base in _stat_weapons.UPGRADABLE_TYPES:
+		_stat_base["str_per_tier"] = 0
 	# Fixed seed: every random roll below repeats run to run, so a changed result
 	# is a real change, not luck.
 	seed(20260926)

@@ -28,16 +28,16 @@ const HEAVY_STAMINA_COST := 40
 #                          one to force this hit to land as a crit (Dagger's
 #                          Bleeding Cut)
 static var CLUB := {
-	"id": "club", "name": "Club", "price": 0,
+	"id": "club", "str_bonus": 2, "name": "Club", "price": 0,
 	"damage_mult": 1.0, "cooldown_mult": 1.0, "active_duration": 0.15,
 	"shape": "rect", "reach": 40.0, "width": 36.0,
 	"description": "Simple wooden club. Balanced, free.",
 	"shop_description": "Everyone starts somewhere. Won't win you any medals, but it won't cost you a copper either.",
 	"icon": "club",
 	"specials": [
-		{"id": "club_leg_blow", "name": "Thy Kneecaps are Mine", "stamina_cost": 30, "dmg_mult": 1.2, "effect": "leg_blow", "description": "120% damage that ignores rock cover, and permanently slows the target by 1 tile of movement (down to a minimum of 1)."},
-		{"id": "club_second_wind", "name": "Second Wind", "stamina_cost": 35, "dmg_mult": 0.6, "effect": "self_heal", "description": "60% damage, and heals you for ~10% of your max HP."},
-		{"id": "club_heavy_swing", "name": "Heavy Swing", "stamina_cost": 30, "dmg_mult": 1.3, "effect": "full_hp_bonus", "description": "130% damage, plus 50% more against a target still at full HP."},
+		{"id": "club_leg_blow", "name": "Thy Kneecaps are Mine", "stamina_cost": 30, "cost_pct_max": 0.2, "dmg_mult": 1.2, "effect": "leg_blow", "description": "120% damage that ignores rock cover, and permanently slows the target by 1 tile of movement (down to a minimum of 1)."},
+		{"id": "club_second_wind", "name": "Second Wind", "stamina_cost": 10, "cost_pct_max": 0.4, "dmg_mult": 0.6, "effect": "self_heal", "description": "60% damage, and heals you for ~10% of your max HP."},
+		{"id": "club_heavy_swing", "name": "Heavy Swing", "stamina_cost": 30, "cost_pct_max": 0.5, "dmg_mult": 1.3, "effect": "full_hp_bonus", "description": "130% damage, plus 50% more against a target still at full HP. A kill sets off Berserk."},
 	],
 }
 
@@ -46,7 +46,7 @@ static var CLUB := {
 # it opens, so "some spears are better than others" -- only damage and price
 # vary between tiers, reach/cooldown/shape stay true to the weapon type.
 static var SPEAR := {
-	"id": "spear", "name": "Spear", "price": 15,
+	"id": "spear", "str_per_tier": 4, "name": "Spear", "price": 15,
 	"damage_mult": 0.55, "cooldown_mult": 0.45, "active_duration": 0.12,
 	"shape": "rect", "reach": 75.0, "width": 18.0,
 	"long_range": true,
@@ -61,7 +61,7 @@ static var SPEAR := {
 }
 
 static var GREATSWORD := {
-	"id": "greatsword", "name": "Greatsword", "price": 25,
+	"id": "greatsword", "str_per_tier": 6, "name": "Greatsword", "price": 25,
 	"damage_mult": 1.9, "cooldown_mult": 1.7, "active_duration": 0.22,
 	"shape": "rect", "reach": 32.0, "width": 70.0,
 	"description": "Wide horizontal slash, heavy damage, slow.",
@@ -75,7 +75,7 @@ static var GREATSWORD := {
 }
 
 static var HAMMER := {
-	"id": "hammer", "name": "Hammer", "price": 30,
+	"id": "hammer", "str_per_tier": 7, "name": "Hammer", "price": 30,
 	"damage_mult": 1.6, "cooldown_mult": 2.2, "active_duration": 0.28,
 	"shape": "circle", "radius": 50.0, "offset": 26.0,
 	"description": "Huge spreading slam, very slow.",
@@ -89,7 +89,7 @@ static var HAMMER := {
 }
 
 static var BATTLE_AXE := {
-	"id": "battle_axe", "name": "Battle Axe", "price": 40,
+	"id": "battle_axe", "str_per_tier": 5, "name": "Battle Axe", "price": 40,
 	"damage_mult": 2.3, "cooldown_mult": 2.5, "active_duration": 0.35,
 	"shape": "sweep", "reach": 48.0, "width": 24.0, "sweep_angle_deg": 120.0,
 	"ohko_chance": 0.2,
@@ -104,7 +104,7 @@ static var BATTLE_AXE := {
 }
 
 static var DAGGER := {
-	"id": "dagger", "name": "Dagger", "price": 12,
+	"id": "dagger", "str_per_tier": 4, "name": "Dagger", "price": 12,
 	"damage_mult": 0.45, "cooldown_mult": 0.3, "active_duration": 0.1,
 	"shape": "rect", "reach": 28.0, "width": 20.0,
 	"description": "Very fast, light damage, favors relentless pressure.",
@@ -118,7 +118,7 @@ static var DAGGER := {
 }
 
 static var BOW := {
-	"id": "bow", "name": "Bow", "price": 20,
+	"id": "bow", "str_per_tier": 5, "name": "Bow", "price": 20,
 	"damage_mult": 0.5, "cooldown_mult": 0.9, "active_duration": 0.12,
 	"shape": "rect", "reach": 110.0, "width": 14.0,
 	"long_range": true,
@@ -164,7 +164,7 @@ const ARROW_SELL_PRICE := 2
 const ARROW_PRICE_GROWTH := 1.3
 
 static var KNUCKLE_GLOVES := {
-	"id": "knuckle_gloves", "name": "Knuckle Gloves", "price": 14,
+	"id": "knuckle_gloves", "str_per_tier": 4, "name": "Knuckle Gloves", "price": 14,
 	"damage_mult": 0.4, "cooldown_mult": 0.32, "active_duration": 0.1,
 	"shape": "rect", "reach": 22.0, "width": 30.0,
 	# A flat 10% chance for any plain Attack to land twice (2026-09-29 -- was
@@ -183,7 +183,7 @@ static var KNUCKLE_GLOVES := {
 }
 
 static var HAND_PICKS := {
-	"id": "hand_picks", "name": "Hand Picks", "price": 18,
+	"id": "hand_picks", "str_per_tier": 4, "name": "Hand Picks", "price": 18,
 	"damage_mult": 0.85, "cooldown_mult": 0.6, "active_duration": 0.16,
 	"shape": "rect", "reach": 34.0, "width": 26.0,
 	# Innate -- a mining tool built to tear through the hardest material, so
@@ -208,14 +208,14 @@ static var HAND_PICKS := {
 # chance to make the target flee in fear. Its regular attack is PUMMEL, which only reaches an enemy within one tile
 # (15 stamina, or mana for a caster: 0.85 x STR + 0.25 x MAG); its three specials spend MANA (casters), or stamina for
 # anyone without a mana pool. Numbers: the user's design doc (2026-10-30); the mana costs are the doc's (Landfall 40%,
-# I SUMMON THEE half of the pool), Poison Bomb's is my draft. Keys: range_bonus = extra attack range, magic_bonus = flat magic
+# I SUMMON THEE half of the pool), Poison Bomb's is my draft. Keys: range_bonus = extra attack range, magic_per_tier = flat magic (x the quality tier's rank) in the variant's magic_bonus
 # while wielded, uses_magic = damage uses the magic stat, ally_only = the player can't equip it, pummel = the regular attack
 # is the adjacent-only Pummel, passive_ranged_fear_chance = chance a ranged hit frightens.
 static var STAFF := {
 	"id": "staff", "name": "Staff", "price": 30,
 	"damage_mult": 1.0, "cooldown_mult": 1.3, "active_duration": 0.18,
 	"shape": "rect", "reach": 40.0, "width": 16.0,
-	"ally_only": true, "uses_magic": true, "range_bonus": 2, "magic_bonus": 5,
+	"ally_only": true, "uses_magic": true, "range_bonus": 2, "magic_per_tier": 5,
 	"passive_ranged_fear_chance": 0.10,
 	"pummel": true, "pummel_stamina_cost": 15,
 	"description": "Party members only. +2 range and +5 magic; damage uses the wielder's magic stat. Ranged attacks have a 10% chance to scare the target into running away. Its regular attack is Pummel, which only reaches an enemy within one tile.",
@@ -237,7 +237,7 @@ static var WAND := {
 	"id": "wand", "name": "Wand", "price": 30,
 	"damage_mult": 1.0, "cooldown_mult": 1.0, "active_duration": 0.14,
 	"shape": "rect", "reach": 40.0, "width": 12.0,
-	"ally_only": true, "uses_magic": true, "range_bonus": 3, "magic_bonus": 6,
+	"ally_only": true, "uses_magic": true, "range_bonus": 3, "magic_per_tier": 6,
 	"passive_blind_chance": 0.05,
 	"no_close_attack": true,
 	"description": "Party members only. +3 range and +6 magic; damage uses the wielder's magic stat. Every attack has a 5% chance to blind. It has no close-quarters attack: it cannot strike an enemy right next to you.",
@@ -268,6 +268,25 @@ static func is_ally_only(weapon: Dictionary) -> bool:
 		return true
 	var base := get_base_type(weapon)
 	return bool(base.get("ally_only", false))
+
+# What a special costs in the pool of whoever uses it: its flat stamina_cost plus cost_pct_max of that pool's maximum
+# ("30 + 20% of max stamina"). max_pool is the user's maximum stamina, or maximum mana for a caster.
+static func special_cost(special: Dictionary, max_pool: int) -> int:
+	var flat: int = int(special.get("stamina_cost", 0))
+	var pct: float = float(special.get("cost_pct_max", 0.0))
+	if pct <= 0.0:
+		return flat
+	return maxi(1, flat + int(round(float(max_pool) * pct)))
+
+# The same cost as the words the screens print: "30", "30 + 20%", or just "40%".
+static func cost_text(special: Dictionary) -> String:
+	var flat: int = int(special.get("stamina_cost", 0))
+	var pct: float = float(special.get("cost_pct_max", 0.0))
+	if pct <= 0.0:
+		return str(flat)
+	if flat <= 0:
+		return "%d%%" % int(round(pct * 100.0))
+	return "%d + %d%%" % [flat, int(round(pct * 100.0))]
 
 # Inverse of make_variant()'s id construction: a purchased/offered weapon's
 # id is always "<base_id>_<tier>_<material>" (or "<base_id>_mythic"), except
@@ -446,6 +465,55 @@ static func _pick_tier(min_rank: int, luck_bonus: float = 0.0) -> Dictionary:
 			return eligible[i]
 	return eligible[-1]
 
+# --- Unique weapons: not forged, not sold -- they drop (Main.gd:_roll_unique_drop). Built from a base type like a Mythic,
+# with the id "<base>_<key>". The doc gives their modifiers but no base damage, so each sits on a Legendary's.
+const UNIQUE_DROP_CHANCE := 0.005
+static var UNIQUE_WEAPONS := {
+	"dagger": {
+		"key": "retribution", "name": "Retribution",
+		"description": "Taken from something the void spat out. It wants mages dead and does not care much for anything else.",
+		"passive": {
+			"passive_crit_chance_bonus": 0.15, "passive_crit_damage_mult": 1.33,
+			"passive_damage_vs_mage_mult": 1.5, "passive_damage_vs_nonmage_mult": 0.7,
+			"passive_taken_from_mage_mult": 0.95, "passive_taken_from_nonmage_mult": 1.10,
+		},
+	},
+}
+
+static func unique_id(base_id: String) -> String:
+	return "%s_%s" % [base_id, str(UNIQUE_WEAPONS.get(base_id, {}).get("key", ""))]
+
+# The flat Strength / Magic a weapon carries (the doc: "+4 STR per quality tier"): a set amount for every rung of the quality ladder
+# it sits on, Broken being the first rung (0) and Mythic the sixth (5). Added to the wielder's own stat before the weapon's
+# damage multiplier. The Club is flat (+2 STR) and Fists add nothing.
+static func _stamp_stat_bonuses(variant: Dictionary, base: Dictionary, tier: Dictionary) -> void:
+	if base.has("str_per_tier"):
+		variant.str_bonus = int(base.str_per_tier) * int(tier.get("rank", 0))
+	if base.has("magic_per_tier"):
+		variant.magic_bonus = int(round(float(base.magic_per_tier) * float(tier.get("rank", 0))))
+
+static func _build_unique_variant(base: Dictionary, unique: Dictionary) -> Dictionary:
+	var tier: Dictionary = {}
+	for t in TIERS:
+		if t.tier_name == "Legendary":
+			tier = t
+	var variant: Dictionary = base.duplicate(true)
+	variant.tier_name = "Legendary"
+	variant.required_might = tier.required_might
+	variant.material_name = "Steel"
+	variant.material_id = "steel"
+	variant.id = "%s_%s" % [base.id, unique.key]
+	variant.name = unique.name
+	variant.description = unique.description
+	variant.unique = true
+	_stamp_stat_bonuses(variant, base, tier)
+	variant.damage_mult = base.damage_mult * tier.damage_scale
+	variant.price = int(round(base.price * tier.price_scale))
+	variant.break_chance = 0.0
+	for key in unique.passive:
+		variant[key] = unique.passive[key]
+	return variant
+
 static func _build_mythic_variant(base: Dictionary, tier: Dictionary) -> Dictionary:
 	var mythic: Dictionary = MYTHIC_WEAPONS[base.id]
 	# A deep duplicate -- not the shallow default -- since the tiered path
@@ -457,6 +525,7 @@ static func _build_mythic_variant(base: Dictionary, tier: Dictionary) -> Diction
 	variant.id = "%s_mythic" % base.id
 	variant.name = mythic.name
 	variant.description = mythic.description
+	_stamp_stat_bonuses(variant, base, tier)
 	variant.damage_mult = base.damage_mult * tier.damage_scale
 	variant.price = int(round(base.price * tier.price_scale))
 	for key in mythic.passive:
@@ -476,6 +545,7 @@ static func _build_tiered_variant(base: Dictionary, tier: Dictionary, material: 
 	# combat code (Main.gd) reads it to gate each material's passive trait.
 	# See Talismans.gd's stone_amulet, which amplifies whichever one is active.
 	variant.material_id = material.id
+	_stamp_stat_bonuses(variant, base, tier)
 	variant.damage_mult = base.damage_mult * tier.damage_scale * material.damage_scale
 	variant.price = int(round(base.price * tier.price_scale * material.price_scale))
 	variant.break_chance = material.break_chance
@@ -530,6 +600,8 @@ static func get_owned_variant(id: String) -> Dictionary:
 		if not id.begins_with("%s_" % base.id):
 			continue
 		var rest: String = id.substr(base.id.length() + 1)
+		if UNIQUE_WEAPONS.has(base.id) and rest == str(UNIQUE_WEAPONS[base.id].key):
+			return _build_unique_variant(base, UNIQUE_WEAPONS[base.id])
 		if rest == "mythic" and MYTHIC_WEAPONS.has(base.id):
 			var mythic_tier: Dictionary = {}
 			for t in TIERS:

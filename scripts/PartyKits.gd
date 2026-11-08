@@ -46,6 +46,7 @@ const DRIVE_BY_MULT := 1.4
 const FEED_MULT := 1.5
 const FEED_HP_THRESHOLD := 0.2            # Feed bites harder under 20% HP
 const FEED_KILL_HEAL := 5                 # heals 5 HP on a kill...
+const FEED_KILL_HEAL_PCT := 0.33          # ...plus a third of its max HP...
 const FEED_KILL_STAMINA := 20             # ...and refunds 20 stamina
 const NIPPER_MULT := 0.8
 const NIPPER_SLOW_CHANCE := 0.5           # 50% to halve the enemy's speed
@@ -58,17 +59,18 @@ const DRUID_BUFF_MULT := 1.5              # buff: target deals 1.5x damage...
 const DRUID_BUFF_TURNS := 3               # ...for 3 turns
 
 # --- Guardian ---
-const BODY_SLAM_MULT := 1.3
+const BODY_SLAM_MULT := 1.3                 # CRUSH: 1.3 x Resilience + 1.3 x Fortitude
 const BODY_SLAM_STUN_CHANCE := 0.15
 const HAYMAKER_MULT := 1.5
-const BELLOW_FLAT := 20.0                 # (20) + 0.67 x the Guardian's max HP to every enemy
-const BELLOW_HP_MULT := 0.67
+const BELLOW_FLAT := 20.0                 # (20) + 0.66 x the Guardian's Vigor (max HP) to every enemy
+const BELLOW_HP_MULT := 0.66
 
 # --- Marksman ---
 const MARKSMAN_BOW_CRIT_MULT := 1.5       # crit chance x1.5 with a bow
 
 # --- Rogue ---
-const ROGUE_STEAL_CHANCE := 0.25          # a regular hit may steal 1 gold instead of damaging
+const ROGUE_STEAL_CHANCE := 0.25          # a regular hit may steal 1 gold...
+const ROGUE_STEAL_DAMAGE_MULT := 0.75     # ...but then it lands at 0.75x
 const ROGUE_KNIFE_MULT := 1.25
 const PICKPOCKET_COINS := 3
 const JUGULAR_BLEED_TURNS := 2
@@ -98,7 +100,7 @@ const KITS := {
 		{"id": "necromancer_curse_of_rot", "name": "Curse of Rot", "stamina_cost": 0, "dmg_mult": 0.0, "effect": "curse_of_rot", "hp_cost_flat": 10, "hp_cost_pct": 0.15,
 			"description": "Rots an enemy from within: it loses 10% of its max HP every turn for 5 turns, and if it dies while cursed the kill is the Necromancer's. Costs 10 HP plus 15% of max HP."},
 		# Takes the Necromancer to 1 HP to cast (the cost is worked out when the menu opens).
-		{"id": "necromancer_revival_blessing", "name": "Revival Blessing", "stamina_cost": 0, "dmg_mult": 0.0, "effect": "revive", "cost_all": true,
+		{"id": "necromancer_revival_blessing", "name": "Energy Transfer", "stamina_cost": 0, "dmg_mult": 0.0, "effect": "revive", "cost_all": true,
 			"description": "Raise a downed ally to full HP. It takes everything the Necromancer has: HP drops to 1."},
 		# 5 HP per skeleton, as many as you choose (a picker) up to one for each enemy slain in the last battle; needs
 		# 5 HP + 40% of max HP to cast (require_hp_*; both worked out when the menu opens).
@@ -115,11 +117,11 @@ const KITS := {
 	],
 	# --- the older kits (the doc's Party Members tab) ---
 	"wolf": [
-		{"id": "wolf_drive_by", "name": "Drive-By", "stamina_cost": 35, "dmg_mult": DRIVE_BY_MULT, "effect": "drive_by", "keeps_turn": true,
+		{"id": "wolf_drive_by", "name": "Drive-By", "stamina_cost": 35, "cost_pct_max": 0.3, "dmg_mult": DRIVE_BY_MULT, "effect": "drive_by", "keeps_turn": true,
 			"description": "Hit hard, dash to the tile past the enemy, and get ONE more regular attack."},
-		{"id": "wolf_feed", "name": "Feed", "stamina_cost": 25, "dmg_mult": 1.0, "effect": "feed",
-			"description": "Bites 50% harder into an enemy under 20% HP. A kill heals the Wolf 5 HP and refunds 20 stamina."},
-		{"id": "wolf_nipper", "name": "Nipper", "stamina_cost": 10, "dmg_mult": NIPPER_MULT, "effect": "nipper",
+		{"id": "wolf_feed", "name": "Feed", "stamina_cost": 25, "cost_pct_max": 0.3, "dmg_mult": 1.0, "effect": "feed",
+			"description": "Bites 50% harder into an enemy under 20% HP. A kill heals the Wolf 5 HP plus a third of its max HP and refunds 20 stamina."},
+		{"id": "wolf_nipper", "name": "Nipper", "stamina_cost": 10, "cost_pct_max": 0.2, "dmg_mult": NIPPER_MULT, "effect": "nipper",
 			"description": "A quick nip at 80% damage with a 50% chance to halve the enemy's speed."},
 	],
 	"druid": [
@@ -134,13 +136,13 @@ const KITS := {
 	"guardian": [
 		{"id": "guardian_taunt", "name": "Taunt", "stamina_cost": 0, "dmg_mult": 0.0, "effect": "taunt", "keeps_turn": true,
 			"description": "Draw every enemy onto the Guardian (and brace like Guard). It does NOT end the turn."},
-		{"id": "guardian_body_slam", "name": "Body Slam", "stamina_cost": 35, "dmg_mult": BODY_SLAM_MULT, "effect": "body_slam",
-			"description": "Slam with the Guardian's DEFENSE instead of its attack at 130% damage. 15% chance to stun."},
+		{"id": "guardian_body_slam", "name": "CRUSH", "stamina_cost": 35, "dmg_mult": BODY_SLAM_MULT, "effect": "body_slam",
+			"description": "Deals 1.3 x Resilience plus 1.3 x Fortitude. 15% chance to stun the foe."},
 		{"id": "guardian_haymaker", "name": "Haymaker", "stamina_cost": 50, "dmg_mult": HAYMAKER_MULT, "effect": "haymaker",
 			"description": "A crushing swing at 150% damage that always stuns."},
 		# DRAFT cost -- the doc gives none.
 		{"id": "guardian_bellow", "name": "Earbursting Bellow", "stamina_cost": 60, "dmg_mult": 0.0, "effect": "bellow",
-			"description": "20 + 0.67 x the Guardian's max HP to EVERY enemy -- and you take the same unless you time it right."},
+			"description": "20 + 0.66 x the Guardian's Vigor to EVERY enemy -- and you take the same unless you time it right."},
 	],
 	"marksman": [
 		# The Bow's specials are its special arrows, fired from the quiver you share (no stamina).
@@ -153,7 +155,7 @@ const KITS := {
 	],
 	"rogue": [
 		{"id": "rogue_pickpocket", "name": "Pickpocket", "stamina_cost": 0, "dmg_mult": 0.0, "effect": "pickpocket",
-			"description": "No damage: steal 3 coins. Ends the turn, but the Rogue moves 1 extra tile next turn."},
+			"description": "No damage: steals 1 coin for every point of the foe's attack. No stamina. Ends the turn, but the Rogue moves 1 extra tile next turn."},
 		{"id": "rogue_jugular", "name": "Aim for the Jugular!", "stamina_cost": 40, "dmg_mult": 1.0, "effect": "jugular",
 			"description": "Always a crit, and the wound bleeds."},
 		{"id": "rogue_londons_welcome", "name": "London's Welcome", "stamina_cost": 50, "dmg_mult": LONDON_SLASH_MULT, "effect": "londons_welcome",

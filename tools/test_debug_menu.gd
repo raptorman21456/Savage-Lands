@@ -101,6 +101,11 @@ func _wait_for_hero() -> void:
 		await process_frame
 
 func _init() -> void:
+	# Magic from a Staff or Wand used to be a flat +5 / +6; the doc's per-quality-tier version (test_weapon_stat_bonuses.gd) gives a Fine one
+	# (the second rung) the same figures at 2.5 / 3.0 a tier, so these checks keep the numbers they were written against.
+	var _magic_weapons = load("res://scripts/Weapons.gd")
+	_magic_weapons.STAFF["magic_per_tier"] = 2.5
+	_magic_weapons.WAND["magic_per_tier"] = 3.0
 	seed(20261018)
 	var scratch_before := _snapshot_scratch()
 	await _frames(2)

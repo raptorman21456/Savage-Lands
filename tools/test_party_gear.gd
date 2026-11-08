@@ -5,6 +5,11 @@ extends SceneTree
 # and how a member's weapon is rebuilt (its own talismans, the Astral weapon passives).
 
 func _init() -> void:
+	# Magic from a Staff or Wand used to be a flat +5 / +6; the doc's per-quality-tier version (test_weapon_stat_bonuses.gd) gives a Fine one
+	# (the second rung) the same figures at 2.5 / 3.0 a tier, so these checks keep the numbers they were written against.
+	var _magic_weapons = load("res://scripts/Weapons.gd")
+	_magic_weapons.STAFF["magic_per_tier"] = 2.5
+	_magic_weapons.WAND["magic_per_tier"] = 3.0
 	seed(20261006)
 	var weapons = load("res://scripts/Weapons.gd")
 	var rules = load("res://scripts/PartyRules.gd")
@@ -90,9 +95,9 @@ func _init() -> void:
 	player.owned_talismans["wolf_fang"] = true
 	player.owned_talismans["moss_charm"] = true
 	player.equipped_talismans.clear()
-	print("Members have 2 talisman slots from the start whatever their level (4 for the Shaman): %s (expected [2, 2, 2, 2, 4])" % [[rules.talisman_slots("druid", 1), rules.talisman_slots("druid", 4), rules.talisman_slots("druid", 8), rules.talisman_slots("druid", 12), rules.talisman_slots("shaman", 1)]])
+	print("Members have 2 talisman slots from the start whatever their level (5 for the Shaman): %s (expected [2, 2, 2, 2, 5])" % [[rules.talisman_slots("druid", 1), rules.talisman_slots("druid", 4), rules.talisman_slots("druid", 8), rules.talisman_slots("druid", 12), rules.talisman_slots("shaman", 1)]])
 	print("A level-1 Druid has two slots: %d (expected 2)" % [druid.talisman_slot_count()])
-	print("She wears Ember Charm: %s (expected true)" % [player.equip_ally_talisman(druid, "ember_charm")])
+	print("She wears Pyrogenesis Organ: %s (expected true)" % [player.equip_ally_talisman(druid, "ember_charm")])
 	print("A second one fits: %s (expected true)" % [player.equip_ally_talisman(druid, "wolf_fang")])
 	print("A third doesn't: %s -- %s (expected false, No free slot.)" % [player.equip_ally_talisman(druid, "moss_charm"), player.ally_talisman_block_reason(druid, "moss_charm")])
 	print("The Guardian can't wear what the Druid wears: %s (expected Druid is wearing it.)" % [player.ally_talisman_block_reason(guardian, "ember_charm")])
@@ -101,8 +106,8 @@ func _init() -> void:
 	print("Nor can a member wear what YOU wear: %s (expected You are wearing it.)" % [player.ally_talisman_block_reason(guardian, "moss_charm")])
 	player.equipped_talismans.clear()
 	var equipped_ok: bool = player.equip_talisman("ember_charm")
-	print("You put on the Ember Charm -- it comes off the Druid: you=%s druid_still=%s (expected true, false)" % [equipped_ok, druid.talisman_ids().has("ember_charm")])
-	print("Effects of what she still wears (Wolf Fang): %s (expected {wolf_slot: 1, ...})" % [druid.talisman_effects().get("wolf_slot", 0.0)])
+	print("You put on the Pyrogenesis Organ -- it comes off the Druid: you=%s druid_still=%s (expected true, false)" % [equipped_ok, druid.talisman_ids().has("ember_charm")])
+	print("Effects of what she still wears (Wolf Fang): %s (expected {traitor_wolf_chance_pct: 0.25, ...})" % [druid.talisman_effects().get("traitor_wolf_chance_pct", 0.0)])
 	print("Unequipping works: %s then %s (expected true, false)" % [player.unequip_ally_talisman(druid, "wolf_fang"), player.unequip_ally_talisman(druid, "wolf_fang")])
 
 	# =========================================================

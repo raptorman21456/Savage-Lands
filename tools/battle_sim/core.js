@@ -63,6 +63,11 @@ const WANDER_DIRS = MC.WANDER_DIRS.map((d) => V(d[0], d[1]));
 
 // ---------------------------------------------------------------- data lookups
 const clone = (o) => JSON.parse(JSON.stringify(o));
+// What a special costs: its flat stamina_cost plus cost_pct_max of the user's whole pool ("30 + 20% of max stamina").
+function special_cost(sp, max_pool) {
+  const flat = sp.stamina_cost || 0, pct = sp.cost_pct_max || 0;
+  return pct > 0 ? Math.max(1, flat + round(max_pool * pct)) : flat;
+}
 const W = D.weapons;
 function weaponBases() { return [W.club, ...W.bases]; }
 function baseById(id) { return weaponBases().find((b) => b.id === id) || null; }
@@ -84,8 +89,15 @@ function slotsForLevel(level) {
 
 // ---------------------------------------------------------------- weapon variants (Weapons.gd)
 // Mirrors Weapons._build_tiered_variant / _build_mythic_variant exactly.
+// The flat Strength / Magic a weapon carries (the doc: "+4 STR per quality tier"): a set amount per rung of the quality ladder.
+function stampStatBonuses(v, base, tier) {
+  if (base.str_per_tier !== undefined) v.str_bonus = Math.trunc(base.str_per_tier) * Math.trunc(tier.rank || 0);
+  if (base.magic_per_tier !== undefined) v.magic_bonus = Math.trunc(base.magic_per_tier) * Math.trunc(tier.rank || 0);
+}
+
 function buildTieredVariant(base, tier, material) {
   const v = clone(base);
+  stampStatBonuses(v, base, tier);
   v.tier_name = tier.tier_name;
   v.required_might = tier.required_might;
   if (tier.required_intimidation !== undefined) v.required_intimidation = tier.required_intimidation;
@@ -107,6 +119,7 @@ function buildTieredVariant(base, tier, material) {
 function buildMythicVariant(base, tier) {
   const myth = W.mythics[base.id];
   const v = clone(base);
+  stampStatBonuses(v, base, tier);
   v.tier_name = tier.tier_name;
   v.required_might = tier.required_might;
   if (tier.required_intimidation !== undefined) v.required_intimidation = tier.required_intimidation;

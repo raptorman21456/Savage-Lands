@@ -11,8 +11,8 @@ class_name Potions
 # effect: "" (Health -- plain heal only), "cleanse" (strips poison/burning/
 # bleeding/concussion/blindness), "attack_buff" (temporary damage bonus),
 # "resilience_buff" (temporary flat damage reduction), "energy_buff"
-# (temporary +1 battle move range), or "restore_stamina" (instant, no
-# duration). The three buffs last Main.gd's POTION_BUFF_TURNS once drunk --
+# (temporary +2 battle move range), "restore_stamina" (instant, no
+# duration) or "restore_mana" (instant: every spellcaster in the party gets its mana back). The three buffs last Main.gd's POTION_BUFF_TURNS once drunk --
 # see _battle_player_item for dispatch and the turn-tick-down block
 # (alongside Berserk/Stealth) for expiry.
 #
@@ -21,9 +21,9 @@ class_name Potions
 # plain mechanical description shown in the row's own tooltip.
 static var TIERS := [
 	{
-		"id": "potion_health", "name": "Health Potion", "price": 15, "heal_amount": 20,
+		"id": "potion_health", "name": "Health Potion", "price": 15, "heal_amount": 20, "heal_max_hp_pct": 0.33,
 		"effect": "",
-		"description": "Heals 20 HP.",
+		"description": "Heals 20 HP plus a third of your max HP.",
 		"shop_description": "Drink up. Whatever's ailing you, this'll patch it.",
 		"icon": "potion",
 	},
@@ -37,14 +37,14 @@ static var TIERS := [
 	{
 		"id": "potion_resilience", "name": "Resilience Potion", "price": 20, "heal_amount": 0,
 		"effect": "resilience_buff",
-		"description": "No healing, but adds +20 Defense and Fortitude for your next 3 turns.",
+		"description": "No healing, but you take 20% less damage for your next 3 turns.",
 		"shop_description": "Won't stop a blade. Just stops it from mattering quite so much.",
 		"icon": "potion",
 	},
 	{
 		"id": "potion_energy", "name": "Energy Potion", "price": 15, "heal_amount": 0,
 		"effect": "energy_buff",
-		"description": "No healing, but grants an extra tile of movement in battle for your next 3 turns.",
+		"description": "No healing, but grants two extra tiles of movement in battle for your next 3 turns.",
 		"shop_description": "Light on the feet, heavy on the results.",
 		"icon": "potion",
 	},
@@ -53,6 +53,13 @@ static var TIERS := [
 		"effect": "restore_stamina",
 		"description": "No healing, but instantly refills your stamina to full.",
 		"shop_description": "For when your arms give out before your enemies do.",
+		"icon": "potion",
+	},
+	{
+		"id": "potion_mana", "name": "Mana Potion", "price": 12, "heal_amount": 0,
+		"effect": "restore_mana",
+		"description": "No healing, but every spellcaster in your party gets its mana back in full.",
+		"shop_description": "For the ones who do the magic, since you won't.",
 		"icon": "potion",
 	},
 	{

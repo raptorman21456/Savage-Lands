@@ -1,5 +1,8 @@
 extends SceneTree
 
+# A sturdy stand-in for the Goblin: the Club now adds 2 Strength, so a swing from a fresh hero (3 damage) would kill a 3 HP enemy outright.
+const TANK := 100
+
 func _init() -> void:
 	# Fixed seed: every random roll below repeats run to run, so a changed result
 	# is a real change, not luck.
@@ -21,31 +24,31 @@ func _init() -> void:
 
 	# Fresh enemy, in-direction (facing down) -- should hit.
 	player.facing = Vector2(0, 1)
-	enemy_a.health = enemy_a.MAX_HEALTH
+	enemy_a.health = TANK
 	enemy_a.global_position = player.global_position + Vector2(0, 30)
 	await physics_frame
 	await physics_frame
 	player._start_attack()
 	for i in 10:
 		await physics_frame
-	print("in-direction (fresh enemy) -> health: %d (expected < %d)" % [enemy_a.health, enemy_a.MAX_HEALTH])
+	print("in-direction (fresh enemy) -> health: %d (expected < %d)" % [enemy_a.health, TANK])
 
 	# A DIFFERENT fresh enemy, placed behind (opposite of facing), never
 	# previously near the hitbox -- should miss.
 	player.facing = Vector2(0, 1)
-	enemy_b.health = enemy_b.MAX_HEALTH
+	enemy_b.health = TANK
 	enemy_b.global_position = player.global_position + Vector2(0, -30)
 	await physics_frame
 	await physics_frame
 	player._start_attack()
 	for i in 10:
 		await physics_frame
-	print("out-of-direction (fresh enemy) -> health: %d (expected == %d, i.e. missed)" % [enemy_b.health, enemy_b.MAX_HEALTH])
+	print("out-of-direction (fresh enemy) -> health: %d (expected == %d, i.e. missed)" % [enemy_b.health, TANK])
 
 	# Regression check on enemy_a again: stationary in-direction enemy takes
 	# damage on every swing, not just the first.
 	player.facing = Vector2(0, 1)
-	enemy_a.health = enemy_a.MAX_HEALTH
+	enemy_a.health = TANK
 	enemy_a.global_position = player.global_position + Vector2(0, 30)
 	await physics_frame
 	await physics_frame

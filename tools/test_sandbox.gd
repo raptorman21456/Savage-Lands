@@ -107,7 +107,7 @@ func _init() -> void:
 	print("the Astral-granted Knight plus chosen members join (capacity 3): mercenaries=%d party=%d (expected 1, 2)" % [player.party_members.size(), player.party.size()])
 	print("...and the Knight is named as such: %s (expected Knight)" % [player.party_members[0].name])
 	var guardian = player.party[0]
-	print("a levelled party member has its points placed: level=%d picks left=%d hp=%d (expected 5, 0, %d)" % [guardian.level, guardian.picks, guardian.max_hp(), int(round((25.0 + 4 * 1.25 + 2 * 1.25)))])
+	print("a levelled party member has its points placed: level=%d picks left=%d hp=%d (expected 5, 0, %d)" % [guardian.level, guardian.picks, guardian.max_hp(), int(round((25.0 + 4 * 1.5 + 2 * 1.5)))])
 
 	# --- Squads -------------------------------------------------------------------------
 	cfg = SandboxScript.default_config()

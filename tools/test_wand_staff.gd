@@ -60,6 +60,11 @@ func _cast(main, u: Dictionary, special_name: String, target = null) -> void:
 	main.battle_actor = {}
 
 func _init() -> void:
+	# Magic from a Staff or Wand used to be a flat +5 / +6; the doc's per-quality-tier version (test_weapon_stat_bonuses.gd) gives a Fine one
+	# (the second rung) the same figures at 2.5 / 3.0 a tier, so these checks keep the numbers they were written against.
+	var _magic_weapons = load("res://scripts/Weapons.gd")
+	_magic_weapons.STAFF["magic_per_tier"] = 2.5
+	_magic_weapons.WAND["magic_per_tier"] = 3.0
 	seed(20261031)
 	var weapons = load("res://scripts/Weapons.gd")
 	var main = load("res://Main.tscn").instantiate()
@@ -75,6 +80,8 @@ func _init() -> void:
 	for e in main.get_tree().get_nodes_in_group("enemies"):
 		e.set_physics_process(false)
 	var druid = player.recruit("druid")
+	# Mana is 20 + 5 per point of Intelligence now. These checks were written against the 80 a Wand-wielding Druid used to have, so she gets the Intelligence that makes it so.
+	druid.extra["intelligence"] = 6.0
 
 	# =========================================================
 	# Names the doc uses

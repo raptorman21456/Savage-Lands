@@ -27,6 +27,11 @@ func _make_goblin(main, tile: Vector2i, hp: int = 999) -> Dictionary:
 	}
 
 func _init() -> void:
+	# Magic from a Staff or Wand used to be a flat +5 / +6; the doc's per-quality-tier version (test_weapon_stat_bonuses.gd) gives a Fine one
+	# (the second rung) the same figures at 2.5 / 3.0 a tier, so these checks keep the numbers they were written against.
+	var _magic_weapons = load("res://scripts/Weapons.gd")
+	_magic_weapons.STAFF["magic_per_tier"] = 2.5
+	_magic_weapons.WAND["magic_per_tier"] = 3.0
 	seed(20261016)
 	load("res://scripts/SaveData.gd").mark_tutorial_completed()
 	var main = load("res://Main.tscn").instantiate()
@@ -34,6 +39,8 @@ func _init() -> void:
 	await physics_frame
 	await physics_frame
 	var player = main.player
+	# Two tiles of walking (speed rating 20): the reach diamond below is the 2-move one.
+	player.stat_agility = player.AGILITY_START + 15 * player.AGILITY_BONUS_PER_LEVEL
 	var hud = main.hud
 	player.max_party_slots = 20
 	for kind in ["knight", "necromancer", "druid", "rogue", "guardian"]:
@@ -241,7 +248,7 @@ func _init() -> void:
 	dummy.hp = 999
 	dummy.vulnerable_turns = 2
 	var marked: Vector2i = main._estimate_hit(dummy, 1.0)
-	print("A marked (Vulnerable) target takes 25%% more: %d vs %d (expected %d)" % [marked.x, est.x, int(round(est.x * 1.25))])
+	print("A marked (Vulnerable) target takes 20%% more: %d vs %d (expected %d)" % [marked.x, est.x, int(round(est.x * 1.2))])
 	main.battle_preview_action = "attack"
 	main.battle_menu_state = "fight"
 	main.battle_commanding_ally = null

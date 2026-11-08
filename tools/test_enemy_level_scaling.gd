@@ -41,13 +41,15 @@ func _init() -> void:
 	player.level = 11
 	print("Normal level 11: regular x%.3f (expected 1.500), boss x%.3f (expected 1.250, half the rate)" % [main._enemy_level_scale(false), main._enemy_level_scale(true)])
 	player.difficulty_id = "hard"
-	print("Hard level 11: regular x%.2f (expected 1.80), boss x%.2f (expected 1.40)" % [main._enemy_level_scale(false), main._enemy_level_scale(true)])
+	print("Hard level 11: regular x%.2f (expected 2.00), boss x%.2f (expected 1.50)" % [main._enemy_level_scale(false), main._enemy_level_scale(true)])
+	player.difficulty_id = "apocalyptic"
+	print("Apocalyptic level 11: regular x%.2f (expected 2.70), boss x%.2f (expected 1.85)" % [main._enemy_level_scale(false), main._enemy_level_scale(true)])
 	player.difficulty_id = "not_a_difficulty"
 	print("an unknown difficulty id falls back to the Normal rate: x%.2f (expected 1.50)" % [main._enemy_level_scale(false)])
 
 	# --- through the real _setup_battle_grid (HP and damage) ---
 	var goblin_hard: Array = _stats_for(main, player, 10, "hard", "res://scripts/Enemy.gd")
-	print("Hard, level 10 Goblin (base 3 HP / 1 dmg, x1.72 level x1.75 difficulty): hp=%d dmg=%d (expected 9, 3)" % [goblin_hard[0], goblin_hard[1]])
+	print("Hard, level 10 Goblin (base 3 HP / 1 dmg, x1.90 level x1.75 difficulty): hp=%d dmg=%d (expected 10, 3)" % [goblin_hard[0], goblin_hard[1]])
 	var treant_normal: Array = _stats_for(main, player, 10, "normal", "res://scripts/Treant.gd")
 	print("Normal, level 10 Treant (miniboss, base 175 HP / 6 dmg, x1.225): hp=%d dmg=%d (expected 214, 7)" % [treant_normal[0], treant_normal[1]])
 	var goblin_baby: Array = _stats_for(main, player, 20, "baby", "res://scripts/Enemy.gd")

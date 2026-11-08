@@ -68,15 +68,12 @@ func _init() -> void:
 	main.hud.battle_main_buttons["move"].pressed.emit()
 	print("step 0 allows Move: menu_state=%s (expected move)" % [main.battle_menu_state])
 
-	# Move only 1 of the 2 available tiles -- the enemy is pinned exactly
-	# PLAYER_BASE_MOVE_RANGE+1 tiles away, so this deliberately leaves it
-	# still 1 tile out of melee range, with 1 move point left over, to
-	# actually exercise the Fight step's Move-fallback below (rather than
-	# just asserting it's allowed without ever needing it).
+	# The hero walks 1 tile a turn now (the doc's movement rule), and the enemy is pinned exactly
+	# PLAYER_BASE_MOVE_RANGE+1 = 2 tiles away: the one step brings it into melee range.
 	main.battle_player_tile += Vector2i(1, 0)
 	main.battle_player_moves_left -= 1
 	main.hud.battle_move_buttons["confirm"].pressed.emit()
-	print("confirming Move advances to step 1 (Fight), gap not yet closed: step=%d moves_left=%d x_distance=%d (expected 1, 1, 2)" % [
+	print("confirming Move advances to step 1 (Fight), the gap is closed: step=%d moves_left=%d x_distance=%d (expected 1, 0, 1)" % [
 		main.tutorial_step, main.battle_player_moves_left, main.battle_units[0].tile.x - main.battle_player_tile.x
 	])
 
@@ -87,11 +84,9 @@ func _init() -> void:
 	print("step 1 still blocks Defend: still_defending=%s (expected false)" % [main.battle_player_defending])
 
 	main.hud.battle_main_buttons["move"].pressed.emit()
-	print("step 1 still allows Move as a softlock-avoidance fallback: menu_state=%s (expected move)" % [main.battle_menu_state])
-	main.battle_player_tile += Vector2i(1, 0)
-	main.battle_player_moves_left -= 1
+	print("step 1 cannot open Move once the hero's one tile is spent: menu_state=%s (expected main)" % [main.battle_menu_state])
 	main.hud.battle_move_buttons["confirm"].pressed.emit()
-	print("the fallback Move closes the rest of the gap to melee range: x_distance=%d (expected 1)" % [
+	print("confirming without walking leaves the hero in melee range: x_distance=%d (expected 1)" % [
 		main.battle_units[0].tile.x - main.battle_player_tile.x
 	])
 

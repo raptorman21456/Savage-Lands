@@ -21,7 +21,7 @@ Object.assign(Sim.prototype, {
       this.battle_move_trail = [];
       return true;
     }
-    if (p.talisman_bonus("ironclad_ward") > 0 && !this.battle_ironclad_move_allowed) { this.log("Ironclad Ward roots you to the spot this turn."); return false; }
+    if (p.talisman_bonus("ironclad_ward") > 0 && !this.battle_ironclad_move_allowed) { this.log("Steelclad Band roots you to the spot this turn."); return false; }
     if (this.battle_player_moves_left <= 0) { this.log("No moves left this turn."); return false; }
     this.battle_menu_state = "move";
     this.battle_move_undo = {
@@ -54,11 +54,12 @@ Object.assign(Sim.prototype, {
       if (fall_mult <= 0) this.log(`Your ${p.equipped_armor.name} lets you shrug off the fall.`);
       else {
         const dmg = round(p.max_health * MC.CLIFF_FALL_DAMAGE_PCT * fall_mult);
-        p.take_battle_damage(dmg);
+        p.take_battle_damage(dmg, true);
         this.log(`You fall! Took ${dmg} damage.`, "bad");
         this._check_player_dead();
       }
     }
+    this._fitbit_heal();
   },
 
   _try_battle_ally_move(dir) {
@@ -118,13 +119,24 @@ Object.assign(Sim.prototype, {
     if (magical_part > 0) total += this._reduce_magical(magical_part);
     // Berserk: the whole hit is cut, after every other reduction.
     if (p.berserk_turns_remaining > 0 && total > 0) total = Math.max(1, round(total * (1.0 - this._berserk_taken_cut())));
+    // Retribution in hand: mages hurt a little less, everything else a little more.
+    const held = p.current_weapon;
+    if (held.passive_taken_from_mage_mult !== undefined && total > 0) total = Math.max(1, round(total * (traits.mage ? held.passive_taken_from_mage_mult : (held.passive_taken_from_nonmage_mult ?? 1.0))));
+    // Resilience Potion: the blow is a fifth smaller (-20% damage taken, not points of Defense).
+    if (p.potion_resilience_turns > 0 && total > 0) total = Math.max(1, round(total * (1.0 - MC.RESILIENCE_POTION_DAMAGE_REDUCTION_PCT)));
+    // Gilded Scarab: a little more cut for every coin held (never more than half the blow).
+    const coin_cut = Math.min(0.5, p.coin_reduction());
+    if (coin_cut > 0 && total > 0) total = Math.max(1, round(total * (1.0 - coin_cut)));
+    // Thorny Ring doubles what lands on you.
+    const taken_pct = p.talisman_bonus("damage_taken_pct");
+    if (taken_pct !== 0 && total > 0) total = Math.max(1, round(total * Math.max(0.0, 1.0 + taken_pct)));
     return total;
   },
 
   // The cuts that apply to either kind of harm: a Resilience Potion and Last Stand.
   _generic_reduction() {
     const p = this.player;
-    let generic = p.potion_resilience_turns > 0 ? MC.RESILIENCE_POTION_DAMAGE_REDUCTION_PCT : 0.0;
+    let generic = 0.0;
     if (p.meta_last_stand_pct_per_10 > 0) {
       const missing = 1.0 - p.health / p.max_health;
       generic += p.meta_last_stand_pct_per_10 * Math.floor(missing * 10.0);
@@ -247,7 +259,7 @@ Object.assign(Sim.prototype, {
     if (r.fell) {
       const fall_mult = (p.equipped_armor.fall_damage_mult ?? 1.0) * p.fall_damage_factor();
       if (fall_mult <= 0) this.log(`Your ${p.equipped_armor.name} lets you shrug off the fall.`);
-      else { const dmg = round(p.max_health * MC.CLIFF_FALL_DAMAGE_PCT * fall_mult); p.take_battle_damage(dmg); this.log(`You fall! Took ${dmg} damage.`, "bad"); this._check_player_dead(); }
+      else { const dmg = round(p.max_health * MC.CLIFF_FALL_DAMAGE_PCT * fall_mult); p.take_battle_damage(dmg, true); this.log(`You fall! Took ${dmg} damage.`, "bad"); this._check_player_dead(); }
     }
   },
 
@@ -329,9 +341,9 @@ Object.assign(Sim.prototype, {
         this.battle_momentum_chain_stacks = 0; this.battle_player_turns_to_skip += 1;
         this.log("The chain breaks -- you're staggered!", "bad");
       }
-      if (traits.inflicts_concussion && rng.randf() < MC.CONCUSSION_INFLICT_CHANCE) { this.player_concussed_turns = MC.PLAYER_CONCUSSION_TURNS; this.log("The blow leaves you dazed!", "bad"); }
-      if (traits.inflicts_bleed && this.player_bleed_turns <= 0) { this.player_bleed_turns = MC.BLEED_BASE_TURNS; this.log("The wound leaves you bleeding!", "bad"); }
-      if (traits.inflicts_blind) { this.player_blind_turns = MC.BLINDNESS_TURNS; this.log("Your vision swims -- you're blinded!", "bad"); }
+      if (traits.inflicts_concussion && rng.randf() < MC.CONCUSSION_INFLICT_CHANCE) { this.player_concussed_turns = this._status_len(MC.PLAYER_CONCUSSION_TURNS); this.log("The blow leaves you dazed!", "bad"); }
+      if (traits.inflicts_bleed && this.player_bleed_turns <= 0) { this.player_bleed_turns = this._status_len(MC.BLEED_BASE_TURNS); this.log("The wound leaves you bleeding!", "bad"); }
+      if (traits.inflicts_blind) { this.player_blind_turns = this._status_len(MC.BLINDNESS_TURNS); this.log("Your vision swims -- you're blinded!", "bad"); }
       this._check_player_dead();
       return { dmg, is_player: true, target_name: "", dodged: false };
     }
@@ -344,7 +356,7 @@ Object.assign(Sim.prototype, {
     let target_ally = null;
     for (const a of this.battle_allies) if (veq(a.tile, target_tile)) { target_ally = a; break; }
     if (target_ally) {
-      // Defense and Fortitude bend on the Defense.gd curve (80% ceiling, the Guardian's 90%); Guardian Knot and
+      // Defense and Fortitude bend on the Defense.gd curve (80% ceiling, the Guardian's 90%); BFF Bracelet and
       // Last Stand are extra points pooled into both. Bodily harm uses Defense, magical harm Fortitude (both: half and half).
       let ally_extra = p.talisman_bonus("ally_defense_pct") * 100.0;
       if (p.meta_last_stand_pct_per_10 > 0) {
@@ -620,25 +632,24 @@ Object.assign(Sim.prototype, {
     const rng = this.rng;
     // end-of-round statuses on the player
     if (this.player_poison_turns > 0) {
-      this.player_poison_turns -= 1; p.take_battle_damage(this.player_poison_dmg);
-      this.log(`You're poisoned for ${this.player_poison_dmg} damage!`, "bad");
+      this.player_poison_turns -= 1; this._hero_dot_damage(this.player_poison_dmg, `You're poisoned for ${this.player_poison_dmg} damage!`, "poison");
       if (p.health <= 0) { this._check_player_dead(); return; }
     }
     if (this.player_bleed_turns > 0) {
       this.player_bleed_turns -= 1;
       const bd = Math.max(1, round(p.max_health * MC.BLEED_DAMAGE_PCT));
-      p.take_battle_damage(bd); this.log(`You're bleeding for ${bd} damage!`, "bad");
+      this._hero_dot_damage(bd, `You're bleeding for ${bd} damage!`, "bleeding");
       if (p.health <= 0) { this._check_player_dead(); return; }
     }
     if (this.player_burning) {
       const bd = Math.max(1, round(p.max_health / MC.BURN_DAMAGE_DIVISOR));
-      p.take_battle_damage(bd); this.log(`You burn for ${bd} damage!`, "bad");
+      this._hero_dot_damage(bd, `You burn for ${bd} damage!`, "fire");
       if (p.health <= 0) { this._check_player_dead(); return; }
     }
     if (this.player_concussed_turns > 0) {
       this.player_concussed_turns -= 1;
       if (rng.randf() < MC.PLAYER_CONCUSSION_CHANCE) {
-        const cd = p.stat_might; p.take_battle_damage(cd);
+        const cd = p.stat_might; p.take_battle_damage(cd, true);
         this.log(`You're concussed and stumble, taking ${cd} damage!`, "bad");
         if (p.health <= 0) { this._check_player_dead(); return; }
       }
@@ -698,6 +709,18 @@ Object.assign(Sim.prototype, {
   _start_berserk(message) { this.player.berserk_turns_remaining = MC.BERSERK_TURNS; this.log(message, "good"); },
   _rage_scale() { return 1.0 + this.player.stat_rage * MC.RAGE_SCALE_PER_POINT; },
   _berserk_damage_mult() { return 1.0 + MC.BERSERK_DAMAGE_BONUS_PCT * this._rage_scale() + this.player.meta_rage_bonus_pct; },
+  // One tick of poison, bleeding or burning on the hero: Masochist turns it into healing and Honour spares you it.
+  _hero_dot_damage(amount, message, what) {
+    const p = this.player;
+    if (p.talisman_bonus("dot_heals") > 0) { p.heal(amount); this.log(`Your ${what} mends you for ${amount} instead!`, "good"); return; }
+    if (p.talisman_bonus("direct_only") > 0) { this.log(`Honour spares you the ${what}.`); return; }
+    p.take_battle_damage(amount);
+    this.log(message, "bad");
+  },
+  // How long a status the hero is given lasts: Rebound takes a turn off it (never below one).
+  _status_len(base) { return Math.max(1, base - Math.trunc(this.player.talisman_bonus("status_turns_cut"))); },
+  // Fitbit: HP for every tile moved.
+  _fitbit_heal() { const per = Math.trunc(this.player.talisman_bonus("heal_per_tile")); if (per > 0) this.player.heal(per); },
   _berserk_taken_cut() { return Math.min(MC.BERSERK_TAKEN_CUT_CAP, MC.BERSERK_DAMAGE_TAKEN_CUT * this._rage_scale()); },
   _berserk_move_bonus() { return Math.floor(MC.BERSERK_MOVE_BONUS * this._rage_scale() + 0.0001); },
   _berserk_speed_mult() { return 1.0 + (this._rage_scale() - 1.0) * MC.RAGE_SPEED_SHARE; },
@@ -939,7 +962,7 @@ Object.assign(Sim.prototype, {
     const hv = Math.trunc(w.heavy_stamina_cost_override ?? W.consts.HEAVY_STAMINA_COST);
     a.attack = a.fight && p.stamina >= reg && this._targetable_indices().length > 0;
     a.heavy = a.fight && p.stamina >= hv && this._targetable_indices().length > 0;
-    a.specials = (w.specials || []).map((sp) => a.fight && sp.learned !== false && p.stamina >= (w.passive_free_specials ? 0 : sp.stamina_cost) && (sp.effect === "diamonds" ? this.battle_units.length > 0 : this._targetable_indices().length > 0));
+    a.specials = (w.specials || []).map((sp) => a.fight && sp.learned !== false && p.stamina >= (w.passive_free_specials ? 0 : special_cost(sp, p.max_stamina)) && (sp.effect === "diamonds" ? this.battle_units.length > 0 : this._targetable_indices().length > 0));
     a.mine = a.fight && this._player_has_hand_picks() && this._targetable_rock_tiles().length > 0;
     a.item = live && p.potion_queue.length > 0 && !feared && p.talisman_bonus("disable_healing_items") <= 0;
     a.defend = live;

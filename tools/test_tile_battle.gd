@@ -142,22 +142,22 @@ func _init() -> void:
 	# and available every turn regardless of which action gets chosen.
 	var player_script = load("res://scripts/Player.gd")
 	player.stat_agility = player_script.AGILITY_START
-	print("move range at baseline agility: %d (expected 2)" % [main._battle_player_move_range()])
-	player.stat_agility = player_script.AGILITY_START + main.AGILITY_PER_EXTRA_MOVE
-	print("move range after +%d agility: %d (expected 3)" % [main.AGILITY_PER_EXTRA_MOVE, main._battle_player_move_range()])
+	print("move range at baseline agility: %d (expected 1)" % [main._battle_player_move_range()])
+	player.stat_agility = player_script.AGILITY_START + 15 * player_script.AGILITY_BONUS_PER_LEVEL
+	print("move range at speed rating 20 (+%d agility): %d (expected 2)" % [15 * player_script.AGILITY_BONUS_PER_LEVEL, main._battle_player_move_range()])
 
 	main.in_battle = true
 	main._setup_battle_grid(orc_squad)
 	main.battle_terrain.clear()
-	print("moves_left initialized from move range: %d (expected 3)" % [main.battle_player_moves_left])
+	print("moves_left initialized from move range: %d (expected 2)" % [main.battle_player_moves_left])
 
 	var tile_before_move: Vector2i = main.battle_player_tile
 	main._try_battle_player_move(Vector2i(1, 0))
-	print("moving doesn't end the turn: tile=%s moved=%s moves_left=%d turn=%s (expected changed, 2, player)" % [
+	print("moving doesn't end the turn: tile=%s moved=%s moves_left=%d turn=%s (expected changed, 1, player)" % [
 		main.battle_player_tile, main.battle_player_tile != tile_before_move, main.battle_player_moves_left, main.battle_turn
 	])
 
 	main._battle_player_defend()
-	print("move budget refreshes for the next player turn: moves_left=%d (expected 3)" % [main.battle_player_moves_left])
+	print("move budget refreshes for the next player turn: moves_left=%d (expected 2)" % [main.battle_player_moves_left])
 
 	quit()

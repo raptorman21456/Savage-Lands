@@ -63,6 +63,15 @@ static func item_entries(player, category: String) -> Array:
 	return []
 
 # A weapon's plain name: its type ("Spear"), never its tier or material (the glow and the picture say those); a Mythic keeps its own.
+# "+8 STR" / "+10 Magic": the flat stat a weapon adds at its quality (the doc: per quality tier).
+static func _stat_bonus_text(variant: Dictionary) -> String:
+	var out := ""
+	if int(variant.get("str_bonus", 0)) > 0:
+		out += "  +%d STR." % int(variant.str_bonus)
+	if int(variant.get("magic_bonus", 0)) > 0:
+		out += "  +%d Magic." % int(variant.magic_bonus)
+	return out
+
 static func weapon_name(variant: Dictionary) -> String:
 	if str(variant.get("tier_name", "")) == "Mythic":
 		return str(variant.get("name", ""))
@@ -106,7 +115,7 @@ static func weapon_entry(player, variant: Dictionary, member = null) -> Dictiona
 	for s in variant.get("specials", []):
 		var unit_word := " MP" if bool(variant.get("uses_magic", false)) and unit_is_caster else " STA"
 		specials.append({
-			"id": str(s.get("id", "")), "n": str(s.get("name", "")), "c": "%d%s" % [int(s.get("stamina_cost", 0)), unit_word],
+			"id": str(s.get("id", "")), "n": str(s.get("name", "")), "c": "%s%s" % [WeaponsScript.cost_text(s), unit_word],
 			"d": str(s.get("description", "")).replace("%%", "%"), "learned": bool(player.learned_specials.get(str(s.get("id", "")), false)),
 		})
 	var rune_id := str(player.weapon_enchantments.get(id, ""))
@@ -114,7 +123,7 @@ static func weapon_entry(player, variant: Dictionary, member = null) -> Dictiona
 	return {
 		"kind": "weapon", "id": id, "name": weapon_name(variant), "sub": " · ".join(parts) + (" +%d" % level if level > 0 else ""),
 		"quality": quality, "art": WeaponIcons.texture_for(variant), "number": str(damage), "lore": ItemLoreScript.weapon(variant, base_id),
-		"desc": str(variant.get("description", "")).replace("%%", "%"), "mythic": quality == "Mythic", "holders": holders, "lack": lacking(player, variant),
+		"desc": (str(variant.get("description", "")).replace("%%", "%") + _stat_bonus_text(variant)).strip_edges(), "mythic": quality == "Mythic", "holders": holders, "lack": lacking(player, variant),
 		"specials": specials, "data": variant, "tint": Color(0, 0, 0, 0), "qty": 1, "key": id, "level": level,
 		"rune": str(EnchantmentsScript.get_rune(rune_id).get("name", "")) if rune_id != "" else "",
 		"sort_quality": float(_tier_rank(variant)) * 1000.0 + float(damage), "sort_number": float(damage), "sort_new": 0,
@@ -194,7 +203,7 @@ static func shield_entries(player, member = null) -> Array:
 	var order := 0
 	for id in ShieldsScript.SHIELD_IDS:
 		var shield: Dictionary = ShieldsScript.SHIELDS[id]
-		var is_free: bool = int(shield.get("price", 1)) == 0
+		var is_free: bool = int(shield.get("price", 1)) == 0 or bool(shield.get("free_for_party", false))
 		if not player.owned_shields.has(id) and not is_free:
 			continue
 		order += 1
@@ -353,13 +362,13 @@ static func rows(player, member, entry: Dictionary) -> Array:
 		"potion", "food":
 			var tier: Dictionary = entry.data
 			var blocked: bool = player.talisman_bonus("disable_healing_items") > 0.0
-			var heal: int = int(tier.get("heal_amount", 0))
+			var heal: int = int(tier.get("heal_amount", 0)) + int(round(float(player.max_health) * float(tier.get("heal_max_hp_pct", 0.0))))
 			var bonus: float = player.meta_healing_bonus_pct + player.talisman_bonus("heal_pct")
 			if bonus > 0.0:
 				heal = int(round(heal * (1.0 + bonus)))
 			if heal > 0:
 				var after_hp: int = mini(int(player.max_health), int(player.health) + heal)
-				out.append(["HP", str(int(player.health)), str(after_hp), "no effect: Vampire's Pact" if blocked else _signed(after_hp - int(player.health))])
+				out.append(["HP", str(int(player.health)), str(after_hp), "no effect: Bat Fang" if blocked else _signed(after_hp - int(player.health))])
 			var sta := int(tier.get("stamina_amount", 0))
 			if sta > 0:
 				var after_sta: int = mini(int(player.max_stamina), int(player.stamina) + sta)
@@ -550,6 +559,8 @@ static func talisman_action(player, member, entry: Dictionary) -> Dictionary:
 	if slots.worn.has(id):
 		return {"label": "Take off", "enabled": true, "reason": ""}
 	if member == null:
+		if TalismansScript.get_talisman(id).get("allies_only", false):
+			return {"label": "Allies only", "enabled": false, "reason": "Only a party member can wear this."}
 		if slots.worn.size() >= slots.open:
 			return {"label": "No free slot", "enabled": false, "reason": "All your slots are full."}
 		var holder := str(entry.holder)

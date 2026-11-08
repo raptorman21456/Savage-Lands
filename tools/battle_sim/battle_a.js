@@ -73,7 +73,8 @@ class Sim {
 
   // ---------------------------------------------------------------- player setup helpers
   _battle_player_move_range() {
-    let bonus = Math.max(0, Math.trunc((this.player.stat_agility - PC.AGILITY_START) / MC.AGILITY_PER_EXTRA_MOVE));
+    const speed_rating = 5 + Math.trunc((this.player.stat_agility - PC.AGILITY_START) / PC.AGILITY_BONUS_PER_LEVEL);
+    let bonus = Math.max(0, Math.floor(MC.MOVE_TILES_PER_SPEED * speed_rating + 0.0001));
     // Berserk: an extra tile of reach for as long as it lasts.
     if (this.player.berserk_turns_remaining > 0) bonus += this._berserk_move_bonus();
     if (this.player.potion_energy_turns > 0) bonus += MC.ENERGY_POTION_MOVE_BONUS;
@@ -202,7 +203,7 @@ class Sim {
     return { tile: nt, moved: true };
   }
 
-  // Water: extinguishes burning (and Ember Charm's fire) and pushes along its current.
+  // Water: extinguishes burning (and Pyrogenesis Organ's fire) and pushes along its current.
   _apply_water_push(tile, unit = null) {
     const terrain = this.terrainAt(tile);
     if (!terrain || terrain.type !== "water") return tile;

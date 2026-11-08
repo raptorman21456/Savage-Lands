@@ -128,7 +128,7 @@ async function autoPlayerTurn(sim, policy) {
       let bestI = -1, bestV = 0;
       (w.specials || []).forEach((sp, i) => {
         if (!av.specials[i]) return;
-        const cost = w.passive_free_specials ? 0 : sp.stamina_cost;
+        const cost = w.passive_free_specials ? 0 : special_cost(sp, p.max_stamina);
         if (p.stamina - cost < reserve) return;
         const hits = sp.hit_count_max ? (sp.hit_count_min + sp.hit_count_max) / 2 : sp.pass_count_max ? (sp.pass_count_min + sp.pass_count_max) / 2 : 1;
         const value = Math.max(sp.dmg_mult || 0, 0.01) * hits;
@@ -139,7 +139,7 @@ async function autoPlayerTurn(sim, policy) {
         if (["devastating_slash", "knife_throw", "target_practice", "diamonds"].includes(sp.effect)) return;   // risky self-penalty moves: left to manual play
         if (v > bestV) { bestV = v; bestI = i; }
       });
-      if (bestI >= 0 && p.stamina >= (w.specials[bestI].stamina_cost || 0) + reserve && p.stamina > p.max_stamina * 0.5) { await sim.do_action("special", bestI); return; }
+      if (bestI >= 0 && p.stamina >= special_cost(w.specials[bestI], p.max_stamina) + reserve && p.stamina > p.max_stamina * 0.5) { await sim.do_action("special", bestI); return; }
     }
     if (policy.use_heavy && av.heavy && p.stamina - (w.heavy_stamina_cost_override ?? W.consts.HEAVY_STAMINA_COST) >= reserve && p.stamina > p.max_stamina * 0.6) { await sim.do_action("heavy"); return; }
     if (av.attack) { await sim.do_action("attack"); return; }

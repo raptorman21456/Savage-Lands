@@ -70,6 +70,11 @@ func _cast(main, u: Dictionary, special_name: String) -> void:
 	main.battle_actor = {}
 
 func _init() -> void:
+	# Magic from a Staff or Wand used to be a flat +5 / +6; the doc's per-quality-tier version (test_weapon_stat_bonuses.gd) gives a Fine one
+	# (the second rung) the same figures at 2.5 / 3.0 a tier, so these checks keep the numbers they were written against.
+	var _magic_weapons = load("res://scripts/Weapons.gd")
+	_magic_weapons.STAFF["magic_per_tier"] = 2.5
+	_magic_weapons.WAND["magic_per_tier"] = 3.0
 	seed(20261008)
 	var weapons = load("res://scripts/Weapons.gd")
 	var rules = load("res://scripts/PartyRules.gd")
@@ -97,7 +102,7 @@ func _init() -> void:
 	print("Brawler 20 / 2 / 2 / 4 / 0 / fortitude 5: %d / %.0f / %.0f / %.0f / %.0f / %.0f (expected 20 / 2 / 2 / 4 / 0 / 5)" % [brawler.max_hp(), brawler.attack(), brawler.defense_pct(), brawler.speed(), brawler.magic(), brawler.fortitude()])
 	print("Shaman 12 / 0 / 1 / 5 / 10 / fortitude 10: %d / %.0f / %.0f / %.0f / %.0f / %.0f (expected 12 / 0 / 1 / 5 / 10 / 10)" % [shaman.max_hp(), shaman.attack(), shaman.defense_pct(), shaman.speed(), shaman.magic(), shaman.fortitude()])
 	var wolf = player.recruit("wolf")
-	print("A wolf's fortitude is -5 scaled by its x0.8 (it never levels): %.1f (expected -4.0)" % [wolf.fortitude()])
+	print("A wolf's fortitude is -5 scaled by its x0.7 (it never levels): %.1f (expected -3.5)" % [wolf.fortitude()])
 	print("Fortitude data for every kind (start / multiplier): %s (expected the user's list)" % [[
 		[rules.rules("druid").base.fortitude, rules.growth("druid", "fortitude")],
 		[rules.rules("guardian").base.fortitude, rules.growth("guardian", "fortitude")],
@@ -110,16 +115,16 @@ func _init() -> void:
 	]])
 	print("Casters and fighters: necromancer caster=%s hp_as_mana=%s mana=%d, shaman caster=%s mana=%d, knight caster=%s stamina=%d (expected true, true, 50, true, 50, false, 100)" % [necro.is_caster(), necro.rules().get("hp_as_mana", false), necro.max_mana(), shaman.is_caster(), shaman.max_mana(), knight.is_caster(), knight.max_stamina()])
 	print("A speed of 4 would cost a tile -- Knight and Brawler still move 2: %d / %d (expected 2 / 2)" % [knight.move_tiles(), brawler.move_tiles()])
-	print("The Shaman has all four talisman slots at level 1: %d (expected 4); others follow the level curve: knight=%d (expected 1)" % [shaman.talisman_slot_count(), knight.talisman_slot_count()])
-	print("The Shaman's attack never grows (x0): %.1f after three levels (expected 0.0); pickable=%s (expected no attack)" % [_levelled(rules, "shaman", 3).attack(), shaman.pickable_stats()])
+	print("The Shaman has all five talisman slots at level 1: %d (expected 5); others follow the level curve: knight=%d (expected 1)" % [shaman.talisman_slot_count(), knight.talisman_slot_count()])
+	print("The Shaman's attack grows at only x0.4 and cannot be picked: %.1f after three levels (expected 1.2); pickable=%s (expected no attack)" % [_levelled(rules, "shaman", 3).attack(), shaman.pickable_stats()])
 	var lv = _levelled(rules, "necromancer", 2)
 	for i in 2:
 		lv.spend_pick("magic")
-	print("Necromancer magic x3.0: 10 + (2 + 2) x 3 = %.1f (expected 22.0)" % [lv.magic()])
+	print("Necromancer magic x1.8: 10 + (2 + 2) x 1.8 = %.1f (expected 17.2)" % [lv.magic()])
 	var lk = _levelled(rules, "knight", 2)
 	for i in 2:
 		lk.spend_pick("defense")
-	print("Knight defense x1.5: 3 + (2 + 2) x 1.5 = %.1f (expected 9.0)" % [lk.defense_pct()])
+	print("Knight defense x1.3: 3 + (2 + 2) x 1.3 = %.1f (expected 8.2)" % [lk.defense_pct()])
 	var lb = _levelled(rules, "brawler", 2)
 	for i in 2:
 		lb.spend_pick("speed")
@@ -140,7 +145,7 @@ func _init() -> void:
 	print("...kit first, then the weapon's own specials: %s (expected 3 kit names, then 3 greatsword ones, then Stealth, which every member has)" % [sword_names])
 	player.unequip_ally_weapon(knight)
 	var brawler_unit: Dictionary = main._make_member_battle_unit(brawler, Vector2i(1, 4), 1.0)
-	print("Brawler perks: crit chance +%.2f (expected 0.10), double-hit chance +%.2f (expected 0.10), bare fists range %d (expected 2)" % [brawler_unit.mods.get("crit_chance", 0.0), brawler_unit.weapon.get("passive_double_hit_chance", 0.0), brawler_unit.attack_range])
+	print("Brawler perks: crits hit +%.2f harder (expected 0.50), no double-hit perk any more +%.2f (expected 0.00), bare fists range %d (expected 2)" % [brawler_unit.mods.get("crit_damage_pct", 0.0), brawler_unit.weapon.get("passive_double_hit_chance", 0.0), brawler_unit.attack_range])
 	player.equip_ally_weapon(brawler, "knuckle_gloves_fine_steel")
 	var gloves_unit: Dictionary = main._make_member_battle_unit(brawler, Vector2i(1, 4), 1.0)
 	var gloves_plain: int = int(rules.rules("brawler").attack_range) + int(gloves_unit.weapon.get("range_bonus", 0)) + int(gloves_unit.weapon.get("passive_extra_range", 0))
@@ -148,7 +153,7 @@ func _init() -> void:
 	player.unequip_ally_weapon(brawler)
 	player.equip_ally_weapon(brawler, "club")
 	var club_unit: Dictionary = main._make_member_battle_unit(brawler, Vector2i(1, 4), 1.0)
-	print("...a club gets no range bonus (%d, expected 1) but the perks still apply: crit +%.2f, double-hit +%.2f (expected 0.10, 0.10)" % [club_unit.attack_range, club_unit.mods.get("crit_chance", 0.0), club_unit.weapon.get("passive_double_hit_chance", 0.0)])
+	print("...a club gets no range bonus (%d, expected 1) but the perk still applies: crit damage +%.2f, double-hit +%.2f (expected 0.50, 0.00)" % [club_unit.attack_range, club_unit.mods.get("crit_damage_pct", 0.0), club_unit.weapon.get("passive_double_hit_chance", 0.0)])
 	player.unequip_ally_weapon(brawler)
 	var necro_unit: Dictionary = main._make_member_battle_unit(necro, Vector2i(1, 4), 1.0)
 	print("Necromancer pays in HP: pool=%s hp=%d (expected HP, 15); no staff -> kill heal %.0f (expected 0)" % [main._unit_pool_name(necro_unit), necro_unit.hp, necro_unit.mods.get("kill_heal", 0.0)])
@@ -179,7 +184,7 @@ func _init() -> void:
 	var necro_menu: Dictionary = main._make_member_battle_unit(necro, Vector2i(1, 3), 1.0)
 	for s in main._ally_specials(necro_menu):
 		nlabels.append(s.name + main._ally_cost_text(necro_menu, int(s.stamina_cost)))
-	print("Necromancer's, in HP: %s (expected [Curse of Rot (12 HP), Revival Blessing (14 HP), Summon the Dead (5 HP), Stealth (4 HP)])" % [nlabels])
+	print("Necromancer's, in HP: %s (expected [Curse of Rot (12 HP), Energy Transfer (14 HP), Summon the Dead (5 HP), Stealth (4 HP)])" % [nlabels])
 	var slabels := []
 	var shaman_menu: Dictionary = main._make_member_battle_unit(shaman, Vector2i(1, 3), 1.0)
 	for s in main._ally_specials(shaman_menu):
@@ -286,7 +291,7 @@ func _init() -> void:
 	var bt := _make_goblin(main, Vector2i(2, 4), 100)
 	main.battle_units = [bt]
 	await _cast(main, b1, "Sucker Punch")
-	print("Sucker Punch on a full-health enemy is a guaranteed crit: %d (expected 10)" % [100 - bt.hp])
+	print("Sucker Punch on a full-health enemy is a guaranteed crit: %d (expected 13: 5 x 2.5, then the Brawler's 50%% harder crits)" % [100 - bt.hp])
 	bt.hp = 60
 	bt.tile = Vector2i(2, 4)
 	bt.vulnerable_turns = 0
@@ -324,7 +329,7 @@ func _init() -> void:
 	print("Drain Punch heals half the damage dealt: dealt %d (expected 10), HP 10 -> %d (expected 15)" % [100 - bd.hp, b3.hp])
 
 	# =========================================================
-	# Necromancer: Curse of Rot, kills, Revival Blessing, Summon the Dead
+	# Necromancer: Curse of Rot, kills, Energy Transfer, Summon the Dead
 	# =========================================================
 	_reset(main, player)
 	var n1: Dictionary = main._make_member_battle_unit(necro, Vector2i(1, 4), 1.0)
@@ -377,7 +382,7 @@ func _init() -> void:
 	main._note_enemy_death({"name": "Goblin"}, {})
 	print("A kill by anyone else counts for nobody: necromancer max HP still %d (expected %d)" % [n2.max_hp, other_before])
 
-	# Revival Blessing
+	# Energy Transfer
 	_reset(main, player)
 	var guardian = player.recruit("guardian")
 	var necro_c = player.recruit("necromancer")
@@ -389,8 +394,8 @@ func _init() -> void:
 	main.battle_units = [_make_goblin(main, Vector2i(7, 7))]
 	corpse.hp = 0
 	main._remove_fallen_allies()
-	var revive_cost: int = int(_special(main, n3, "Revival Blessing").stamina_cost)
-	print("Revival Blessing takes the whole bar: every HP but one (%d HP) -> cost shows %s (expected 14 HP)" % [n3.hp - 1, main._ally_cost_text(n3, revive_cost)])
+	var revive_cost: int = int(_special(main, n3, "Energy Transfer").stamina_cost)
+	print("Energy Transfer takes the whole bar: every HP but one (%d HP) -> cost shows %s (expected 14 HP)" % [n3.hp - 1, main._ally_cost_text(n3, revive_cost)])
 	var n3_filler := _filler()
 	main.battle_allies = [n3, n3_filler]
 	main.battle_ally_queue = [n3_filler]
@@ -402,7 +407,7 @@ func _init() -> void:
 	print("The Guardian is back at full HP %d/%d (expected equal) and the Necromancer is at %d HP (expected 1)" % [corpse.hp, corpse.max_hp, n3.hp])
 	var low: Dictionary = main._make_member_battle_unit(necro_c, Vector2i(1, 4), 1.0)
 	low.hp = 1
-	print("At 1 HP it cannot pay for Revival at all: disabled=%s (expected true)" % [not main._unit_can_pay(low, int(_special(main, low, "Revival Blessing").stamina_cost))])
+	print("At 1 HP it cannot pay for Revival at all: disabled=%s (expected true)" % [not main._unit_can_pay(low, int(_special(main, low, "Energy Transfer").stamina_cost))])
 
 	# Summon the Dead
 	_reset(main, player)

@@ -48,7 +48,7 @@ const SPELLS := [
 	{"id": "necromancer_curse_of_rot", "owner": "Necromancer", "name": "Curse of Rot",
 		"numbers": [{"pct": 0.10, "kills": 1}, {"pct": 0.12, "kills": 1}, {"pct": 0.15, "kills": 2}],
 		"text": ["", "The curse eats 12% of max HP a turn.", "The curse eats 15% of max HP a turn, and a kill it claims counts as 2 kills."]},
-	{"id": "necromancer_revival_blessing", "owner": "Necromancer", "name": "Revival Blessing",
+	{"id": "necromancer_revival_blessing", "owner": "Necromancer", "name": "Energy Transfer",
 		"numbers": [{"keep_pct": 0.0}, {"keep_pct": 0.25}, {"keep_pct": 0.5}],
 		"text": ["", "The Necromancer is left with 25% of her max HP, not 1.", "The Necromancer is left with half her max HP."]},
 	{"id": "necromancer_summon_the_dead", "owner": "Necromancer", "name": "Summon the Dead",

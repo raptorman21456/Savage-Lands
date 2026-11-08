@@ -1,7 +1,7 @@
 extends SceneTree
 
 # Things found out in the world rather than bought: the Knight in the ruins (once Friends in High Places puts him within
-# reach), the four found talismans (Ember Charm in the Lava Causeway, Wildfire Core in the Crater, Stone Amulet in the
+# reach), the four found talismans (Pyrogenesis Organ in the Lava Causeway, Wildfire Core in the Crater, Stone Amulet in the
 # Old Mine, Lucky Clover by luck on the plains), and fishing at Pesca (bait, fish, rods; fish sell for far less there).
 # See Main.gd's Knight / Lucky Clover / Chests sections, FishmongerPanel.gd and FishingHole.gd.
 

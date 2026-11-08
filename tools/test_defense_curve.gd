@@ -66,14 +66,14 @@ func _init() -> void:
 	player.equipped_shield = {}
 	player.meta_war_chest_reduction = 0.0
 
-	# Last Stand and the Resilience Potion pool as points too, so the ceiling holds for them as well.
+	# Last Stand pools as points too, so the ceiling holds for it; the Resilience Potion is a fifth off the blow afterwards.
 	player.resilience_reduction = 0.0
 	player.equipped_armor = {"damage_reduction": 100.0, "fortitude": 0}
 	player.potion_resilience_turns = 3
 	player.meta_last_stand_pct_per_10 = 0.10
 	player.health = 1
 	var worst: int = main._apply_incoming_reductions(100, {})
-	print("Everything stacked on a near-dead hero still lets some through: %d (expected 20, never less than 20 for 100)" % [worst])
+	print("Everything stacked on a near-dead hero still lets some through: %d (expected 16: the curve's floor of 20, then the Resilience Potion's fifth off)" % [worst])
 	player.potion_resilience_turns = 0
 	player.meta_last_stand_pct_per_10 = 0.0
 	player.health = 100

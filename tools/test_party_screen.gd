@@ -61,6 +61,11 @@ func _pool_ids(main, member) -> Array:
 	return main.member_special_pool(member).map(func(e): return str(e.special.get("id", "")))
 
 func _init() -> void:
+	# Magic from a Staff or Wand used to be a flat +5 / +6; the doc's per-quality-tier version (test_weapon_stat_bonuses.gd) gives a Fine one
+	# (the second rung) the same figures at 2.5 / 3.0 a tier, so these checks keep the numbers they were written against.
+	var _magic_weapons = load("res://scripts/Weapons.gd")
+	_magic_weapons.STAFF["magic_per_tier"] = 2.5
+	_magic_weapons.WAND["magic_per_tier"] = 3.0
 	seed(20261014)
 	var rules = load("res://scripts/PartyRules.gd")
 	var main = load("res://Main.tscn").instantiate()
@@ -120,7 +125,7 @@ func _init() -> void:
 	druid.set_loadout_slot(2, dp[5], dp)
 	print("She can swap all three spells out for the Staff's: %s (expected [Poison Bomb, Landfall, I SUMMON THEE, Stealth]) " % [_names(main._ally_specials(main.member_preview(druid)))])
 	print("A wolf has only its three kit specials and fills all three slots: %d (expected 3)" % [wolf.resolved_loadout(_pool_ids(main, wolf)).size()])
-	print("The Guardian's four kit specials don't all fit: default slots %s (expected Taunt, Body Slam, Haymaker, then Stealth -- Earbursting Bellow waits in the pool)" % [_names(main._ally_specials(main.member_preview(guardian)))])
+	print("The Guardian's four kit specials don't all fit: default slots %s (expected Taunt, CRUSH, Haymaker, then Stealth -- Earbursting Bellow waits in the pool)" % [_names(main._ally_specials(main.member_preview(guardian)))])
 	print("Units without a loadout (mercenaries, skeletons) keep the whole pool: %s (expected true)" % [not main._make_skeleton(Vector2i(0, 0)).has("special_ids")])
 	main.enforce_special_loadouts = false
 	var all_on: Dictionary = main.member_preview(guardian)

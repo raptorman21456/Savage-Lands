@@ -100,7 +100,7 @@ function secCharacter(p) {
       <button data-act="fillpicks" data-s="strength">All Str</button><button data-act="fillpicks" data-s="vigor">All Vig</button><button data-act="fillpicks" data-s="balanced">Balanced</button><button data-act="fillpicks" data-s="reset">Reset</button></div>
     <table class="kv">
       <tr><td>Max HP</td><td>${p.max_health}</td></tr><tr><td>Attack (base damage)</td><td>${p.attack_damage}</td></tr>
-      <tr><td>Move range (battle)</td><td>${MC.PLAYER_BASE_MOVE_RANGE + Math.max(0, Math.trunc((p.stat_agility - PC.AGILITY_START) / MC.AGILITY_PER_EXTRA_MOVE)) + Math.trunc(p.talisman_bonus("move_range")) + Math.trunc(p.armor_trait_value("move_bonus", 0))} tiles</td></tr>
+      <tr><td>Move range (battle)</td><td>${MC.PLAYER_BASE_MOVE_RANGE + Math.max(0, Math.floor(MC.MOVE_TILES_PER_SPEED * (5 + Math.trunc((p.stat_agility - PC.AGILITY_START) / PC.AGILITY_BONUS_PER_LEVEL)) + 0.0001)) + Math.trunc(p.talisman_bonus("move_range")) + Math.trunc(p.armor_trait_value("move_bonus", 0))} tiles</td></tr>
       <tr><td>Stamina (max / start)</td><td>${p.max_stamina} / ${round(p.max_stamina * PC.BATTLE_START_STAMINA_PCT)}</td></tr>
       <tr><td>Crit / Dodge</td><td>${pct(p.crit_chance_total(), 1)} / ${pct(p.dodge_chance_total(), 1)}</td></tr>
       <tr><td>Damage reduction (Defense ${Math.round(p.bodily_defense_points())}: armor+clothes+shield+res.)</td><td>${pct(p.bodily_reduction(), 1)}</td></tr>
@@ -137,8 +137,8 @@ function secWeapon(p) {
     <h2 style="margin-top:8px">${esc(w.name)}</h2>
     <table class="kv">
       <tr><td>Damage multiplier</td><td>${w.damage_mult.toFixed(3)}</td></tr>
-      <tr><td>Plain hit (your Attack ${p.attack_damage})</td><td>${round(p.attack_damage * w.damage_mult)} dmg</td></tr>
-      <tr><td>Heavy attack (x${W.consts.HEAVY_DAMAGE_MULT}, ${w.heavy_stamina_cost_override ?? W.consts.HEAVY_STAMINA_COST} stam)</td><td>${round(p.attack_damage * w.damage_mult * W.consts.HEAVY_DAMAGE_MULT)} dmg</td></tr>
+      <tr><td>Plain hit (your Attack ${p.attack_damage}${w.str_bonus ? " + " + w.str_bonus + " from the weapon" : ""})</td><td>${round(p.effective_strength() * w.damage_mult)} dmg</td></tr>
+      <tr><td>Heavy attack (x${W.consts.HEAVY_DAMAGE_MULT}, ${w.heavy_stamina_cost_override ?? W.consts.HEAVY_STAMINA_COST} stam)</td><td>${round(p.effective_strength() * w.damage_mult * W.consts.HEAVY_DAMAGE_MULT)} dmg</td></tr>
       <tr><td>Range / long-range</td><td>${w.passive_unlimited_range ? "whole grid" : (w.long_range ? 2 : 1) + (w.passive_extra_range || 0)} tiles</td></tr>
       <tr><td>Break chance per hit</td><td>${pct(w.break_chance || 0, 1)}</td></tr>
       <tr><td>Miss chance</td><td>${pct(p.miss_chance_for(w), 1)}</td></tr>
@@ -470,7 +470,7 @@ function renderSide() {
   const w = p.current_weapon;
   const players = `<div class="panel"><h2>You — level ${p.level}</h2>${hpBar(p.health, p.max_health, "hp")}${hpBar(p.stamina, p.max_stamina, "st", `${p.stamina}/${p.max_stamina} stamina${p.exhausted ? " (exhausted)" : ""}`)}
     <div class="chips">${chips.map(([c, t]) => `<span class="chip ${c}">${esc(t)}</span>`).join("") || '<span class="dim">no status effects</span>'}</div>
-    <table class="kv" style="margin-top:6px"><tr><td>Weapon</td><td>${esc(w.name)}</td></tr><tr><td>Attack × weapon</td><td>${p.attack_damage} × ${w.damage_mult.toFixed(2)}</td></tr>
+    <table class="kv" style="margin-top:6px"><tr><td>Weapon</td><td>${esc(w.name)}</td></tr><tr><td>Attack × weapon</td><td>${p.effective_strength()} × ${w.damage_mult.toFixed(2)}</td></tr>
     <tr><td>Items left</td><td>${p.potion_queue.length}${p.potion_queue.length ? " (next: " + esc(consumableById(p.potion_queue[0]).name) + ")" : ""}</td></tr>
     <tr><td>Arrows F/Z/B</td><td>${p.owned_arrows.flame}/${p.owned_arrows.freeze}/${p.owned_arrows.bomb}</td></tr><tr><td>Coins</td><td>${p.coins}</td></tr>
     <tr><td>XP</td><td>${p.xp}/${p.xp_to_next || "max"}</td></tr></table></div>`;
@@ -540,8 +540,8 @@ function renderMenu() {
     html += btn("Tactics", "menu", "tactics", av.tactics, "", "Taunt or Stealth.") + btn("Flee", "flee", "", av.flee, "", "Leave the battle.");
     html += `<button data-bact="autoturn">Auto turn</button>`;
   } else if (uiMenu === "fight") {
-    html = btn("Attack", "attack", "", av.attack, reg ? reg + " st" : "free", `Plain attack: ${round(p.attack_damage * w.damage_mult)} dmg (+${MC.STAMINA_REGEN_ON_ATTACK} stamina).`) + btn("Heavy", "heavy", "", av.heavy, hv + " st", `Heavy attack x${W.consts.HEAVY_DAMAGE_MULT}: ~${round(p.attack_damage * w.damage_mult * W.consts.HEAVY_DAMAGE_MULT)} dmg.`);
-    (w.specials || []).forEach((sp, i) => { html += btn(sp.name, "special", i, av.specials[i], (w.passive_free_specials ? 0 : sp.stamina_cost) + " st", `${sp.description || ""}${sp.learned === false ? " (not learned)" : ""}`); });
+    html = btn("Attack", "attack", "", av.attack, reg ? reg + " st" : "free", `Plain attack: ${round(p.effective_strength() * w.damage_mult)} dmg (+${MC.STAMINA_REGEN_ON_ATTACK} stamina).`) + btn("Heavy", "heavy", "", av.heavy, hv + " st", `Heavy attack x${W.consts.HEAVY_DAMAGE_MULT}: ~${round(p.effective_strength() * w.damage_mult * W.consts.HEAVY_DAMAGE_MULT)} dmg.`);
+    (w.specials || []).forEach((sp, i) => { html += btn(sp.name, "special", i, av.specials[i], (w.passive_free_specials ? 0 : special_cost(sp, p.max_stamina)) + " st", `${sp.description || ""}${sp.learned === false ? " (not learned)" : ""}`); });
     if (sim._player_has_hand_picks() && sim._targetable_rock_tiles().length) html += btn("Mine rock", "mine", "", av.mine, "", "Break an adjacent rock (costs the turn).");
     html += `<button data-bact="menu" data-arg="main">« Back</button>`;
   } else if (uiMenu === "arrow") {

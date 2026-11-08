@@ -59,6 +59,12 @@ func _attack(main, g: Dictionary, action: Dictionary, forced: Array, seed_value:
 	return g.max_hp - g.hp
 
 func _init() -> void:
+	# These checks predate the doc's flat weapon Strength (Club +2, Spear +4 per quality tier...), which has its own test
+	# (test_weapon_stat_bonuses.gd): here weapons add nothing, so every damage figure below stays as it was.
+	var _stat_weapons = load("res://scripts/Weapons.gd")
+	_stat_weapons.CLUB["str_bonus"] = 0
+	for _stat_base in _stat_weapons.UPGRADABLE_TYPES:
+		_stat_base["str_per_tier"] = 0
 	seed(20261005)
 
 	# =========================================================

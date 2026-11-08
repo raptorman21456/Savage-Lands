@@ -24,12 +24,13 @@ func _init() -> void:
 	var clothing = load("res://scripts/Clothing.gd")
 	var armor = load("res://scripts/Armor.gd")
 
-	print("3 slots x 3 pieces: slots=%d (expected 3), pieces=%d (expected 9)" % [clothing.SLOTS.size(), clothing.PIECES.size()])
+	print("3 slots, 9 plain pieces and the doc's 2 effect pieces: slots=%d (expected 3), pieces=%d (expected 11)" % [clothing.SLOTS.size(), clothing.PIECES.size()])
 	var each_slot_three := true
 	for slot in clothing.SLOTS:
-		if clothing.for_slot(slot).size() != 3:
+		var plain: Array = clothing.for_slot(slot).filter(func(p): return not p.has("effects"))
+		if plain.size() != 3:
 			each_slot_three = false
-	print("...three per slot: %s (expected true)" % [each_slot_three])
+	print("...three plain pieces per slot: %s (expected true)" % [each_slot_three])
 	print("nothing is worn to start: dr=%.2f (expected 0.00)" % [player.clothing_damage_reduction()])
 
 	# --- Buying: auto-wears if it beats the slot's current piece. ---

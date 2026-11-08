@@ -39,6 +39,13 @@ func _reset(main, player) -> void:
 
 func _member_unit(main, player, kind: String, weapon_id: String, tile: Vector2i):
 	var member = player.recruit(kind)
+	# A caster's mana is 20 + 5 per point of Intelligence now. These checks were written against the pools a Staff (86) and a
+	# Wand (80) used to give, so the caster gets the Intelligence that makes it so; what they test is what the spells do with the pool.
+	var rules = load("res://scripts/PartyRules.gd")
+	if member.is_caster() and weapon_id.begins_with("staff"):
+		member.extra["intelligence"] = 13.2 - rules.extra_base(kind, "intelligence")
+	elif member.is_caster() and weapon_id.begins_with("wand"):
+		member.extra["intelligence"] = 12.0 - rules.extra_base(kind, "intelligence")
 	if weapon_id != "":
 		player.owned_weapons[weapon_id] = true
 		player.equip_ally_weapon(member, weapon_id)
@@ -55,6 +62,11 @@ func _start(main, unit: Dictionary) -> void:
 	main._start_ally_turn()
 
 func _init() -> void:
+	# Magic from a Staff or Wand used to be a flat +5 / +6; the doc's per-quality-tier version (test_weapon_stat_bonuses.gd) gives a Fine one
+	# (the second rung) the same figures at 2.5 / 3.0 a tier, so these checks keep the numbers they were written against.
+	var _magic_weapons = load("res://scripts/Weapons.gd")
+	_magic_weapons.STAFF["magic_per_tier"] = 2.5
+	_magic_weapons.WAND["magic_per_tier"] = 3.0
 	seed(20261006)
 	var weapons = load("res://scripts/Weapons.gd")
 	var main = load("res://Main.tscn").instantiate()
@@ -80,12 +92,15 @@ func _init() -> void:
 	var bare: Dictionary = main._make_member_battle_unit(druid, Vector2i(1, 4), 1.0)
 	print("A bare-handed Druid: magic=%.1f mana=%d range=%d weapon=%s (expected 10.0, 50, 1, {damage_mult: 1.0})" % [bare.magic, bare.max_mana, bare.attack_range, bare.weapon])
 	player.equip_ally_weapon(druid, "staff_fine_steel")
+	# Mana is 20 + 5 per point of Intelligence now; these checks were written against the 86 a Staff-wielding Druid used to have.
+	druid.extra["intelligence"] = 7.2
 	var armed: Dictionary = main._make_member_battle_unit(druid, Vector2i(1, 4), 1.0)
 	print("With a Staff (+5 magic, then her x1.15 favour): magic=%.2f mana=%d (expected 17.25, 86)" % [armed.magic, armed.max_mana])
 	print("...range is 1 + 2 = %d (expected 3), the weapon is %s, and Landfall costs %d%% of her mana (expected Staff, 40)" % [armed.attack_range, armed.weapon.name, int(round(float(armed.weapon.specials[1].cost_pct_max) * 100.0))])
 	# The Wand: +6 magic and +3 range (the Druid has no favour for it); a Moonstick doubles what levelling GAINED.
 	player.unequip_ally_weapon(druid)
 	player.equip_ally_weapon(druid, "wand_fine_steel")
+	druid.extra["intelligence"] = 6.0   # ...and the 80 of a Wand-wielding one
 	var wand_unit: Dictionary = main._make_member_battle_unit(druid, Vector2i(1, 4), 1.0)
 	print("With a Wand (+6 magic, no favour): magic=%.2f mana=%d range=%d (expected 16.00, 80, 4)" % [wand_unit.magic, wand_unit.max_mana, wand_unit.attack_range])
 	druid.bonus.magic = 4.0
@@ -93,10 +108,11 @@ func _init() -> void:
 	player.unequip_ally_weapon(druid)
 	player.equip_ally_weapon(druid, "wand_mythic")
 	var moon: Dictionary = main._make_member_battle_unit(druid, Vector2i(1, 4), 1.0)
-	print("Levelled-up magic (+4): %.2f; with Moonstick doubling the GAIN: %.2f (expected 20.00, 24.00)" % [gained.magic, moon.magic])
+	print("Levelled-up magic (+4): %.2f; with Moonstick doubling the GAIN: %.2f (expected 20.00, 33.00: 10 + 8 gained + 15 from a Mythic wand at 3.0 a tier)" % [gained.magic, moon.magic])
 	druid.bonus.magic = 0.0
 	player.unequip_ally_weapon(druid)
 	player.equip_ally_weapon(druid, "staff_fine_steel")
+	druid.extra["intelligence"] = 7.2   # back to the Staff-wielder's 86
 	var guardian = player.recruit("guardian")
 	var guardian_unit: Dictionary = main._make_member_battle_unit(guardian, Vector2i(1, 3), 1.0)
 	print("A non-caster has no mana pool but a stamina one: mana=%d stamina=%d (expected 0, 100)" % [guardian_unit.max_mana, guardian_unit.max_stamina])
@@ -157,6 +173,7 @@ func _init() -> void:
 	_reset(main, player)
 	player.unequip_ally_weapon(druid)
 	player.equip_ally_weapon(druid, "wand_fine_steel")
+	druid.extra["intelligence"] = 6.0   # a Wand-wielder's 80
 	var u3: Dictionary = main._make_member_battle_unit(druid, Vector2i(1, 4), 1.0)
 	var center := _make_goblin(main, Vector2i(6, 4))
 	var adjacent := _make_goblin(main, Vector2i(6, 5))
@@ -191,6 +208,7 @@ func _init() -> void:
 	print("...the charge is spent: %s (expected {})" % [u3.charging])
 	player.unequip_ally_weapon(druid)
 	player.equip_ally_weapon(druid, "staff_fine_steel")
+	druid.extra["intelligence"] = 7.2   # a Staff-wielder's 86
 
 	# a downed caster loses the charge
 	var u4: Dictionary = main._make_member_battle_unit(druid, Vector2i(1, 4), 1.0)
@@ -328,7 +346,7 @@ func _init() -> void:
 	main.battle_commanding_ally = reviver
 	main.battle_ally_target = body
 	main.battle_actor = reviver
-	await main._battle_perform_attack({"stamina_cost": 0, "dmg_mult": 0.0, "effect": "revive", "name": "Revival Blessing"})
+	await main._battle_perform_attack({"stamina_cost": 0, "dmg_mult": 0.0, "effect": "revive", "name": "Energy Transfer"})
 	print("The revive EFFECT stands a downed ally up: %s (expected true)" % [main.battle_allies.has(body) and body.hp == body.max_hp])
 
 	# =========================================================
@@ -382,9 +400,9 @@ func _init() -> void:
 	striker.mods = {"damage_pct": 0.5}
 	print("Its own talisman: +50%% damage -> %d (expected 30)" % [await swing.call(striker)])
 	striker.mods = {"crit_chance": 1.0}
-	print("Its own crit chance (hero's stat is not used): %d (expected 40, a double-damage crit)" % [await swing.call(striker)])
+	print("Its own crit chance (hero's stat is not used): %d (expected 50, a x2.5 crit: 250%%)" % [await swing.call(striker)])
 	striker.mods = {"crit_chance": 1.0, "crit_damage_mult_bonus": 0.5}
-	print("...a crit-damage talisman adds to the multiplier: %d (expected 50, x2.5)" % [await swing.call(striker)])
+	print("...a crit-damage talisman adds to the multiplier: %d (expected 60, x3.0: 250%% plus the talisman's 50%%)" % [await swing.call(striker)])
 	striker.mods = {}
 	player.talisman_bonus("crit_chance")
 	print("With no talismans it never crits off the hero's stat: %d (expected 20)" % [await swing.call(striker)])
@@ -392,7 +410,7 @@ func _init() -> void:
 	striker.hp = 10
 	player.health = 400
 	await swing.call(striker)
-	print("Vampire's Pact on an ally heals THAT ally, not the hero: ally=%d (expected 20), hero=%d (expected 400)" % [striker.hp, player.health])
+	print("Bat Fang on an ally heals THAT ally, not the hero: ally=%d (expected 20), hero=%d (expected 400)" % [striker.hp, player.health])
 	striker.mods = {"low_hp_damage_pct": 1.0}
 	striker.hp = 4
 	striker.max_hp = 50
@@ -403,7 +421,7 @@ func _init() -> void:
 	player.health = 400
 	striker.mods = {"burn_chance": 1.0}
 	await swing.call(striker)
-	print("Ember Charm on an ally sets the target alight: burning=%s (expected true)" % [target.burning])
+	print("Pyrogenesis Organ on an ally sets the target alight: burning=%s (expected true)" % [target.burning])
 	striker.mods = {}
 	striker.hp = 50
 	# knockback goes away from the ATTACKER, not from the hero
@@ -469,6 +487,7 @@ func _init() -> void:
 	_reset(main, player)
 	player.unequip_ally_weapon(druid)
 	player.equip_ally_weapon(druid, "wand_fine_steel")
+	druid.extra["intelligence"] = 6.0
 	var wander: Dictionary = main._make_member_battle_unit(druid, Vector2i(1, 4), 1.0)
 	wander.weapon = wander.weapon.duplicate(true)
 	wander.weapon["passive_blind_chance"] = 1.0
@@ -492,5 +511,6 @@ func _init() -> void:
 	main.battle_actor = {}
 	player.unequip_ally_weapon(druid)
 	player.equip_ally_weapon(druid, "staff_fine_steel")
+	druid.extra["intelligence"] = 7.2
 
 	quit()

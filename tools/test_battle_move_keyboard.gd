@@ -21,6 +21,8 @@ func _init() -> void:
 	var goblin_script = load("res://scripts/Enemy.gd")
 	var goblin = goblin_script.new()
 	main.add_child(goblin)
+	# Two tiles of walking (speed rating 20): this test moves twice in a turn, and a new hero walks one tile now (the doc's movement rule).
+	main.player.stat_agility = main.player.AGILITY_START + 15 * main.player.AGILITY_BONUS_PER_LEVEL
 	goblin.global_position = main.player.global_position + Vector2(30, 0)
 	# This test isn't about the first-ever-battle tutorial -- mark it
 	# completed first so trigger_battle doesn't force a solo squad/pinned

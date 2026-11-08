@@ -277,7 +277,7 @@ static func apply_build(main, cfg: Dictionary) -> void:
 			p.weapon_whisperer_specials.append(str(sid))
 	p._rebuild_talisman_cache()
 	# Max stamina counts talismans and the worn armour (Cindermail's heat).
-	p.max_stamina = p._base_max_stamina + int(p.talisman_bonus("max_stamina")) + p.armor_max_stamina_bonus()
+	p.max_stamina = p.stamina_cap()
 	p.stamina = mini(p.stamina, p.max_stamina)
 
 	# weapon

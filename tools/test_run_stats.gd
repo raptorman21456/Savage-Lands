@@ -40,6 +40,9 @@ func _init() -> void:
 	var goblin = goblin_script.new()
 	main.add_child(goblin)
 	main._setup_battle_grid([goblin])
+	# (a sturdy Goblin: the Club adds 2 Strength now, so a fresh hero would kill a 3 HP one outright)
+	main.battle_units[0].hp = 100
+	main.battle_units[0].max_hp = 100
 	var hp_before: int = main.battle_units[0].hp
 	var dealt_before: int = main.run_damage_dealt
 	main._apply_single_hit(0, 1.0, "", player.current_weapon)

@@ -237,7 +237,7 @@ static func unstick(main) -> Dictionary:
 # The map and the danger
 # ---------------------------------------------------------------------------------------------------------------------------
 
-# The Pathfinder's Compass without the talisman: every room counts as visited and every place as found (map, mini-map, legend).
+# The Compass without the talisman: every room counts as visited and every place as found (map, mini-map, legend).
 static func reveal_map(main) -> Dictionary:
 	RoomsScript.ensure_built()
 	for r in RoomsScript.rooms:

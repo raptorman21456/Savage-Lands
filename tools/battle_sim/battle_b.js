@@ -123,11 +123,11 @@ Object.assign(Sim.prototype, {
     // Shadowweave: the hit after a dodge is a guaranteed crit.
     const shadow_forced_crit = you && this.battle_shadow_crit;
     if (shadow_forced_crit) this.battle_shadow_crit = false;
-    const base_attack = attack_stat >= 0 ? attack_stat : p.attack_damage;
+    const base_attack = attack_stat >= 0 ? attack_stat : p.attack_damage + (weapon.str_bonus || 0);
     let dmg = round(base_attack * (weapon.damage_mult ?? 1.0) * dmg_mult);
     if (attack_stat >= 0) dmg = Math.max(1, dmg);
     if (flat_dmg >= 0) dmg = flat_dmg;
-    else if (you) dmg += round(p.coin_scaled_attack_bonus());
+    else if (you) dmg = round(dmg * p.coin_damage_mult());
     if (p.pichaku_active && effect === "") dmg = round(dmg * MC.PICHAKU_DAMAGE_MULT);
     if (you && p.shield_damage_penalty_pct() > 0) dmg = round(dmg * (1.0 - p.shield_damage_penalty_pct()));
     if (p.temp_damage_bonus_pct !== 0) dmg = round(dmg * (1.0 + p.temp_damage_bonus_pct));
@@ -161,9 +161,12 @@ Object.assign(Sim.prototype, {
       const ut = TRAITS[u.name] || {};
       if (ut.is_undead || ut.is_boss_tier) dmg = round(dmg * (1.0 + undead_boss_bonus));
     }
+    // Retribution: a mage-slayer -- more damage to mages, less to everything else.
+    const vs_mage = weapon.passive_damage_vs_mage_mult ?? 1.0, vs_other = weapon.passive_damage_vs_nonmage_mult ?? 1.0;
+    if (vs_mage !== 1.0 || vs_other !== 1.0) dmg = round(dmg * ((TRAITS[u.name] || {}).mage ? vs_mage : vs_other));
     let is_crit = blind_forced_crit || stealth_forced_crit || bleeding_cut_forced_crit || shadow_forced_crit;
     // Grunkle Gloves: 1.3x the wielder's crit chance and 1.2x crit damage.
-    const crit_chance = p.crit_chance_total() * (weapon.passive_crit_chance_mult || 1.0);
+    const crit_chance = p.crit_chance_total() * (weapon.passive_crit_chance_mult || 1.0) + (you ? (weapon.passive_crit_chance_bonus || 0) : 0);
     if (you && !is_crit && crit_chance > 0 && rng.randf() < crit_chance) is_crit = true;
     if (is_crit) dmg = round(dmg * p.crit_damage_mult() * (weapon.passive_crit_damage_mult || 1.0));
     if (you && p.potion_attack_turns > 0) dmg = round(dmg * (1.0 + MC.ATTACK_POTION_DAMAGE_BONUS_PCT));
@@ -202,7 +205,7 @@ Object.assign(Sim.prototype, {
     this.battle_had_combat_action_this_cycle = true;
     if (you) {
       const ls = p.talisman_bonus("lifesteal_pct");
-      if (ls > 0 && dmg > 0) p.heal(Math.max(1, round(dmg * ls)));
+      if (ls > 0 && dmg > 0) p.heal(Math.max(1, round(dmg * ls)), true);
       if (p.talisman_bonus("momentum_chain") > 0) this.battle_momentum_chain_stacks += 1;
       if (p.talisman_bonus("bloodmoon_fang") > 0 && p.bloodmoon_stacks < PC.BLOODMOON_MAX_STACKS && !p.bloodmoon_debuffed) { p.bloodmoon_stacks += 1; p._recalc_stats(); }
     }
@@ -220,18 +223,28 @@ Object.assign(Sim.prototype, {
       delete p.weapon_enchantments[broken_id];
       p._equip_weapon(clone(W.club));
     }
-    if (effect === "lifesteal") { const h = Math.max(1, round(dmg * MC.LIFESTEAL_PCT)); p.heal(h); this.log(`You drain ${h} HP from the wound.`); }
+    if (effect === "lifesteal") { const h = Math.max(1, round(dmg * MC.LIFESTEAL_PCT)); p.heal(h, true); this.log(`You drain ${h} HP from the wound.`); }
     if (effect === "leg_blow" && u.hp > 0) { u.move_range = Math.max(1, Math.trunc(u.move_range) - 1); this.log(`The ${u.name} is hobbled, slowing it down!`); }
     if (effect === "low_sweep" && u.hp > 0 && rng.randf() < this._proc(MC.LOW_SWEEP_CHANCE)) { u.move_range = Math.max(1, Math.trunc(u.move_range / 2)); this.log(`The ${u.name} is swept off its feet, slowed dramatically!`); }
     if (effect === "crushing_collision" && u.hp > 0 && u.armored) { u.armored = false; this.log(`The ${u.name}'s armor is shattered!`); }
     if (effect === "bonk" && u.hp > 0) { u.concussed_turns = MC.BONK_CONCUSSED_TURNS; this.log(`The ${u.name} is left dazed and concussed!`); }
     if (effect === "wrist_strike" && u.hp > 0) { u.disarmed_tile = this._pick_disarm_tile(); this.log(`The ${u.name}'s weapon is knocked loose!`); }
     if (effect === "arrow_flame" && u.hp > 0) { u.burning = true; this.log(`The ${u.name} catches fire!`); }
-    // Ember Charm (talisman)
+    // Pyrogenesis Organ (talisman)
     if (you && u.hp > 0 && !u.burning) {
       let burn_chance = is_multihit ? p.talisman_bonus("burn_chance_multihit") : p.talisman_bonus("burn_chance");
       burn_chance = this._proc(burn_chance);
       if (burn_chance > 0 && rng.randf() < burn_chance) { this._ignite_with_ember(u); this.log(`The ${u.name} catches fire!`); }
+    }
+    // Rusted Edge (talisman): a chance for any landed hit to poison the target.
+    if (you && u.hp > 0 && !(u.poison_turns > 0)) {
+      const rust = this._proc(p.talisman_bonus("poison_chance"));
+      if (rust > 0 && rng.randf() < rust) { u.poison_turns = MC.POISON_TURNS; u.poison_dmg = Math.max(1, round(u.max_hp * MC.POISON_DAMAGE_PCT)); this.log(`The ${u.name} is poisoned!`); }
+    }
+    // Fake PHD (talisman): a chance for a hit to leave a random negative status.
+    if (you && u.hp > 0) {
+      const phd = this._proc(p.talisman_bonus("random_status_chance"));
+      if (phd > 0 && rng.randf() < phd) this._inflict_random_status(u);
     }
     if (you && u.hp > 0 && (weapon.material_id || "") === "bone") {
       let dread = MC.BONE_DREAD_CHANCE;
@@ -257,9 +270,9 @@ Object.assign(Sim.prototype, {
       if (this._in_battle_bounds(behind_tile) && !this._battle_tile_occupied(behind_tile, u.ref)) { u.tile = behind_tile; this.log(`The ${u.name} is hurled behind you!`); }
     }
     const passive_ls = weapon.passive_lifesteal_pct || 0;
-    if (passive_ls > 0 && dmg > 0) { const h = Math.max(1, round(dmg * passive_ls)); p.heal(h); this.log(`Your weapon drains ${h} HP from the wound.`); }
+    if (passive_ls > 0 && dmg > 0) { const h = Math.max(1, round(dmg * passive_ls)); p.heal(h, true); this.log(`Your weapon drains ${h} HP from the wound.`); }
     const heal_chance = weapon.passive_heal_chance || 0;
-    if (heal_chance > 0 && rng.randf() < this._proc(heal_chance)) { const hf = Math.trunc(weapon.passive_heal_flat || 0) + round(p.max_health * (weapon.passive_heal_max_hp_pct || 0)); p.heal(hf); this.log(`Your spear drinks deep -- you feel ${hf} HP return.`); }
+    if (heal_chance > 0 && rng.randf() < this._proc(heal_chance)) { const hf = Math.trunc(weapon.passive_heal_flat || 0) + round(p.max_health * (weapon.passive_heal_max_hp_pct || 0)); p.heal(hf, true); this.log(`Your spear drinks deep -- you feel ${hf} HP return.`); }
     // The Great Toothpicke's poison chance, and Second Best's concussion chance.
     const poison_chance = weapon.passive_poison_chance || 0;
     if (poison_chance > 0 && u.hp > 0 && rng.randf() < this._proc(poison_chance)) { u.poison_turns = MC.POISON_TURNS; u.poison_dmg = Math.max(1, round(u.max_hp * MC.POISON_DAMAGE_PCT)); this.log(`The ${u.name} is poisoned!`); }
@@ -268,7 +281,7 @@ Object.assign(Sim.prototype, {
     const self_damage_pct = weapon.passive_self_damage_pct || 0;
     if (self_damage_pct > 0 && dmg > 0 && you) {
       const recoil = Math.max(1, round(dmg * self_damage_pct));
-      p.take_battle_damage(recoil);
+      p.take_battle_damage(recoil, true);
       this.log(`The recoil sears you for ${recoil} damage.`, "bad");
       this._check_player_dead();
     }
@@ -332,7 +345,7 @@ Object.assign(Sim.prototype, {
   },
   _ignite_with_ember(u) {
     u.burning = true;
-    if (this.player.talisman_bonus("ember_burn") > 0) u.burn_value = MC.EMBER_BURN_BASE + this.player.attack_damage / MC.EMBER_BURN_ATTACK_DIV;
+    if (this.player.talisman_bonus("ember_burn") > 0) u.burn_value = MC.EMBER_BURN_BASE + this.player.effective_strength() / MC.EMBER_BURN_ATTACK_DIV;
   },
   _proc(chance) { return Math.min(1.0, chance * this.player.secondary_chance_mult()); },
 
@@ -343,7 +356,7 @@ Object.assign(Sim.prototype, {
     const blast = Math.max(1, fire_tick_dmg * MC.WILDFIRE_EXPLOSION_FIRE_MULT);
     this.log("The blaze erupts outward!", "bad");
     if (this._in_blast_radius(this.battle_player_tile, center, MC.WILDFIRE_EXPLOSION_RADIUS)) {
-      p.take_battle_damage(blast); this.player_burning = true;
+      p.take_battle_damage(blast, true); this.player_burning = true;
       this.log(`You're caught in the blast for ${blast} damage and catch fire!`, "bad");
       this._check_player_dead();
     }
@@ -499,7 +512,7 @@ Object.assign(Sim.prototype, {
     const target_tile = vclone(this.battle_units[idx].tile);
     if (this.rng.randf() < MC.DIAMONDS_MISS_CHANCE) {
       const self_dmg = Math.max(1, round(this.player.max_health * MC.DIAMONDS_MISS_SELF_DAMAGE_PCT));
-      this.player.take_battle_damage(self_dmg);
+      this.player.take_battle_damage(self_dmg, true);
       this.log(`You misjudge the jump and crash down hard, taking ${self_dmg} damage!`, "bad");
       this._check_player_dead();
       return;
@@ -525,11 +538,30 @@ Object.assign(Sim.prototype, {
     const cost = Math.trunc(this.player.current_weapon.heavy_stamina_cost_override ?? W.consts.HEAVY_STAMINA_COST);
     await this._battle_perform_attack({ stamina_cost: cost, dmg_mult: W.consts.HEAVY_DAMAGE_MULT, effect: "", name: "Heavy Attack" });
   },
+  // Fake PHD: one of the enemy's negative statuses, picked at random and given its usual length.
+  _inflict_random_status(u) {
+    const kinds = ["poison", "burn", "bleed", "freeze", "concuss", "blind", "vulnerable", "stun", "fear"];
+    const k = kinds[Math.floor(this.rng.randf() * kinds.length) % kinds.length];
+    const nm = u.name;
+    switch (k) {
+      case "poison": u.poison_turns = MC.POISON_TURNS; u.poison_dmg = Math.max(1, round(u.max_hp * MC.POISON_DAMAGE_PCT)); this.log(`The ${nm} is poisoned!`); break;
+      case "burn": u.burning = true; this.log(`The ${nm} catches fire!`); break;
+      case "bleed": u.bleed_turns = MC.BLEED_BASE_TURNS; this.log(`The ${nm} starts to bleed!`); break;
+      case "freeze": u.frozen_turns = MC.ARROW_FREEZE_MIN_TURNS + Math.floor(this.rng.randf() * (MC.ARROW_FREEZE_MAX_TURNS - MC.ARROW_FREEZE_MIN_TURNS + 1)); this.log(`The ${nm} freezes solid!`); break;
+      case "concuss": u.concussed_turns = MC.BONK_CONCUSSED_TURNS; this.log(`The ${nm} is concussed!`); break;
+      case "blind": u.blind_turns = MC.BLINDNESS_TURNS; this.log(`The ${nm} is blinded!`); break;
+      case "vulnerable": u.vulnerable_turns = MC.VULNERABLE_TURNS; this.log(`The ${nm} is left vulnerable!`); break;
+      case "stun": u.stunned = true; this.log(`The ${nm} is stunned!`); break;
+      default: u.feared = true; this.log(`The ${nm} cowers in dread!`);
+    }
+  },
   async _battle_player_special(index) {
     const specials = this.player.current_weapon.specials || [];
     if (index < 0 || index >= specials.length) return;
     let action = specials[index];
     if (action.learned === false) { this.log(`You haven't learned ${action.name} yet.`); return; }
+    // A share-of-the-pool price (the Club's "30 + 20% of max stamina") is worked out against today's maximum.
+    if ((action.cost_pct_max || 0) > 0) { action = clone(action); action.stamina_cost = special_cost(action, this.player.max_stamina); delete action.cost_pct_max; }
     if (this.player.current_weapon.passive_free_specials) { action = clone(action); action.stamina_cost = 0; }
     const free_chance = this.player.current_weapon.passive_free_special_chance || 0;
     if (action.stamina_cost > 0 && free_chance > 0 && this.rng.randf() < this._proc(free_chance)) {
@@ -546,7 +578,7 @@ Object.assign(Sim.prototype, {
     this.stat_action(kind + " arrow");
     if (kind === "bomb") this._resolve_bomb_arrow(vclone(this.battle_units[idx].tile));
     else if (kind === "flame") {
-      const flame_dmg = MC.ARROW_FLAME_FLAT_DMG + round(p.attack_damage * MC.ARROW_FLAME_DMG_STAT_PCT);
+      const flame_dmg = MC.ARROW_FLAME_FLAT_DMG + round(p.effective_strength() * MC.ARROW_FLAME_DMG_STAT_PCT);
       this._apply_single_hit(idx, 1.0, "arrow_flame", p.current_weapon, "You", null, flame_dmg);
     } else this._apply_single_hit(idx, 1.0, "arrow_freeze", p.current_weapon, "You", null, MC.ARROW_FREEZE_FLAT_DMG);
     p.owned_arrows[kind] -= 1;
@@ -567,7 +599,7 @@ Object.assign(Sim.prototype, {
     for (const idx of targets) this._apply_single_hit(idx, 1.0, "arrow_bomb", p.current_weapon, "You", null, MC.ARROW_BOMB_FLAT_DMG);
     for (const a of this.battle_allies) if (a.hp > 0 && this._in_blast_radius(a.tile, center, MC.ARROW_BOMB_RADIUS)) { a.hp -= MC.ARROW_BOMB_FLAT_DMG; this.log(`Your ${a.name} is caught in the blast!`); }
     if (this._in_blast_radius(this.battle_player_tile, center, MC.ARROW_BOMB_RADIUS)) {
-      p.take_battle_damage(MC.ARROW_BOMB_FLAT_DMG);
+      p.take_battle_damage(MC.ARROW_BOMB_FLAT_DMG, true);
       this.log(`You're caught in your own blast for ${MC.ARROW_BOMB_FLAT_DMG} damage!`, "bad");
       this._check_player_dead();
     }
@@ -601,6 +633,7 @@ Object.assign(Sim.prototype, {
       case "resilience_buff": p.potion_resilience_turns = MC.POTION_BUFF_TURNS; this.log("Your skin hardens against incoming blows!"); break;
       case "energy_buff": p.potion_energy_turns = MC.POTION_BUFF_TURNS; this.log("Your legs feel lighter -- extra reach on your next turns of movement!"); break;
       case "restore_stamina": p.reset_stamina(); this.log("Stamina rushes back into you!"); break;
+      case "restore_mana": this.log("Mana floods back into your casters (the simulator fields none)."); break;
     }
     // Battle Medic: a healing item used in battle lashes every enemy for a little damage.
     if (p.meta_battle_medic_damage > 0) {
@@ -690,7 +723,7 @@ Object.assign(Sim.prototype, {
       this.battle_bloodmoon_quiet_turns += 1;
       if (this.battle_bloodmoon_quiet_turns >= MC.BLOODMOON_QUIET_TURNS_LIMIT && !p.bloodmoon_debuffed) {
         p.bloodmoon_debuffed = true; p.bloodmoon_stacks = 0; p._recalc_stats();
-        this.log("Bloodmoon Fang crashes -- your stats are halved!", "bad");
+        this.log("Bloodthirsty Idol crashes -- your stats are halved!", "bad");
       }
     }
     this.battle_had_combat_action_this_cycle = false;

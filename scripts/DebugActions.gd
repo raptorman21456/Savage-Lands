@@ -398,6 +398,7 @@ static func remove_clothing(main, piece_id: String) -> Dictionary:
 	p.owned_clothing.erase(piece_id)
 	if str(p.equipped_clothing.get(piece.slot, "")) == piece_id:
 		p.equipped_clothing[piece.slot] = ""
+		p._rebuild_talisman_cache()
 	return ok("Removed %s." % piece.name)
 
 static func give_talisman(main, talisman_id: String, wear: bool) -> Dictionary:

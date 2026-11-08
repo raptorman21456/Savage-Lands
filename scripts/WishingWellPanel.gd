@@ -152,7 +152,12 @@ func _apply_outcome(id: String) -> String:
 # A talisman you don't own yet, worn if a slot is free; if you somehow own the
 # whole catalog, coins instead.
 func _grant_wish() -> String:
-	var pick: Array = TalismansScript.roll_stock(1, _player.owned_talismans, rng)
+	# Never one only a party member can wear (the BFF Bracelet): a wish should give the hero something to put on.
+	var skip: Dictionary = _player.owned_talismans.duplicate()
+	for item in TalismansScript.ITEMS:
+		if item.get("allies_only", false):
+			skip[item.id] = true
+	var pick: Array = TalismansScript.roll_stock(1, skip, rng)
 	if pick.is_empty():
 		var amount: int = WishingWellScript.jackpot_amount(wager) / 2
 		_player.add_coins_flat(amount)

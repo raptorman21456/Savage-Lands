@@ -23,6 +23,8 @@ var xp := 0
 var picks := 0
 # Everything gained on top of the starting stats, already scaled by the kind's growth.
 var bonus := {"hp": 0.0, "attack": 0.0, "defense": 0.0, "speed": 0.0, "magic": 0.0, "fortitude": 0.0}
+# The five stats beyond those (PartyRules.EXTRA_STATS): what levelling has added to the kind's starting value.
+var extra := {"dexterity": 0.0, "might": 0.0, "intelligence": 0.0, "charisma": 0.0, "reflexes": 0.0}
 # Wolves: times it has fainted this run (it dies for good at PartyRulesScript.WOLF_MAX_FAINTS),
 # and how many battles of loyalty remain (-1 = no limit).
 var faints := 0
@@ -145,6 +147,9 @@ func talisman_effects() -> Dictionary:
 # range_bonus; the structural keys "weapon" and "magic_mult" are read separately.
 func effect_mods(weapon_base_id: String) -> Dictionary:
 	var mods := talisman_effects()
+	# Dexterity feeds its crit chance, on top of any talisman or perk.
+	if levels():
+		mods["crit_chance"] = float(mods.get("crit_chance", 0.0)) + crit_from_dexterity()
 	var favour: Dictionary = PartyRulesScript.favour_for(kind, weapon_base_id)
 	for key in favour:
 		if key == "weapon" or key == "weapons" or key == "magic_mult":
@@ -217,11 +222,39 @@ func fortitude() -> float:
 func is_caster() -> bool:
 	return bool(rules().get("caster", false))
 
+# 20 + 5 for every point of Intelligence (the doc); only a magic-user has a pool at all.
 func max_mana() -> int:
-	return int(round(magic() * PartyRulesScript.MANA_PER_MAGIC)) if is_caster() else 0
+	return PartyRulesScript.MANA_BASE + int(round(intelligence() * PartyRulesScript.MANA_PER_INTELLIGENCE)) if is_caster() else 0
 
+# A member with a stamina pool has 100 (150 for the Wolf) plus 3 for every point of Might.
 func max_stamina() -> int:
-	return int(rules().get("stamina", 0))
+	var pool: int = int(rules().get("stamina", 0))
+	return pool + int(round(might() * PartyRulesScript.STAMINA_PER_MIGHT)) if pool > 0 else 0
+
+# --- The five stats beyond the original six ----------------------------------------------
+func extra_stat(stat_name: String) -> float:
+	return PartyRulesScript.extra_base(kind, stat_name) + float(extra.get(stat_name, 0.0))
+
+func dexterity() -> float:
+	return extra_stat("dexterity")
+
+func might() -> float:
+	return extra_stat("might")
+
+func intelligence() -> float:
+	return extra_stat("intelligence")
+
+func charisma() -> float:
+	return extra_stat("charisma")
+
+func reflexes() -> float:
+	return extra_stat("reflexes")
+
+func crit_from_dexterity() -> float:
+	return minf(PartyRulesScript.CRIT_FROM_DEXTERITY_CAP, dexterity() * PartyRulesScript.CRIT_PER_DEXTERITY)
+
+func dodge_from_reflexes() -> float:
+	return minf(PartyRulesScript.DODGE_FROM_REFLEXES_CAP, reflexes() * PartyRulesScript.DODGE_PER_REFLEXES)
 
 # Tiles it can move in a battle turn.
 func move_tiles() -> int:
@@ -233,8 +266,10 @@ func move_tiles() -> int:
 	if move.has("per_speed"):
 		tiles = float(move.get("base", PartyRulesScript.BASE_MOVE_TILES)) + float(move.per_speed) * rating
 	else:
-		tiles = float(PartyRulesScript.BASE_MOVE_TILES) + floorf((rating - PartyRulesScript.SPEED_START) / PartyRulesScript.SPEED_PER_EXTRA_TILE)
+		tiles = float(PartyRulesScript.BASE_MOVE_TILES) + floorf(PartyRulesScript.MOVE_TILES_PER_SPEED * rating + 0.0001)
 	tiles *= float(move.get("tile_mult", 1.0))
+	if str(move.get("round", "down")) == "up":
+		return maxi(int(move.get("min", 1)), int(ceilf(tiles - 0.0001)))
 	return maxi(int(move.get("min", 1)), int(floorf(tiles + 0.0001)))
 
 # --- Levelling ----------------------------------------------------------------------
@@ -262,6 +297,8 @@ func _level_up() -> void:
 	picks += 1
 	for stat_name in PartyRulesScript.STAT_NAMES:
 		bonus[stat_name] += PartyRulesScript.PASSIVE_GAIN[stat_name] * PartyRulesScript.growth(kind, stat_name)
+	for stat_name in PartyRulesScript.EXTRA_STATS:
+		extra[stat_name] = float(extra.get(stat_name, 0.0)) + PartyRulesScript.EXTRA_GAIN * PartyRulesScript.extra_growth(kind, stat_name)
 
 # Spends one bonus pick on a stat. False if there is no pick left or the kind cannot
 # improve that stat.

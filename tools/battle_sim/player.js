@@ -163,7 +163,7 @@ class Player {
     this.real_miss = cfg.real_miss !== false;
     this._rebuild_talisman_cache();
     // Max stamina counts talismans and the worn armour (Cindermail's heat), as the game's Sandbox does.
-    this.max_stamina = this._base_max_stamina + Math.trunc(this.talisman_bonus("max_stamina")) + this.armor_max_stamina_bonus();
+    this.max_stamina = this.stamina_cap();
 
     const wsel = cfg.weapon || { base: "club" };
     const weapon = buildWeapon(wsel);
@@ -192,7 +192,7 @@ class Player {
         case "strength": this.stat_strength += 1 + this.meta_levelup_bonus_strength; break;
         case "vigor": this.stat_vigor += 1 + this.meta_levelup_bonus_vigor; break;
         case "agility": this.stat_agility += PC.AGILITY_BONUS_PER_LEVEL + this.meta_levelup_bonus_agility; break;
-        case "might": this.stat_might += 1 + this.meta_levelup_bonus_might; break;
+        case "might": this.stat_might += 1 + this.meta_levelup_bonus_might; this.max_stamina = this.stamina_cap(); break;
         case "resilience": this.stat_resilience += 1; break;
         case "reflexes": this.stat_reflexes += 1; break;
         case "dexterity": this.stat_dexterity += 1; break;
@@ -292,9 +292,13 @@ class Player {
   low_hp_damage_bonus_total() { return this.meta_low_hp_damage_bonus_pct + this.talisman_bonus("low_hp_damage_pct"); }
   low_hp_threshold() { const t = this.talisman_bonus("low_hp_threshold"); return t > 0 ? t : 0.3; }
   fall_damage_factor() { return Math.max(0.0, 1.0 - this.talisman_bonus("fall_reduction")); }
-  crit_damage_mult() { return 2.0 + this.talisman_bonus("crit_damage_mult_bonus"); }
-  coin_scaled_attack_bonus() { return this.talisman_bonus("attack_per_coin") * this.coins; }
-  coin_scaled_defense_bonus() { return this.talisman_bonus("defense_per_coin") * this.coins; }
+  crit_damage_mult() { return PC.CRIT_BASE_MULT + this.talisman_bonus("crit_damage_mult_bonus"); }
+  // The whole stamina pool: 100 and the Church's bonus, +3 per Might, then talismans and armour.
+  stamina_cap() { return this._base_max_stamina + PC.STAMINA_PER_MIGHT * this.stat_might + Math.trunc(this.talisman_bonus("max_stamina")) + this.armor_max_stamina_bonus(); }
+  // Your Strength plus the flat Strength the weapon in hand carries.
+  effective_strength() { return this.attack_damage + ((this.current_weapon || {}).str_bonus || 0); }
+  coin_damage_mult() { return 1.0 + this.talisman_bonus("damage_pct_per_coin") * this.coins; }
+  coin_reduction() { return this.talisman_bonus("reduction_per_coin") * this.coins; }
   get_weapon_upgrade_level(id) { return this.weapon_upgrade_levels[id] || 0; }
   get_armor_upgrade_level(id) { return this.armor_upgrade_levels[id] || 0; }
 
@@ -326,7 +330,7 @@ class Player {
     return total;
   }
   armor_damage_reduction() {
-    let total = this.armor_tier_damage_reduction() + this.clothing_damage_reduction() + this.talisman_bonus("damage_reduction") + this.coin_scaled_defense_bonus();
+    let total = this.armor_tier_damage_reduction() + this.clothing_damage_reduction() + this.talisman_bonus("damage_reduction");
     if (this.talisman_bonus("ironclad_ward") > 0) total *= 2.5;
     if (this.bloodmoon_debuffed) total *= 0.5;
     return total;
@@ -462,7 +466,11 @@ class Player {
   }
 
   // ------------------------------------------------------------ health / stamina
-  heal(amount) { this.health = clamp(this.health + amount, 0, this.max_health); }
+  // from_hit: healing out of a blow you land (lifesteal) -- the one kind Bat Fang leaves alone.
+  heal(amount, from_hit = false) {
+    if (!from_hit && this.talisman_bonus("disable_healing_items") > 0) return;
+    this.health = clamp(this.health + amount, 0, this.max_health);
+  }
   restore_health(amount) { this.health = clamp(amount, 0, this.max_health); }
   reset_stamina() { this.stamina = this.max_stamina; this.exhausted = false; }
   reset_stamina_for_battle() { this.stamina = round(this.max_stamina * PC.BATTLE_START_STAMINA_PCT); this.exhausted = false; }
@@ -499,7 +507,7 @@ class Player {
   }
   _consume_potion(id) {
     const tier = consumableById(id);
-    let heal_amount = tier.heal_amount !== undefined ? tier.heal_amount : PC.ITEM_HEAL_AMOUNT;
+    let heal_amount = (tier.heal_amount !== undefined ? tier.heal_amount : PC.ITEM_HEAL_AMOUNT) + round(this.max_health * (tier.heal_max_hp_pct || 0));
     const heal_bonus_pct = this.meta_healing_bonus_pct + this.talisman_bonus("heal_pct");
     if (heal_bonus_pct > 0) heal_amount = round(heal_amount * (1.0 + heal_bonus_pct));
     this.heal(heal_amount);
@@ -514,10 +522,16 @@ class Player {
 
   // ------------------------------------------------------------ damage
   _try_phoenix() {
-    if (this.phoenix_used || this.talisman_bonus("phoenix") <= 0) return false;
-    this.phoenix_used = true; this.health = 1; return true;
+    if (this.talisman_bonus("phoenix") <= 0) return false;
+    this.phoenix_used = true;
+    // The ash is spent: it leaves the slot, and the fighter rises on full HP and stamina.
+    this.equipped_talismans = this.equipped_talismans.filter((id) => !((talismanById(id) || {}).effects || {}).phoenix);
+    this._rebuild_talisman_cache();
+    this.health = this.max_health; this.stamina = this.max_stamina; return true;
   }
-  take_battle_damage(amount) {
+  take_battle_damage(amount, indirect = false) {
+    // Honour: only a direct attack hurts you.
+    if (indirect && this.talisman_bonus("direct_only") > 0) return;
     this.health -= amount;
     if (this.health <= 0) {
       const survive = this.meta_favour_chance + this.talisman_bonus("survive_lethal");
@@ -546,7 +560,7 @@ class Player {
   }
   _level_up() {
     this.level += 1;
-    this.stat_intimidation += 1; this.stat_strength += 1; this.stat_vigor += 1; this.stat_agility += 1; this.stat_might += 1;
+    this.stat_intimidation += 1; this.stat_strength += 1; this.stat_vigor += 1; this.stat_agility += 1; this.stat_might += 1; this.max_stamina = this.stamina_cap();
     if (this.meta_resilience_unlocked) this.stat_resilience += 1;
     if (this.meta_reflexes_unlocked) this.stat_reflexes += 1;
     if (this.meta_dexterity_unlocked) this.stat_dexterity += 1;

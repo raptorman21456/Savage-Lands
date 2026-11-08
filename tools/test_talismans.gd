@@ -9,13 +9,15 @@ extends SceneTree
 
 const KNOWN_KEYS := [
 	"damage_pct", "crit_chance", "crit_damage_mult_bonus", "low_hp_damage_pct", "low_hp_threshold",
-	"burn_chance", "burn_chance_multihit", "ember_burn", "double_secondary_chance", "first_attack_damage_pct",
-	"traitor_wolf_chance_pct", "wolf_recruit_chance_min", "wolf_slot", "wolf_stay_bonus",
+	"ember_burn", "double_secondary_chance", "first_attack_damage_pct",
+	"traitor_wolf_chance_pct", "wolf_recruit_chance_min",
+	# --- the doc's 2026-10-30 roster ---
+	"poison_chance", "random_status_chance", "direct_only", "damage_taken_pct", "status_turns_cut", "dot_heals", "heal_per_tile",
 	"material_passive_boost", "survive_lethal",
-	"fall_reduction", "ignore_ledge_attack", "water_push_prompt", "ally_defense_pct", "taunt_confusion",
-	"hp_regen_turn", "hp_regen_per_20_max_hp", "heal_pct", "heal_on_kill", "stamina_regen",
+	"fall_reduction", "ignore_ledge_attack", "water_push_prompt", "taunt_confusion",
+	"hp_regen_turn", "hp_regen_per_20_max_hp", "heal_pct", "heal_on_kill",
 	"special_stamina_flat_reduction",
-	"coin_pct", "shop_discount", "coin_drop_chance", "attack_per_coin", "defense_per_coin", "xp_pct",
+	"coin_pct", "shop_discount", "coin_drop_chance", "damage_pct_per_coin", "reduction_per_coin", "xp_pct",
 	"move_speed_pct", "reveal_all_locations", "gambling_luck", "phoenix", "fishing_luck",
 	"arrow_unlimited", "arrow_price_pct",
 	# --- Wildcard ---
@@ -61,6 +63,12 @@ func _wear(player, ids: Array) -> void:
 	player._on_talismans_changed()
 
 func _init() -> void:
+	# These checks predate the doc's flat weapon Strength (Club +2, Spear +4 per quality tier...), which has its own test
+	# (test_weapon_stat_bonuses.gd): here weapons add nothing, so every damage figure below stays as it was.
+	var _stat_weapons = load("res://scripts/Weapons.gd")
+	_stat_weapons.CLUB["str_bonus"] = 0
+	for _stat_base in _stat_weapons.UPGRADABLE_TYPES:
+		_stat_base["str_per_tier"] = 0
 	# Fixed seed: every random roll below repeats run to run, so a changed result
 	# is a real change, not luck.
 	seed(20260926)
@@ -125,9 +133,9 @@ func _init() -> void:
 
 	# --- Effects sum per key --------------------------------------------------------------
 	_reset(player)
-	_wear(player, ["ember_charm", "ember_charm"])
-	print("effects sum across worn talismans: burn_chance=%.2f burn_chance_multihit=%.2f (expected 0.20 0.04)" % [
-		player.talisman_bonus("burn_chance"), player.talisman_bonus("burn_chance_multihit")
+	_wear(player, ["rusted_edge", "rusted_edge"])
+	print("effects sum across worn talismans: poison_chance=%.2f ember_burn=%.2f (expected 0.20 0.00)" % [
+		player.talisman_bonus("poison_chance"), player.talisman_bonus("ember_burn")
 	])
 	_reset(player)
 	print("nothing worn -> every bonus is 0: %s (expected true)" % [KNOWN_KEYS.all(func(k): return player.talisman_bonus(k) == 0.0)])
@@ -138,7 +146,7 @@ func _init() -> void:
 	var base_stamina: int = player.max_stamina
 	_wear(player, ["swift_feather"])
 	# Nothing in the current catalog carries max_hp or max_stamina any more
-	# (Turtle Shell and Deep Lung Charm moved off them in the Defense/Sustain
+	# (Turtle Shell and Protein Bars moved off them in the Defense/Sustain
 	# reworks) -- poked directly into the cache so the underlying mechanism
 	# (Player._recalc_stats/_on_talismans_changed reading
 	# talisman_bonus("max_hp")/("max_stamina")) still has real regression
@@ -148,7 +156,7 @@ func _init() -> void:
 	player._talisman_cache["max_hp"] = 5
 	player._recalc_stats()
 	print("a max_hp bonus applies (no catalog talisman grants one right now): %d (expected %d)" % [player.max_health, base_hp + 5])
-	print("Swift Feather +35%% move speed: %.1f (expected %.1f)" % [player.move_speed, base_speed * 1.35])
+	print("Scroll of the Swift +35%% move speed: %.1f (expected %.1f)" % [player.move_speed, base_speed * 1.35])
 	# max_stamina isn't touched by _recalc_stats -- it's applied separately in
 	# _on_talismans_changed (Player.gd:841), which also rebuilds the cache
 	# from scratch first, wiping a poke like max_hp's above before it could be
@@ -173,7 +181,7 @@ func _init() -> void:
 	player.coins = 0
 	_wear(player, ["merchants_coin"])
 	player.add_coins(100)
-	print("Merchant's Coin: +10%% coins: %d (expected 110)" % [player.coins])
+	print("Metal Detector: +10%% coins: %d (expected 110)" % [player.coins])
 	_reset(player)
 	var potion: Dictionary = load("res://scripts/Potions.gd").get_tier("potion_health")
 	var full_price: int = player.get_potion_price(potion)
@@ -187,13 +195,13 @@ func _init() -> void:
 	print("...and without it nothing changes: x%.1f (expected x1.0), %.2f (expected 0.30)" % [player.secondary_chance_mult(), main._proc(0.3)])
 	_reset(player)
 	_wear(player, ["gilded_scarab"])
-	player.coins = 100
-	print("Gilded Scarab: scales with coins held: attack_bonus=%.2f (expected 12.50), defense_bonus=%.2f (expected 10.00)" % [
-		player.coin_scaled_attack_bonus(), player.coin_scaled_defense_bonus()
+	player.coins = 1000
+	print("Gilded Scarab: scales with coins held: damage x%.2f (expected x1.30), reduction %.2f (expected 0.10)" % [
+		player.coin_damage_mult(), player.coin_reduction()
 	])
 	player.equipped_armor = load("res://scripts/Armor.gd").TIERS[0]
 	player.equipped_clothing = {"head": "", "body": "", "feet": ""}
-	print("...folded into armor_damage_reduction: %.2f (expected 10.00)" % [player.armor_damage_reduction()])
+	print("...and it is not folded into the armour's points: %.2f (expected 0.00)" % [player.armor_damage_reduction()])
 	main.in_battle = true
 	main.battle_terrain.clear()
 	main.battle_allies = []
@@ -205,11 +213,11 @@ func _init() -> void:
 	player.equipped_shield = {}
 	player.potion_resilience_turns = 0
 	main.battle_player_defending = false
-	print("...through the real damage path, still short of the 80%% ceiling: 100 -> %d (expected 25, 1000 points)" % [main._apply_incoming_reductions(100, {})])
+	print("...through the real damage path it turns a tenth of a blow aside: 100 -> %d (expected 90)" % [main._apply_incoming_reductions(100, {})])
 
 	# The attack side lands through the real damage formula too -- and only
 	# for the player's own hits, not an ally's.
-	player.coins = 80
+	player.coins = 1000
 	player.berserk_turns_remaining = 0
 	main.battle_turn = "player"
 	player.current_weapon = weapons.CLUB
@@ -221,7 +229,7 @@ func _init() -> void:
 	var scarab_target := _make_goblin(main, Vector2i(3, 2))
 	main.battle_units = [scarab_target]
 	main._battle_player_fight()
-	print("Gilded Scarab: attack power scales into a real hit: dealt=%d (expected %d)" % [999 - scarab_target.hp, 20])
+	print("Gilded Scarab: damage scales into a real hit: dealt=%d (expected %d)" % [999 - scarab_target.hp, 13])
 	var scarab_ally_target := _make_goblin(main, Vector2i(3, 2))
 	main.battle_units = [scarab_ally_target]
 	main._apply_single_hit(0, 1.0, "", {"damage_mult": 1.0}, "Your Wolf", Vector2i(2, 2))
@@ -259,7 +267,7 @@ func _init() -> void:
 	player.xp_to_next = 100000
 	_wear(player, ["scholars_quill"])
 	player.gain_xp(100)
-	print("Scholar's Quill: +30%% xp: %d (expected 130)" % [player.xp])
+	print("Scholar's Quill: +50%% xp: %d (expected 150)" % [player.xp])
 	_reset(player)
 
 	# --- Healing -------------------------------------------------------------------------------------
@@ -269,7 +277,7 @@ func _init() -> void:
 	player.health = 1
 	player.add_potion("potion_health")
 	var result: Dictionary = player.use_healing_item()
-	print("Healer's Knot: potions heal 25%% more: %d (expected 25)" % [result.get("healed", -1)])
+	print("Little Sprout: potions heal 25%% more: %d (expected 108: (20 + a third of 200) x 1.25)" % [result.get("healed", -1)])
 	_reset(player)
 	player._recalc_stats()
 
@@ -323,11 +331,11 @@ func _init() -> void:
 	main.in_battle = false
 	_reset(player)
 
-	# Cliffwalker's Bead: no fall damage at all, and any weapon can now
+	# Cliffwalker's Beadstring: no fall damage at all, and any weapon can now
 	# attack up a ledge/cliff drop.
 	print("no talisman: the old default fall factor is 1.00 (no reduction): %.2f (expected 1.00)" % [player.fall_damage_factor()])
 	_wear(player, ["cliffwalkers_bead"])
-	print("Cliffwalker's Bead: immune to fall damage: %.2f (expected 0.00)" % [player.fall_damage_factor()])
+	print("Cliffwalker's Beadstring: immune to fall damage: %.2f (expected 0.00)" % [player.fall_damage_factor()])
 	main.battle_terrain.clear()
 	# diff (target - attacker) must equal -dir for the ledge gate to trigger --
 	# (1, 0) == -(-1, 0), i.e. attacking up from directly below the drop.
@@ -346,7 +354,7 @@ func _init() -> void:
 	main.battle_terrain.clear()
 	_reset(player)
 
-	# Guardian Knot: allies take less damage -- their only reduction source.
+	# BFF Bracelet: allies take less damage -- their only reduction source.
 	main.in_battle = true
 	main.battle_player_tile = Vector2i(0, 0)
 	var ally := {"tile": Vector2i(5, 5), "hp": 200, "max_hp": 200, "name": "Ally", "dmg_mult": 1.0, "move_range": 2, "attack_range": 1}
@@ -355,9 +363,9 @@ func _init() -> void:
 	main._enemy_apply_damage({"ref": null, "tile": Vector2i(5, 6)}, Vector2i(5, 5), 100, {})
 	print("no talisman: an ally takes the raw hit: hp=%d (expected 100)" % [ally.hp])
 	ally.hp = 200
-	_wear(player, ["guardian_knot"])
+	ally["mods"] = {"damage_taken_pct": -0.33}
 	main._enemy_apply_damage({"ref": null, "tile": Vector2i(5, 6)}, Vector2i(5, 5), 100, {})
-	print("Guardian Knot: allies gain 40 Defense, so a 100 hit does 68: hp=%d (expected 132)" % [ally.hp])
+	print("BFF Bracelet worn by the ally: 33%% less, so a 100 hit does 67: hp=%d (expected 133)" % [ally.hp])
 	main.battle_allies = []
 	_reset(player)
 
@@ -464,7 +472,7 @@ func _init() -> void:
 	# usual 200%) and are 5% more likely.
 	_reset(player)
 	player.meta_crit_chance = 0.0
-	print("no talisman: crit multiplier is the usual 2.0x: %.2f (expected 2.00)" % [player.crit_damage_mult()])
+	print("no talisman: crit multiplier is the usual 2.5x: %.2f (expected 2.50)" % [player.crit_damage_mult()])
 	_wear(player, ["duelists_coin"])
 	print("Duelist's Coin: -15%% damage_pct, +5%% crit chance, crit multiplier 3.0x: %.2f %.2f %.2f (expected -0.15 0.05 3.00)" % [
 		player.talisman_bonus("damage_pct"), player.crit_chance_total(), player.crit_damage_mult()
@@ -493,7 +501,7 @@ func _init() -> void:
 	main.in_battle = false
 	_reset(player)
 
-	# Whetstone Pendant: the first hit of the battle (player OR ally) hits 50%
+	# Whetstone: the first hit of the battle (player OR ally) hits 50%
 	# harder; every hit after that is unaffected.
 	main.in_battle = true
 	main.battle_terrain.clear()
@@ -505,25 +513,25 @@ func _init() -> void:
 	var first_target := _make_goblin(main, Vector2i(3, 2))
 	main.battle_units = [first_target]
 	main._battle_player_fight()
-	print("Whetstone Pendant: the battle's first hit deals +50%%: dealt=%d (expected 15), flag_consumed=%s (expected true)" % [999 - first_target.hp, main.battle_first_attack_used])
+	print("Whetstone: the battle's first hit deals +50%%: dealt=%d (expected 15), flag_consumed=%s (expected true)" % [999 - first_target.hp, main.battle_first_attack_used])
 	var second_target := _make_goblin(main, Vector2i(3, 2))
 	main.battle_units = [second_target]
 	main._battle_player_fight()
 	print("...but the second hit of the same battle doesn't: dealt=%d (expected 10)" % [999 - second_target.hp])
-	# It's genuinely "whichever comes first" -- an ally's hit consumes it too.
+	# It belongs to whoever wears it: an ally's hit neither gets the bonus nor uses up the hero's first hit.
 	main.battle_first_attack_used = false
 	var ally_target := _make_goblin(main, Vector2i(3, 2))
 	main.battle_units = [ally_target]
 	main._apply_single_hit(0, 1.0, "", {"damage_mult": 1.0}, "Your Wolf", Vector2i(2, 2))
-	print("...an ally's hit can consume it just as well: dealt=%d (expected 15, +50%%), flag_consumed=%s (expected true)" % [999 - ally_target.hp, main.battle_first_attack_used])
+	print("...an ally's hit gets nothing and leaves the hero's first hit alone: dealt=%d (expected 10), flag_consumed=%s (expected false)" % [999 - ally_target.hp, main.battle_first_attack_used])
 	main.in_battle = false
 	_reset(player)
 
-	# Berserker's Knot: a much bigger low-HP bonus at a tighter (riskier)
+	# Berserk Brace: a much bigger low-HP bonus at a tighter (riskier)
 	# threshold than the skill tree's own 30%.
 	print("no talisman: the default low-HP threshold is 30%%: %.2f (expected 0.30)" % [player.low_hp_threshold()])
 	_wear(player, ["berserkers_knot"])
-	print("Berserker's Knot: +100%% damage, threshold tightened to 20%%: %.2f %.2f (expected 1.00 0.20)" % [player.low_hp_damage_bonus_total(), player.low_hp_threshold()])
+	print("Berserk Brace: +100%% damage, threshold tightened to 20%%: %.2f %.2f (expected 1.00 0.20)" % [player.low_hp_damage_bonus_total(), player.low_hp_threshold()])
 	main.in_battle = true
 	main.battle_terrain.clear()
 	main.battle_allies = []
@@ -544,7 +552,7 @@ func _init() -> void:
 	main.in_battle = false
 	_reset(player)
 
-	# Ember Charm: a chance per landed hit to set the target alight, much
+	# Pyrogenesis Organ: a chance per landed hit to set the target alight, much
 	# smaller on multi-hit actions so a 5-10-hit flurry doesn't near-guarantee
 	# a burn. _talisman_cache is poked directly to drive the roll to 100%/0%,
 	# rather than relying on the real (much smaller) rolled odds -- the actual
@@ -560,7 +568,7 @@ func _init() -> void:
 	var burn_target := _make_goblin(main, Vector2i(3, 2))
 	main.battle_units = [burn_target]
 	main._apply_single_hit(0, 1.0, "", weapons.CLUB, "You", Vector2i(-1, -1), -1, false)
-	print("Ember Charm: a single hit can set the target on fire: %s (expected true)" % [burn_target.get("burning", false)])
+	print("Pyrogenesis Organ: a single hit can set the target on fire: %s (expected true)" % [burn_target.get("burning", false)])
 	var multihit_target := _make_goblin(main, Vector2i(3, 2))
 	main.battle_units = [multihit_target]
 	main._apply_single_hit(0, 1.0, "", weapons.CLUB, "You", Vector2i(-1, -1), -1, true)
@@ -571,13 +579,13 @@ func _init() -> void:
 	main.battle_units = [no_charm_target]
 	main._apply_single_hit(0, 1.0, "", weapons.CLUB, "You", Vector2i(-1, -1), -1, false)
 	print("with the charm off, hits don't ignite: %s (expected false)" % [no_charm_target.get("burning", false)])
-	# An ally's hit never carries the player's own Ember Charm, even primed.
+	# An ally's hit never carries the player's own Pyrogenesis Organ, even primed.
 	player._talisman_cache["burn_chance"] = 1.0
 	var ember_ally_target := _make_goblin(main, Vector2i(3, 2))
 	main.battle_units = [ember_ally_target]
 	main._apply_single_hit(0, 1.0, "", {"damage_mult": 1.0}, "Your Wolf", Vector2i(2, 2))
-	print("an ally's hit doesn't ignite from the player's own Ember Charm: %s (expected false)" % [ember_ally_target.get("burning", false)])
-	# Ember Charm's own fire: (5 + attack/5) on the first tick, then x0.7 per
+	print("an ally's hit doesn't ignite from the player's own Pyrogenesis Organ: %s (expected false)" % [ember_ally_target.get("burning", false)])
+	# Pyrogenesis Organ's own fire: (5 + attack/5) on the first tick, then x0.7 per
 	# turn rounded up, until what's left is under 1. Attack 20 -> 9, 7, 5, 4,
 	# 3, 2, 2 (6.3, 4.41, 3.09, 2.16, 1.51, 1.06 left, then 0.74 puts it out).
 	player.attack_damage = 20
@@ -590,7 +598,7 @@ func _init() -> void:
 	while ember_target.get("burning", false) and ember_ticks.size() < 20:
 		ember_ticks.append(main._burn_tick_damage(ember_target))
 		main._decay_ember_burn(ember_target)
-	print("Ember Charm's fire: ticks %s (expected [9, 7, 5, 4, 3, 2, 2]), burned out: %s (expected true)" % [str(ember_ticks), not ember_target.get("burning", false)])
+	print("Pyrogenesis Organ's fire: ticks %s (expected [9, 7, 5, 4, 3, 2, 2]), burned out: %s (expected true)" % [str(ember_ticks), not ember_target.get("burning", false)])
 	player._talisman_cache["ember_burn"] = 0.0
 	var legacy_target := _make_goblin(main, Vector2i(3, 2), 300)
 	legacy_target.burning = true
@@ -619,24 +627,24 @@ func _init() -> void:
 	print("Bloodstone: +3 HP on a kill: %d (expected 13)" % [player.health])
 	_reset(player)
 
-	# Second Wind Whistle: +5 stamina at the start of every battle turn.
-	print("no talisman: no bonus turn-start stamina: %d (expected 0)" % [player.stamina_regen_per_turn()])
+	# Fitbit: 1 HP back for every tile moved (it used to be the Second Wind Whistle's +5 stamina a turn).
+	print("no talisman: no HP per tile: %d (expected 0)" % [int(player.talisman_bonus("heal_per_tile"))])
 	_wear(player, ["second_wind_whistle"])
-	print("Second Wind Whistle: +5 stamina per turn: %d (expected 5)" % [player.stamina_regen_per_turn()])
+	print("Fitbit: 1 HP per tile: %d (expected 1), and no bonus stamina any more: %d (expected 0)" % [int(player.talisman_bonus("heal_per_tile")), player.stamina_regen_per_turn()])
 	_reset(player)
 
-	# Moss Charm: 1 flat HP per turn, plus 1 more for every 20 max HP owned.
+	# Mossy Rock: 1 flat HP per turn, plus 1 more for every 20 max HP owned.
 	# (After _wear: equipping recalculates max HP from vigor, so max_health is
 	# set AFTER wearing it, same as Bloodstone's own health override above.)
 	print("no talisman: no turn-start healing: %d (expected 0)" % [player.hp_regen_per_turn()])
 	_wear(player, ["moss_charm"])
 	player.max_health = 100
-	print("Moss Charm at 100 max HP: 1 flat + 1 per 20 max HP (100/20=5): %d (expected 6)" % [player.hp_regen_per_turn()])
+	print("Mossy Rock at 100 max HP: 1 flat + 1 per 20 max HP (100/20=5): %d (expected 6)" % [player.hp_regen_per_turn()])
 	player.max_health = 239
 	print("...rounds the scaling part down, not up (239/20=11.95 -> 11): %d (expected 12)" % [player.hp_regen_per_turn()])
 	_reset(player)
 
-	# Deep Lung Charm: -5 stamina cost on every weapon special, stamped at
+	# Protein Bars: -5 stamina cost on every weapon special, stamped at
 	# equip time -- the same mechanism the Reserved special_stamina_discount
 	# key already used, just additive instead of percentage (see
 	# Player.gd:_apply_talisman_to_weapon).
@@ -644,37 +652,40 @@ func _init() -> void:
 	player.try_buy_weapon(weapons.SPEAR)
 	var base_special_cost: int = player.current_weapon.specials[0].stamina_cost
 	_wear(player, ["deep_lung_charm"])
-	print("Deep Lung Charm: -5 stamina cost on every special: %d (expected %d)" % [player.current_weapon.specials[0].stamina_cost, base_special_cost - 5])
+	print("Protein Bars: -5 stamina cost on every special: %d (expected %d)" % [player.current_weapon.specials[0].stamina_cost, base_special_cost - 5])
 	_reset(player)
 	print("...and unequipping restores the normal cost: %d (expected %d)" % [player.current_weapon.specials[0].stamina_cost, base_special_cost])
 
-	# --- Survival: Phoenix Ash, once per run ---------------------------------------------------------------
+	# --- Survival: Phoenix Ash, spent when it saves you ---------------------------------------------------------------
 	player.max_health = 100
 	player.health = 5
+	player.max_stamina = 100
+	player.stamina = 10
 	player.phoenix_used = false
 	player.meta_favour_chance = 0.0
 	_wear(player, ["phoenix_ash"])
 	player.take_battle_damage(999)
-	print("Phoenix Ash: a killing blow leaves 1 HP: health=%d (expected 1), used=%s (expected true)" % [player.health, player.phoenix_used])
+	print("Phoenix Ash: a killing blow leaves full HP and stamina: health=%d (expected %d, the full max), stamina=%d (expected 100), used=%s (expected true)" % [player.health, player.max_health, player.stamina, player.phoenix_used])
+	print("...and the ash is spent: still owned=%s (expected false), worn=%s (expected [])" % [player.owned_talismans.has("phoenix_ash"), player.equipped_talismans])
 	var died := [false]
 	player.died.connect(func(): died[0] = true)
 	player.health = 5
 	player.take_battle_damage(999)
-	print("...but only once a run: died=%s (expected true)" % [died[0]])
+	print("...so the next killing blow kills: died=%s (expected true)" % [died[0]])
 	_reset(player)
 	player.phoenix_used = false
 	player.health = 5
 	player.take_battle_damage(999)
 	print("without the charm a killing blow kills: health=%d (expected 0)" % [player.health])
-	# Iron Will Band shares the once-per-battle Favour chance.
+	# Iron Will Ring shares the once-per-battle Favour chance.
 	player.health = 50
 	player.max_health = 100
 	player.second_chance_used_this_battle = false
 	_wear(player, ["iron_will_band"])
-	print("Iron Will Band adds a survive-lethal chance: %.2f (expected 0.10)" % [player.talisman_bonus("survive_lethal")])
+	print("Iron Will Ring adds a survive-lethal chance: %.2f (expected 0.25)" % [player.talisman_bonus("survive_lethal")])
 	_reset(player)
 
-	# Pathfinder's Compass: a venue only shows on the Map tab once the player
+	# Compass: a venue only shows on the Map tab once the player
 	# has actually reached its door (Main.gd:_try_open_panel stamps
 	# discovered_locations), unless the talisman reveals everything up front.
 	# main.game_over is still true from the Phoenix Ash deaths above, so
@@ -689,7 +700,7 @@ func _init() -> void:
 	player.discovered_locations.clear()
 	print("no talisman: reveal_all_locations reads 0: %.2f (expected 0.00)" % [player.talisman_bonus("reveal_all_locations")])
 	_wear(player, ["pathfinders_compass"])
-	print("Pathfinder's Compass: reveal_all_locations is active: %.2f (expected 1.00)" % [player.talisman_bonus("reveal_all_locations")])
+	print("Compass: reveal_all_locations is active: %.2f (expected 1.00)" % [player.talisman_bonus("reveal_all_locations")])
 	_reset(player)
 
 	# --- Wildcard talismans: extreme, build-defining trade-offs -------------------------------------------------
@@ -697,12 +708,12 @@ func _init() -> void:
 	_reset(player)
 	var base_max_hp: int = player.max_health
 	_wear(player, ["glass_cannon_charm"])
-	print("Glass Cannon Charm: -50%% max HP: %d (expected %d), +75%% damage_pct: %.2f (expected 0.75)" % [
+	print("Glass Cannon: -50%% max HP: %d (expected %d), +75%% damage_pct: %.2f (expected 0.75)" % [
 		player.max_health, int(round(base_max_hp * 0.5)), player.talisman_bonus("damage_pct")
 	])
 	_reset(player)
 
-	# Vampire's Pact: 25% lifesteal on landed hits; potions/food disabled.
+	# Bat Fang: 25% lifesteal on landed hits; potions/food disabled.
 	main.in_battle = true
 	main.battle_terrain.clear()
 	main.battle_allies = []
@@ -715,10 +726,13 @@ func _init() -> void:
 	var pact_target := {"ref": null, "tile": Vector2i(3, 2), "hp": 999, "max_hp": 999, "move_range": 2, "damage": 0, "name": "Goblin"}
 	main.battle_units = [pact_target]
 	main._apply_single_hit(0, 1.0, "", weapons.CLUB, "You", Vector2i(-1, -1), 20, false)
-	print("Vampire's Pact: heals 25%% of damage dealt: health=%d (expected %d)" % [player.health, 55])
+	print("Bat Fang: heals 25%% of damage dealt: health=%d (expected %d)" % [player.health, 55])
 	player.add_potion("potion_health")
 	var pact_result: Dictionary = player.use_healing_item()
 	print("...and potions/food no longer work at all: %s (expected true, empty result)" % [pact_result.is_empty()])
+	player.health = 50
+	player.heal(20)
+	print("...nor does any other healing: health=%d (expected 50), but a blow that lands may still drink: %d (expected 60)" % [player.health, (func(): player.heal(10, true); return player.health).call()])
 	main.in_battle = false
 	_reset(player)
 
@@ -748,7 +762,7 @@ func _init() -> void:
 	main.in_battle = false
 	_reset(player)
 
-	# Whirlwind Charm: melee regular Attacks land twice, all damage cut to 40%.
+	# Double-Blade Technique: melee regular Attacks land twice, all damage cut to 40%.
 	# current_weapon is set AFTER _wear -- _wear's _on_talismans_changed calls
 	# _equip_weapon(current_weapon_base) internally, which would otherwise
 	# silently re-equip whatever weapon was owned before this block (Deep
@@ -764,7 +778,7 @@ func _init() -> void:
 	var whirl_target := _make_goblin(main, Vector2i(3, 2))
 	main.battle_units = [whirl_target]
 	main._battle_player_fight()
-	print("Whirlwind Charm: a melee Attack lands twice at 40%% damage each: dealt=%d (expected %d)" % [999 - whirl_target.hp, 2 * int(round(10 * 0.4))])
+	print("Double-Blade Technique: a melee Attack lands twice at 40%% damage each: dealt=%d (expected %d)" % [999 - whirl_target.hp, 2 * int(round(10 * 0.4))])
 	var spear_weapon: Dictionary = weapons.SPEAR.duplicate(true)
 	player.current_weapon = spear_weapon
 	var whirl_spear_target := _make_goblin(main, Vector2i(3, 2))
@@ -790,7 +804,7 @@ func _init() -> void:
 	player.weapon_whisperer_specials = []
 	_reset(player)
 
-	# Chaos Shard: every hit's damage rerolled to 50%-160% of normal.
+	# Chaos Shard: every hit's damage rerolled to 90%-125% of normal.
 	main.in_battle = true
 	player.current_weapon = weapons.CLUB
 	_wear(player, ["chaos_shard"])
@@ -804,7 +818,7 @@ func _init() -> void:
 		var chaos_dealt: int = chaos_before - chaos_target.hp
 		chaos_min = mini(chaos_min, chaos_dealt)
 		chaos_max = maxi(chaos_max, chaos_dealt)
-	print("Chaos Shard: damage varies between 50%% and 160%% of normal over 200 trials: min=%d max=%d (expected roughly 50-60 and 150-160)" % [chaos_min, chaos_max])
+	print("Chaos Shard: damage varies between 90%% and 125%% of normal over 200 trials: min=%d max=%d (expected roughly 90-95 and 120-125)" % [chaos_min, chaos_max])
 	main.in_battle = false
 	_reset(player)
 
@@ -830,7 +844,7 @@ func _init() -> void:
 	player.stat_vigor = 100
 	player._recalc_stats()
 
-	# Bloodmoon Fang: every landed hit stacks +5% damage/+7.5% move speed each; 3 quiet
+	# Bloodthirsty Idol: every landed hit stacks +5% damage/+7.5% move speed each; 3 quiet
 	# turns crash it to -50% all combat stats.
 	main.in_battle = true
 	main.battle_player_tile = Vector2i(2, 2)
@@ -847,7 +861,7 @@ func _init() -> void:
 	main.battle_units = [bm_kill_target]
 	main._apply_single_hit(0, 1.0, "", weapons.CLUB, "You", Vector2i(-1, -1), 999, false)
 	player.berserk_turns_remaining = 0
-	print("Bloodmoon Fang: a landed hit stacks Bloodlust: stacks=%d (expected 1), move_speed reflects it: %.1f (expected %.1f)" % [
+	print("Bloodthirsty Idol: a landed hit stacks Bloodlust: stacks=%d (expected 1), move_speed reflects it: %.1f (expected %.1f)" % [
 		player.bloodmoon_stacks, player.move_speed, 100.0 * (1.0 + 0.075)
 	])
 	var bm_target := {"ref": null, "tile": Vector2i(3, 2), "hp": 999999, "max_hp": 999999, "move_range": 2, "damage": 0, "name": "Goblin"}
@@ -869,7 +883,7 @@ func _init() -> void:
 	player.stat_agility = 5
 	player._recalc_stats()
 
-	# Ironclad Ward: Move only works every other player turn; defense x2.5.
+	# Steelclad Band: Move only works every other player turn; defense x2.5.
 	main.in_battle = true
 	main.battle_turn = "player"
 	main.battle_menu_state = "main"
@@ -877,7 +891,7 @@ func _init() -> void:
 	_wear(player, ["ironclad_ward"])
 	main.battle_ironclad_move_allowed = false
 	main._on_battle_main_action("move")
-	print("Ironclad Ward: Move is refused on the off turn: menu_state=%s (expected main, not move)" % [main.battle_menu_state])
+	print("Steelclad Band: Move is refused on the off turn: menu_state=%s (expected main, not move)" % [main.battle_menu_state])
 	main.battle_ironclad_move_allowed = true
 	main._on_battle_main_action("move")
 	print("...but works on the next: menu_state=%s (expected move)" % [main.battle_menu_state])
@@ -1017,7 +1031,7 @@ func _init() -> void:
 	print("pressing it wears it: %s (expected [wolf_fang, stone_amulet])" % [player.equipped_talismans])
 	print("with the slots full the button says so: label=%s enabled=%s (expected No free slot, false)" % [InvData.talisman_action(player, null, InvData.talisman_entries(player).filter(func(e): return str(e.id) == "ember_charm")[0]).label, InvData.talisman_action(player, null, InvData.talisman_entries(player).filter(func(e): return str(e.id) == "ember_charm")[0]).enabled])
 	var unfound: Array = InvData.talisman_entries(player).filter(func(e): return not e.owned)
-	print("talismans you haven't found are listed as not owned (shown as black shapes): %d of %d (expected 43 of 46 with three owned)" % [unfound.size(), InvData.talisman_entries(player).size()])
+	print("talismans you haven't found are listed as not owned (shown as black shapes): %d of %d (expected %d of %d with three owned)" % [unfound.size(), InvData.talisman_entries(player).size(), load("res://scripts/Talismans.gd").ITEMS.size() - 3, load("res://scripts/Talismans.gd").ITEMS.size()])
 	panel.close()
 
 	quit()
