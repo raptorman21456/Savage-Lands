@@ -162,6 +162,7 @@ func _build_top() -> void:
 	_top_row.add_child(_snap_button)
 	_top_row.add_child(_btn("Rebuild room", func(): ed.rebuild_room()))
 	_top_row.add_child(_btn("Check map", func(): run_check()))
+	_top_row.add_child(_btn("Play here", func(): ed.play_here()))
 	_top_row.add_child(_btn("Help", func(): toggle_help()))
 	var grow := Control.new()
 	grow.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -420,12 +421,11 @@ func toast(text_in: String, bad: bool = false) -> void:
 # --- the help sheet -----------------------------------------------------------------------------------------------------------
 
 const HELP_LINES := [
-	["MOVING AROUND", ""],
+	["MOVING AROUND AND PICKING", ""],
 	["Arrow keys / W A S D", "move the view (hold Shift to go faster)"],
 	["Mouse wheel  or  + / -", "zoom in and out (only the editor's view)"],
 	["Drag the empty map  or  right / middle mouse", "or hold Space and drag over anything"],
 	["Home  /  F", "see the whole world  /  fit the picked room"],
-	["PICKING", ""],
 	["Click a room, or its square on the little map", "to pick it. The tabs on the right edit it."],
 	["EDITING", ""],
 	["Click a shape, tree row or set piece", "to select it; drag it to move it"],
@@ -436,9 +436,11 @@ const HELP_LINES := [
 	["Ctrl+D  Ctrl+Z  Ctrl+Y  Ctrl+S", "copy, undo, redo, save"],
 	["Esc", "cancel what you are drawing, or put the selection down"],
 	["G  /  R  /  Tab  /  M", "grid  /  rebuild room  /  hide panel  /  hide little map"],
-	["CHECKING AND SAVING", ""],
+	["CHECKING, SAVING AND PLAYING", ""],
 	["Check map", "finds rooms you cannot walk to and places stuck in walls"],
 	["Save writes res://data/*.json", "the old files are kept in data/backups. Nothing touches your saves."],
+	["Play here  or  P", "walk it yourself (P: from the mouse). Esc or P comes back."],
+	["While you play", "arrows / WASD walk, Shift runs. Unsaved edits show up."],
 ]
 
 func _build_help() -> void:
@@ -457,7 +459,7 @@ func _build_help() -> void:
 	box.grow_vertical = Control.GROW_DIRECTION_BOTH
 	_help.add_child(box)
 	var col := VBoxContainer.new()
-	col.add_theme_constant_override("separation", 2)
+	col.add_theme_constant_override("separation", 0)
 	box.add_child(col)
 	col.add_child(WidgetsScript.title("Map Editor help"))
 	for line in HELP_LINES:

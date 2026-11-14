@@ -19,6 +19,7 @@ const WorldScript := preload("res://scripts/MapEditorWorld.gd")
 const UIScript := preload("res://scripts/MapEditorUI.gd")
 const OverlayScript := preload("res://scripts/MapEditorOverlay.gd")
 const OverworldMapScript := preload("res://scripts/OverworldMap.gd")
+const PlayScript := preload("res://scripts/MapEditorPlay.gd")
 
 const TABS := ["room", "floor", "decor", "props", "doors", "world"]
 const TAB_NAMES := {"room": "Room", "floor": "Floor", "decor": "Decor", "props": "Props", "doors": "Doors", "world": "World"}
@@ -30,12 +31,14 @@ const SNAPS := [0.0, 10.0, 20.0, 40.0, 80.0, 160.0]
 const PAN_SPEED := 760.0                   # screen px per second
 const HANDLE_PX := 11.0                    # how close (screen px) the mouse must be to grab a handle
 # Who can live in a room (the keys of Main.REGION_ENEMY_SCRIPTS) and which minibosses a region can have (Main.MINIBOSS_SCRIPTS).
-const ENEMY_KEYS := ["goblin", "orc", "archer", "brute", "shade", "wolf", "centaur_pack", "fae_hut", "gnome_pack"]
+const ENEMY_KEYS := ["goblin", "orc", "archer", "brute", "shade", "wolf", "centaur_pack", "fae_hut", "gnome_pack", "shadelet", "disgraced_mage", "fire_mage", "hermoid", "earth_mage", "gale_mage", "treant", "voidwing", "empowered_mage"]
 const ENEMY_NAMES := {"goblin": "Goblin", "orc": "Orc", "archer": "Archer", "brute": "Brute", "shade": "Shade", "wolf": "Wolf",
-	"centaur_pack": "Centaur pack", "fae_hut": "Fae hut", "gnome_pack": "Gnome pack"}
-const MINIBOSS_KEYS := ["", "treant", "black_dragonlet", "iron_construct", "lava_construct", "voidwing"]
-const MINIBOSS_NAMES := {"": "None", "treant": "Treant", "black_dragonlet": "Black dragonlet", "iron_construct": "Iron construct",
-	"lava_construct": "Lava construct", "voidwing": "Voidwing"}
+	"centaur_pack": "Centaur pack", "fae_hut": "Fae hut", "gnome_pack": "Gnome pack",
+	"shadelet": "Shadelet", "disgraced_mage": "Disgraced Mage", "fire_mage": "Fire Mage", "hermoid": "Hermoid", "earth_mage": "Earth Mage", "gale_mage": "Gale Mage", "treant": "Treant", "voidwing": "Voidwing", "empowered_mage": "Empowered Mage"}
+const MINIBOSS_KEYS := ["", "black_dragonlet", "iron_construct", "lava_construct", "voidwing_swarm", "water_construct", "stone_construct", "frost_construct", "wyrm_hole"]
+const MINIBOSS_NAMES := {"": "None", "black_dragonlet": "Black dragonlet", "iron_construct": "Steel construct",
+	"lava_construct": "Magma construct", "voidwing_swarm": "Voidwing swarm",
+	"water_construct": "Water construct", "stone_construct": "Stone construct", "frost_construct": "Frost construct", "wyrm_hole": "Wyrm-Hole"}
 const ROAD_STYLES := ["", "boards", "ash", "snow", "sand", "crystal"]
 const ROAD_STYLE_NAMES := {"": "Dirt", "boards": "Boards", "ash": "Ash", "snow": "Snow", "sand": "Sand", "crystal": "Crystal"}
 # Landmarks the game's code puts at fixed spots (the town in the middle, where you wake, Pesca's houses and docks), so they cannot be
@@ -57,6 +60,7 @@ var world                                # MapEditorWorld
 var camera: Camera2D
 var ui                                   # MapEditorUI
 var overlay                              # MapEditorOverlay
+var play                                 # MapEditorPlay: the walker for Play here
 var cam_pos := Vector2(16800, 11900)
 var zoom := 0.05
 var view_changed := true
@@ -95,6 +99,10 @@ func _ready() -> void:
 	add_child(ui)
 	ui.setup(self)
 	overlay = ui.overlay
+	play = PlayScript.new()
+	play.name = "Play"
+	add_child(play)
+	play.setup(self)
 	# open on the room you wake in, close enough to see the real thing (Home, or a click on the little map, goes anywhere else)
 	pick_at(WorldMapScript.spawn_position())
 	focus_room()
@@ -339,6 +347,8 @@ func zoom_by(factor: float, around_screen: Vector2) -> void:
 func _process(delta: float) -> void:
 	if camera == null:
 		return
+	if play != null and play.active:
+		return                      # Play here: the walker moves the camera
 	var dir := Vector2.ZERO
 	if not _typing():
 		if Input.is_key_pressed(KEY_LEFT) or Input.is_key_pressed(KEY_A):
@@ -959,6 +969,12 @@ func check_map() -> Array:
 func _unhandled_input(event: InputEvent) -> void:
 	if camera == null:
 		return
+	if play != null and play.active:
+		# while you play, the walker reads the keyboard itself; only P and Esc do anything here (they come back to the editor)
+		if event is InputEventKey and event.pressed and not event.echo and (event.keycode == KEY_P or event.keycode == KEY_ESCAPE):
+			play.stop()
+			get_viewport().set_input_as_handled()
+		return
 	if event is InputEventMouseButton:
 		_on_mouse_button(event)
 	elif event is InputEventMouseMotion:
@@ -1083,6 +1099,9 @@ func _on_key(event: InputEventKey) -> void:
 			focus_world()
 		KEY_F:
 			focus_room()
+		KEY_P:
+			if not ctrl:
+				play_here(_mouse_start())
 		KEY_G:
 			grid_on = not grid_on
 			ui.refresh_top()
@@ -1101,6 +1120,23 @@ func _on_key(event: InputEventKey) -> void:
 			zoom_by(1.25, viewport_size() * 0.5)
 		KEY_MINUS, KEY_KP_SUBTRACT:
 			zoom_by(0.8, viewport_size() * 0.5)
+
+# PLAY HERE: walk the map yourself (see MapEditorPlay.gd). `at` is where to start (Vector2.INF = the picked room, or what you are looking at);
+# calling it while you are playing comes back to the editor instead.
+func play_here(at: Vector2 = Vector2.INF) -> void:
+	if play == null:
+		return
+	if play.active:
+		play.stop()
+	else:
+		play.start(at)
+
+# With P, the walker starts where the mouse is when it is over the map (not over the panel or the top bar).
+func _mouse_start() -> Vector2:
+	if ui == null or DisplayServer.get_name() == "headless":
+		return Vector2.INF
+	var m: Vector2 = get_viewport().get_mouse_position()
+	return s2w(m) if ui.free_area().has_point(m) else Vector2.INF
 
 func cycle_snap() -> void:
 	var i := SNAPS.find(snap_step)
