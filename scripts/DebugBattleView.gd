@@ -101,10 +101,15 @@ func _right_column() -> void:
 	var lose: PixelButton = k.button("Lose now", func(): menu.confirm("End the run? You fall at once and the game-over screen follows.", func(): act(DebugBattleScript.lose_now(main))), false, "", "You fall: the game-over screen.")
 	var heal: PixelButton = k.button("Heal everyone", func(): act(DebugBattleScript.heal_everyone(main)))
 	var refill: PixelButton = k.button("Refill my turn", func(): act(DebugBattleScript.refill_turn(main)), false, "", "Full movement and stamina again.")
-	for b in [win, lose, refill]:
+	var end_turn: PixelButton = k.button("End my turn", func(): act(DebugBattleScript.end_my_turn(main)), false, "", "Passes your turn, as if you had pressed End Turn.")
+	for b in [win, lose, refill, end_turn]:
 		k.set_enabled(b, fighting)
-	for b in [win, lose, heal, refill]:
+	for b in [win, lose, heal, refill, end_turn]:
 		ends.add_child(b)
+	k.section(col, "Fight cheats")
+	switch_row(col, "Always crit", player().debug_always_crit, func(v): return DebugBattleScript.set_always_crit(main, v), "Every hit you or your party lands is a critical hit.")
+	switch_row(col, "Enemies stand still", player().debug_enemies_pass, func(v): return DebugBattleScript.set_enemies_pass(main, v), "Enemies skip their turns (their statuses still tick).")
+	switch_row(col, "Never miss", DebugBattleScript.never_miss_on(main), func(v): return DebugBattleScript.set_never_miss(main, v), "Your attacks and your party's always land. Off puts the real miss chances back.")
 	if not fighting:
 		return
 	k.section(col, "Statuses")
@@ -152,16 +157,91 @@ func _right_column() -> void:
 	if not has.is_empty():
 		var names: Array = has.map(func(e): return "%s%s" % [str(e.name), (" (%s)" % str(e.detail)) if str(e.detail) != "" else ""])
 		k.note(col, "Now: %s" % ", ".join(names), PixelKit.CREAM)
-	if not main.battle_units.is_empty():
-		k.section(col, "Enemies")
-		for i in main.battle_units.size():
-			var idx: int = i
-			var u: Dictionary = main.battle_units[i]
-			var line := k.hbox(col, 6)
-			var label := PixelKit.label("%s  %d / %d HP" % [str(u.name), int(u.hp), int(u.max_hp)], "body", PixelKit.CREAM)
-			label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-			line.add_child(label)
-			line.add_child(k.button("Hurt it", func(): act(DebugBattleScript.set_enemy_hp(main, idx, 1)), false, "", "Takes it down to 1 HP."))
-			line.add_child(k.button("Kill it", func(): act(DebugBattleScript.kill_enemy(main, idx))))
+	k.section(col, "Your turn")
+	num(col, "Tiles left to walk", int(main.battle_player_moves_left), func(v): return DebugBattleScript.set_moves_left(main, v), {"min": 0, "max": 30, "steps": [1], "label_w": 190})
+	num(col, "Kills towards Berserk", int(player().berserk_kills), func(v): return DebugBattleScript.set_berserk_kills(main, v), {"min": 0, "max": 50, "steps": [1], "label_w": 190},
+		"The kills counted towards your next Berserk (it starts on the 5th).")
+	num(col, "Momentum stacks", int(main.battle_momentum_stacks), func(v): return DebugBattleScript.set_momentum(main, v), {"min": 0, "max": 50, "steps": [1], "label_w": 190})
+	# everyone's HP: type a number and press Enter; Edit opens everything about that unit in the Inspector
+	k.section(col, "Everyone's HP")
+	_unit_line(col, "You  %d / %d HP" % [int(player().health), int(player().max_health)], "hero", int(player().health), "player", "")
+	for ai in main.battle_allies.size():
+		var ally: Dictionary = main.battle_allies[ai]
+		_unit_line(col, "%s  %d / %d HP" % [str(ally.get("name", "Ally")), int(ally.hp), int(ally.max_hp)], "ally:%d" % ai, int(ally.hp), "ally:%d" % ai, "Down it", func(): act(DebugBattleScript.down_ally(main, ai)))
+	for di in main.battle_downed_allies.size():
+		var downed: Dictionary = main.battle_downed_allies[di]
+		var dline := k.hbox(col, 6)
+		var dlabel := PixelKit.label("%s  (down)" % str(downed.get("name", "Ally")), "body", PixelKit.DIM)
+		dlabel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		dlabel.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		dline.add_child(dlabel)
+		dline.add_child(k.button("Stand up", func(): act(DebugBattleScript.revive_ally(main, di))))
+	for i in main.battle_units.size():
+		var u: Dictionary = main.battle_units[i]
+		_unit_line(col, "%s  %d / %d HP" % [str(u.name), int(u.hp), int(u.max_hp)], "enemy:%d" % i, int(u.hp), "enemy:%d" % i, "Kill it", func(): act(DebugBattleScript.kill_enemy(main, i)))
+	# more of anything
+	var cfg: Dictionary = menu.state.enemy_cfg
+	k.section(col, "Add to the fight")
+	k.note(col, "The enemy, count, danger tier, level and strength on the left apply.")
+	var add := k.flow(col)
+	add.add_child(k.button("Add %d x %s" % [int(cfg.count), str(cfg.enemy)], func(): act(DebugBattleScript.add_enemy(main, str(cfg.enemy), int(cfg.count), int(cfg.tier), bool(cfg.elite), float(cfg.power), int(cfg.get("level", 0)))), true))
+	k.note(col, "A new party member (the party's size limit is raised if it must be):")
+	var allies_row := k.flow(col)
+	for member_kind in DebugActionsScript.member_kinds():
+		var kind_id: String = str(member_kind.kind)
+		allies_row.add_child(k.button(str(member_kind.name), func(): act(DebugBattleScript.add_ally(main, kind_id))))
+	_move_and_build(col, targets, target_id)
 	k.spacer(col, 12)
+
+# One row for a unit: what it is, a box to type its HP into, an optional second action (Kill it / Down it) and Edit (the Inspector).
+func _unit_line(col: VBoxContainer, text: String, hp_target: String, hp: int, inspect_id: String, action_text: String, action: Callable = Callable()) -> void:
+	var k := DebugKitScript
+	var line := k.hbox(col, 6)
+	var label := PixelKit.label(text, "body", PixelKit.CREAM)
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.clip_text = true
+	line.add_child(label)
+	var field := k.line_edit(str(hp), 70, "HP")
+	field.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	field.tooltip_text = "Type its HP and press Enter (1 up to its max)."
+	field.text_submitted.connect(func(t): act(DebugBattleScript.set_unit_hp(main, hp_target, t.to_int())))
+	line.add_child(field)
+	if action.is_valid():
+		line.add_child(k.button(action_text, action))
+	line.add_child(k.button("Edit", func(): menu.open_inspector(inspect_id), false, "", "Opens every variable of it in the Console tab's Inspector."))
+
+# Put a unit on a tile, and change the ground under the fight.
+func _move_and_build(col: VBoxContainer, targets: Array, target_id: String) -> void:
+	var k := DebugKitScript
+	if not bs.has("tx"):
+		bs["tx"] = 0
+		bs["ty"] = 0
+		bs["terrain"] = "rock"
+	k.section(col, "Move and build")
+	var single: bool = target_id == "hero" or target_id.begins_with("ally:") or target_id.begins_with("enemy:")
+	var who := "the one picked under Statuses (%s)" % target_id if single else "nobody: pick one unit under Statuses"
+	k.note(col, "Grid %d x %d, tiles counted from 0. Moves %s." % [main.BATTLE_GRID_W, main.BATTLE_GRID_H, who])
+	var set_tx := func(v):
+		bs["tx"] = v
+		return DebugActionsScript.ok("x = %d." % v)
+	var set_ty := func(v):
+		bs["ty"] = v
+		return DebugActionsScript.ok("y = %d." % v)
+	num(col, "Tile x", int(bs.tx), set_tx, {"min": 0, "max": main.BATTLE_GRID_W - 1, "steps": [1], "label_w": 190})
+	num(col, "Tile y", int(bs.ty), set_ty, {"min": 0, "max": main.BATTLE_GRID_H - 1, "steps": [1], "label_w": 190})
+	var move: PixelButton = k.button("Move them to (%d, %d)" % [int(bs.tx), int(bs.ty)], func(): act(DebugBattleScript.move_unit(main, target_id, int(bs.tx), int(bs.ty))), true)
+	k.set_enabled(move, single)
+	var move_row := k.flow(col)
+	move_row.add_child(move)
+	var terrain_options: Array = []
+	for t in DebugBattleScript.terrain_types(main):
+		terrain_options.append([str(t), str(t).capitalize().replace("_", " ")])
+	var terrain_row := k.row(col, "Ground", 90.0)
+	k.choice_row(terrain_row, terrain_options, str(bs.terrain), func(id):
+		bs["terrain"] = str(id)
+		refresh())
+	var ground := k.flow(col)
+	ground.add_child(k.button("Place it at (%d, %d)" % [int(bs.tx), int(bs.ty)], func(): act(DebugBattleScript.set_terrain(main, int(bs.tx), int(bs.ty), str(bs.terrain))), true))
+	ground.add_child(k.button("Clear that tile", func(): act(DebugBattleScript.clear_terrain(main, int(bs.tx), int(bs.ty)))))
+	ground.add_child(k.button("Clear all ground", func(): act(DebugBattleScript.clear_all_terrain(main))))

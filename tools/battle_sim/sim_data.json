@@ -398,14 +398,14 @@
 	},
 	"enemies": [
 		{
-			"contact_damage": 1,
+			"contact_damage": 2,
 			"max_health": 3,
 			"name": "Goblin",
 			"script": "Enemy",
 			"xp_reward": 15
 		},
 		{
-			"contact_damage": 2,
+			"contact_damage": 3,
 			"max_health": 20,
 			"name": "Orc",
 			"script": "Orc",
@@ -433,14 +433,14 @@
 			"xp_reward": 40
 		},
 		{
-			"contact_damage": 2,
+			"contact_damage": 3,
 			"max_health": 8,
 			"name": "Wolf",
 			"script": "Wolf",
 			"xp_reward": 20
 		},
 		{
-			"contact_damage": 2,
+			"contact_damage": 3,
 			"max_health": 8,
 			"name": "Traitor Wolf",
 			"script": "Wolf",
@@ -482,6 +482,90 @@
 			"xp_reward": 12
 		},
 		{
+			"contact_damage": 1,
+			"max_health": 2,
+			"name": "Shadelet",
+			"script": "Shadelet",
+			"xp_reward": 6
+		},
+		{
+			"contact_damage": 14,
+			"max_health": 3,
+			"name": "Disgraced Mage",
+			"script": "DisgracedMage",
+			"xp_reward": 70
+		},
+		{
+			"contact_damage": 4,
+			"max_health": 10,
+			"name": "Fire Mage",
+			"script": "FireMage",
+			"xp_reward": 45
+		},
+		{
+			"contact_damage": 2,
+			"max_health": 18,
+			"name": "Hermoid",
+			"script": "Hermoid",
+			"xp_reward": 50
+		},
+		{
+			"contact_damage": 3,
+			"max_health": 40,
+			"name": "Earth Mage",
+			"script": "EarthMage",
+			"xp_reward": 85
+		},
+		{
+			"contact_damage": 6,
+			"max_health": 6,
+			"name": "Gale Mage",
+			"script": "GaleMage",
+			"xp_reward": 55
+		},
+		{
+			"contact_damage": 5,
+			"max_health": 30,
+			"name": "Voidwing Swarm",
+			"script": "VoidwingSwarm",
+			"xp_reward": 0
+		},
+		{
+			"contact_damage": 6,
+			"max_health": 80,
+			"name": "Empowered Mage",
+			"script": "EmpoweredMage",
+			"xp_reward": 140
+		},
+		{
+			"contact_damage": 6,
+			"max_health": 170,
+			"name": "Water Construct",
+			"script": "WaterConstruct",
+			"xp_reward": 540
+		},
+		{
+			"contact_damage": 7,
+			"max_health": 220,
+			"name": "Stone Construct",
+			"script": "StoneConstruct",
+			"xp_reward": 580
+		},
+		{
+			"contact_damage": 6,
+			"max_health": 190,
+			"name": "Frost Construct",
+			"script": "FrostConstruct",
+			"xp_reward": 560
+		},
+		{
+			"contact_damage": 6,
+			"max_health": 200,
+			"name": "Wyrm-Hole",
+			"script": "WyrmHole",
+			"xp_reward": 570
+		},
+		{
 			"contact_damage": 7,
 			"max_health": 235,
 			"name": "Black Dragonlet",
@@ -489,11 +573,11 @@
 			"xp_reward": 690
 		},
 		{
-			"contact_damage": 6,
-			"max_health": 175,
+			"contact_damage": 4,
+			"max_health": 60,
 			"name": "Treant",
 			"script": "Treant",
-			"xp_reward": 530
+			"xp_reward": 120
 		},
 		{
 			"contact_damage": 8,
@@ -510,11 +594,11 @@
 			"xp_reward": 548
 		},
 		{
-			"contact_damage": 6,
-			"max_health": 160,
+			"contact_damage": 5,
+			"max_health": 30,
 			"name": "Voidwing",
 			"script": "Voidwing",
-			"xp_reward": 525
+			"xp_reward": 90
 		},
 		{
 			"contact_damage": 6,
@@ -559,7 +643,7 @@
 			"xp_reward": 715
 		}
 	],
-	"exported": "2026-11-08T15:49:29",
+	"exported": "2026-11-13T19:44:54",
 	"foods": [
 		{
 			"description": "Heals 5 HP and restores 15 stamina.",
@@ -697,6 +781,7 @@
 		"BONE_DREAD_CHANCE": 0.1,
 		"BONK_CONCUSSED_TURNS": 3,
 		"BOSS_BATTLE_GRID_SIZE": 15,
+		"BOSS_DAMAGE_MULT": 1.5,
 		"BOSS_ENRAGE_DAMAGE_MULT": 1.5,
 		"BOSS_ENRAGE_HP_THRESHOLD": 0.3,
 		"BOSS_LEVEL_SCALING_FACTOR": 0.5,
@@ -784,6 +869,8 @@
 		"EMBER_BURN_ATTACK_DIV": 5.0,
 		"EMBER_BURN_BASE": 5.0,
 		"EMBER_BURN_DECAY": 0.7,
+		"EMPOWERED_MAX_STACKS": 10,
+		"EMPOWERED_STACK_DAMAGE_PCT": 0.1,
 		"ENEMY_COUNT": 6,
 		"ENEMY_LEVEL_SCALING": 0.05,
 		"ENEMY_LEVEL_SCALING_BY_DIFFICULTY": {
@@ -801,23 +888,35 @@
 			"Brute": 2.0,
 			"Centaur Archer": 6.0,
 			"Centaur Lancer": 7.0,
+			"Disgraced Mage": 9.0,
+			"Earth Mage": 2.0,
 			"Elder Oak": 2.0,
+			"Empowered Mage": 6.0,
 			"Fae": 7.0,
 			"Fae Hut": 3.0,
+			"Fire Mage": 8.0,
+			"Frost Construct": 3.0,
+			"Gale Mage": 12.0,
 			"Gnome": 5.0,
 			"Goblin": 6.0,
+			"Hermoid": 2.0,
 			"Leviathan": 3.0,
 			"Lizen Warband": 5.0,
 			"Magma Construct": 3.0,
 			"Orc": 3.0,
 			"Red Wyrm": 4.0,
 			"Shade": 7.0,
+			"Shadelet": 3.0,
 			"Steel Construct": 2.0,
+			"Stone Construct": 2.0,
 			"Traitor Wolf": 8.0,
 			"Treant": 2.0,
 			"Voidwing": 9.0,
+			"Voidwing Swarm": 9.0,
+			"Water Construct": 3.0,
 			"White Drake": 4.0,
-			"Wolf": 8.0
+			"Wolf": 8.0,
+			"Wyrm-Hole": 5.0
 		},
 		"ENEMY_SPEED_DEFAULT": 5.0,
 		"ENEMY_TRAITS": {
@@ -874,6 +973,26 @@
 			"Centaur Lancer": {
 				"move_range": 2
 			},
+			"Disgraced Mage": {
+				"big_squad": true,
+				"dodge_chance": 0.5,
+				"frail": true,
+				"harm": "magical",
+				"inflicts_fear": true,
+				"is_undead": true,
+				"is_void": true,
+				"move_range": 4
+			},
+			"Earth Mage": {
+				"armored": true,
+				"attack_range": 3,
+				"harm": "magical",
+				"ignore_line": true,
+				"knockback_resist": 0.6,
+				"mage": true,
+				"move_range": 1,
+				"splash": true
+			},
 			"Elder Oak": {
 				"armored": true,
 				"enrage_mult": 1.5,
@@ -884,6 +1003,17 @@
 				"sweeps": true,
 				"windup": true
 			},
+			"Empowered Mage": {
+				"attack_range": 3,
+				"harm": "magical",
+				"ignore_line": true,
+				"inflicts_blind": true,
+				"is_void": true,
+				"mage": true,
+				"move_range": 2,
+				"self_stacks": true,
+				"sweeps": true
+			},
 			"Fae": {
 				"harm": "magical"
 			},
@@ -891,11 +1021,45 @@
 				"move_range": 1,
 				"spawns_fae": true
 			},
+			"Fire Mage": {
+				"attack_range": 3,
+				"harm": "magical",
+				"ignore_line": true,
+				"inflicts_burn": true,
+				"mage": true,
+				"move_range": 3
+			},
+			"Frost Construct": {
+				"armored": true,
+				"enrage_mult": 1.5,
+				"enrage_threshold": 0.3,
+				"is_boss_tier": true,
+				"is_miniboss": true,
+				"knockback_resist": 0.7,
+				"move_range": 1,
+				"slide_player": 3,
+				"windup": true
+			},
+			"Gale Mage": {
+				"attack_range": 5,
+				"harm": "magical",
+				"ignore_line": true,
+				"mage": true,
+				"move_range": 5,
+				"windup": true
+			},
 			"Gnome": {
 				"big_squad": true
 			},
 			"Goblin": {
+				"move_range": 3,
 				"pack_bonus_mult": 1.5
+			},
+			"Hermoid": {
+				"armored": true,
+				"block_chance": 0.3,
+				"knockback_resist": 0.5,
+				"move_range": 1
 			},
 			"Leviathan": {
 				"armored": true,
@@ -934,7 +1098,7 @@
 				"corners": true,
 				"inflicts_concussion": true,
 				"knockback_resist": 0.5,
-				"move_range": 1,
+				"move_range": 2,
 				"quick_jab_chance": 0.4,
 				"windup": true
 			},
@@ -961,6 +1125,12 @@
 				"is_void": true,
 				"move_range": 3
 			},
+			"Shadelet": {
+				"big_squad": true,
+				"harm": "magical",
+				"is_void": true,
+				"move_range": 1
+			},
 			"Steel Construct": {
 				"armored": true,
 				"enrage_mult": 1.5,
@@ -972,15 +1142,22 @@
 				"move_range": 1,
 				"windup": true
 			},
-			"Traitor Wolf": {
-				"move_range": 3
-			},
-			"Treant": {
+			"Stone Construct": {
 				"armored": true,
 				"enrage_mult": 1.5,
 				"enrage_threshold": 0.3,
 				"is_boss_tier": true,
 				"is_miniboss": true,
+				"knockback_resist": 0.9,
+				"move_range": 1,
+				"places_rocks": 2,
+				"windup": true
+			},
+			"Traitor Wolf": {
+				"move_range": 3
+			},
+			"Treant": {
+				"armored": true,
 				"knockback_resist": 0.85,
 				"move_range": 1,
 				"windup": true
@@ -988,15 +1165,29 @@
 			"Voidwing": {
 				"attack_range": 2,
 				"dodge_chance": 0.3,
-				"enrage_mult": 1.5,
-				"enrage_threshold": 0.3,
 				"harm": "magical",
 				"ignore_line": true,
 				"inflicts_bleed": true,
+				"is_void": true,
+				"move_range": 3,
+				"windup": true
+			},
+			"Voidwing Swarm": {
+				"harm": "magical",
 				"is_boss_tier": true,
 				"is_miniboss": true,
 				"is_void": true,
-				"move_range": 3,
+				"move_range": 3
+			},
+			"Water Construct": {
+				"armored": true,
+				"enrage_mult": 1.5,
+				"enrage_threshold": 0.3,
+				"is_boss_tier": true,
+				"is_miniboss": true,
+				"knockback_resist": 0.6,
+				"move_range": 1,
+				"push_player": 2,
 				"windup": true
 			},
 			"White Drake": {
@@ -1013,6 +1204,20 @@
 			},
 			"Wolf": {
 				"move_range": 3
+			},
+			"Wyrm-Hole": {
+				"armored": true,
+				"enrage_mult": 1.5,
+				"enrage_threshold": 0.3,
+				"ignore_cover": true,
+				"ignore_terrain": true,
+				"is_boss_tier": true,
+				"is_miniboss": true,
+				"knockback_resist": 0.7,
+				"move_range": 2,
+				"size": 2,
+				"teleports": true,
+				"windup": true
 			}
 		},
 		"ENERGY_POTION_MOVE_BONUS": 2,
@@ -1055,9 +1260,9 @@
 		"MANA_PER_HP": 5,
 		"MARACAS_ARMORED_MULT": 1.53846153846154,
 		"MAX_AMBIENT_ENEMIES": 40,
-		"MAX_BATTLE_ENEMIES_GOBLIN": 2,
-		"MAX_BATTLE_ENEMIES_TOUGH": 4,
-		"MAX_BATTLE_SQUAD_SIZE_CEILING": 6,
+		"MAX_BATTLE_ENEMIES_GOBLIN": 3,
+		"MAX_BATTLE_ENEMIES_TOUGH": 5,
+		"MAX_BATTLE_SQUAD_SIZE_CEILING": 7,
 		"MAX_BATTLE_TOUGH_UNITS": 2,
 		"MERCENARY_SPEED": 5.0,
 		"MERCHANT_EVENT_DISCOUNT": 0.6,
@@ -1065,10 +1270,13 @@
 		"MINIBOSS_CHANCE": 0.04,
 		"MINIBOSS_SCRIPTS": {
 			"black_dragonlet": null,
+			"frost_construct": null,
 			"iron_construct": null,
 			"lava_construct": null,
-			"treant": null,
-			"voidwing": null
+			"stone_construct": null,
+			"voidwing_swarm": null,
+			"water_construct": null,
+			"wyrm_hole": null
 		},
 		"MINIGAME_BLOCK_HELD_REDUCTION": 0.5,
 		"MINIGAME_BRACE_HELD_REDUCTION": 0.25,
@@ -1155,13 +1363,23 @@
 			"archer": null,
 			"brute": null,
 			"centaur_pack": null,
+			"disgraced_mage": null,
+			"earth_mage": null,
+			"empowered_mage": null,
 			"fae_hut": null,
+			"fire_mage": null,
+			"gale_mage": null,
 			"gnome_pack": null,
 			"goblin": null,
+			"hermoid": null,
 			"orc": null,
 			"shade": null,
+			"shadelet": null,
+			"treant": null,
+			"voidwing": null,
 			"wolf": null
 		},
+		"REGULAR_START_CLOSER": 2,
 		"REROLL_BASE_COST": 10,
 		"REROLL_COST_INCREMENT": 10,
 		"RESERVED_TERRAIN_TYPES": [
@@ -1231,11 +1449,23 @@
 		"STEALTH_STAMINA_COST": 20,
 		"STEALTH_TURNS": 3,
 		"STONE_AMULET_MATERIAL_BOOST_MULT": 2.0,
+		"STONE_ROCKS_MAX": 10,
 		"SUMMON_PICK_LIMIT": 24,
 		"SWARM_BONUS_GOBLINS": 4,
 		"TARGET_DECONFLICT_TOLERANCE": 1,
 		"TARGET_PRACTICE_BOSS_CHANCE": 0.05,
 		"TARGET_PRACTICE_CHANCE": 0.3,
+		"TIER_DAMAGE_MULT": [
+			1.0,
+			1.0,
+			1.2,
+			1.5,
+			1.9,
+			2.4,
+			3.0,
+			3.6,
+			4.2
+		],
 		"TOWN_AREA_ORIGIN": [
 			15900.0,
 			11275.0
@@ -1484,6 +1714,7 @@
 		"TRAITOR_WOLF_RECRUIT_CHANCE": 0.25,
 		"TURN_ORDER_ROWS": 8,
 		"TURN_TIME_BASE": 100.0,
+		"VOIDWING_SWARM_SIZE": 7,
 		"VULNERABLE_DAMAGE_TAKEN_BONUS_PCT": 0.2,
 		"VULNERABLE_TURNS": 2,
 		"WANDER_DIRS": [
@@ -1516,7 +1747,8 @@
 		"WORLD_SIZE": [
 			33600.0,
 			23800.0
-		]
+		],
+		"WYRM_TELEPORT_CHANCE": 0.5
 	},
 	"party": {
 		"consts": {
@@ -3395,6 +3627,26 @@
 		"Centaur Lancer": {
 			"move_range": 2
 		},
+		"Disgraced Mage": {
+			"big_squad": true,
+			"dodge_chance": 0.5,
+			"frail": true,
+			"harm": "magical",
+			"inflicts_fear": true,
+			"is_undead": true,
+			"is_void": true,
+			"move_range": 4
+		},
+		"Earth Mage": {
+			"armored": true,
+			"attack_range": 3,
+			"harm": "magical",
+			"ignore_line": true,
+			"knockback_resist": 0.6,
+			"mage": true,
+			"move_range": 1,
+			"splash": true
+		},
 		"Elder Oak": {
 			"armored": true,
 			"enrage_mult": 1.5,
@@ -3405,6 +3657,17 @@
 			"sweeps": true,
 			"windup": true
 		},
+		"Empowered Mage": {
+			"attack_range": 3,
+			"harm": "magical",
+			"ignore_line": true,
+			"inflicts_blind": true,
+			"is_void": true,
+			"mage": true,
+			"move_range": 2,
+			"self_stacks": true,
+			"sweeps": true
+		},
 		"Fae": {
 			"harm": "magical"
 		},
@@ -3412,11 +3675,45 @@
 			"move_range": 1,
 			"spawns_fae": true
 		},
+		"Fire Mage": {
+			"attack_range": 3,
+			"harm": "magical",
+			"ignore_line": true,
+			"inflicts_burn": true,
+			"mage": true,
+			"move_range": 3
+		},
+		"Frost Construct": {
+			"armored": true,
+			"enrage_mult": 1.5,
+			"enrage_threshold": 0.3,
+			"is_boss_tier": true,
+			"is_miniboss": true,
+			"knockback_resist": 0.7,
+			"move_range": 1,
+			"slide_player": 3,
+			"windup": true
+		},
+		"Gale Mage": {
+			"attack_range": 5,
+			"harm": "magical",
+			"ignore_line": true,
+			"mage": true,
+			"move_range": 5,
+			"windup": true
+		},
 		"Gnome": {
 			"big_squad": true
 		},
 		"Goblin": {
+			"move_range": 3,
 			"pack_bonus_mult": 1.5
+		},
+		"Hermoid": {
+			"armored": true,
+			"block_chance": 0.3,
+			"knockback_resist": 0.5,
+			"move_range": 1
 		},
 		"Leviathan": {
 			"armored": true,
@@ -3455,7 +3752,7 @@
 			"corners": true,
 			"inflicts_concussion": true,
 			"knockback_resist": 0.5,
-			"move_range": 1,
+			"move_range": 2,
 			"quick_jab_chance": 0.4,
 			"windup": true
 		},
@@ -3482,6 +3779,12 @@
 			"is_void": true,
 			"move_range": 3
 		},
+		"Shadelet": {
+			"big_squad": true,
+			"harm": "magical",
+			"is_void": true,
+			"move_range": 1
+		},
 		"Steel Construct": {
 			"armored": true,
 			"enrage_mult": 1.5,
@@ -3493,15 +3796,22 @@
 			"move_range": 1,
 			"windup": true
 		},
-		"Traitor Wolf": {
-			"move_range": 3
-		},
-		"Treant": {
+		"Stone Construct": {
 			"armored": true,
 			"enrage_mult": 1.5,
 			"enrage_threshold": 0.3,
 			"is_boss_tier": true,
 			"is_miniboss": true,
+			"knockback_resist": 0.9,
+			"move_range": 1,
+			"places_rocks": 2,
+			"windup": true
+		},
+		"Traitor Wolf": {
+			"move_range": 3
+		},
+		"Treant": {
+			"armored": true,
 			"knockback_resist": 0.85,
 			"move_range": 1,
 			"windup": true
@@ -3509,15 +3819,29 @@
 		"Voidwing": {
 			"attack_range": 2,
 			"dodge_chance": 0.3,
-			"enrage_mult": 1.5,
-			"enrage_threshold": 0.3,
 			"harm": "magical",
 			"ignore_line": true,
 			"inflicts_bleed": true,
+			"is_void": true,
+			"move_range": 3,
+			"windup": true
+		},
+		"Voidwing Swarm": {
+			"harm": "magical",
 			"is_boss_tier": true,
 			"is_miniboss": true,
 			"is_void": true,
-			"move_range": 3,
+			"move_range": 3
+		},
+		"Water Construct": {
+			"armored": true,
+			"enrage_mult": 1.5,
+			"enrage_threshold": 0.3,
+			"is_boss_tier": true,
+			"is_miniboss": true,
+			"knockback_resist": 0.6,
+			"move_range": 1,
+			"push_player": 2,
 			"windup": true
 		},
 		"White Drake": {
@@ -3534,6 +3858,20 @@
 		},
 		"Wolf": {
 			"move_range": 3
+		},
+		"Wyrm-Hole": {
+			"armored": true,
+			"enrage_mult": 1.5,
+			"enrage_threshold": 0.3,
+			"ignore_cover": true,
+			"ignore_terrain": true,
+			"is_boss_tier": true,
+			"is_miniboss": true,
+			"knockback_resist": 0.7,
+			"move_range": 2,
+			"size": 2,
+			"teleports": true,
+			"windup": true
 		}
 	},
 	"upgrades": {

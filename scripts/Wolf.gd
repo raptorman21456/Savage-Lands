@@ -9,7 +9,7 @@ signal died(xp_reward: int)
 # enemy type, at moderate HP.
 const SPEED := 130.0
 const MAX_HEALTH := 8
-const CONTACT_DAMAGE := 2
+const CONTACT_DAMAGE := 3   # was 2 (2026-11-13)
 const DETECT_RANGE := 180.0
 const CONTACT_COOLDOWN := 0.6
 const BODY_RADIUS := 14.0

@@ -239,6 +239,9 @@ static func reset_cheats(main) -> void:
 	p.debug_god_mode = false
 	p.debug_infinite_stamina = false
 	p.debug_speed_mult = 1.0
+	p.debug_always_crit = false
+	p.debug_enemies_pass = false
+	p.miss_chance_override = 0.0 if OS.get_cmdline_args().has("--script") else -1.0   # as a fresh Player starts: the real miss chances (none under a test run)
 	set_one_hit_kills(main, false)
 	load("res://scripts/DebugProgress.gd").restore_engine(main.get_tree() if main.is_inside_tree() else null)
 
@@ -306,7 +309,7 @@ static func remove_weapon(main, weapon_id: String) -> Dictionary:
 	p.owned_weapons.erase(weapon_id)
 	p.weapon_upgrade_levels.erase(weapon_id)
 	p.weapon_enchantments.erase(weapon_id)
-	for m in p.party:
+	for m in p.all_members():
 		if m.weapon_id() == weapon_id:
 			m.gear.weapon = ""
 	if str(p.current_weapon_base.get("id", "")) == weapon_id:
@@ -352,7 +355,7 @@ static func remove_armor(main, armor_id: String) -> Dictionary:
 		return fail("You do not have that armour.")
 	p.owned_armor.erase(armor_id)
 	p.armor_upgrade_levels.erase(armor_id)
-	for m in p.party:
+	for m in p.all_members():
 		if m.armor_id() == armor_id:
 			m.gear.armor = ""
 	if str(p.equipped_armor.get("id", "")) == armor_id:
@@ -373,7 +376,7 @@ static func remove_shield(main, shield_id: String) -> Dictionary:
 	if not p.owned_shields.has(shield_id):
 		return fail("You do not have that shield.")
 	p.owned_shields.erase(shield_id)
-	for m in p.party:
+	for m in p.all_members():
 		if m.shield_id() == shield_id:
 			m.gear.shield = ""
 	if str(p.equipped_shield.get("id", "")) == shield_id:
@@ -423,7 +426,7 @@ static func remove_talisman(main, talisman_id: String) -> Dictionary:
 		return fail("You do not have that talisman.")
 	p.unequip_talisman(talisman_id)
 	p.owned_talismans.erase(talisman_id)
-	for m in p.party:
+	for m in p.all_members():
 		m.gear.talismans.erase(talisman_id)
 	return ok("Removed %s." % str(TalismansScript.get_talisman(talisman_id).get("name", talisman_id)))
 
@@ -643,9 +646,10 @@ static func remove_mercenary(main, index: int) -> Dictionary:
 
 static func dismiss_all(main) -> Dictionary:
 	var p = player_of(main)
-	var n: int = p.party.size() + p.party_members.size()
+	var n: int = p.party.size() + p.party_members.size() + p.bench.size()
 	p.party.clear()
 	p.party_members.clear()
+	p.bench.clear()   # the bench too: "dismiss everyone" leaves nobody anywhere
 	return ok("The party is empty (%d left)." % n)
 
 # A member's level, through its own level-up (+ a bonus pick each level, unspent). Going down starts it over.

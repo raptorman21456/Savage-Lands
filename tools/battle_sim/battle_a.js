@@ -333,7 +333,7 @@ class Sim {
     this.battle_player_moves_left = this._battle_player_move_range();
     p.reset_stamina_for_battle();
 
-    const enemy_col = Math.max(1, this.BATTLE_GRID_W - 3);
+    const enemy_col = Math.max(2, this.BATTLE_GRID_W - 3 - (is_boss_fight ? 0 : MC.REGULAR_START_CLOSER));
     const enemy_rows = [];
     for (let i = 0; i < this.BATTLE_GRID_H; i++) enemy_rows.push(i);
     this.rng.shuffle(enemy_rows);
@@ -363,11 +363,14 @@ class Sim {
       const elite_hp = e.elite ? MC.ELITE_HP_MULT : 1.0;
       const elite_dmg = e.elite ? MC.ELITE_DAMAGE_MULT : 1.0;
       const power_tier = e.power_tier ?? 1.0;
-      const scale_mult = enemy_scale(!!traits.is_boss_tier);
+      // Region danger tier (Main: region_tier_power + _enemy_damage_mult); an entry's own `tier`, else cfg.tier, else 1 (the plains: unchanged).
+      const tier_i = Math.max(1, Math.min(8, e.tier ?? (cfg.tier || 1)));
+      const scale_mult = enemy_scale(!!traits.is_boss_tier) * REGION_TIER_POWER[tier_i];
+      const dmg_mult = MC.TIER_DAMAGE_MULT[tier_i] * (traits.is_boss_tier ? MC.BOSS_DAMAGE_MULT : 1.0);
       const early_hp = early_hp_factor(traits);
       let scaled_hp = Math.max(1, round(edata.max_health * scale_mult * elite_hp * p.difficulty_mult * power_tier * early_hp));
       if (e.name === "Gnome" && gnome_pack_size > 1) scaled_hp += round((gnome_pack_size - 1) * MC.GNOME_HP_PER_PACKMATE * early_hp);
-      const scaled_damage = Math.max(1, round(edata.contact_damage * scale_mult * elite_dmg * p.difficulty_mult * power_tier));
+      const scaled_damage = Math.max(1, round(edata.contact_damage * scale_mult * dmg_mult * elite_dmg * p.difficulty_mult * power_tier));
       this.battle_units.push({
         ref: ++this.ref_counter, tile, hp: scaled_hp, max_hp: scaled_hp,
         move_range: traits.move_range ?? 2, damage: scaled_damage, name: e.name,

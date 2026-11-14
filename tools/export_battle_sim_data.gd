@@ -15,7 +15,7 @@ const PlayerScript := preload("res://scripts/Player.gd")
 const DefenseScript := preload("res://scripts/Defense.gd")
 
 const ENEMY_SCRIPTS := [
-	"Enemy", "Orc", "Archer", "Brute", "Shade", "Wolf", "Centaur", "FaeHut", "Fae", "Gnome",
+	"Enemy", "Orc", "Archer", "Brute", "Shade", "Wolf", "Centaur", "FaeHut", "Fae", "Gnome", "Shadelet", "DisgracedMage", "FireMage", "Hermoid", "EarthMage", "GaleMage", "VoidwingSwarm", "EmpoweredMage", "WaterConstruct", "StoneConstruct", "FrostConstruct", "WyrmHole",
 	"BlackDragonlet", "Treant", "IronConstruct", "LavaConstruct", "Voidwing",
 	"Leviathan", "LizenWarband", "ElderOak", "WhiteDragon", "RedWyrm", "Archmage",
 ]

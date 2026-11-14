@@ -49,11 +49,11 @@ func _init() -> void:
 
 	# --- through the real _setup_battle_grid (HP and damage) ---
 	var goblin_hard: Array = _stats_for(main, player, 10, "hard", "res://scripts/Enemy.gd")
-	print("Hard, level 10 Goblin (base 3 HP / 1 dmg, x1.90 level x1.75 difficulty x1.2 early-game): hp=%d dmg=%d (expected 12, 3)" % [goblin_hard[0], goblin_hard[1]])
-	var treant_normal: Array = _stats_for(main, player, 10, "normal", "res://scripts/Treant.gd")
-	print("Normal, level 10 Treant (miniboss, base 175 HP / 6 dmg, x1.225): hp=%d dmg=%d (expected 214, 7)" % [treant_normal[0], treant_normal[1]])
+	print("Hard, level 10 Goblin (base 3 HP / 2 dmg, x1.90 level x1.75 difficulty x1.2 early-game): hp=%d dmg=%d (expected 12, 7)" % [goblin_hard[0], goblin_hard[1]])
+	var treant_normal: Array = _stats_for(main, player, 10, "normal", "res://scripts/BlackDragonlet.gd")
+	print("Normal, level 10 Black Dragonlet (miniboss, base 235 HP / 7 dmg, x1.225, and the x1.5 boss damage factor at tier 1: hp=%d dmg=%d (expected 288, 13)" % [treant_normal[0], treant_normal[1]])
 	var goblin_baby: Array = _stats_for(main, player, 20, "baby", "res://scripts/Enemy.gd")
-	print("Baby, level 20 Goblin (x1.57 level x0.75 difficulty x1.1 early-game): hp=%d dmg=%d (expected 4, 1)" % [goblin_baby[0], goblin_baby[1]])
+	print("Baby, level 20 Goblin (x1.57 level x0.75 difficulty x1.1 early-game): hp=%d dmg=%d (expected 4, 2)" % [goblin_baby[0], goblin_baby[1]])
 	var oak_normal: Array = _stats_for(main, player, 10, "normal", "res://scripts/ElderOak.gd")
 	print("a full boss scales at the same gentle rate as a miniboss (Elder Oak, base 245 HP, x1.225): hp=%d (expected 300)" % [oak_normal[0]])
 

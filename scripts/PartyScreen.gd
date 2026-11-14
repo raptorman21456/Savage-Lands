@@ -94,6 +94,21 @@ func _build_roster() -> void:
 		if m.picks > 0:
 			sub = "%d pick%s" % [m.picks, "" if m.picks == 1 else "s"]
 		row.add_child(_roster_tile(m.id, str(m.name), "face_%s" % m.kind, sub))
+	# Beside the portraits: the bench (once Friends in High Places allows it, or while someone is on it) and, with the Debug menu on,
+	# a quick way to add any member.
+	var tools := VBoxContainer.new()
+	tools.add_theme_constant_override("separation", 4)
+	tools.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	if player.can_dismiss() or not player.bench.is_empty():
+		var bench_button := PixelButton.make("Bench  %d" % player.bench.size(), "", _open_bench)
+		bench_button.tooltip_text = "Members you sent away for a while. Call one back when there is a place for them."
+		tools.add_child(bench_button)
+	if panel.debug_quick_add_allowed():
+		var add_button := PixelButton.make("Add member", "", _open_add)
+		add_button.tooltip_text = "Debug menu is on: add a new member of any kind to your party."
+		tools.add_child(add_button)
+	if tools.get_child_count() > 0:
+		row.add_child(tools)
 	var cap := PixelKit.label("Party  %d / %d" % [player.party.size(), player.party_capacity()], "body", PixelKit.DIM)
 	cap.position = Vector2(size.x - 190.0, 4)
 	add_child(cap)
@@ -149,6 +164,37 @@ func _select(id: int) -> void:
 	panel.party_selected_id = id
 	panel._play_sfx("menu_move")
 	rebuild()
+
+# The bench as a short list: each row calls that member back (greyed, with the reason, when there is no place for them).
+func _open_bench() -> void:
+	var rows: Array = []
+	for m in player.bench:
+		var member = m
+		var reason: String = player.call_back_block_reason(member)
+		var who := "%s%s" % [member.name, ("   Lv %d" % member.level) if member.levels() else ""]
+		rows.append({"label": who, "right": reason if reason != "" else "call back", "disabled": reason != "", "pick": func(): panel._on_member_called_back(member)})
+	if rows.is_empty():
+		rows.append({"label": "Nobody is waiting on the bench.", "right": "", "disabled": true, "pick": func(): pass})
+	panel.open_pick_popup("Bench", "Sent away for a while", rows)
+
+# Debug only: one row per kind of member; a full party greys them all.
+func _open_add() -> void:
+	var rows: Array = []
+	for kind in PartyRulesScript.KINDS:
+		var kind_id: String = str(kind)
+		var full: bool = not player.can_recruit(kind_id)
+		rows.append({"label": str(PartyRulesScript.KINDS[kind_id].name), "right": "party full" if full else "", "disabled": full, "pick": func(): panel._on_member_quick_added(kind_id)})
+	panel.open_pick_popup("Add member", "Debug menu", rows)
+
+func _dismiss_button(member) -> PixelButton:
+	var button := PixelButton.make("Dismiss", "", func(): panel._on_member_dismissed(member))
+	var reason: String = panel.dismiss_block_reason()
+	if reason != "":
+		button.disabled = true
+		button.tooltip_text = reason
+	else:
+		button.tooltip_text = "Send %s away for a while. They keep their level and gear; call them back from the Bench." % member.name
+	return button
 
 # --- the sheet on the left -------------------------------------------------------------------------------------------------------------
 
@@ -248,6 +294,11 @@ func _build_right(member, pages: Array) -> void:
 	var icons := {"Equipment": "tab_gear", "Specials": "stat_crit", "Stats": "stat_strength", "Defense": "stat_defense", "Run": "stat_speed"}
 	for p in pages:
 		tabs.add_child(PixelButton.make(p, icons[p], _on_page.bind(p), p == page))
+	if member != null:
+		var gap := Control.new()
+		gap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		tabs.add_child(gap)
+		tabs.add_child(_dismiss_button(member))
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED

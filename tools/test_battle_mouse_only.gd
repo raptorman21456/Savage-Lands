@@ -62,6 +62,9 @@ func _init() -> void:
 	main.hud.battle_main_buttons["move"].pressed.emit()
 	print("clicking Move enters move mode: menu_state=%s (expected move)" % [main.battle_menu_state])
 
+	# Goblins are faster and start closer now, so one may already stand on the tile to the right: put the enemies out of the way first.
+	for u in main.battle_units:
+		u.tile = Vector2i(main.BATTLE_GRID_W - 1, 0)
 	var tile_before: Vector2i = main.battle_player_tile
 	_press_key(KEY_RIGHT, true)
 	await process_frame

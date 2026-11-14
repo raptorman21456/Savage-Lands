@@ -372,3 +372,50 @@ static func refill_enemies(main) -> Dictionary:
 	var before: int = main.enemies_alive
 	main._fill_ambient_population(99)
 	return ok("Added %d enemies near you." % (main.enemies_alive - before))
+
+# ---------------------------------------------------------------------------------------------------------------------------
+# Buildings and events, from anywhere
+# ---------------------------------------------------------------------------------------------------------------------------
+
+const EventsScript := preload("res://scripts/Events.gd")
+
+# The town panels the game has built (shop, church, blacksmith...), by their door's name.
+static func panel_kinds(main) -> Array:
+	var kinds: Array = main.town_panels.keys()
+	kinds.sort()
+	return kinds
+
+# Opens a building's menu as if you had walked in (without counting the building as found on your map).
+static func open_panel(main, kind: String) -> Dictionary:
+	if not main.town_panels.has(kind):
+		return fail("There is no '%s' menu." % kind)
+	if bool(main._town_door_blocked()):
+		return fail("Not now: close what is open (and leave the battle) first.")
+	var panel = main.town_panels[kind]
+	if kind == "beastiary":
+		panel.open()
+	else:
+		panel.open(main.player)
+	return ok("Opened the %s." % kind.replace("_", " "), {"close": true})
+
+static func event_ids() -> Array:
+	return EventsScript.EVENT_IDS.duplicate()
+
+static func event_name(id: String) -> String:
+	return str(EventsScript.EVENTS.get(id, {}).get("name", id))
+
+# Plays a random event now: an automatic one applies at once; the others put up their question (Yes / No).
+static func trigger_event(main, id: String) -> Dictionary:
+	if not EventsScript.EVENTS.has(id):
+		return fail("No such event: %s." % id)
+	if bool(main.in_battle) or bool(main.event_choosing) or bool(main.choosing_stat) or bool(main.game_over) or bool(main.in_interior):
+		return fail("Not now: finish what is on screen first (and be out in the open).")
+	var def: Dictionary = EventsScript.EVENTS[id]
+	if bool(def.get("auto", false)):
+		main._apply_automatic_event(id)
+		return ok("%s: it applies." % str(def.name), {"close": true})
+	main.active_event_id = id
+	main.event_choosing = true
+	main.get_tree().paused = true
+	main.hud.show_event_choice(def.name, main._build_event_description(id), def.yes_label, def.no_label)
+	return ok("%s: it asks you." % str(def.name), {"close": true})

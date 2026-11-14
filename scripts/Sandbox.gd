@@ -32,7 +32,7 @@ static func config_path() -> String:
 # Every enemy script the tile battle knows, by file. Display names (and the
 # Wolf / Centaur variants) are read from the scripts themselves.
 const ENEMY_FILES := [
-	"Enemy", "Orc", "Archer", "Brute", "Shade", "Wolf", "Centaur", "FaeHut", "Fae", "Gnome",
+	"Enemy", "Orc", "Archer", "Brute", "Shade", "Wolf", "Centaur", "FaeHut", "Fae", "Gnome", "Shadelet", "DisgracedMage", "FireMage", "Hermoid", "EarthMage", "GaleMage", "VoidwingSwarm", "EmpoweredMage", "WaterConstruct", "StoneConstruct", "FrostConstruct", "WyrmHole",
 	# the 5 minibosses, then the 6 full bosses
 	"BlackDragonlet", "Treant", "IronConstruct", "LavaConstruct", "Voidwing",
 	"Leviathan", "LizenWarband", "ElderOak", "WhiteDragon", "RedWyrm", "Archmage",

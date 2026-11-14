@@ -14,6 +14,18 @@ const CentaurScript := preload("res://scripts/Centaur.gd")
 const FaeHutScript := preload("res://scripts/FaeHut.gd")
 const FaeScript := preload("res://scripts/Fae.gd")
 const GnomeScript := preload("res://scripts/Gnome.gd")
+const ShadeletScript := preload("res://scripts/Shadelet.gd")
+const DisgracedMageScript := preload("res://scripts/DisgracedMage.gd")
+const FireMageScript := preload("res://scripts/FireMage.gd")
+const HermoidScript := preload("res://scripts/Hermoid.gd")
+const EarthMageScript := preload("res://scripts/EarthMage.gd")
+const GaleMageScript := preload("res://scripts/GaleMage.gd")
+const VoidwingSwarmScript := preload("res://scripts/VoidwingSwarm.gd")
+const EmpoweredMageScript := preload("res://scripts/EmpoweredMage.gd")
+const WaterConstructScript := preload("res://scripts/WaterConstruct.gd")
+const StoneConstructScript := preload("res://scripts/StoneConstruct.gd")
+const FrostConstructScript := preload("res://scripts/FrostConstruct.gd")
+const WyrmHoleScript := preload("res://scripts/WyrmHole.gd")
 const LeviathanScript := preload("res://scripts/Leviathan.gd")
 const LizenWarbandScript := preload("res://scripts/LizenWarband.gd")
 const BlackDragonletScript := preload("res://scripts/BlackDragonlet.gd")
@@ -246,6 +258,7 @@ const SEER_REROLL_COST := 15
 const QUEST_TEMPLATES := ["cull_the_herd", "monster_slayer", "treasure_hunter"]
 
 const DEFAULT_BATTLE_GRID_SIZE := 8
+const REGULAR_START_CLOSER := 2          # columns nearer the hero that a regular (non-boss) fight starts
 const BOSS_BATTLE_GRID_SIZE := 15
 # Not const: a boss fight (see _setup_battle_grid) sizes these up to
 # BOSS_BATTLE_GRID_SIZE for the duration of that battle. Every read site
@@ -256,13 +269,13 @@ var BATTLE_GRID_H := DEFAULT_BATTLE_GRID_SIZE
 # Goblin-tier battles (weak/support types mixed in) stay small; "tough"
 # battles (Orc, Brute, Shade) are the bigger, harder set-piece fights,
 # guaranteed at least one tough unit (the one you engaged).
-const MAX_BATTLE_ENEMIES_GOBLIN := 2
-const MAX_BATTLE_ENEMIES_TOUGH := 4
+const MAX_BATTLE_ENEMIES_GOBLIN := 3   # was 2: one more in every pack (2026-11-13)
+const MAX_BATTLE_ENEMIES_TOUGH := 5   # was 4
 const MAX_BATTLE_TOUGH_UNITS := 2
 # The overall party-size ceiling _gather_squad's computed max_enemies can
 # never exceed, regardless of how big _squad_size_bonus gets -- up from the
 # old flat MAX_BATTLE_ENEMIES_TOUGH=4 hard cap.
-const MAX_BATTLE_SQUAD_SIZE_CEILING := 6
+const MAX_BATTLE_SQUAD_SIZE_CEILING := 7   # was 6, so the extra enemy is not clipped
 const BATTLE_GATHER_RADIUS := 200.0
 const CLIFF_FALL_DAMAGE_PCT := 0.05
 const ROCK_COVER_REDUCTION := 0.25
@@ -592,11 +605,11 @@ const ENEMY_TRAITS := {
 	# Hits harder whenever another goblin is still alive in the same fight.
 	# "Persistent" (never loses aggro once it spots you) lives in Enemy.gd,
 	# not here, since that's an overworld-chase behavior, not a battle one.
-	"Goblin": {"pack_bonus_mult": GOBLIN_PACK_DAMAGE_MULT},
+	"Goblin": {"pack_bonus_mult": GOBLIN_PACK_DAMAGE_MULT, "move_range": 3},   # 3 tiles a turn (was the default 2): they now reach you
 	# Tries to flank around the player toward the nearest edge instead of
 	# charging straight in (see _flank_target_tile), and sometimes skips its
 	# telegraph for an immediate weak jab instead of the big windup hit.
-	"Orc": {"windup": true, "knockback_resist": ORC_KNOCKBACK_RESIST_CHANCE, "move_range": 1, "big_squad": true, "corners": true, "quick_jab_chance": ORC_QUICK_JAB_CHANCE, "armored": true, "inflicts_concussion": true},
+	"Orc": {"windup": true, "knockback_resist": ORC_KNOCKBACK_RESIST_CHANCE, "move_range": 2, "big_squad": true, "corners": true, "quick_jab_chance": ORC_QUICK_JAB_CHANCE, "armored": true, "inflicts_concussion": true},
 	# Reworked from the original Archer: shorter range than before but no
 	# longer needs a straight line to its target (see ignore_line on
 	# _can_battle_attack) -- a caster's arcing bolt instead of a bowstring's
@@ -636,6 +649,24 @@ const ENEMY_TRAITS := {
 	# big_squad so a Gnome-initiated fight can actually seat a pack of up to
 	# GNOME_PACK_SIZE_MAX (5) once _squad_size_bonus allows it.
 	"Gnome": {"big_squad": true},
+	# The doc's new regular enemies (draft numbers): a Shadelet is a slow, weak void bubble that drops no gold; a Disgraced Mage is a Shade the void
+	# has overpowered (bigger, faster, harder, a few HP); a Fire Mage hits decently from range and burns; a Hermoid blocks a blow outright now and then.
+	"Shadelet": {"is_void": true, "harm": "magical", "move_range": 1, "big_squad": true},
+	"Disgraced Mage": {"frail": true, "is_undead": true, "is_void": true, "harm": "magical", "move_range": 4, "big_squad": true, "dodge_chance": 0.5, "inflicts_fear": true},
+	"Fire Mage": {"harm": "magical", "mage": true, "attack_range": 3, "ignore_line": true, "move_range": 3, "inflicts_burn": true},
+	"Hermoid": {"move_range": 1, "armored": true, "knockback_resist": 0.5, "block_chance": 0.3},
+	# Earth Mage (caves): very slow and tanky, its hit also lands on everything next to the target. Gale Mage (peaks): very fast, brittle, long reach;
+	# it winds up a turn (a charge) and then hits one target for double.
+	"Earth Mage": {"harm": "magical", "mage": true, "attack_range": 3, "ignore_line": true, "move_range": 1, "armored": true, "knockback_resist": 0.6, "splash": true},
+	"Gale Mage": {"harm": "magical", "mage": true, "windup": true, "attack_range": 5, "ignore_line": true, "move_range": 5},
+	# Late-game: an Empowered Mage grows +10% damage for every turn it has survived (up to 10), sweeps everything in reach and blinds.
+	"Empowered Mage": {"is_void": true, "harm": "magical", "mage": true, "sweeps": true, "attack_range": 3, "ignore_line": true, "move_range": 2, "inflicts_blind": true, "self_stacks": true},
+	# The Constructs and the Wyrm-Hole (minibosses, draft numbers). Water: every blow shoves you 2 tiles and leaves water behind. Stone: raises rocks round you each
+	# turn. Frost: every blow slides you 3 tiles and leaves ice behind. Wyrm-Hole: 2x2, tunnels through terrain, and half its turns vanishes and bursts up beside you.
+	"Water Construct": {"windup": true, "armored": true, "knockback_resist": 0.6, "move_range": 1, "push_player": 2, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true, "is_miniboss": true},
+	"Stone Construct": {"windup": true, "armored": true, "knockback_resist": 0.9, "move_range": 1, "places_rocks": 2, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true, "is_miniboss": true},
+	"Frost Construct": {"windup": true, "armored": true, "knockback_resist": 0.7, "move_range": 1, "slide_player": 3, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true, "is_miniboss": true},
+	"Wyrm-Hole": {"windup": true, "armored": true, "knockback_resist": 0.7, "move_range": 2, "size": 2, "ignore_terrain": true, "ignore_cover": true, "teleports": true, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true, "is_miniboss": true},
 	# Beach's boss -- a short-range psychic reach (ignore_line, like the
 	# Apprentice Mage but shorter) instead of a straight-line melee attack,
 	# plus the same telegraph/enrage shape every Boss-tier unit uses.
@@ -646,7 +677,8 @@ const ENEMY_TRAITS := {
 	# A miniboss -- a breath-weapon sweep.
 	"Black Dragonlet": {"harm": "both", "windup": true, "sweeps": true, "armored": true, "knockback_resist": 0.7, "move_range": 1, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true, "is_miniboss": true, "inflicts_bleed": true},
 	# A miniboss -- rooted and tanky, resists being shoved.
-	"Treant": {"windup": true, "armored": true, "knockback_resist": 0.85, "move_range": 1, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true, "is_miniboss": true},
+	# Late-game forest enemy (a miniboss until 2026-11-12): rooted-feeling, armoured, hard to push around, hits with a wind-up.
+	"Treant": {"windup": true, "armored": true, "knockback_resist": 0.85, "move_range": 1},
 	# Forest's world-ending boss -- Treant aged up, a wide branch sweep.
 	"Elder Oak": {"windup": true, "sweeps": true, "armored": true, "knockback_resist": 0.9, "move_range": 1, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true},
 	# A miniboss -- an immovable construct.
@@ -661,7 +693,9 @@ const ENEMY_TRAITS := {
 	"Red Wyrm": {"harm": "both", "windup": true, "sweeps": true, "attack_range": 2, "armored": true, "knockback_resist": 0.8, "move_range": 1, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true, "inflicts_bleed": true},
 	# A miniboss -- fast, evasive, and genuinely ranged (void bolts
 	# that ignore obstacles).
-	"Voidwing": {"is_void": true, "harm": "magical", "windup": true, "move_range": 3, "dodge_chance": 0.3, "ignore_line": true, "attack_range": 2, "enrage_threshold": BOSS_ENRAGE_HP_THRESHOLD, "enrage_mult": BOSS_ENRAGE_DAMAGE_MULT, "is_boss_tier": true, "is_miniboss": true, "inflicts_bleed": true},
+	"Voidwing": {"is_void": true, "harm": "magical", "windup": true, "move_range": 3, "dodge_chance": 0.3, "ignore_line": true, "attack_range": 2, "inflicts_bleed": true},
+	# The miniboss: seven Voidwings at once. This entry is only the marker on the overworld; the fight is seven plain Voidwings (_expand_swarms).
+	"Voidwing Swarm": {"is_void": true, "harm": "magical", "move_range": 3, "is_boss_tier": true, "is_miniboss": true},
 	# Voidlands' world-ending boss -- the last "normal" world boss before
 	# Nothingness, and the one that gets rematched there (see
 	# scripts/Archmage.gd's power_tier). A wide multi-target spell
@@ -678,6 +712,7 @@ const ENEMY_SPEEDS := {
 	"Goblin": 6.0, "Orc": 3.0, "Apprentice Mage": 5.0, "Brute": 2.0, "Shade": 7.0,
 	"Wolf": 8.0, "Traitor Wolf": 8.0, "Centaur Lancer": 7.0, "Centaur Archer": 6.0,
 	"Fae Hut": 3.0, "Fae": 7.0, "Gnome": 5.0,
+	"Shadelet": 3.0, "Disgraced Mage": 9.0, "Fire Mage": 8.0, "Hermoid": 2.0, "Earth Mage": 2.0, "Gale Mage": 12.0, "Empowered Mage": 6.0, "Voidwing Swarm": 9.0, "Water Construct": 3.0, "Stone Construct": 2.0, "Frost Construct": 3.0, "Wyrm-Hole": 5.0,
 	# minibosses
 	"Black Dragonlet": 6.0, "Treant": 2.0, "Steel Construct": 2.0, "Magma Construct": 3.0, "Voidwing": 9.0,
 	# bosses
@@ -713,6 +748,11 @@ const STAMINA_REGEN_ON_DEFEND := 15
 # x(1 + 2 / level) -- 3x at level 1 (a Goblin takes its old three hits again), 2x at level 2, 1.2x at 10, 1.1x at 20. Bosses,
 # minibosses and the frail Shade are left alone; weapons' own Strength per tier is the reward for buying better ones, so it is
 # not compensated. DRAFT number: raise EARLY_GAME_HP_BONUS for a tougher start.
+# DAMAGE by danger tier (2026-11-13, DRAFT -- the user: enemy damage felt far too low, and it should follow the region). On top of the tier's HP-and-damage power
+# (WorldMap.TIER_POWER) and the level scaling: what a hit is multiplied by, indexed by the tier of the ground the enemy lives on (tier 1 stays 1.0 so the
+# opening is untouched), and an extra factor for minibosses and bosses. HP is not touched.
+const TIER_DAMAGE_MULT := [1.0, 1.0, 1.2, 1.5, 1.9, 2.4, 3.0, 3.6, 4.2]
+const BOSS_DAMAGE_MULT := 1.5
 const EARLY_GAME_HP_BONUS := 2.0
 const ENEMY_LEVEL_SCALING := 0.05
 const ENEMY_LEVEL_SCALING_BY_DIFFICULTY := {"baby": 0.03, "normal": ENEMY_LEVEL_SCALING, "hard": 0.10, "apocalyptic": 0.17}
@@ -2604,14 +2644,17 @@ const BOSS_WAKE_RADIUS := 750.0       # ...and starts to move once you are this 
 const REGION_ENEMY_SCRIPTS := {
 	"goblin": EnemyScript, "orc": OrcScript, "archer": ArcherScript, "brute": BruteScript, "shade": ShadeScript,
 	"wolf": WolfScript, "centaur_pack": CentaurScript, "fae_hut": FaeHutScript, "gnome_pack": GnomeScript,
+	"shadelet": ShadeletScript, "disgraced_mage": DisgracedMageScript, "fire_mage": FireMageScript, "hermoid": HermoidScript,
+	"earth_mage": EarthMageScript, "gale_mage": GaleMageScript, "empowered_mage": EmpoweredMageScript, "treant": TreantScript, "voidwing": VoidwingScript,
 }
 const LANDMARK_BOSS_SCRIPTS := {
 	"elder_oak": ElderOakScript, "lizen_warband": LizenWarbandScript, "leviathan": LeviathanScript,
 	"white_dragon": WhiteDragonScript, "red_wyrm": RedWyrmScript, "archmage": ArchmageScript,
 }
 const MINIBOSS_SCRIPTS := {
-	"treant": TreantScript, "black_dragonlet": BlackDragonletScript, "iron_construct": IronConstructScript,
-	"lava_construct": LavaConstructScript, "voidwing": VoidwingScript,
+	"black_dragonlet": BlackDragonletScript, "iron_construct": IronConstructScript,
+	"lava_construct": LavaConstructScript, "voidwing_swarm": VoidwingSwarmScript,
+	"water_construct": WaterConstructScript, "stone_construct": StoneConstructScript, "frost_construct": FrostConstructScript, "wyrm_hole": WyrmHoleScript,
 }
 
 func _build_regional_world() -> void:
@@ -4360,7 +4403,24 @@ func _battle_player_move_range() -> int:
 	bonus += int(player.armor_trait_value("move_bonus", 0))
 	return maxi(1, PLAYER_BASE_MOVE_RANGE + bonus)
 
+# The Voidwing Swarm (a miniboss on the overworld) is seven Voidwings in a fight: its marker is replaced by that many real Voidwing
+# nodes standing where it was. Anything else in the squad is left as it is.
+const VOIDWING_SWARM_SIZE := 7
+func _expand_swarms(squad: Array) -> Array:
+	var out: Array = []
+	for e in squad:
+		if is_instance_valid(e) and e.get_display_name() == "Voidwing Swarm":
+			for i in VOIDWING_SWARM_SIZE:
+				var a: float = TAU * float(i) / float(VOIDWING_SWARM_SIZE)
+				out.append(_spawn_one_enemy(VoidwingScript, e.global_position + Vector2(cos(a), sin(a)) * 70.0))
+			enemies_alive = maxi(0, enemies_alive - 1)
+			e.queue_free()
+		else:
+			out.append(e)
+	return out
+
 func _setup_battle_grid(squad: Array) -> void:
+	squad = _expand_swarms(squad)
 	# A boss fight (always solo -- see _gather_squad) gets a bigger arena,
 	# more room to maneuver against a lone, dangerous threat. Set before
 	# anything below reads BATTLE_GRID_W/H.
@@ -4440,7 +4500,8 @@ func _setup_battle_grid(squad: Array) -> void:
 	# closing of distance -- start them a few tiles off rather than at the
 	# far edge, or a single-move-range unit like the Orc would take several
 	# turns just to reach melee range.
-	var enemy_col: int = max(1, BATTLE_GRID_W - 3)
+	# Regular enemies start REGULAR_START_CLOSER columns nearer you than before (2026-11-13: they died before they reached you); a boss keeps its big arena.
+	var enemy_col: int = max(2, BATTLE_GRID_W - 3 - (0 if is_boss_fight else REGULAR_START_CLOSER))
 	var enemy_rows := range(BATTLE_GRID_H)
 	enemy_rows.shuffle()
 	# (the level-scaling multiplier is per enemy now: regulars and bosses scale at different rates)
@@ -4499,7 +4560,7 @@ func _setup_battle_grid(squad: Array) -> void:
 		var scaled_hp: int = max(1, int(round(e.MAX_HEALTH * scale_mult * elite_hp_mult * player.difficulty_mult * power_tier * early_hp)))
 		if display_name == "Gnome" and gnome_pack_size > 1:
 			scaled_hp += int(round((gnome_pack_size - 1) * GNOME_HP_PER_PACKMATE * early_hp))
-		var scaled_damage: int = max(1, int(round(e.get_contact_damage() * scale_mult * elite_dmg_mult * player.difficulty_mult * power_tier)))
+		var scaled_damage: int = max(1, int(round(e.get_contact_damage() * scale_mult * _enemy_damage_mult(e, traits.get("is_boss_tier", false)) * elite_dmg_mult * player.difficulty_mult * power_tier)))
 		battle_units.append({
 			"ref": e,
 			"tile": tile,
@@ -5618,6 +5679,8 @@ func _enemy_stat_summary(u: Dictionary) -> String:
 		tags.append("Armored")
 	if traits.get("dodge_chance", 0.0) > 0.0:
 		tags.append("Evasive")
+	if traits.get("block_chance", 0.0) > 0.0:
+		tags.append("Blocks")
 	if traits.get("knockback_resist", 0.0) > 0.0:
 		tags.append("Braced")
 	if traits.get("big_squad", false):
@@ -5720,6 +5783,11 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 	var dodge_chance: float = ENEMY_TRAITS.get(u.name, {}).get("dodge_chance", 0.0)
 	if dodge_chance > 0.0 and randf() < dodge_chance:
 		hud.battle_log("The %s dodges out of the way!" % u.name)
+		return
+	# A Hermoid (and the Giant Hermoid) can shut a blow out completely: no damage and none of its effects.
+	var block_chance: float = ENEMY_TRAITS.get(u.name, {}).get("block_chance", 0.0)
+	if block_chance > 0.0 and randf() < block_chance:
+		hud.battle_log("The %s blocks the blow completely!" % u.name)
 		return
 	# Missing: a small chance the attack whiffs entirely -- no damage and none of its
 	# effects. Rolled here, per hit, so every hit of a multi-hit move gets its own
@@ -5933,7 +6001,7 @@ func _apply_single_hit(idx: int, dmg_mult: float, effect: String, weapon: Dictio
 	# player's stat) -- doubles damage and ignores the rock-cover reduction
 	# below entirely ("ignores defense"), same as Blindness's guaranteed
 	# crit-on-hit reuses.
-	var is_crit := blind_forced_crit or stealth_forced_crit or ally_stealth_crit or bleeding_cut_forced_crit or sucker_forced_crit or shadow_forced_crit or effect == "jugular"
+	var is_crit := blind_forced_crit or stealth_forced_crit or ally_stealth_crit or bleeding_cut_forced_crit or sucker_forced_crit or shadow_forced_crit or effect == "jugular" or (player.debug_always_crit and (attacker_label == "You" or _actor_is_ally()))
 	# A member crits off its own crit chance (talismans, favours) -- never the hero's stat.
 	var actor_crit_chance: float = _actor_tb("crit_chance") if _actor_is_ally() else (player.crit_chance_total() if attacker_label == "You" else 0.0)
 	# The Marksman's bow favour multiplies whatever crit chance it has.
@@ -9477,6 +9545,10 @@ func _pick_confused_target_tile(u: Dictionary) -> Vector2i:
 # of the enemy's attack patterns plays (AttackPatterns.pick).
 # The HP/damage multiplier a battle unit gets from the player's level: the difficulty's
 # per-level rate (bosses and minibosses at BOSS_LEVEL_SCALING_FACTOR of it).
+func _enemy_damage_mult(e, is_boss_tier: bool) -> float:
+	var tier: int = clampi(int(e.get_meta("region_tier", 1)), 1, TIER_DAMAGE_MULT.size() - 1)
+	return float(TIER_DAMAGE_MULT[tier]) * (BOSS_DAMAGE_MULT if is_boss_tier else 1.0)
+
 func _early_hp_factor(is_boss_tier: bool, traits: Dictionary) -> float:
 	if is_boss_tier or bool(traits.get("frail", false)):
 		return 1.0
@@ -9489,6 +9561,30 @@ func _enemy_level_scale(is_boss_tier: bool) -> float:
 	return 1.0 + (player.level - 1) * rate
 
 func _enemy_apply_damage(u: Dictionary, target_tile: Vector2i, raw_dmg: int, traits: Dictionary, attack_kind: String = "normal") -> Dictionary:
+	var result: Dictionary = await _enemy_apply_damage_core(u, target_tile, raw_dmg, traits, attack_kind)
+	if traits.get("splash", false) and (attack_kind == "normal" or attack_kind == "heavy") and not bool(result.get("dodged", false)) and not bool(result.get("blocked", false)):
+		await _enemy_splash(u, target_tile, raw_dmg, traits)
+	return result
+
+# The splash half of a spread attack: every neighbouring tile of the target, you and your party alike, takes half the hit.
+func _enemy_splash(u: Dictionary, target_tile: Vector2i, raw_dmg: int, traits: Dictionary) -> void:
+	var half: int = maxi(1, int(round(float(raw_dmg) * 0.5)))
+	for dx in range(-1, 2):
+		for dy in range(-1, 2):
+			if dx == 0 and dy == 0:
+				continue
+			var t: Vector2i = target_tile + Vector2i(dx, dy)
+			if t == battle_player_tile:
+				hud.battle_log("The blast spreads to you!")
+				_land_enemy_hit_on_player(u, _apply_incoming_reductions(half, traits), traits)
+			else:
+				for a in battle_allies:
+					if a.tile == t:
+						hud.battle_log("The blast spreads to %s!" % str(a.get("name", "your ally")))
+						await _enemy_apply_damage_core(u, t, half, traits, "splash")
+						break
+
+func _enemy_apply_damage_core(u: Dictionary, target_tile: Vector2i, raw_dmg: int, traits: Dictionary, attack_kind: String = "normal") -> Dictionary:
 	if u.get("burning", false):
 		raw_dmg = int(round(raw_dmg * (1.0 - BURN_DAMAGE_DEALT_REDUCTION)))
 	if target_tile == battle_player_tile:
@@ -9721,6 +9817,10 @@ func _land_enemy_hit_on_player(u: Dictionary, dmg: int, traits: Dictionary) -> v
 	if traits.get("inflicts_blind", false):
 		player_blind_turns = _status_len(BLINDNESS_TURNS)
 		hud.battle_log("Your vision swims -- you're blinded!")
+	# Burning (fire mages): guaranteed on a landed hit; it lasts until you reach water, like the embers.
+	if traits.get("inflicts_burn", false) and not player_burning:
+		player_burning = true
+		hud.battle_log("You catch fire!")
 
 # ---------------------------------------------------------------------------
 # Dodge / block timing minigames. An enemy attack on the hero opens either a DODGE popup
@@ -10011,6 +10111,10 @@ func _enemy_take_turn(u: Dictionary, assigned_targets: Dictionary, fae_spawns_ne
 		u.tile = _apply_water_push(u.tile, u)
 		return
 
+	_enemy_turn_start_hook(u, traits, target_tile)
+	if u.hp <= 0:
+		return
+
 	var was_cornered: bool = traits.get("kites", false) and _can_battle_attack(u.tile, target_tile, 1, ignore_line)
 	if was_cornered:
 		# The current target has closed to melee range -- back off before
@@ -10180,6 +10284,9 @@ func _enemy_take_turn(u: Dictionary, assigned_targets: Dictionary, fae_spawns_ne
 			if enrage_threshold > 0.0 and float(u.hp) < float(u.max_hp) * enrage_threshold:
 				dmg = int(round(dmg * traits.get("enrage_mult", 1.0)))
 				hud.battle_log("The %s is enraged!" % u.name)
+			if traits.get("self_stacks", false) and int(u.get("stacks", 0)) > 0:
+				dmg = int(round(dmg * (1.0 + EMPOWERED_STACK_DAMAGE_PCT * int(u.stacks))))
+				hud.battle_log("The %s's power has built up: x%d!" % [u.name, int(u.stacks)])
 			# A sweeping boss's sweep hits every occupied tile within range,
 			# not just its chosen target -- dmg is computed once above and
 			# applied in full to each tile struck, not divided. Every
@@ -10203,12 +10310,104 @@ func _enemy_take_turn(u: Dictionary, assigned_targets: Dictionary, fae_spawns_ne
 					hud.battle_log("The %s hits your %s for %d damage!" % [u.name, hit_result.target_name, hit_result.dmg])
 			if player_was_hit and player.health <= 0:
 				return
+			if player_was_hit:
+				_enemy_on_hit_effects(u, traits)
 	else:
 		# Lost track of its target -- the telegraph doesn't carry over.
 		u["winding_up"] = false
+	if traits.get("self_stacks", false):
+		u["stacks"] = mini(EMPOWERED_MAX_STACKS, int(u.get("stacks", 0)) + 1)
 	if size == 1:
 		u.tile = _apply_water_push(u.tile, u)
 		_apply_terrain_tick(u.tile, u)
+
+# --- What the miniboss set does besides hitting ---------------------------------------------------------------------
+const EMPOWERED_STACK_DAMAGE_PCT := 0.10     # an Empowered Mage: +10% damage per turn survived...
+const EMPOWERED_MAX_STACKS := 10             # ...up to this many
+const STONE_ROCKS_MAX := 10                  # a Stone Construct raises rocks round you (2 a turn) until this many stand
+const WYRM_TELEPORT_CHANCE := 0.5            # a Wyrm-Hole vanishes and surfaces beside you on this share of its turns
+
+# Before an aware enemy moves: the Stone Construct walls you in, the Wyrm-Hole may burst up beside you.
+func _enemy_turn_start_hook(u: Dictionary, traits: Dictionary, target_tile: Vector2i) -> void:
+	if traits.get("places_rocks", false):
+		var cells: Array = []
+		for dx in range(-1, 2):
+			for dy in range(-1, 2):
+				if dx != 0 or dy != 0:
+					cells.append(battle_player_tile + Vector2i(dx, dy))
+		cells.shuffle()
+		var placed := 0
+		for c in cells:
+			if placed >= int(traits.places_rocks) or int(u.get("rocks_placed", 0)) >= STONE_ROCKS_MAX:
+				break
+			if not _in_battle_bounds(c) or _battle_tile_occupied(c) or battle_terrain.has(c):
+				continue
+			# never wall you in completely: at least one of your four sides stays open
+			var open_sides := 0
+			for d in CARDINAL_DIRS:
+				var n: Vector2i = battle_player_tile + d
+				var rocky: bool = battle_terrain.has(n) and battle_terrain[n].type in ["rock", "rubble"]
+				if _in_battle_bounds(n) and not rocky and n != c:
+					open_sides += 1
+			if open_sides < 1:
+				continue
+			battle_terrain[c] = {"type": "rock"}
+			u["rocks_placed"] = int(u.get("rocks_placed", 0)) + 1
+			placed += 1
+		if placed > 0:
+			hud.battle_log("The %s raises %d wall%s of stone round you!" % [u.name, placed, "" if placed == 1 else "s"])
+			_refresh_battle_display()
+	if traits.get("teleports", false) and randf() < WYRM_TELEPORT_CHANCE:
+		var size: int = u.get("size", 1)
+		var spots: Array = []
+		for dx in range(-3, 4):
+			for dy in range(-3, 4):
+				var t: Vector2i = target_tile + Vector2i(dx, dy)
+				var dist: int = maxi(absi(dx), absi(dy))
+				if dist < 2 or dist > 3:
+					continue
+				var fits := true
+				for cell in _footprint(t, size):
+					if not _in_battle_bounds(cell) or _battle_tile_occupied(cell, u.ref) or (battle_terrain.has(cell) and battle_terrain[cell].type in ["rock", "rubble"]):
+						fits = false
+						break
+				if fits:
+					spots.append(t)
+		if not spots.is_empty():
+			u.tile = spots[randi() % spots.size()]
+			hud.battle_log("The %s vanishes, then bursts up out of the ground!" % u.name)
+			_refresh_battle_display()
+
+# After an enemy blow lands on YOU: the Water Construct shoves you away, the Frost Construct slides you, each leaving its element behind.
+func _enemy_on_hit_effects(u: Dictionary, traits: Dictionary) -> void:
+	var water: bool = int(traits.get("push_player", 0)) > 0
+	var tiles: int = int(traits.get("push_player", 0)) if water else int(traits.get("slide_player", 0))
+	if tiles <= 0:
+		return
+	var dir: Vector2i = _knockback_dir(u.tile, battle_player_tile)
+	var from_tile: Vector2i = battle_player_tile
+	var moved := _push_player_tiles(dir, tiles)
+	if moved > 0:
+		hud.battle_log("The %s's %s sends you %s %d tile%s!" % [u.name, "wave" if water else "blow", "flying" if water else "sliding", moved, "" if moved == 1 else "s"])
+		if not battle_terrain.has(from_tile):
+			battle_terrain[from_tile] = {"type": "water", "push_dir": dir} if water else {"type": "ice"}
+		_refresh_battle_display()
+
+# Moves you up to `tiles` tiles along `dir`, stopping at anything in the way; a cliff costs its fall damage. Returns the tiles moved.
+func _push_player_tiles(dir: Vector2i, tiles: int) -> int:
+	var moved := 0
+	for i in tiles:
+		var step: Dictionary = _resolve_battle_step(battle_player_tile, dir)
+		if not step.moved:
+			break
+		battle_player_tile = step.tile
+		moved += 1
+		if step.fell:
+			var fall_dmg: int = int(round(float(player.max_health) * CLIFF_FALL_DAMAGE_PCT))
+			player.take_battle_damage(fall_dmg, true)
+			hud.battle_log("You are thrown off the edge and take %d damage!" % fall_dmg)
+			break
+	return moved
 
 # The housekeeping after enemy turns: sweep anyone who died, add the Fae the huts queued, remove allies
 # that fell, and see whether the fight is over. False = the battle ended (or was left), stop here.
@@ -10281,7 +10480,8 @@ func _process_enemy_turn() -> void:
 	var assigned_targets: Dictionary = _assign_enemy_targets()
 	for u in battle_units:
 		var health_before: int = player.health
-		await _enemy_take_turn(u, assigned_targets, fae_spawns_needed)
+		if not player.debug_enemies_pass:   # the Debug menu can have them stand still
+			await _enemy_take_turn(u, assigned_targets, fae_spawns_needed)
 		if player.health <= 0 and health_before > 0:
 			return
 	if not _finish_enemy_actions(fae_spawns_needed):
@@ -10632,7 +10832,8 @@ func _run_enemy_actor(u: Dictionary) -> void:
 	var fae_spawns_needed: Array = []
 	_update_enemy_awareness()
 	var assigned_targets: Dictionary = _assign_enemy_targets()
-	await _enemy_take_turn(u, assigned_targets, fae_spawns_needed)
+	if not player.debug_enemies_pass:   # the Debug menu can have them stand still
+		await _enemy_take_turn(u, assigned_targets, fae_spawns_needed)
 	if player.health <= 0:
 		return
 	_finish_enemy_actions(fae_spawns_needed)

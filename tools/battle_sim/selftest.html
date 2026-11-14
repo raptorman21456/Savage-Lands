@@ -402,14 +402,14 @@ const SIM_DATA = {
 	},
 	"enemies": [
 		{
-			"contact_damage": 1,
+			"contact_damage": 2,
 			"max_health": 3,
 			"name": "Goblin",
 			"script": "Enemy",
 			"xp_reward": 15
 		},
 		{
-			"contact_damage": 2,
+			"contact_damage": 3,
 			"max_health": 20,
 			"name": "Orc",
 			"script": "Orc",
@@ -437,14 +437,14 @@ const SIM_DATA = {
 			"xp_reward": 40
 		},
 		{
-			"contact_damage": 2,
+			"contact_damage": 3,
 			"max_health": 8,
 			"name": "Wolf",
 			"script": "Wolf",
 			"xp_reward": 20
 		},
 		{
-			"contact_damage": 2,
+			"contact_damage": 3,
 			"max_health": 8,
 			"name": "Traitor Wolf",
 			"script": "Wolf",
@@ -486,6 +486,90 @@ const SIM_DATA = {
 			"xp_reward": 12
 		},
 		{
+			"contact_damage": 1,
+			"max_health": 2,
+			"name": "Shadelet",
+			"script": "Shadelet",
+			"xp_reward": 6
+		},
+		{
+			"contact_damage": 14,
+			"max_health": 3,
+			"name": "Disgraced Mage",
+			"script": "DisgracedMage",
+			"xp_reward": 70
+		},
+		{
+			"contact_damage": 4,
+			"max_health": 10,
+			"name": "Fire Mage",
+			"script": "FireMage",
+			"xp_reward": 45
+		},
+		{
+			"contact_damage": 2,
+			"max_health": 18,
+			"name": "Hermoid",
+			"script": "Hermoid",
+			"xp_reward": 50
+		},
+		{
+			"contact_damage": 3,
+			"max_health": 40,
+			"name": "Earth Mage",
+			"script": "EarthMage",
+			"xp_reward": 85
+		},
+		{
+			"contact_damage": 6,
+			"max_health": 6,
+			"name": "Gale Mage",
+			"script": "GaleMage",
+			"xp_reward": 55
+		},
+		{
+			"contact_damage": 5,
+			"max_health": 30,
+			"name": "Voidwing Swarm",
+			"script": "VoidwingSwarm",
+			"xp_reward": 0
+		},
+		{
+			"contact_damage": 6,
+			"max_health": 80,
+			"name": "Empowered Mage",
+			"script": "EmpoweredMage",
+			"xp_reward": 140
+		},
+		{
+			"contact_damage": 6,
+			"max_health": 170,
+			"name": "Water Construct",
+			"script": "WaterConstruct",
+			"xp_reward": 540
+		},
+		{
+			"contact_damage": 7,
+			"max_health": 220,
+			"name": "Stone Construct",
+			"script": "StoneConstruct",
+			"xp_reward": 580
+		},
+		{
+			"contact_damage": 6,
+			"max_health": 190,
+			"name": "Frost Construct",
+			"script": "FrostConstruct",
+			"xp_reward": 560
+		},
+		{
+			"contact_damage": 6,
+			"max_health": 200,
+			"name": "Wyrm-Hole",
+			"script": "WyrmHole",
+			"xp_reward": 570
+		},
+		{
 			"contact_damage": 7,
 			"max_health": 235,
 			"name": "Black Dragonlet",
@@ -493,11 +577,11 @@ const SIM_DATA = {
 			"xp_reward": 690
 		},
 		{
-			"contact_damage": 6,
-			"max_health": 175,
+			"contact_damage": 4,
+			"max_health": 60,
 			"name": "Treant",
 			"script": "Treant",
-			"xp_reward": 530
+			"xp_reward": 120
 		},
 		{
 			"contact_damage": 8,
@@ -514,11 +598,11 @@ const SIM_DATA = {
 			"xp_reward": 548
 		},
 		{
-			"contact_damage": 6,
-			"max_health": 160,
+			"contact_damage": 5,
+			"max_health": 30,
 			"name": "Voidwing",
 			"script": "Voidwing",
-			"xp_reward": 525
+			"xp_reward": 90
 		},
 		{
 			"contact_damage": 6,
@@ -563,7 +647,7 @@ const SIM_DATA = {
 			"xp_reward": 715
 		}
 	],
-	"exported": "2026-11-08T15:49:29",
+	"exported": "2026-11-13T19:44:54",
 	"foods": [
 		{
 			"description": "Heals 5 HP and restores 15 stamina.",
@@ -701,6 +785,7 @@ const SIM_DATA = {
 		"BONE_DREAD_CHANCE": 0.1,
 		"BONK_CONCUSSED_TURNS": 3,
 		"BOSS_BATTLE_GRID_SIZE": 15,
+		"BOSS_DAMAGE_MULT": 1.5,
 		"BOSS_ENRAGE_DAMAGE_MULT": 1.5,
 		"BOSS_ENRAGE_HP_THRESHOLD": 0.3,
 		"BOSS_LEVEL_SCALING_FACTOR": 0.5,
@@ -788,6 +873,8 @@ const SIM_DATA = {
 		"EMBER_BURN_ATTACK_DIV": 5.0,
 		"EMBER_BURN_BASE": 5.0,
 		"EMBER_BURN_DECAY": 0.7,
+		"EMPOWERED_MAX_STACKS": 10,
+		"EMPOWERED_STACK_DAMAGE_PCT": 0.1,
 		"ENEMY_COUNT": 6,
 		"ENEMY_LEVEL_SCALING": 0.05,
 		"ENEMY_LEVEL_SCALING_BY_DIFFICULTY": {
@@ -805,23 +892,35 @@ const SIM_DATA = {
 			"Brute": 2.0,
 			"Centaur Archer": 6.0,
 			"Centaur Lancer": 7.0,
+			"Disgraced Mage": 9.0,
+			"Earth Mage": 2.0,
 			"Elder Oak": 2.0,
+			"Empowered Mage": 6.0,
 			"Fae": 7.0,
 			"Fae Hut": 3.0,
+			"Fire Mage": 8.0,
+			"Frost Construct": 3.0,
+			"Gale Mage": 12.0,
 			"Gnome": 5.0,
 			"Goblin": 6.0,
+			"Hermoid": 2.0,
 			"Leviathan": 3.0,
 			"Lizen Warband": 5.0,
 			"Magma Construct": 3.0,
 			"Orc": 3.0,
 			"Red Wyrm": 4.0,
 			"Shade": 7.0,
+			"Shadelet": 3.0,
 			"Steel Construct": 2.0,
+			"Stone Construct": 2.0,
 			"Traitor Wolf": 8.0,
 			"Treant": 2.0,
 			"Voidwing": 9.0,
+			"Voidwing Swarm": 9.0,
+			"Water Construct": 3.0,
 			"White Drake": 4.0,
-			"Wolf": 8.0
+			"Wolf": 8.0,
+			"Wyrm-Hole": 5.0
 		},
 		"ENEMY_SPEED_DEFAULT": 5.0,
 		"ENEMY_TRAITS": {
@@ -878,6 +977,26 @@ const SIM_DATA = {
 			"Centaur Lancer": {
 				"move_range": 2
 			},
+			"Disgraced Mage": {
+				"big_squad": true,
+				"dodge_chance": 0.5,
+				"frail": true,
+				"harm": "magical",
+				"inflicts_fear": true,
+				"is_undead": true,
+				"is_void": true,
+				"move_range": 4
+			},
+			"Earth Mage": {
+				"armored": true,
+				"attack_range": 3,
+				"harm": "magical",
+				"ignore_line": true,
+				"knockback_resist": 0.6,
+				"mage": true,
+				"move_range": 1,
+				"splash": true
+			},
 			"Elder Oak": {
 				"armored": true,
 				"enrage_mult": 1.5,
@@ -888,6 +1007,17 @@ const SIM_DATA = {
 				"sweeps": true,
 				"windup": true
 			},
+			"Empowered Mage": {
+				"attack_range": 3,
+				"harm": "magical",
+				"ignore_line": true,
+				"inflicts_blind": true,
+				"is_void": true,
+				"mage": true,
+				"move_range": 2,
+				"self_stacks": true,
+				"sweeps": true
+			},
 			"Fae": {
 				"harm": "magical"
 			},
@@ -895,11 +1025,45 @@ const SIM_DATA = {
 				"move_range": 1,
 				"spawns_fae": true
 			},
+			"Fire Mage": {
+				"attack_range": 3,
+				"harm": "magical",
+				"ignore_line": true,
+				"inflicts_burn": true,
+				"mage": true,
+				"move_range": 3
+			},
+			"Frost Construct": {
+				"armored": true,
+				"enrage_mult": 1.5,
+				"enrage_threshold": 0.3,
+				"is_boss_tier": true,
+				"is_miniboss": true,
+				"knockback_resist": 0.7,
+				"move_range": 1,
+				"slide_player": 3,
+				"windup": true
+			},
+			"Gale Mage": {
+				"attack_range": 5,
+				"harm": "magical",
+				"ignore_line": true,
+				"mage": true,
+				"move_range": 5,
+				"windup": true
+			},
 			"Gnome": {
 				"big_squad": true
 			},
 			"Goblin": {
+				"move_range": 3,
 				"pack_bonus_mult": 1.5
+			},
+			"Hermoid": {
+				"armored": true,
+				"block_chance": 0.3,
+				"knockback_resist": 0.5,
+				"move_range": 1
 			},
 			"Leviathan": {
 				"armored": true,
@@ -938,7 +1102,7 @@ const SIM_DATA = {
 				"corners": true,
 				"inflicts_concussion": true,
 				"knockback_resist": 0.5,
-				"move_range": 1,
+				"move_range": 2,
 				"quick_jab_chance": 0.4,
 				"windup": true
 			},
@@ -965,6 +1129,12 @@ const SIM_DATA = {
 				"is_void": true,
 				"move_range": 3
 			},
+			"Shadelet": {
+				"big_squad": true,
+				"harm": "magical",
+				"is_void": true,
+				"move_range": 1
+			},
 			"Steel Construct": {
 				"armored": true,
 				"enrage_mult": 1.5,
@@ -976,15 +1146,22 @@ const SIM_DATA = {
 				"move_range": 1,
 				"windup": true
 			},
-			"Traitor Wolf": {
-				"move_range": 3
-			},
-			"Treant": {
+			"Stone Construct": {
 				"armored": true,
 				"enrage_mult": 1.5,
 				"enrage_threshold": 0.3,
 				"is_boss_tier": true,
 				"is_miniboss": true,
+				"knockback_resist": 0.9,
+				"move_range": 1,
+				"places_rocks": 2,
+				"windup": true
+			},
+			"Traitor Wolf": {
+				"move_range": 3
+			},
+			"Treant": {
+				"armored": true,
 				"knockback_resist": 0.85,
 				"move_range": 1,
 				"windup": true
@@ -992,15 +1169,29 @@ const SIM_DATA = {
 			"Voidwing": {
 				"attack_range": 2,
 				"dodge_chance": 0.3,
-				"enrage_mult": 1.5,
-				"enrage_threshold": 0.3,
 				"harm": "magical",
 				"ignore_line": true,
 				"inflicts_bleed": true,
+				"is_void": true,
+				"move_range": 3,
+				"windup": true
+			},
+			"Voidwing Swarm": {
+				"harm": "magical",
 				"is_boss_tier": true,
 				"is_miniboss": true,
 				"is_void": true,
-				"move_range": 3,
+				"move_range": 3
+			},
+			"Water Construct": {
+				"armored": true,
+				"enrage_mult": 1.5,
+				"enrage_threshold": 0.3,
+				"is_boss_tier": true,
+				"is_miniboss": true,
+				"knockback_resist": 0.6,
+				"move_range": 1,
+				"push_player": 2,
 				"windup": true
 			},
 			"White Drake": {
@@ -1017,6 +1208,20 @@ const SIM_DATA = {
 			},
 			"Wolf": {
 				"move_range": 3
+			},
+			"Wyrm-Hole": {
+				"armored": true,
+				"enrage_mult": 1.5,
+				"enrage_threshold": 0.3,
+				"ignore_cover": true,
+				"ignore_terrain": true,
+				"is_boss_tier": true,
+				"is_miniboss": true,
+				"knockback_resist": 0.7,
+				"move_range": 2,
+				"size": 2,
+				"teleports": true,
+				"windup": true
 			}
 		},
 		"ENERGY_POTION_MOVE_BONUS": 2,
@@ -1059,9 +1264,9 @@ const SIM_DATA = {
 		"MANA_PER_HP": 5,
 		"MARACAS_ARMORED_MULT": 1.53846153846154,
 		"MAX_AMBIENT_ENEMIES": 40,
-		"MAX_BATTLE_ENEMIES_GOBLIN": 2,
-		"MAX_BATTLE_ENEMIES_TOUGH": 4,
-		"MAX_BATTLE_SQUAD_SIZE_CEILING": 6,
+		"MAX_BATTLE_ENEMIES_GOBLIN": 3,
+		"MAX_BATTLE_ENEMIES_TOUGH": 5,
+		"MAX_BATTLE_SQUAD_SIZE_CEILING": 7,
 		"MAX_BATTLE_TOUGH_UNITS": 2,
 		"MERCENARY_SPEED": 5.0,
 		"MERCHANT_EVENT_DISCOUNT": 0.6,
@@ -1069,10 +1274,13 @@ const SIM_DATA = {
 		"MINIBOSS_CHANCE": 0.04,
 		"MINIBOSS_SCRIPTS": {
 			"black_dragonlet": null,
+			"frost_construct": null,
 			"iron_construct": null,
 			"lava_construct": null,
-			"treant": null,
-			"voidwing": null
+			"stone_construct": null,
+			"voidwing_swarm": null,
+			"water_construct": null,
+			"wyrm_hole": null
 		},
 		"MINIGAME_BLOCK_HELD_REDUCTION": 0.5,
 		"MINIGAME_BRACE_HELD_REDUCTION": 0.25,
@@ -1159,13 +1367,23 @@ const SIM_DATA = {
 			"archer": null,
 			"brute": null,
 			"centaur_pack": null,
+			"disgraced_mage": null,
+			"earth_mage": null,
+			"empowered_mage": null,
 			"fae_hut": null,
+			"fire_mage": null,
+			"gale_mage": null,
 			"gnome_pack": null,
 			"goblin": null,
+			"hermoid": null,
 			"orc": null,
 			"shade": null,
+			"shadelet": null,
+			"treant": null,
+			"voidwing": null,
 			"wolf": null
 		},
+		"REGULAR_START_CLOSER": 2,
 		"REROLL_BASE_COST": 10,
 		"REROLL_COST_INCREMENT": 10,
 		"RESERVED_TERRAIN_TYPES": [
@@ -1235,11 +1453,23 @@ const SIM_DATA = {
 		"STEALTH_STAMINA_COST": 20,
 		"STEALTH_TURNS": 3,
 		"STONE_AMULET_MATERIAL_BOOST_MULT": 2.0,
+		"STONE_ROCKS_MAX": 10,
 		"SUMMON_PICK_LIMIT": 24,
 		"SWARM_BONUS_GOBLINS": 4,
 		"TARGET_DECONFLICT_TOLERANCE": 1,
 		"TARGET_PRACTICE_BOSS_CHANCE": 0.05,
 		"TARGET_PRACTICE_CHANCE": 0.3,
+		"TIER_DAMAGE_MULT": [
+			1.0,
+			1.0,
+			1.2,
+			1.5,
+			1.9,
+			2.4,
+			3.0,
+			3.6,
+			4.2
+		],
 		"TOWN_AREA_ORIGIN": [
 			15900.0,
 			11275.0
@@ -1488,6 +1718,7 @@ const SIM_DATA = {
 		"TRAITOR_WOLF_RECRUIT_CHANCE": 0.25,
 		"TURN_ORDER_ROWS": 8,
 		"TURN_TIME_BASE": 100.0,
+		"VOIDWING_SWARM_SIZE": 7,
 		"VULNERABLE_DAMAGE_TAKEN_BONUS_PCT": 0.2,
 		"VULNERABLE_TURNS": 2,
 		"WANDER_DIRS": [
@@ -1520,7 +1751,8 @@ const SIM_DATA = {
 		"WORLD_SIZE": [
 			33600.0,
 			23800.0
-		]
+		],
+		"WYRM_TELEPORT_CHANCE": 0.5
 	},
 	"party": {
 		"consts": {
@@ -3399,6 +3631,26 @@ const SIM_DATA = {
 		"Centaur Lancer": {
 			"move_range": 2
 		},
+		"Disgraced Mage": {
+			"big_squad": true,
+			"dodge_chance": 0.5,
+			"frail": true,
+			"harm": "magical",
+			"inflicts_fear": true,
+			"is_undead": true,
+			"is_void": true,
+			"move_range": 4
+		},
+		"Earth Mage": {
+			"armored": true,
+			"attack_range": 3,
+			"harm": "magical",
+			"ignore_line": true,
+			"knockback_resist": 0.6,
+			"mage": true,
+			"move_range": 1,
+			"splash": true
+		},
 		"Elder Oak": {
 			"armored": true,
 			"enrage_mult": 1.5,
@@ -3409,6 +3661,17 @@ const SIM_DATA = {
 			"sweeps": true,
 			"windup": true
 		},
+		"Empowered Mage": {
+			"attack_range": 3,
+			"harm": "magical",
+			"ignore_line": true,
+			"inflicts_blind": true,
+			"is_void": true,
+			"mage": true,
+			"move_range": 2,
+			"self_stacks": true,
+			"sweeps": true
+		},
 		"Fae": {
 			"harm": "magical"
 		},
@@ -3416,11 +3679,45 @@ const SIM_DATA = {
 			"move_range": 1,
 			"spawns_fae": true
 		},
+		"Fire Mage": {
+			"attack_range": 3,
+			"harm": "magical",
+			"ignore_line": true,
+			"inflicts_burn": true,
+			"mage": true,
+			"move_range": 3
+		},
+		"Frost Construct": {
+			"armored": true,
+			"enrage_mult": 1.5,
+			"enrage_threshold": 0.3,
+			"is_boss_tier": true,
+			"is_miniboss": true,
+			"knockback_resist": 0.7,
+			"move_range": 1,
+			"slide_player": 3,
+			"windup": true
+		},
+		"Gale Mage": {
+			"attack_range": 5,
+			"harm": "magical",
+			"ignore_line": true,
+			"mage": true,
+			"move_range": 5,
+			"windup": true
+		},
 		"Gnome": {
 			"big_squad": true
 		},
 		"Goblin": {
+			"move_range": 3,
 			"pack_bonus_mult": 1.5
+		},
+		"Hermoid": {
+			"armored": true,
+			"block_chance": 0.3,
+			"knockback_resist": 0.5,
+			"move_range": 1
 		},
 		"Leviathan": {
 			"armored": true,
@@ -3459,7 +3756,7 @@ const SIM_DATA = {
 			"corners": true,
 			"inflicts_concussion": true,
 			"knockback_resist": 0.5,
-			"move_range": 1,
+			"move_range": 2,
 			"quick_jab_chance": 0.4,
 			"windup": true
 		},
@@ -3486,6 +3783,12 @@ const SIM_DATA = {
 			"is_void": true,
 			"move_range": 3
 		},
+		"Shadelet": {
+			"big_squad": true,
+			"harm": "magical",
+			"is_void": true,
+			"move_range": 1
+		},
 		"Steel Construct": {
 			"armored": true,
 			"enrage_mult": 1.5,
@@ -3497,15 +3800,22 @@ const SIM_DATA = {
 			"move_range": 1,
 			"windup": true
 		},
-		"Traitor Wolf": {
-			"move_range": 3
-		},
-		"Treant": {
+		"Stone Construct": {
 			"armored": true,
 			"enrage_mult": 1.5,
 			"enrage_threshold": 0.3,
 			"is_boss_tier": true,
 			"is_miniboss": true,
+			"knockback_resist": 0.9,
+			"move_range": 1,
+			"places_rocks": 2,
+			"windup": true
+		},
+		"Traitor Wolf": {
+			"move_range": 3
+		},
+		"Treant": {
+			"armored": true,
 			"knockback_resist": 0.85,
 			"move_range": 1,
 			"windup": true
@@ -3513,15 +3823,29 @@ const SIM_DATA = {
 		"Voidwing": {
 			"attack_range": 2,
 			"dodge_chance": 0.3,
-			"enrage_mult": 1.5,
-			"enrage_threshold": 0.3,
 			"harm": "magical",
 			"ignore_line": true,
 			"inflicts_bleed": true,
+			"is_void": true,
+			"move_range": 3,
+			"windup": true
+		},
+		"Voidwing Swarm": {
+			"harm": "magical",
 			"is_boss_tier": true,
 			"is_miniboss": true,
 			"is_void": true,
-			"move_range": 3,
+			"move_range": 3
+		},
+		"Water Construct": {
+			"armored": true,
+			"enrage_mult": 1.5,
+			"enrage_threshold": 0.3,
+			"is_boss_tier": true,
+			"is_miniboss": true,
+			"knockback_resist": 0.6,
+			"move_range": 1,
+			"push_player": 2,
 			"windup": true
 		},
 		"White Drake": {
@@ -3538,6 +3862,20 @@ const SIM_DATA = {
 		},
 		"Wolf": {
 			"move_range": 3
+		},
+		"Wyrm-Hole": {
+			"armored": true,
+			"enrage_mult": 1.5,
+			"enrage_threshold": 0.3,
+			"ignore_cover": true,
+			"ignore_terrain": true,
+			"is_boss_tier": true,
+			"is_miniboss": true,
+			"knockback_resist": 0.7,
+			"move_range": 2,
+			"size": 2,
+			"teleports": true,
+			"windup": true
 		}
 	},
 	"upgrades": {
@@ -5251,6 +5589,7 @@ const SIM_DATA = {
 
 const D = SIM_DATA;
 const MC = D.main_consts;     // Main.gd constants
+const REGION_TIER_POWER = [1.0, 1.0, 1.25, 1.55, 1.9, 2.35, 2.9, 3.5, 4.2];   // WorldMap.TIER_POWER (HP and damage by the region's danger tier)
 const PC = D.player_consts;   // Player.gd constants
 const DEF = D.defense;        // Defense.gd constants
 
@@ -6345,7 +6684,7 @@ class Sim {
     this.battle_player_moves_left = this._battle_player_move_range();
     p.reset_stamina_for_battle();
 
-    const enemy_col = Math.max(1, this.BATTLE_GRID_W - 3);
+    const enemy_col = Math.max(2, this.BATTLE_GRID_W - 3 - (is_boss_fight ? 0 : MC.REGULAR_START_CLOSER));
     const enemy_rows = [];
     for (let i = 0; i < this.BATTLE_GRID_H; i++) enemy_rows.push(i);
     this.rng.shuffle(enemy_rows);
@@ -6375,11 +6714,14 @@ class Sim {
       const elite_hp = e.elite ? MC.ELITE_HP_MULT : 1.0;
       const elite_dmg = e.elite ? MC.ELITE_DAMAGE_MULT : 1.0;
       const power_tier = e.power_tier ?? 1.0;
-      const scale_mult = enemy_scale(!!traits.is_boss_tier);
+      // Region danger tier (Main: region_tier_power + _enemy_damage_mult); an entry's own `tier`, else cfg.tier, else 1 (the plains: unchanged).
+      const tier_i = Math.max(1, Math.min(8, e.tier ?? (cfg.tier || 1)));
+      const scale_mult = enemy_scale(!!traits.is_boss_tier) * REGION_TIER_POWER[tier_i];
+      const dmg_mult = MC.TIER_DAMAGE_MULT[tier_i] * (traits.is_boss_tier ? MC.BOSS_DAMAGE_MULT : 1.0);
       const early_hp = early_hp_factor(traits);
       let scaled_hp = Math.max(1, round(edata.max_health * scale_mult * elite_hp * p.difficulty_mult * power_tier * early_hp));
       if (e.name === "Gnome" && gnome_pack_size > 1) scaled_hp += round((gnome_pack_size - 1) * MC.GNOME_HP_PER_PACKMATE * early_hp);
-      const scaled_damage = Math.max(1, round(edata.contact_damage * scale_mult * elite_dmg * p.difficulty_mult * power_tier));
+      const scaled_damage = Math.max(1, round(edata.contact_damage * scale_mult * dmg_mult * elite_dmg * p.difficulty_mult * power_tier));
       this.battle_units.push({
         ref: ++this.ref_counter, tile, hp: scaled_hp, max_hp: scaled_hp,
         move_range: traits.move_range ?? 2, damage: scaled_damage, name: e.name,
@@ -6577,6 +6919,8 @@ Object.assign(Sim.prototype, {
     const u = this.battle_units[idx];
     const dodge_chance = (TRAITS[u.name] || {}).dodge_chance || 0;
     if (dodge_chance > 0 && rng.randf() < dodge_chance) { this.log(`The ${u.name} dodges out of the way!`); return; }
+    const block_chance = (TRAITS[u.name] || {}).block_chance || 0;
+    if (block_chance > 0 && rng.randf() < block_chance) { this.log(`The ${u.name} blocks the blow completely!`); return; }
     const you = attacker_label === "You";
     if (effect !== "thorns") {
       const miss = you ? p.miss_chance_for(weapon) : p.ally_miss_chance();
@@ -7605,7 +7949,22 @@ Object.assign(Sim.prototype, {
   },
 
   // ---------------------------------------------------------------- one enemy attack landing
+  // The Earth Mage's splash: the same hit also lands (at half) on everything next to the target (Main._enemy_apply_damage / _enemy_splash).
   async _enemy_apply_damage(u, target_tile, raw_dmg, traits) {
+    const r = await this._enemy_apply_damage_core(u, target_tile, raw_dmg, traits);
+    if (traits.splash && !(r && (r.dodged || r.blocked))) {
+      const half = Math.max(1, round(raw_dmg * 0.5));
+      for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
+        if (dx === 0 && dy === 0) continue;
+        const t = V(target_tile.x + dx, target_tile.y + dy);
+        if (veq(t, this.battle_player_tile)) { this.log("The blast spreads to you!"); const d = this._apply_incoming_reductions(half, traits); this.player.take_battle_damage(d); this.stats.damage_taken += d; this._check_player_dead(); }
+        else { for (const a of this.battle_allies) if (veq(a.tile, t)) { await this._enemy_apply_damage_core(u, t, half, traits); break; } }
+      }
+    }
+    return r;
+  },
+
+  async _enemy_apply_damage_core(u, target_tile, raw_dmg, traits) {
     const p = this.player;
     const rng = this.rng;
     if (u.burning) raw_dmg = round(raw_dmg * (1.0 - MC.BURN_DAMAGE_DEALT_REDUCTION));
@@ -7637,6 +7996,7 @@ Object.assign(Sim.prototype, {
       if (traits.inflicts_concussion && rng.randf() < MC.CONCUSSION_INFLICT_CHANCE) { this.player_concussed_turns = this._status_len(MC.PLAYER_CONCUSSION_TURNS); this.log("The blow leaves you dazed!", "bad"); }
       if (traits.inflicts_bleed && this.player_bleed_turns <= 0) { this.player_bleed_turns = this._status_len(MC.BLEED_BASE_TURNS); this.log("The wound leaves you bleeding!", "bad"); }
       if (traits.inflicts_blind) { this.player_blind_turns = this._status_len(MC.BLINDNESS_TURNS); this.log("Your vision swims -- you're blinded!", "bad"); }
+      if (traits.inflicts_burn && !this.player_burning) { this.player_burning = true; this.log("You catch fire!", "bad"); }
       this._check_player_dead();
       return { dmg, is_player: true, target_name: "", dodged: false };
     }
@@ -7764,6 +8124,8 @@ Object.assign(Sim.prototype, {
       u.tile = this._apply_water_push(u.tile, u);
       return;
     }
+    this._enemy_turn_start_hook(u, traits, target_tile);
+    if (u.hp <= 0) return;
     const was_cornered = !!traits.kites && this._can_battle_attack(u.tile, target_tile, 1, ignore_line);
     if (was_cornered) {
       const away = this._knockback_dir(target_tile, u.tile);
@@ -7851,6 +8213,7 @@ Object.assign(Sim.prototype, {
         if ((u.buffed_dmg_turns || 0) > 0) { dmg = round(dmg * (1.0 + (u.buffed_dmg_pct || 0))); u.buffed_dmg_turns -= 1; }
         const enrage = traits.enrage_threshold || 0;
         if (enrage > 0 && u.hp < u.max_hp * enrage) { dmg = round(dmg * (traits.enrage_mult ?? 1.0)); this.log(`The ${u.name} is enraged!`, "bad"); }
+        if (traits.self_stacks && (u.stacks || 0) > 0) { dmg = round(dmg * (1.0 + MC.EMPOWERED_STACK_DAMAGE_PCT * u.stacks)); this.log(`The ${u.name}'s power has built up: x${u.stacks}!`, "bad"); }
         const sweep_targets = traits.sweeps ? this._sweep_targets(u) : [target_tile];
         let player_was_hit = false;
         for (const t of sweep_targets) {
@@ -7861,9 +8224,66 @@ Object.assign(Sim.prototype, {
           else this.log(`The ${u.name} hits your ${hr.target_name} for ${hr.dmg} damage!`);
         }
         if (player_was_hit && p.health <= 0) { this._check_player_dead(); return; }
+        if (player_was_hit) this._enemy_on_hit_effects(u, traits);
       }
     } else u.winding_up = false;
+    if (traits.self_stacks) u.stacks = Math.min(MC.EMPOWERED_MAX_STACKS, (u.stacks || 0) + 1);
     if (size === 1) { u.tile = this._apply_water_push(u.tile, u); this._apply_terrain_tick(u.tile, u); }
+  },
+
+  // The miniboss set (Main.gd:_enemy_turn_start_hook / _enemy_on_hit_effects / _push_player_tiles): the Stone Construct walls you in, the Wyrm-Hole bursts up
+  // beside you, the Water and Frost Constructs push and slide you and leave water / ice behind.
+  _enemy_turn_start_hook(u, traits, target_tile) {
+    const rng = this.rng;
+    if (traits.places_rocks) {
+      const cells = [];
+      for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) if (dx || dy) cells.push(V(this.battle_player_tile.x + dx, this.battle_player_tile.y + dy));
+      rng.shuffle(cells);
+      let placed = 0;
+      for (const c of cells) {
+        if (placed >= traits.places_rocks || (u.rocks_placed || 0) >= MC.STONE_ROCKS_MAX) break;
+        if (!this._in_battle_bounds(c) || this._battle_tile_occupied(c) || this.battle_terrain[vkey(c)]) continue;
+        let open = 0;
+        for (const d of CARDINAL_DIRS) { const n = vadd(this.battle_player_tile, d); const tn = this.battle_terrain[vkey(n)]; const rocky = tn && (tn.type === "rock" || tn.type === "rubble"); if (this._in_battle_bounds(n) && !rocky && !veq(n, c)) open++; }
+        if (open < 1) continue;
+        this.battle_terrain[vkey(c)] = { type: "rock" }; u.rocks_placed = (u.rocks_placed || 0) + 1; placed++;
+      }
+      if (placed > 0) this.log(`The ${u.name} raises ${placed} wall${placed === 1 ? "" : "s"} of stone round you!`);
+    }
+    if (traits.teleports && rng.randf() < MC.WYRM_TELEPORT_CHANCE) {
+      const size = u.size || 1; const spots = [];
+      for (let dx = -3; dx <= 3; dx++) for (let dy = -3; dy <= 3; dy++) {
+        const dist = Math.max(Math.abs(dx), Math.abs(dy)); if (dist < 2 || dist > 3) continue;
+        const t = V(target_tile.x + dx, target_tile.y + dy); let fits = true;
+        for (const cell of this._footprint(t, size)) { const tn = this.battle_terrain[vkey(cell)]; if (!this._in_battle_bounds(cell) || this._battle_tile_occupied(cell, u.ref) || (tn && (tn.type === "rock" || tn.type === "rubble"))) { fits = false; break; } }
+        if (fits) spots.push(t);
+      }
+      if (spots.length) { u.tile = spots[Math.floor(rng.randf() * spots.length) % spots.length]; this.log(`The ${u.name} vanishes, then bursts up out of the ground!`); }
+    }
+  },
+
+  _enemy_on_hit_effects(u, traits) {
+    const water = (traits.push_player || 0) > 0;
+    const tiles = water ? traits.push_player : (traits.slide_player || 0);
+    if (tiles <= 0) return;
+    const dir = this._knockback_dir(u.tile, this.battle_player_tile);
+    const from = this.battle_player_tile;
+    const moved = this._push_player_tiles(dir, tiles);
+    if (moved > 0) {
+      this.log(`The ${u.name}'s ${water ? "wave" : "blow"} sends you ${water ? "flying" : "sliding"} ${moved} tile${moved === 1 ? "" : "s"}!`, "bad");
+      if (!this.battle_terrain[vkey(from)]) this.battle_terrain[vkey(from)] = water ? { type: "water", push_dir: dir } : { type: "ice" };
+    }
+  },
+
+  _push_player_tiles(dir, tiles) {
+    const p = this.player; let moved = 0;
+    for (let i = 0; i < tiles; i++) {
+      const step = this._resolve_battle_step(this.battle_player_tile, dir);
+      if (!step.moved) break;
+      this.battle_player_tile = step.tile; moved++;
+      if (step.fell) { const d = round(p.max_health * MC.CLIFF_FALL_DAMAGE_PCT); p.take_battle_damage(d, true); this.stats.damage_taken += d; this.log(`You are thrown off the edge and take ${d} damage!`, "bad"); this._check_player_dead(); break; }
+    }
+    return moved;
   },
 
   // The housekeeping after enemy turns (Main.gd:_finish_enemy_actions): false = the battle ended, stop here.
@@ -8682,9 +9102,9 @@ async function main() {
     const s = createSim({ level, difficulty: diff, weapon: { base: "club" }, armor: "armor_gambeson", talismans: [], upgrades: {}, enemies: [{ name: enemy }], world: "plains", seed: 1, consumables: [] }, 1);
     return JSON.stringify([s.battle_units[0].hp, s.battle_units[0].damage]);
   };
-  P(`scaling Hard L10 Goblin [hp,dmg]: ${scaleCase("hard", 10, "Goblin")} (expected [12,3])`);
-  P(`scaling Normal L10 Treant (miniboss, half rate) [hp,dmg]: ${scaleCase("normal", 10, "Treant")} (expected [214,7])`);
-  P(`scaling Baby L20 Goblin [hp,dmg]: ${scaleCase("baby", 20, "Goblin")} (expected [4,1])`);
+  P(`scaling Hard L10 Goblin [hp,dmg]: ${scaleCase("hard", 10, "Goblin")} (expected [12,7])`);
+  P(`scaling Normal L10 Black Dragonlet (miniboss, half rate) [hp,dmg]: ${scaleCase("normal", 10, "Black Dragonlet")} (expected [288,13])`);
+  P(`scaling Baby L20 Goblin [hp,dmg]: ${scaleCase("baby", 20, "Goblin")} (expected [4,2])`);
 
   // 2. fuzz every weapon / tier / material / random talismans / upgrades / party / enemies
   const rnd = mulberry(99);

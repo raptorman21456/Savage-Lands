@@ -4,7 +4,8 @@ extends CanvasLayer
 # almost anything: your stats and gear, the party, where you are, the battle in front of you, the Church's upgrades, the game's speed.
 # It is OFF for normal play: it answers F1 only when Settings > Gameplay > "Debug menu (F1)" is On, or in the Sandbox.
 #
-#   Tabs      Player / Items / Party / World / Battle / Progress / Game   (Q and E step through them)
+#   Tabs      Player / Items / Party / World / Battle / Progress / Game / Console   (Q and E step through them)
+#             Console is the way to do anything else: type an expression, or browse and edit any variable (DebugConsole.gd)
 #   Keys      F1 or Esc close it. Arrows move between buttons, Enter / Space / Z press one, Tab also moves on.
 #   Pause     it pauses the game while it is open and puts the pause back as it found it (re-worked if an action ended a battle).
 #   Log       every action says what it did in the strip at the bottom.
@@ -18,18 +19,19 @@ const DebugKitScript := preload("res://scripts/DebugKit.gd")
 const DebugActionsScript := preload("res://scripts/DebugActions.gd")
 const DebugWorldScript := preload("res://scripts/DebugWorld.gd")
 const DebugProgressScript := preload("res://scripts/DebugProgress.gd")
+const DebugConsoleViewScript := preload("res://scripts/DebugConsoleView.gd")
 
 const WINDOW_SIZE := Vector2(1120, 624)
 const BODY_POS := Vector2(6, 62)
 const BODY_H := 444.0
 const TABS := [
 	["Player", "tab_character"], ["Items", "tab_items"], ["Party", "tab_party"], ["World", "tab_map"],
-	["Battle", "stat_damage"], ["Progress", "stat_level"], ["Game", "tab_settings"],
+	["Battle", "stat_damage"], ["Progress", "stat_level"], ["Game", "tab_settings"], ["Console", "tab_gear"],
 ]
 const VIEW_SCRIPTS := {
 	"Player": "res://scripts/DebugPlayerView.gd", "Items": "res://scripts/DebugItemsView.gd", "Party": "res://scripts/DebugPartyView.gd",
 	"World": "res://scripts/DebugWorldView.gd", "Battle": "res://scripts/DebugBattleView.gd", "Progress": "res://scripts/DebugProgressView.gd",
-	"Game": "res://scripts/DebugGameView.gd",
+	"Game": "res://scripts/DebugGameView.gd", "Console": "res://scripts/DebugConsoleView.gd",
 }
 
 var main = null
@@ -296,10 +298,25 @@ func _select_tab(tab_name: String) -> void:
 	body.add_child(view)
 	view.setup(self, main)
 
-# Keyboard focus: the first control in the tab, or the tab's own button when the tab has none.
+# Jumps to the Console tab's Inspector, opened on `root_id` ("player", "main", "member:3", "ally:0", "enemy:1"... see DebugInspector.roots).
+func open_inspector(root_id: String) -> void:
+	DebugConsoleViewScript.ensure_state(state)
+	state.inspect["root"] = root_id
+	state.inspect["path"] = []
+	state.inspect["search"] = ""
+	state.console["page"] = "Inspector"
+	_select_tab("Console")
+	_focus_first.call_deferred()
+
+# Keyboard focus: the first control in the tab (or the one the tab asks for), or the tab's own button when the tab has none.
 func _focus_first() -> void:
 	if not visible or view == null:
 		return
+	if view.has_method("preferred_focus"):
+		var wanted = view.preferred_focus()
+		if wanted != null:
+			wanted.grab_focus()
+			return
 	var items: Array = DebugKitScript.focusables(view)
 	if not items.is_empty():
 		items[0].grab_focus()

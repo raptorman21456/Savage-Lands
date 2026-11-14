@@ -9,6 +9,7 @@
 
 const D = SIM_DATA;
 const MC = D.main_consts;     // Main.gd constants
+const REGION_TIER_POWER = [1.0, 1.0, 1.25, 1.55, 1.9, 2.35, 2.9, 3.5, 4.2];   // WorldMap.TIER_POWER (HP and damage by the region's danger tier)
 const PC = D.player_consts;   // Player.gd constants
 const DEF = D.defense;        // Defense.gd constants
 

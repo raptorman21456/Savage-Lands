@@ -82,9 +82,11 @@ func _init() -> void:
 	])
 	var wing_unit := {"tile": Vector2i(0, 0), "hp": 50, "max_hp": 100, "damage": 20, "name": "Voidwing"}
 	var wing_summary: String = main._enemy_stat_summary(wing_unit)
-	print("a miniboss's summary is tagged Miniboss and Evasive: %s (expected true)" % [
-		wing_summary.contains("Miniboss") and wing_summary.contains("Evasive")
+	print("a Voidwing (a late-game regular now) is tagged Evasive and no longer Miniboss: %s (expected true)" % [
+		wing_summary.contains("Evasive") and not wing_summary.contains("Miniboss")
 	])
+	var dragonlet_summary: String = main._enemy_stat_summary({"tile": Vector2i(0, 0), "hp": 50, "max_hp": 100, "damage": 20, "name": "Black Dragonlet"})
+	print("a real miniboss's summary is tagged Miniboss and Armored: %s (expected true)" % [dragonlet_summary.contains("Miniboss") and dragonlet_summary.contains("Armored")])
 
 	# --- BeastiaryPanel: locked vs. unlocked rows, pause nesting ---
 	var panel = main.beastiary_panel

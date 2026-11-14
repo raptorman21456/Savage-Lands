@@ -23,25 +23,25 @@
 		"heartwood_grove": {
 			"name": "The HeartWood",
 			"tier": 3,
-			"enemies": [["wolf", 4], ["fae_hut", 2], ["gnome_pack", 2], ["brute", 1]],
-			"miniboss": "treant"
+			"enemies": [["wolf", 4], ["fae_hut", 2], ["gnome_pack", 2], ["brute", 1], ["treant", 1]],
+			"miniboss": ""
 		},
 		"ruins": {
 			"name": "The Ruined Settlement",
 			"tier": 2,
 			"enemies": [["shade", 3], ["orc", 2], ["goblin", 2]],
-			"miniboss": ""
+			"miniboss": "stone_construct"
 		},
 		"volcano_hills": {
 			"name": "Death Mountain",
 			"tier": 5,
-			"enemies": [["brute", 3], ["orc", 3], ["centaur_pack", 1], ["shade", 1]],
+			"enemies": [["brute", 3], ["orc", 3], ["centaur_pack", 1], ["shade", 1], ["fire_mage", 2]],
 			"miniboss": ""
 		},
 		"volcano_slopes": {
 			"name": "Death Mountain",
 			"tier": 6,
-			"enemies": [["brute", 3], ["shade", 3], ["archer", 1]],
+			"enemies": [["brute", 3], ["shade", 3], ["archer", 1], ["fire_mage", 3]],
 			"miniboss": "lava_construct"
 		},
 		"crater": {
@@ -54,12 +54,12 @@
 			"name": "Arahas Desert",
 			"tier": 4,
 			"enemies": [["centaur_pack", 2], ["orc", 3], ["brute", 2], ["archer", 1]],
-			"miniboss": "iron_construct"
+			"miniboss": "wyrm_hole"
 		},
 		"mountains": {
 			"name": "Lexian Peaks",
 			"tier": 5,
-			"enemies": [["brute", 3], ["orc", 3], ["centaur_pack", 1], ["archer", 1]],
+			"enemies": [["brute", 3], ["orc", 3], ["centaur_pack", 1], ["archer", 1], ["gale_mage", 2]],
 			"miniboss": "iron_construct"
 		},
 		"lizen": {
@@ -77,7 +77,7 @@
 		"beach": {
 			"name": "Sandy Shores",
 			"tier": 2,
-			"enemies": [["goblin", 4], ["orc", 2], ["archer", 2], ["gnome_pack", 1]],
+			"enemies": [["goblin", 4], ["orc", 2], ["archer", 2], ["gnome_pack", 1], ["hermoid", 2]],
 			"miniboss": ""
 		},
 		"ocean": {
@@ -108,13 +108,13 @@
 			"name": "The Frozen Wastes",
 			"tier": 5,
 			"enemies": [["wolf", 4], ["brute", 3], ["shade", 2], ["archer", 1]],
-			"miniboss": "black_dragonlet"
+			"miniboss": "frost_construct"
 		},
 		"voidlands": {
 			"name": "The Voidlands",
 			"tier": 8,
-			"enemies": [["shade", 4], ["archer", 2], ["brute", 2], ["centaur_pack", 1]],
-			"miniboss": "voidwing"
+			"enemies": [["shade", 4], ["archer", 2], ["brute", 2], ["centaur_pack", 1], ["shadelet", 3], ["voidwing", 2], ["empowered_mage", 1]],
+			"miniboss": "voidwing_swarm"
 		},
 		"ranch": {
 			"name": "The Ranch",

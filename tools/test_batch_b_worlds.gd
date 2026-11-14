@@ -26,7 +26,7 @@ func _check_world(main, wave_mini: int, wave_boss: int, world_name: String, mini
 	if mini_ref != null:
 		var squad: Array = main._gather_squad(mini_ref)
 		main._setup_battle_grid(squad)
-		print("...%s fights solo, big arena: squad_size=%d w=%d h=%d (expected 1, 15, 15)" % [mini_name, squad.size(), main.BATTLE_GRID_W, main.BATTLE_GRID_H])
+		print("...%s fights solo, big arena: squad_size=%d w=%d h=%d (expected 1, and %d x %d: a boss arena, except for the Voidwing, which is a regular enemy now)" % [mini_name, squad.size(), main.BATTLE_GRID_W, main.BATTLE_GRID_H, 8 if mini_name == "Voidwing" else 15, 8 if mini_name == "Voidwing" else 15])
 
 	main.wave = wave_boss
 	main.current_world_index = main._world_index_for_wave(main.wave)
@@ -58,7 +58,7 @@ func _init() -> void:
 		e.set_physics_process(false)
 
 	# --- Data sanity ---
-	var names := ["Magma Construct", "Elder Oak", "Black Dragonlet", "White Drake", "Voidwing"]
+	var names := ["Magma Construct", "Elder Oak", "Black Dragonlet", "White Drake"]   # (the Voidwing is a late-game regular enemy now)
 	var all_boss_tier := true
 	var all_have_icons := true
 	for n in names:
@@ -66,7 +66,7 @@ func _init() -> void:
 			all_boss_tier = false
 		if main.hud.ENEMY_ICONS.get(n, null) == null:
 			all_have_icons = false
-	print("All 5 Batch B enemies are is_boss_tier: %s (expected true)" % [all_boss_tier])
+	print("All 4 Batch B boss-tier enemies are is_boss_tier: %s (expected true)" % [all_boss_tier])
 	print("All 5 Batch B enemies have HUD icons: %s (expected true)" % [all_have_icons])
 
 	# --- Distinguishing mechanics ---

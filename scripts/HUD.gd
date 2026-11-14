@@ -38,6 +38,18 @@ const ENEMY_ICONS := {
 	"Fae Hut": preload("res://assets/enemy_fae_hut.png"),
 	"Fae": preload("res://assets/enemy_fae.png"),
 	"Gnome": preload("res://assets/enemy_gnome.png"),
+	"Shadelet": preload("res://assets/enemy_shade.png"),
+	"Disgraced Mage": preload("res://assets/enemy_shade.png"),
+	"Fire Mage": preload("res://assets/enemy_apprentice_mage.png"),
+	"Hermoid": preload("res://assets/enemy_gnome.png"),
+	"Earth Mage": preload("res://assets/enemy_apprentice_mage.png"),
+	"Gale Mage": preload("res://assets/enemy_apprentice_mage.png"),
+	"Voidwing Swarm": preload("res://assets/enemy_voidwing.png"),
+	"Empowered Mage": preload("res://assets/enemy_apprentice_mage.png"),
+	"Water Construct": preload("res://assets/enemy_water_elemental.png"),
+	"Stone Construct": preload("res://assets/enemy_stone_giant.png"),
+	"Frost Construct": preload("res://assets/enemy_frost_giant.png"),
+	"Wyrm-Hole": preload("res://assets/enemy_red_wyrm.png"),
 	"Leviathan": preload("res://assets/enemy_aboleth.png"),
 	"Lizen Warband": preload("res://assets/enemy_lizard_soldier_swarm.png"),
 	"Black Dragonlet": preload("res://assets/enemy_black_dragonlet.png"),
@@ -386,7 +398,7 @@ const MiniMapScript := preload("res://scripts/MiniMap.gd")
 # Kept in sync by hand with Main.gd:MAX_BATTLE_SQUAD_SIZE_CEILING -- the enemy
 # icon/marker pools below must be at least this big or a heavily-scaled squad
 # (see _squad_size_bonus) would index past the pool.
-const MAX_BATTLE_UNITS := 6
+const MAX_BATTLE_UNITS := 14   # the Voidwing Swarm is seven; room for a bigger fight and the Fae Huts' summons
 # Kept in sync by hand with Main.gd:FAE_HUT_SPAWN_INTERVAL, purely for the
 # battle-marker countdown text below (see update_battle_grid).
 const FAE_HUT_SPAWN_INTERVAL := 3

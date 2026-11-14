@@ -7,7 +7,7 @@ signal died(xp_reward: int)
 
 const SPEED := 100.0
 const MAX_HEALTH := 3
-const CONTACT_DAMAGE := 1
+const CONTACT_DAMAGE := 2   # was 1 (2026-11-13: too weak once they reach you)
 const DETECT_RANGE := 160.0
 const CONTACT_COOLDOWN := 0.6
 const BODY_RADIUS := 14.0

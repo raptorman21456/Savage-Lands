@@ -107,7 +107,7 @@ static func weapon_entry(player, variant: Dictionary, member = null) -> Dictiona
 	var holders: Array = []
 	if str(player.current_weapon_base.get("id", "")) == id:
 		holders.append("You")
-	for m in player.party:
+	for m in player.all_members():
 		if m.weapon_id() == id:
 			holders.append(str(m.name))
 	var unit_is_caster: bool = member != null and member.is_caster()
@@ -163,7 +163,7 @@ static func armor_entries(player, member = null) -> Array:
 		var holders: Array = []
 		if worn_id == id:
 			holders.append("You")
-		for m in player.party:
+		for m in player.all_members():
 			if m.armor_id() == id:
 				holders.append(str(m.name))
 		out.append({
@@ -210,7 +210,7 @@ static func shield_entries(player, member = null) -> Array:
 		var holders: Array = []
 		if worn_id == id:
 			holders.append("You")
-		for m in player.party:
+		for m in player.all_members():
 			if m.shield_id() == id:
 				holders.append(str(m.name))
 		var block := int(round(float(shield.get("block_chance", 0.0)) * 100.0))

@@ -443,6 +443,46 @@ func _on_member_loadout_reset(member) -> void:
 	_play_sfx("purchase")
 	_refresh()
 
+# Why a member cannot be sent away right now ("" = they can): Friends in High Places is what allows it, and not in the middle of a fight.
+func dismiss_block_reason() -> String:
+	if _player == null or not _player.can_dismiss():
+		return "Friends in High Places (the Church) lets you send members away for a while."
+	var parent := get_parent()
+	if parent != null and bool(parent.get("in_battle")):
+		return "Not in the middle of a battle."
+	return ""
+
+# Sends a member to the bench: they keep their level, picks and gear, and can be called back from the Party tab.
+func _on_member_dismissed(member) -> void:
+	var ok: bool = member != null and dismiss_block_reason() == "" and _player.send_to_bench(member.id)
+	if ok and party_selected_id == member.id:
+		party_selected_id = PartyScreen.HERO_ID
+	_play_sfx("menu_move" if ok else "error")
+	_refresh()
+
+# Brings a benched member back into the party, if there is a place for them.
+func _on_member_called_back(member) -> void:
+	var ok: bool = member != null and _player.call_back(member.id)
+	if ok:
+		party_selected_id = member.id
+	_play_sfx("purchase" if ok else "error")
+	_refresh()
+
+# The Debug menu's shortcut: a brand-new member of any kind, straight into the party (a full party still refuses). Only while the
+# Debug menu (F1) is switched on in Settings; it is how the six members without a recruiting side-quest yet get into a real run.
+func debug_quick_add_allowed() -> bool:
+	var parent := get_parent()
+	return parent != null and parent.get("settings") != null and bool(parent.settings.debug_menu_enabled)
+
+func _on_member_quick_added(kind: String) -> void:
+	var member = null
+	if debug_quick_add_allowed() and _player.can_recruit(kind):
+		member = _player.recruit(kind)
+	if member != null:
+		party_selected_id = member.id
+	_play_sfx("purchase" if member != null else "error")
+	_refresh()
+
 func _on_member_talisman_added(member, talisman_id: String) -> void:
 	if talisman_id == "":
 		return

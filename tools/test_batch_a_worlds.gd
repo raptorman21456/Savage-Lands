@@ -24,9 +24,9 @@ func _check_world(main, wave_mini: int, wave_boss: int, world_name: String, mini
 		e.set_physics_process(false)
 	if mini_ref != null:
 		var squad: Array = main._gather_squad(mini_ref)
-		print("...%s fights solo, big arena: squad_size=%d w=%d h=%d (expected 1, 15, 15)" % [mini_name, squad.size(), main.BATTLE_GRID_W, main.BATTLE_GRID_H])
+		print("...%s fights solo, big arena: squad_size=%d w=%d h=%d (expected 1; the grid is 15 x 15 for a boss, 8 x 8 for the Treant, which is a regular late-game enemy now)" % [mini_name, squad.size(), main.BATTLE_GRID_W, main.BATTLE_GRID_H])
 		main._setup_battle_grid(squad)
-		print("...arena confirmed: w=%d h=%d (expected 15, 15)" % [main.BATTLE_GRID_W, main.BATTLE_GRID_H])
+		print("...arena: w=%d h=%d (expected %d, %d)" % [main.BATTLE_GRID_W, main.BATTLE_GRID_H, 8 if mini_name == "Treant" else 15, 8 if mini_name == "Treant" else 15])
 
 	main.wave = wave_boss
 	main.current_world_index = main._world_index_for_wave(main.wave)
@@ -58,7 +58,7 @@ func _init() -> void:
 		e.set_physics_process(false)
 
 	# --- Data sanity: ENEMY_TRAITS + HUD icons for all 6 new enemies ---
-	var names := ["Lizen Warband", "Black Dragonlet", "Treant", "Elder Oak", "Steel Construct", "Leviathan"]
+	var names := ["Lizen Warband", "Black Dragonlet", "Elder Oak", "Steel Construct", "Leviathan"]   # (the Treant is a regular enemy now)
 	var all_boss_tier := true
 	var all_have_icons := true
 	for n in names:
@@ -66,7 +66,7 @@ func _init() -> void:
 			all_boss_tier = false
 		if main.hud.ENEMY_ICONS.get(n, null) == null:
 			all_have_icons = false
-	print("All 6 Batch A enemies are is_boss_tier: %s (expected true)" % [all_boss_tier])
+	print("All 5 Batch A boss-tier enemies are is_boss_tier: %s (expected true)" % [all_boss_tier])
 	print("All 6 Batch A enemies have HUD icons: %s (expected true)" % [all_have_icons])
 
 	# --- Distinguishing mechanics ---
@@ -81,7 +81,7 @@ func _init() -> void:
 	print("Leviathan reaches with a psychic strike: attack_range=%d ignore_line=%s (expected 2, true)" % [
 		main.ENEMY_TRAITS["Leviathan"].attack_range, main.ENEMY_TRAITS["Leviathan"].ignore_line
 	])
-	print("is_miniboss flags (Lizen Warband, Black Dragonlet, Treant, Elder Oak, Steel Construct, Leviathan): %s (expected [false, true, true, false, true, false])" % [[main.ENEMY_TRAITS["Lizen Warband"].get("is_miniboss", false), main.ENEMY_TRAITS["Black Dragonlet"].get("is_miniboss", false), main.ENEMY_TRAITS["Treant"].get("is_miniboss", false), main.ENEMY_TRAITS["Elder Oak"].get("is_miniboss", false), main.ENEMY_TRAITS["Steel Construct"].get("is_miniboss", false), main.ENEMY_TRAITS["Leviathan"].get("is_miniboss", false)]])
+	print("is_miniboss flags (Lizen Warband, Black Dragonlet, Treant, Elder Oak, Steel Construct, Leviathan): %s (expected [false, true, false, false, true, false]: the Treant is no longer a miniboss)" % [[main.ENEMY_TRAITS["Lizen Warband"].get("is_miniboss", false), main.ENEMY_TRAITS["Black Dragonlet"].get("is_miniboss", false), main.ENEMY_TRAITS["Treant"].get("is_miniboss", false), main.ENEMY_TRAITS["Elder Oak"].get("is_miniboss", false), main.ENEMY_TRAITS["Steel Construct"].get("is_miniboss", false), main.ENEMY_TRAITS["Leviathan"].get("is_miniboss", false)]])
 	print("Steel Construct is immovable: knockback_resist=%.1f (expected 1.0)" % [main.ENEMY_TRAITS["Steel Construct"].knockback_resist])
 
 	# --- End-to-end per world ---

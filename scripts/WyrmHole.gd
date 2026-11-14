@@ -1,0 +1,191 @@
+extends CharacterBody2D
+class_name WyrmHole
+
+const PickupScript := preload("res://scripts/Pickup.gd")
+
+signal died(xp_reward: int)
+
+# Miniboss of the desert: a huge sand worm that vanishes and bursts up beside you, tunnelling straight through anything.
+# (Battle behaviour: Main.gd ENEMY_TRAITS["Wyrm-Hole"].)
+const SPEED := 32.0
+const WINDUP_SPEED_FRACTION := 0.3
+const MAX_HEALTH := 200
+const ATTACK_DAMAGE := 6
+const DETECT_RANGE := 190.0
+const ATTACK_RANGE := 60.0
+const HURTBOX_RADIUS := 112.0
+const WINDUP_TIME := 0.8
+const ATTACK_COOLDOWN := 1.3
+const BODY_RADIUS := 30.0
+# Walking into it starts the fight at once (the player's body is 16 across), the same as every plain enemy -- not only its telegraphed strike.
+const TOUCH_RANGE := BODY_RADIUS + 18.0
+const XP_REWARD := 570
+const COIN_MIN := 90
+const COIN_MAX := 130
+const MEAT_CHANCE := 0.5
+const TINT := Color(1.0, 0.9, 0.55)
+
+var health := MAX_HEALTH
+var is_elite := false
+var wander_dir := Vector2.ZERO
+var wander_timer := 0.0
+var windup_timer := 0.0
+var is_winding_up := false
+var attack_cooldown := 0.0
+var flash_timer := 0.0
+var player: Node2D = null
+var sprite: Sprite2D
+
+func _ready() -> void:
+	add_to_group("enemies")
+	motion_mode = CharacterBody2D.MOTION_MODE_FLOATING
+	process_mode = Node.PROCESS_MODE_PAUSABLE
+
+	var collision := CollisionShape2D.new()
+	var shape := CircleShape2D.new()
+	shape.radius = BODY_RADIUS
+	collision.shape = shape
+	add_child(collision)
+
+	sprite = Sprite2D.new()
+	sprite.texture = preload("res://assets/enemy_red_wyrm.png")
+	sprite.scale = Vector2(2.6, 2.6)
+	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	add_child(sprite)
+
+func _physics_process(delta: float) -> void:
+	if attack_cooldown > 0.0:
+		attack_cooldown -= delta
+	if flash_timer > 0.0:
+		flash_timer -= delta
+
+	if player == null or not is_instance_valid(player):
+		player = get_tree().get_first_node_in_group("player")
+
+	if player != null and attack_cooldown <= 0.0 and global_position.distance_to(player.global_position) < TOUCH_RANGE:
+		_touched_by_player()
+		return
+
+	if is_winding_up:
+		var track_dir := Vector2.ZERO
+		if player != null:
+			track_dir = (player.global_position - global_position).normalized()
+		velocity = track_dir * SPEED * WINDUP_SPEED_FRACTION
+		move_and_slide()
+		if track_dir.x != 0.0:
+			sprite.flip_h = track_dir.x < 0.0
+		windup_timer -= delta
+		if windup_timer <= 0.0:
+			_finish_windup()
+	else:
+		var move_dir := Vector2.ZERO
+		if player != null:
+			var dist := global_position.distance_to(player.global_position)
+			if dist < ATTACK_RANGE and attack_cooldown <= 0.0:
+				is_winding_up = true
+				windup_timer = WINDUP_TIME
+			elif dist < DETECT_RANGE:
+				move_dir = (player.global_position - global_position).normalized()
+			else:
+				move_dir = _wander(delta)
+		else:
+			move_dir = _wander(delta)
+
+		velocity = move_dir * SPEED
+		move_and_slide()
+
+		if move_dir.x != 0.0:
+			sprite.flip_h = move_dir.x < 0.0
+
+	if flash_timer > 0.0:
+		sprite.modulate = Color(1.0, 0.5, 0.5)
+	elif is_winding_up:
+		var progress: float = 1.0 - clamp(windup_timer / WINDUP_TIME, 0.0, 1.0)
+		sprite.modulate = TINT.lerp(Color(1.0, 0.6, 0.1), progress)
+	else:
+		sprite.modulate = TINT
+
+func _finish_windup() -> void:
+	is_winding_up = false
+	attack_cooldown = ATTACK_COOLDOWN + randf_range(0.0, 0.3)
+	if player != null and global_position.distance_to(player.global_position) < HURTBOX_RADIUS:
+		_play_attack_lunge(player.global_position)
+		var main := get_parent()
+		if main != null and main.has_method("trigger_battle"):
+			main.trigger_battle(self)
+		elif player.has_method("take_damage"):
+			player.take_damage(ATTACK_DAMAGE)
+
+func get_contact_damage() -> int:
+	return ATTACK_DAMAGE
+
+func get_display_name() -> String:
+	return "Wyrm-Hole"
+
+func set_battle_cooldown(t: float) -> void:
+	attack_cooldown = t
+	is_winding_up = false
+
+func _wander(delta: float) -> Vector2:
+	wander_timer -= delta
+	if wander_timer <= 0.0:
+		wander_timer = randf_range(1.0, 2.5)
+		wander_dir = Vector2(randf_range(-1, 1), randf_range(-1, 1)).normalized()
+	return wander_dir
+
+func _play_attack_lunge(target_pos: Vector2) -> void:
+	var dir: Vector2 = (target_pos - global_position).normalized()
+	var base_scale: Vector2 = sprite.scale
+	var tween := create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(sprite, "position", dir * 10.0, 0.1)
+	tween.tween_property(sprite, "scale", base_scale * 1.18, 0.1)
+	tween.chain().set_parallel(true)
+	tween.tween_property(sprite, "position", Vector2.ZERO, 0.15)
+	tween.tween_property(sprite, "scale", base_scale, 0.15)
+
+func take_damage(amount: int) -> void:
+	if health <= 0:
+		return
+	health -= amount
+	flash_timer = 0.15
+	if is_winding_up:
+		is_winding_up = false
+		attack_cooldown = ATTACK_COOLDOWN * 0.5
+	if health <= 0:
+		var main := get_parent()
+		if main.has_method("spawn_death_burst"):
+			main.spawn_death_burst(global_position)
+		_drop_loot()
+		died.emit(XP_REWARD)
+		queue_free()
+
+func _drop_loot() -> void:
+	var coin_count := PickupScript.roll_coins(COIN_MIN, COIN_MAX, is_elite)
+	if coin_count > 0:
+		var coin := PickupScript.new()
+		coin.kind = "coin"
+		coin.amount = coin_count
+		coin.position = global_position
+		get_parent().add_child(coin)
+	if randf() < MEAT_CHANCE:
+		var meat := PickupScript.new()
+		meat.kind = "meat"
+		meat.amount = 1
+		meat.position = global_position + Vector2(randf_range(-10, 10), randf_range(-10, 10))
+		get_parent().add_child(meat)
+	if is_elite:
+		var shard := PickupScript.new()
+		shard.kind = "shard"
+		shard.amount = 1
+		shard.position = global_position + Vector2(randf_range(-10, 10), randf_range(-10, 10))
+		get_parent().add_child(shard)
+
+# The player walked into it: the fight starts now (and it has to wait out its cooldown before it can start another).
+func _touched_by_player() -> void:
+	is_winding_up = false
+	attack_cooldown = ATTACK_COOLDOWN + randf_range(0.0, 0.3)
+	_play_attack_lunge(player.global_position)
+	var main := get_parent()
+	if main != null and main.has_method("trigger_battle"):
+		main.trigger_battle(self)

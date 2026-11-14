@@ -237,7 +237,7 @@ func _section_window() -> void:
 	print("F1 over the open Inventory: debug visible=%s (expected true), inventory visible=%s (expected true)" % [menu.visible, main.inventory_panel.visible])
 	var inventory_tab_before: String = main.inventory_panel.active_tab
 	await _tap_key(KEY_Q)
-	print("Q switches the Debug menu's tab (Player wraps back to Game), not the Inventory's: debug tab=%s (expected Game), inventory tab=%s (expected %s, unchanged)" % [menu.active_tab, main.inventory_panel.active_tab, inventory_tab_before])
+	print("Q switches the Debug menu's tab (Player wraps back to the last one, Console), not the Inventory's: debug tab=%s (expected Console), inventory tab=%s (expected %s, unchanged)" % [menu.active_tab, main.inventory_panel.active_tab, inventory_tab_before])
 	menu.close()
 	print("closing it leaves the Inventory open and the game still paused: inventory=%s (expected true), paused=%s (expected true)" % [main.inventory_panel.visible, paused])
 	main.inventory_panel.close()
@@ -253,7 +253,7 @@ func _section_tabs_and_keys() -> void:
 	menu.open()
 	await _frames(2)
 	var names: Array = DebugMenuScript.TABS.map(func(t): return t[0])
-	print("the tabs: %s (expected Player, Items, Party, World, Battle, Progress, Game)" % [", ".join(names)])
+	print("the tabs: %s (expected Player, Items, Party, World, Battle, Progress, Game, Console)" % [", ".join(names)])
 	for t in names:
 		menu._select_tab(t)
 		await _frames(2)
@@ -265,7 +265,7 @@ func _section_tabs_and_keys() -> void:
 	print("E steps to the next tab: %s (expected Items)" % menu.active_tab)
 	await _tap_key(KEY_Q)
 	await _tap_key(KEY_Q)
-	print("Q steps back, wrapping round: %s (expected Game)" % menu.active_tab)
+	print("Q steps back, wrapping round to the last tab: %s (expected Console)" % menu.active_tab)
 	menu._select_tab("Player")
 	await _frames(2)
 	# keyboard: the first control has focus; Down moves on; Enter presses
@@ -860,11 +860,12 @@ func _section_battle() -> void:
 	await _frames(2)
 	await _clear_pending()
 	DA.dismiss_all(main)
-	# every enemy there is
+	# every enemy there is (with god mode on: some of them kill a starter hero before it can act)
+	player.debug_god_mode = true
 	var failures: Array = []
 	for name in DW.enemy_list(main).map(func(e): return str(e.name)):
 		var rr: Dictionary = DB.start_battle(main, [{"name": name, "count": 1}], 3, false)
-		if not rr.ok or main.battle_units.size() != 1:
+		if not rr.ok or main.battle_units.size() != (7 if name == "Voidwing Swarm" else 1):   # the Swarm is seven Voidwings
 			failures.append(name)
 			continue
 		await _wait_for_hero()
@@ -873,6 +874,7 @@ func _section_battle() -> void:
 		await _clear_pending()
 		if not wr.ok or main.in_battle:
 			failures.append("win " + name)
+	player.debug_god_mode = false
 	print("a battle can be started and won against each of the %d enemies: failures=%s (expected [])" % [DW.enemy_list(main).size(), str(failures)])
 	# a battle in the middle of an enemy turn is refused politely
 	r = DB.win_now(main)

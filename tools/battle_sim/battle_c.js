@@ -312,7 +312,22 @@ Object.assign(Sim.prototype, {
   },
 
   // ---------------------------------------------------------------- one enemy attack landing
+  // The Earth Mage's splash: the same hit also lands (at half) on everything next to the target (Main._enemy_apply_damage / _enemy_splash).
   async _enemy_apply_damage(u, target_tile, raw_dmg, traits) {
+    const r = await this._enemy_apply_damage_core(u, target_tile, raw_dmg, traits);
+    if (traits.splash && !(r && (r.dodged || r.blocked))) {
+      const half = Math.max(1, round(raw_dmg * 0.5));
+      for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
+        if (dx === 0 && dy === 0) continue;
+        const t = V(target_tile.x + dx, target_tile.y + dy);
+        if (veq(t, this.battle_player_tile)) { this.log("The blast spreads to you!"); const d = this._apply_incoming_reductions(half, traits); this.player.take_battle_damage(d); this.stats.damage_taken += d; this._check_player_dead(); }
+        else { for (const a of this.battle_allies) if (veq(a.tile, t)) { await this._enemy_apply_damage_core(u, t, half, traits); break; } }
+      }
+    }
+    return r;
+  },
+
+  async _enemy_apply_damage_core(u, target_tile, raw_dmg, traits) {
     const p = this.player;
     const rng = this.rng;
     if (u.burning) raw_dmg = round(raw_dmg * (1.0 - MC.BURN_DAMAGE_DEALT_REDUCTION));
@@ -344,6 +359,7 @@ Object.assign(Sim.prototype, {
       if (traits.inflicts_concussion && rng.randf() < MC.CONCUSSION_INFLICT_CHANCE) { this.player_concussed_turns = this._status_len(MC.PLAYER_CONCUSSION_TURNS); this.log("The blow leaves you dazed!", "bad"); }
       if (traits.inflicts_bleed && this.player_bleed_turns <= 0) { this.player_bleed_turns = this._status_len(MC.BLEED_BASE_TURNS); this.log("The wound leaves you bleeding!", "bad"); }
       if (traits.inflicts_blind) { this.player_blind_turns = this._status_len(MC.BLINDNESS_TURNS); this.log("Your vision swims -- you're blinded!", "bad"); }
+      if (traits.inflicts_burn && !this.player_burning) { this.player_burning = true; this.log("You catch fire!", "bad"); }
       this._check_player_dead();
       return { dmg, is_player: true, target_name: "", dodged: false };
     }
@@ -471,6 +487,8 @@ Object.assign(Sim.prototype, {
       u.tile = this._apply_water_push(u.tile, u);
       return;
     }
+    this._enemy_turn_start_hook(u, traits, target_tile);
+    if (u.hp <= 0) return;
     const was_cornered = !!traits.kites && this._can_battle_attack(u.tile, target_tile, 1, ignore_line);
     if (was_cornered) {
       const away = this._knockback_dir(target_tile, u.tile);
@@ -558,6 +576,7 @@ Object.assign(Sim.prototype, {
         if ((u.buffed_dmg_turns || 0) > 0) { dmg = round(dmg * (1.0 + (u.buffed_dmg_pct || 0))); u.buffed_dmg_turns -= 1; }
         const enrage = traits.enrage_threshold || 0;
         if (enrage > 0 && u.hp < u.max_hp * enrage) { dmg = round(dmg * (traits.enrage_mult ?? 1.0)); this.log(`The ${u.name} is enraged!`, "bad"); }
+        if (traits.self_stacks && (u.stacks || 0) > 0) { dmg = round(dmg * (1.0 + MC.EMPOWERED_STACK_DAMAGE_PCT * u.stacks)); this.log(`The ${u.name}'s power has built up: x${u.stacks}!`, "bad"); }
         const sweep_targets = traits.sweeps ? this._sweep_targets(u) : [target_tile];
         let player_was_hit = false;
         for (const t of sweep_targets) {
@@ -568,9 +587,66 @@ Object.assign(Sim.prototype, {
           else this.log(`The ${u.name} hits your ${hr.target_name} for ${hr.dmg} damage!`);
         }
         if (player_was_hit && p.health <= 0) { this._check_player_dead(); return; }
+        if (player_was_hit) this._enemy_on_hit_effects(u, traits);
       }
     } else u.winding_up = false;
+    if (traits.self_stacks) u.stacks = Math.min(MC.EMPOWERED_MAX_STACKS, (u.stacks || 0) + 1);
     if (size === 1) { u.tile = this._apply_water_push(u.tile, u); this._apply_terrain_tick(u.tile, u); }
+  },
+
+  // The miniboss set (Main.gd:_enemy_turn_start_hook / _enemy_on_hit_effects / _push_player_tiles): the Stone Construct walls you in, the Wyrm-Hole bursts up
+  // beside you, the Water and Frost Constructs push and slide you and leave water / ice behind.
+  _enemy_turn_start_hook(u, traits, target_tile) {
+    const rng = this.rng;
+    if (traits.places_rocks) {
+      const cells = [];
+      for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) if (dx || dy) cells.push(V(this.battle_player_tile.x + dx, this.battle_player_tile.y + dy));
+      rng.shuffle(cells);
+      let placed = 0;
+      for (const c of cells) {
+        if (placed >= traits.places_rocks || (u.rocks_placed || 0) >= MC.STONE_ROCKS_MAX) break;
+        if (!this._in_battle_bounds(c) || this._battle_tile_occupied(c) || this.battle_terrain[vkey(c)]) continue;
+        let open = 0;
+        for (const d of CARDINAL_DIRS) { const n = vadd(this.battle_player_tile, d); const tn = this.battle_terrain[vkey(n)]; const rocky = tn && (tn.type === "rock" || tn.type === "rubble"); if (this._in_battle_bounds(n) && !rocky && !veq(n, c)) open++; }
+        if (open < 1) continue;
+        this.battle_terrain[vkey(c)] = { type: "rock" }; u.rocks_placed = (u.rocks_placed || 0) + 1; placed++;
+      }
+      if (placed > 0) this.log(`The ${u.name} raises ${placed} wall${placed === 1 ? "" : "s"} of stone round you!`);
+    }
+    if (traits.teleports && rng.randf() < MC.WYRM_TELEPORT_CHANCE) {
+      const size = u.size || 1; const spots = [];
+      for (let dx = -3; dx <= 3; dx++) for (let dy = -3; dy <= 3; dy++) {
+        const dist = Math.max(Math.abs(dx), Math.abs(dy)); if (dist < 2 || dist > 3) continue;
+        const t = V(target_tile.x + dx, target_tile.y + dy); let fits = true;
+        for (const cell of this._footprint(t, size)) { const tn = this.battle_terrain[vkey(cell)]; if (!this._in_battle_bounds(cell) || this._battle_tile_occupied(cell, u.ref) || (tn && (tn.type === "rock" || tn.type === "rubble"))) { fits = false; break; } }
+        if (fits) spots.push(t);
+      }
+      if (spots.length) { u.tile = spots[Math.floor(rng.randf() * spots.length) % spots.length]; this.log(`The ${u.name} vanishes, then bursts up out of the ground!`); }
+    }
+  },
+
+  _enemy_on_hit_effects(u, traits) {
+    const water = (traits.push_player || 0) > 0;
+    const tiles = water ? traits.push_player : (traits.slide_player || 0);
+    if (tiles <= 0) return;
+    const dir = this._knockback_dir(u.tile, this.battle_player_tile);
+    const from = this.battle_player_tile;
+    const moved = this._push_player_tiles(dir, tiles);
+    if (moved > 0) {
+      this.log(`The ${u.name}'s ${water ? "wave" : "blow"} sends you ${water ? "flying" : "sliding"} ${moved} tile${moved === 1 ? "" : "s"}!`, "bad");
+      if (!this.battle_terrain[vkey(from)]) this.battle_terrain[vkey(from)] = water ? { type: "water", push_dir: dir } : { type: "ice" };
+    }
+  },
+
+  _push_player_tiles(dir, tiles) {
+    const p = this.player; let moved = 0;
+    for (let i = 0; i < tiles; i++) {
+      const step = this._resolve_battle_step(this.battle_player_tile, dir);
+      if (!step.moved) break;
+      this.battle_player_tile = step.tile; moved++;
+      if (step.fell) { const d = round(p.max_health * MC.CLIFF_FALL_DAMAGE_PCT); p.take_battle_damage(d, true); this.stats.damage_taken += d; this.log(`You are thrown off the edge and take ${d} damage!`, "bad"); this._check_player_dead(); break; }
+    }
+    return moved;
   },
 
   // The housekeeping after enemy turns (Main.gd:_finish_enemy_actions): false = the battle ended, stop here.

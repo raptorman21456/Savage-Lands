@@ -8,7 +8,7 @@ signal died(xp_reward: int)
 const SPEED := 65.0
 const WINDUP_SPEED_FRACTION := 0.35
 const MAX_HEALTH := 20
-const ATTACK_DAMAGE := 2
+const ATTACK_DAMAGE := 3   # was 2 (2026-11-13)
 const DETECT_RANGE := 170.0
 const ATTACK_RANGE := 48.0
 const HURTBOX_RADIUS := 90.0

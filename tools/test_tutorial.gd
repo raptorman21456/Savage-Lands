@@ -134,7 +134,7 @@ func _init() -> void:
 	goblin4.global_position = player.global_position + Vector2(35, 0)
 	main.trigger_battle(goblin3)
 	await process_frame
-	print("a later battle is no longer tutorial-gated: tutorial_active=%s squad_size=%d (expected false, 2)" % [
+	print("a later battle is no longer tutorial-gated: tutorial_active=%s squad_size=%d (expected false, 3: the Goblin-tier cap is 3 now)" % [
 		main.tutorial_active, main.battle_units.size()
 	])
 

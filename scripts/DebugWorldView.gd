@@ -131,6 +131,18 @@ func _right_column() -> void:
 	spawn.add_child(k.button("Spawn near me", func(): act(DebugWorldScript.spawn_near(main, str(cfg.enemy), int(cfg.count), int(cfg.tier), bool(cfg.elite), float(cfg.power), int(cfg.get("level", 0)))), true))
 	spawn.add_child(k.button("Remove all enemies", func(): act(DebugWorldScript.clear_enemies(main))))
 	spawn.add_child(k.button("Refill wild enemies", func(): act(DebugWorldScript.refill_enemies(main))))
+	k.section(col, "Buildings")
+	k.note(col, "Opens a building's menu from anywhere (not during a battle).")
+	var panels := k.flow(col)
+	for panel_name in DebugWorldScript.panel_kinds(main):
+		var panel_kind: String = str(panel_name)
+		panels.add_child(k.button(panel_kind.replace("_", " ").capitalize(), func(): act(DebugWorldScript.open_panel(main, panel_kind))))
+	k.section(col, "Random events")
+	k.note(col, "Plays an event now: the automatic ones apply at once, the others ask you Yes or No.")
+	var events := k.flow(col)
+	for event_name in DebugWorldScript.event_ids():
+		var event_id: String = str(event_name)
+		events.add_child(k.button(DebugWorldScript.event_name(event_id), func(): act(DebugWorldScript.trigger_event(main, event_id))))
 	if not bool(main.regional_world):
 		k.section(col, "Old arena worlds")
 		var arena := k.flow(col)

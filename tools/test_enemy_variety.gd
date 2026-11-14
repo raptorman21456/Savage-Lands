@@ -247,7 +247,7 @@ func _init() -> void:
 	main.battle_player_tile = Vector2i(5, 2)
 	main.battle_units = [_make_unit(main, orc, Vector2i(2, 2), 20, "Orc", 2)]
 	main._move_enemy_unit(main.battle_units[0], main.battle_units[0].attack_range, Vector2i(0, 2), main.battle_player_tile)
-	print("_move_enemy_unit steers toward movement_target, not straight at the player -- this is what wires the orc's flanking in: tile=%s (expected (1, 2), moved left toward the target, not right toward the player)" % [main.battle_units[0].tile])
+	print("_move_enemy_unit steers toward movement_target, not straight at the player -- this is what wires the orc's flanking in: tile=%s (expected (0, 2): an Orc moves 2 tiles now, left toward the target, not right toward the player)" % [main.battle_units[0].tile])
 
 	# Orc: sometimes skips the telegraph for an immediate quick jab (2
 	# damage) instead of winding up (which still leads to the same old
@@ -278,8 +278,8 @@ func _init() -> void:
 	main.battle_units = [_make_unit(main, orc, Vector2i(3, 2), 20, "Orc", 2)]
 	main.battle_units[0].winding_up = true
 	main._process_enemy_turn()
-	print("orc's full windup hit still deals 4 damage: player_health=%d (expected max_health-4=%d)" % [
-		player.health, player.max_health - 4
+	print("orc's full windup hit now deals 5 after the starter armour (3 base, doubled by the windup): player_health=%d (expected max_health-5=%d)" % [
+		player.health, player.max_health - 5
 	])
 
 	# --- Squad gathering: Brute (and Shade) generalize the old Orc-only

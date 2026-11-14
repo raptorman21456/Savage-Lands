@@ -201,6 +201,9 @@ var temp_damage_bonus_pct := 0.0
 var debug_god_mode := false
 var debug_infinite_stamina := false
 var debug_speed_mult := 1.0
+# Battle cheats: every attack you or your party lands is a critical hit; and the enemies simply do nothing on their turns.
+var debug_always_crit := false
+var debug_enemies_pass := false
 
 # Skill tree tier-4 passives -- stamped onto whatever weapon gets equipped
 # (see _apply_meta_passives_to_weapon), not tied to any one weapon the way a
@@ -372,6 +375,9 @@ var party_members: Array = []
 const BASE_PARTY_SLOTS := 2
 var max_party_slots := BASE_PARTY_SLOTS
 var party: Array = []
+# The bench: members sent away "for a while" (Friends in High Places allows it). They keep their level, bonus picks, gear and a wolf's
+# loyalty, but take no place in the party, never fight and earn nothing; call_back puts one back as soon as there is a place for them.
+var bench: Array = []
 var _next_party_id := 1
 # Wolf bodies harvested for their pelts (needed to craft some armours).
 var pelts := 0
@@ -419,6 +425,45 @@ func dismiss_party_member(member_id: int) -> void:
 			party.remove_at(i)
 			return
 
+# --- The bench ----------------------------------------------------------------------------------------------------------
+# Friends in High Places (the Church) is what lets you send members away for a while; the wolf's own leaving, and the Debug menu's
+# Dismiss, are separate and final.
+
+func can_dismiss() -> bool:
+	return meta_battle_hardened
+
+# Everyone you have recruited who still belongs to you: the party and the bench.
+func all_members() -> Array:
+	return party + bench
+
+# Sends a member from the party to the bench, gear and all. False if they are not in the party.
+func send_to_bench(member_id: int) -> bool:
+	for i in party.size():
+		if party[i].id == member_id:
+			bench.append(party[i])
+			party.remove_at(i)
+			return true
+	return false
+
+# Why a benched member cannot come back right now ("" = they can).
+func call_back_block_reason(member: RefCounted) -> String:
+	if member == null or not bench.has(member):
+		return "They are not on the bench."
+	if not can_recruit(str(member.kind)):
+		return "No free place in your party."
+	return ""
+
+# Brings a benched member back into the party. False if there is no place for them.
+func call_back(member_id: int) -> bool:
+	for i in bench.size():
+		if bench[i].id == member_id:
+			if call_back_block_reason(bench[i]) != "":
+				return false
+			party.append(bench[i])
+			bench.remove_at(i)
+			return true
+	return false
+
 # The roster members that actually take the field. Normally everyone; if the party is
 # over capacity (Wolf Fang taken off while a wolf sits in its slot) the surplus waits
 # behind, later joiners first.
@@ -434,13 +479,13 @@ func fielded_party() -> Array:
 
 # The member currently holding this weapon id, or null.
 func weapon_holder(weapon_id: String) -> RefCounted:
-	for m in party:
+	for m in all_members():   # a benched member keeps what they hold
 		if m.weapon_id() == weapon_id:
 			return m
 	return null
 
 func talisman_holder(talisman_id: String) -> RefCounted:
-	for m in party:
+	for m in all_members():
 		if m.talisman_ids().has(talisman_id):
 			return m
 	return null
@@ -506,13 +551,13 @@ func unequip_ally_talisman(member: RefCounted, talisman_id: String) -> bool:
 # free Wooden Buckler -- like the Club -- is always on offer to everyone, so neither can run out.
 
 func armor_holder(armor_id: String) -> RefCounted:
-	for m in party:
+	for m in all_members():
 		if m.armor_id() == armor_id:
 			return m
 	return null
 
 func shield_holder(shield_id: String) -> RefCounted:
-	for m in party:
+	for m in all_members():
 		if m.shield_id() == shield_id:
 			return m
 	return null
@@ -579,7 +624,7 @@ func equip_shield(shield: Dictionary) -> void:
 
 # You took an item a member was holding: it comes off them (you have the final say).
 func _strip_from_allies(weapon_id: String, talisman_id: String, armor_id: String = "", shield_id: String = "") -> void:
-	for m in party:
+	for m in all_members():
 		if weapon_id != "" and weapon_id != "club" and m.weapon_id() == weapon_id:
 			m.gear.weapon = ""
 		if talisman_id != "":

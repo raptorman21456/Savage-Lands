@@ -11,8 +11,8 @@ signal died(xp_reward: int)
 # obstacles).
 const SPEED := 58.0
 const WINDUP_SPEED_FRACTION := 0.3
-const MAX_HEALTH := 160
-const ATTACK_DAMAGE := 6
+const MAX_HEALTH := 30
+const ATTACK_DAMAGE := 5
 const DETECT_RANGE := 215.0
 const ATTACK_RANGE := 60.0
 const HURTBOX_RADIUS := 108.0
@@ -21,9 +21,9 @@ const ATTACK_COOLDOWN := 1.0
 const BODY_RADIUS := 28.0
 # Walking into it starts the fight at once (the player's body is 16 across), the same as every plain enemy -- not only its telegraphed strike.
 const TOUCH_RANGE := BODY_RADIUS + 18.0
-const XP_REWARD := 525
-const COIN_MIN := 84
-const COIN_MAX := 124
+const XP_REWARD := 90
+const COIN_MIN := 8
+const COIN_MAX := 14
 const MEAT_CHANCE := 1.0
 
 var health := MAX_HEALTH

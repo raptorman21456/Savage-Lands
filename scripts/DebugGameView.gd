@@ -46,6 +46,12 @@ func build() -> void:
 		cheats.append("infinite stamina")
 	if DebugActionsScript.one_hit_kills_on(main):
 		cheats.append("one-hit kills")
+	if p.debug_always_crit:
+		cheats.append("always crit")
+	if p.debug_enemies_pass:
+		cheats.append("enemies stand still")
+	if p.miss_chance_override == 0.0 and not OS.get_cmdline_args().has("--script"):
+		cheats.append("never miss")
 	if p.debug_speed_mult != 1.0:
 		cheats.append("walking x%s" % DebugActionsScript._fmt(p.debug_speed_mult))
 	if Engine.time_scale != 1.0:

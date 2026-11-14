@@ -104,6 +104,8 @@ Object.assign(Sim.prototype, {
     const u = this.battle_units[idx];
     const dodge_chance = (TRAITS[u.name] || {}).dodge_chance || 0;
     if (dodge_chance > 0 && rng.randf() < dodge_chance) { this.log(`The ${u.name} dodges out of the way!`); return; }
+    const block_chance = (TRAITS[u.name] || {}).block_chance || 0;
+    if (block_chance > 0 && rng.randf() < block_chance) { this.log(`The ${u.name} blocks the blow completely!`); return; }
     const you = attacker_label === "You";
     if (effect !== "thorns") {
       const miss = you ? p.miss_chance_for(weapon) : p.ally_miss_chance();

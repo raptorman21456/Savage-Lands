@@ -70,7 +70,7 @@ func _init() -> void:
 	for u in orc_squad:
 		if u.get_display_name() == "Orc":
 			orc_count_in_orc_squad += 1
-	print("orc battle: squad size=%d (expected <=4), orcs_in_squad=%d (expected 1<=x<=2)" % [orc_squad.size(), orc_count_in_orc_squad])
+	print("orc battle: squad size=%d (expected <=5), orcs_in_squad=%d (expected 1<=x<=2)" % [orc_squad.size(), orc_count_in_orc_squad])
 
 	# --- Deterministic grid setup for precise terrain-rule testing. Terrain
 	# rules are exercised directly via _resolve_battle_step, the shared

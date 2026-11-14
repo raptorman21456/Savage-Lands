@@ -20,7 +20,7 @@ func _init() -> void:
 		e.set_physics_process(false)
 
 	# --- Data sanity ---
-	var names := ["Voidwing", "Archmage"]
+	var names := ["Voidwing Swarm", "Archmage"]
 	var all_boss_tier := true
 	var all_have_icons := true
 	for n in names:
@@ -28,7 +28,7 @@ func _init() -> void:
 			all_boss_tier = false
 		if main.hud.ENEMY_ICONS.get(n, null) == null:
 			all_have_icons = false
-	print("Both Voidlands enemies are is_boss_tier: %s (expected true)" % [all_boss_tier])
+	print("The Voidlands miniboss (the Swarm) and boss are is_boss_tier: %s (expected true)" % [all_boss_tier])
 	print("Both Voidlands enemies have HUD icons: %s (expected true)" % [all_have_icons])
 	print("Voidwing is fast, evasive, AND genuinely ranged (unlike the melee Roc): move_range=%d dodge_chance=%.1f ignore_line=%s attack_range=%d (expected 3, 0.3, true, 2)" % [
 		main.ENEMY_TRAITS["Voidwing"].move_range, main.ENEMY_TRAITS["Voidwing"].dodge_chance,
@@ -95,10 +95,10 @@ func _init() -> void:
 	rematch_warlock.set_physics_process(false)
 
 	print("power_tier=1.0 Archmage has its base stats: hp=%d (expected %d), dmg=%d (expected %d)" % [
-		normal_hp, warlock_script.MAX_HEALTH, normal_dmg, warlock_script.ATTACK_DAMAGE
+		normal_hp, warlock_script.MAX_HEALTH, normal_dmg, int(round(warlock_script.ATTACK_DAMAGE * main.BOSS_DAMAGE_MULT))   # a boss hits x1.5 harder now
 	])
 	print("power_tier=2.5 rematch scales both HP and damage by 2.5x: hp=%d (expected %d), dmg=%d (expected %d)" % [
-		rematch_hp, int(round(warlock_script.MAX_HEALTH * 2.5)), rematch_dmg, int(round(warlock_script.ATTACK_DAMAGE * 2.5))
+		rematch_hp, int(round(warlock_script.MAX_HEALTH * 2.5)), rematch_dmg, int(round(warlock_script.ATTACK_DAMAGE * 2.5 * main.BOSS_DAMAGE_MULT))
 	])
 	print("...the rematch is meaningfully tougher than the normal fight: hp_ratio=%.2f dmg_ratio=%.2f (both expected ~2.5)" % [
 		float(rematch_hp) / float(normal_hp), float(rematch_dmg) / float(normal_dmg)

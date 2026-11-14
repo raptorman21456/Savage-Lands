@@ -5,13 +5,13 @@ const PickupScript := preload("res://scripts/Pickup.gd")
 
 signal died(xp_reward: int)
 
-# Forest's miniboss (World Progression feature) -- Boss.gd's windup
+# A late-game forest enemy (it was a miniboss until 2026-11-12) -- Boss.gd's windup
 # template, rooted and tanky rather than fast (see
 # Main.gd:ENEMY_TRAITS["Treant"]).
 const SPEED := 32.0
 const WINDUP_SPEED_FRACTION := 0.3
-const MAX_HEALTH := 175
-const ATTACK_DAMAGE := 6
+const MAX_HEALTH := 60
+const ATTACK_DAMAGE := 4
 const DETECT_RANGE := 190.0
 const ATTACK_RANGE := 60.0
 const HURTBOX_RADIUS := 112.0
@@ -20,10 +20,10 @@ const ATTACK_COOLDOWN := 1.3
 const BODY_RADIUS := 30.0
 # Walking into it starts the fight at once (the player's body is 16 across), the same as every plain enemy -- not only its telegraphed strike.
 const TOUCH_RANGE := BODY_RADIUS + 18.0
-const XP_REWARD := 530
-const COIN_MIN := 85
-const COIN_MAX := 125
-const MEAT_CHANCE := 1.0
+const XP_REWARD := 120
+const COIN_MIN := 8
+const COIN_MAX := 14
+const MEAT_CHANCE := 0.5
 
 var health := MAX_HEALTH
 var is_elite := false

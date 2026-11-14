@@ -39,6 +39,13 @@ const PLAIN := {
 	"Centaur Lancer": {"normal": {"name": "Charge", "style": "bar", "impacts": [{"ms": 640, "mult": 1.0}], "dodge_ms": 165, "weight": 1.0}},
 	"Centaur Archer": {"normal": {"name": "Arrow Shot", "style": "bar", "impacts": [{"ms": 600, "mult": 1.0}], "dodge_ms": 175, "weight": 1.0}},
 	"Gnome": {"normal": {"name": "Pointy Stick", "style": "flash", "impacts": [{"ms": 480, "mult": 1.0}], "dodge_ms": 185, "weight": 1.0}},
+	"Shadelet": {"normal": {"name": "Void Nip", "style": "flash", "impacts": [{"ms": 520, "mult": 1.0}], "dodge_ms": 190, "weight": 1.0}},
+	"Disgraced Mage": {"normal": {"name": "Hollow Strike", "style": "flash", "impacts": [{"ms": 400, "mult": 1.0}], "dodge_ms": 150, "weight": 1.0}},
+	"Fire Mage": {"normal": {"name": "Fire Bolt", "style": "bar", "impacts": [{"ms": 700, "mult": 1.0}], "dodge_ms": 175, "weight": 1.0}},
+	"Hermoid": {"normal": {"name": "Claw Pinch", "style": "ring", "impacts": [{"ms": 820, "mult": 1.0}], "dodge_ms": 160, "weight": 1.0}},
+	"Earth Mage": {"normal": {"name": "Stone Burst", "style": "ring", "impacts": [{"ms": 900, "mult": 1.0}], "dodge_ms": 160, "weight": 1.0}},
+	"Gale Mage": {"normal": {"name": "Storm Strike", "style": "bar", "impacts": [{"ms": 560, "mult": 1.0}], "dodge_ms": 150, "weight": 1.0}},
+	"Empowered Mage": {"normal": {"name": "Void Surge", "style": "ring", "impacts": [{"ms": 780, "mult": 1.0}], "dodge_ms": 165, "weight": 1.0}},
 	"Fae": {"normal": {"name": "Sting", "style": "flash", "impacts": [{"ms": 450, "mult": 1.0}], "dodge_ms": 185, "weight": 1.0}},
 	# Not an enemy: the Guardian's Earbursting Bellow, which the hero has to avoid (Main.gd:_resolve_bellow).
 	"Guardian": {"normal": {"name": "Earbursting Bellow", "style": "ring", "impacts": [{"ms": 950, "mult": 1.0}], "dodge_ms": 175, "weight": 1.0}},
@@ -58,6 +65,11 @@ const BOSS_NAMES := {
 	"Red Wyrm": ["Wyrm Bite", "Tail Lash", "Inferno Breath"],
 	"Voidwing": ["Void Rend", "Shadow Flicker", "Starless Gust"],
 	"Archmage": ["Hex Bolt", "Rapid Curses", "Doom Surge"],
+	"Voidwing Swarm": ["Swarming Bite", "Wing Barrage", "Void Cloud"],
+	"Water Construct": ["Tidal Slam", "Mud Splash", "Flood Surge"],
+	"Stone Construct": ["Boulder Fist", "Gravel Jabs", "Rockslide"],
+	"Frost Construct": ["Glacier Backhand", "Icicle Jabs", "Whiteout"],
+	"Wyrm-Hole": ["Burrow Strike", "Sand Lash", "Sinkhole"],
 }
 
 static var _cache := {}

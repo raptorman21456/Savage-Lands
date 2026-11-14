@@ -61,7 +61,7 @@ func _init() -> void:
 	player.equipped_armor = armor_script.TIERS[3]
 	print("Wave/level/gear all contribute: %d (expected 11, 5+4+2)" % [main._squad_size_bonus()])
 	var scaled_max: int = clampi(main.MAX_BATTLE_ENEMIES_TOUGH + main._squad_size_bonus(), main.MAX_BATTLE_ENEMIES_TOUGH, main.MAX_BATTLE_SQUAD_SIZE_CEILING)
-	print("...but the actual squad cap never exceeds the ceiling: %d (expected 6)" % [scaled_max])
+	print("...but the actual squad cap never exceeds the ceiling: %d (expected 7)" % [scaled_max])
 
 	# Difficulty now also contributes: Baby/Normal round down to +0 (clamped),
 	# Hard/Apocalyptic add +2/+4. Wave/level/gear zeroed out so only the
@@ -106,7 +106,7 @@ func _init() -> void:
 		main.enemies_alive += 1
 		gb.global_position = initial_orc.global_position + Vector2(15 * i, 0)
 	var scaled_squad: Array = main._gather_squad(initial_orc)
-	print("A fully-scaled tough battle can now seat up to 6: squad_size=%d (expected 6)" % [scaled_squad.size()])
+	print("A fully-scaled tough battle can now seat up to 7: squad_size=%d (expected 7)" % [scaled_squad.size()])
 
 	main.wave = 1
 	player.level = 1
